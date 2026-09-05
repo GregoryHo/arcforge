@@ -8,6 +8,8 @@ const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
 
+const { sha256Truncated } = require('../../scripts/lib/utils');
+
 // ---------------------------------------------------------------------------
 // Helpers — build a valid approved instinct candidate
 // ---------------------------------------------------------------------------
@@ -75,6 +77,8 @@ let materialize;
 let buildDraftContent;
 let getDraftRoot;
 let defaultRenderPolicy;
+let staleDraftArtifacts;
+let isMaterializableName;
 
 beforeEach(() => {
   jest.resetModules();
@@ -86,6 +90,8 @@ beforeEach(() => {
     buildDraftContent,
     getDraftRoot,
     defaultRenderPolicy,
+    staleDraftArtifacts,
+    isMaterializableName,
   } = require('../../scripts/lib/learning-curator/materialize'));
 });
 
@@ -111,6 +117,54 @@ function callMaterialize(candidateOverrides = {}, opts = {}) {
     renderPolicy: opts.renderPolicy || defaultRenderPolicy(),
     arcforgeRoot: opts.arcforgeRoot || path.join(tmpDir, '.arcforge'),
   });
+}
+
+// Helper: put a hand-written body where a materialization manifest belongs.
+// The engine only ever writes `JSON.stringify` of an object there, so a manifest
+// that parses to something else is externally corrupted state — which the
+// scanners still have to survive rather than throw out of.
+function writeRawManifest(arcforgeRoot, candidateId, dirName, body) {
+  const dir = path.join(arcforgeRoot, 'learning', 'drafts', candidateId, dirName);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'materialization.json'), body, 'utf8');
+  return dir;
+}
+
+// Helper: the materialization directories written for a candidate
+function materializationDirs(arcforgeRoot, candidateId) {
+  const base = path.join(arcforgeRoot, 'learning', 'drafts', candidateId);
+  return fs
+    .readdirSync(base)
+    .filter((entry) => fs.existsSync(path.join(base, entry, 'materialization.json')));
+}
+
+// Helper: the `materialize → materialized` transitions recorded for a candidate
+function materializeTransitions(arcforgeRoot, candidateId) {
+  const queuePath = path.join(arcforgeRoot, 'learning', 'candidates', 'queue.jsonl');
+  if (!fs.existsSync(queuePath)) return [];
+  return fs
+    .readFileSync(queuePath, 'utf8')
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line))
+    .filter(
+      (event) =>
+        event.event_type === 'candidate.transitioned' &&
+        event.candidate_id === candidateId &&
+        event.action === 'materialize' &&
+        event.next_status === 'materialized',
+    );
+}
+
+// Manifests are ordered by `created_at`, which has millisecond resolution, so two
+// materializations inside one millisecond would tie. Step the clock between them
+// to keep "the latest manifest" unambiguous in the assertions below.
+function waitForNextMillisecond() {
+  const start = Date.now();
+  while (Date.now() === start) {
+    /* busy-wait */
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -509,6 +563,67 @@ describe('L7-11: duplicate materialization handling', () => {
     expect(result2.record.materialization_id).toBe(result1.record.materialization_id);
   });
 
+  // What this pins: the idempotence branch owes Layer 5 the same report the fresh
+  // path makes — AC-10 attaches that report to the manifest being durable, and on
+  // this branch it already is. A re-materialized candidate reaches it because
+  // replaying `candidate.transitioned` rewrites only `lifecycle`, so its record
+  // hash is the one recorded at the first materialization.
+  //
+  // It is deliberately NOT the guard for the `deactivated → materialized` scenario
+  // the review reported: `materialize()` reads `lifecycle.status` only to gate entry
+  // (approved | deactivated) and to record it, so this case passes identically with
+  // an `approved` second call — as the L7-11 case above, which now emits two
+  // transitions as well, already shows. That scenario's guard is end-to-end, in
+  // tests/scripts/learning.test.js ('accepts a deactivated candidate, which the
+  // matrix allows to materialize'): it asserts the CLI hands back `materialized`
+  // and that `learn drafts --project` then lists the candidate.
+  it('reports the transition to Layer 5 on the idempotence branch, at any entry status', () => {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    const policy = defaultRenderPolicy();
+    const approved = makeCandidateRecord({});
+
+    const first = materialize({
+      candidate: approved,
+      sourceActionId: 'act_001',
+      requestedArtifactType: 'instinct',
+      renderPolicy: policy,
+      arcforgeRoot,
+    });
+    expect(first.ok).toBe(true);
+
+    const deactivated = {
+      ...approved,
+      lifecycle: { status: 'deactivated', status_changed_at: '2026-05-23T00:00:00Z' },
+    };
+    const second = materialize({
+      candidate: deactivated,
+      sourceActionId: 'act_002',
+      requestedArtifactType: 'instinct',
+      renderPolicy: policy,
+      arcforgeRoot,
+    });
+
+    expect(second.ok).toBe(true);
+    expect(second.record.materialization_id).toBe(first.record.materialization_id);
+
+    const queuePath = path.join(arcforgeRoot, 'learning', 'candidates', 'queue.jsonl');
+    const transitions = fs
+      .readFileSync(queuePath, 'utf8')
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line))
+      .filter(
+        (event) =>
+          event.event_type === 'candidate.transitioned' &&
+          event.candidate_id === approved.candidate_id &&
+          event.action === 'materialize' &&
+          event.next_status === 'materialized',
+      );
+
+    expect(transitions).toHaveLength(2);
+  });
+
   it('creates a new materialization_id when candidate_record_hash changes', () => {
     const arcforgeRoot = path.join(tmpDir, '.arcforge');
     const policy = defaultRenderPolicy();
@@ -538,6 +653,372 @@ describe('L7-11: duplicate materialization handling', () => {
     expect(result2.ok).toBe(true);
     expect(result2.record.materialization_id).not.toBe(result1.record.materialization_id);
   });
+
+  // What the next three pin: the reuse branch returns "the latest existing draft"
+  // (layer-7-materialization.md, First-slice defaults #3) — an existing *draft*,
+  // not merely an existing manifest. Reusing a manifest whose draft was deleted or
+  // hand-edited would advance the lifecycle to `materialized` and let `learn drafts`
+  // print a path that is not there, while the activation that follows refuses on the
+  // very same content hash (activate.js, L8-3).
+  it('re-materializes when the recorded draft file was deleted', () => {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    const policy = defaultRenderPolicy();
+    const approved = makeCandidateRecord({});
+
+    const first = materialize({
+      candidate: approved,
+      sourceActionId: 'act_001',
+      requestedArtifactType: 'instinct',
+      renderPolicy: policy,
+      arcforgeRoot,
+    });
+    expect(first.ok).toBe(true);
+    fs.rmSync(first.draftPaths[0]);
+    waitForNextMillisecond();
+
+    const deactivated = {
+      ...approved,
+      lifecycle: { status: 'deactivated', status_changed_at: '2026-05-23T00:00:00Z' },
+    };
+    const second = materialize({
+      candidate: deactivated,
+      sourceActionId: 'act_002',
+      requestedArtifactType: 'instinct',
+      renderPolicy: policy,
+      arcforgeRoot,
+    });
+
+    expect(second.ok).toBe(true);
+    expect(second.record.materialization_id).not.toBe(first.record.materialization_id);
+    expect(fs.existsSync(second.draftPaths[0])).toBe(true);
+    expect(materializeTransitions(arcforgeRoot, approved.candidate_id)).toHaveLength(2);
+
+    // The manifest `learn drafts` reads is the fresh one, and its paths are real.
+    const { findUsableMaterialization } = require('../../scripts/lib/learning-curator/activate');
+    const latest = findUsableMaterialization(arcforgeRoot, approved.candidate_id);
+    expect(latest.materialization_id).toBe(second.record.materialization_id);
+    for (const artifact of latest.draft_artifacts) {
+      expect(fs.existsSync(artifact.draft_path)).toBe(true);
+      expect(sha256Truncated(fs.readFileSync(artifact.draft_path, 'utf8'), 64)).toBe(
+        artifact.content_hash,
+      );
+    }
+  });
+
+  it('re-materializes when the recorded draft no longer matches its content hash', () => {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    const policy = defaultRenderPolicy();
+    const approved = makeCandidateRecord({});
+
+    const first = materialize({
+      candidate: approved,
+      sourceActionId: 'act_001',
+      requestedArtifactType: 'instinct',
+      renderPolicy: policy,
+      arcforgeRoot,
+    });
+    expect(first.ok).toBe(true);
+    const tampered = 'hand-edited draft body\n';
+    fs.writeFileSync(first.draftPaths[0], tampered, 'utf8');
+    waitForNextMillisecond();
+
+    const deactivated = {
+      ...approved,
+      lifecycle: { status: 'deactivated', status_changed_at: '2026-05-23T00:00:00Z' },
+    };
+    const second = materialize({
+      candidate: deactivated,
+      sourceActionId: 'act_002',
+      requestedArtifactType: 'instinct',
+      renderPolicy: policy,
+      arcforgeRoot,
+    });
+
+    expect(second.ok).toBe(true);
+    expect(second.record.materialization_id).not.toBe(first.record.materialization_id);
+    expect(second.draftPaths[0]).not.toBe(first.draftPaths[0]);
+    // The fresh materialization gets its own directory, so the edited draft is left
+    // where the reviewer left it — the render policy's overwrite_existing_draft:
+    // false holds without anything having to overwrite-guard.
+    expect(fs.readFileSync(first.draftPaths[0], 'utf8')).toBe(tampered);
+
+    const { findUsableMaterialization } = require('../../scripts/lib/learning-curator/activate');
+    const latest = findUsableMaterialization(arcforgeRoot, approved.candidate_id);
+    expect(latest.materialization_id).toBe(second.record.materialization_id);
+    const artifact = latest.draft_artifacts[0];
+    expect(sha256Truncated(fs.readFileSync(artifact.draft_path, 'utf8'), 64)).toBe(
+      artifact.content_hash,
+    );
+  });
+
+  it('reuses the materialization when the recorded draft is intact', () => {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    const policy = defaultRenderPolicy();
+    const approved = makeCandidateRecord({});
+
+    const first = materialize({
+      candidate: approved,
+      sourceActionId: 'act_001',
+      requestedArtifactType: 'instinct',
+      renderPolicy: policy,
+      arcforgeRoot,
+    });
+    expect(first.ok).toBe(true);
+
+    const deactivated = {
+      ...approved,
+      lifecycle: { status: 'deactivated', status_changed_at: '2026-05-23T00:00:00Z' },
+    };
+    const second = materialize({
+      candidate: deactivated,
+      sourceActionId: 'act_002',
+      requestedArtifactType: 'instinct',
+      renderPolicy: policy,
+      arcforgeRoot,
+    });
+
+    expect(second.ok).toBe(true);
+    expect(second.record.materialization_id).toBe(first.record.materialization_id);
+    expect(second.draftPaths).toEqual(first.draftPaths);
+    expect(materializationDirs(arcforgeRoot, approved.candidate_id)).toHaveLength(1);
+    expect(materializeTransitions(arcforgeRoot, approved.candidate_id)).toHaveLength(2);
+  });
+
+  // The reuse scan's own comment — `continue; // Corrupted manifest — skip` —
+  // covers only what `JSON.parse` throws on. A manifest holding the literal
+  // `null` parses fine and reached the field access below the catch, throwing a
+  // raw TypeError out of `materialize()` past its `makeFailure`/`logFailure`
+  // path: an approved candidate could no longer be materialized at all.
+  it('skips a manifest that parsed to a non-object and materializes afresh', () => {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    const candidateId = `cand_test_${crypto.randomBytes(4).toString('hex')}`;
+
+    const first = callMaterialize({ candidate_id: candidateId });
+    expect(first.ok).toBe(true);
+    writeRawManifest(arcforgeRoot, candidateId, 'mat_0000_null', 'null');
+    // Deleting the one real draft is what sends the scan looking: with it intact
+    // the reuse branch could return before reaching the corrupt manifest.
+    fs.rmSync(first.draftPaths[0]);
+    waitForNextMillisecond();
+
+    const second = callMaterialize({
+      candidate_id: candidateId,
+      lifecycle: { status: 'deactivated', status_changed_at: '2026-05-23T00:00:00Z' },
+    });
+
+    expect(second.ok).toBe(true);
+    expect(second.record.materialization_id).not.toBe(first.record.materialization_id);
+    // Skipped, not merely survived: a third directory means a fresh draft was
+    // written past the corrupt manifest.
+    expect(materializationDirs(arcforgeRoot, candidateId)).toHaveLength(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findUsableMaterialization — the manifest the draft surfaces resolve to
+// ---------------------------------------------------------------------------
+
+// The other end of the reuse branch above. Once Layer 7 began skipping a stale
+// manifest, a candidate could hold an older intact manifest beside a newer stale
+// one — a state that did not exist while reuse ignored the files — and the
+// newest-first lookup activation used then resolved to the manifest reuse had
+// just refused. Activation refuses on that record's missing draft, and it
+// refuses from `materialized`, the one status the matrix allows neither another
+// materialize nor a dismiss from: the candidate is stranded with an intact draft
+// beside it. Both selections have to land on one manifest.
+describe('findUsableMaterialization', () => {
+  function findUsable(arcforgeRoot, candidateId) {
+    const { findUsableMaterialization } = require('../../scripts/lib/learning-curator/activate');
+    return findUsableMaterialization(arcforgeRoot, candidateId);
+  }
+
+  /**
+   * Two manifests for one candidate: an older A whose draft is intact, and a
+   * newer B. Reuse skips A while its draft is gone, which is what writes B; the
+   * caller decides what happens to each draft afterwards.
+   */
+  function twoManifests(arcforgeRoot) {
+    const policy = defaultRenderPolicy();
+    const approved = makeCandidateRecord({});
+    const first = materialize({
+      candidate: approved,
+      sourceActionId: 'act_001',
+      requestedArtifactType: 'instinct',
+      renderPolicy: policy,
+      arcforgeRoot,
+    });
+    expect(first.ok).toBe(true);
+    const bodyA = fs.readFileSync(first.draftPaths[0], 'utf8');
+    fs.rmSync(first.draftPaths[0]);
+    waitForNextMillisecond();
+
+    const deactivated = {
+      ...approved,
+      lifecycle: { status: 'deactivated', status_changed_at: '2026-05-23T00:00:00Z' },
+    };
+    const second = materialize({
+      candidate: deactivated,
+      sourceActionId: 'act_002',
+      requestedArtifactType: 'instinct',
+      renderPolicy: policy,
+      arcforgeRoot,
+    });
+    expect(second.ok).toBe(true);
+    expect(second.record.materialization_id).not.toBe(first.record.materialization_id);
+    // A comes back byte-for-byte — a restored file, or one that was unreadable
+    // when the second materialization ran.
+    fs.writeFileSync(first.draftPaths[0], bodyA, 'utf8');
+    return { candidate: deactivated, first, second };
+  }
+
+  it('resolves the intact manifest, not the newer one whose draft is gone', () => {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    const { candidate, first, second } = twoManifests(arcforgeRoot);
+    fs.rmSync(second.draftPaths[0]);
+
+    // The manifest Layer 7 reuses, and the one every draft surface resolves to,
+    // are now the same record.
+    const reused = materialize({
+      candidate,
+      sourceActionId: 'act_003',
+      requestedArtifactType: 'instinct',
+      renderPolicy: defaultRenderPolicy(),
+      arcforgeRoot,
+    });
+    expect(reused.record.materialization_id).toBe(first.record.materialization_id);
+    expect(findUsable(arcforgeRoot, candidate.candidate_id).materialization_id).toBe(
+      first.record.materialization_id,
+    );
+  });
+
+  it('resolves the newest manifest while its draft is intact', () => {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    const { candidate, second } = twoManifests(arcforgeRoot);
+
+    expect(findUsable(arcforgeRoot, candidate.candidate_id).materialization_id).toBe(
+      second.record.materialization_id,
+    );
+  });
+
+  // The fall-back is what keeps a candidate with nothing left to review refusing
+  // the way it always has: its newest manifest still names the file that is
+  // gone, so `learn drafts` reports it and activation refuses on that record
+  // rather than on an absent one.
+  it('falls back to the newest manifest when no draft is intact', () => {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    const { candidate, first, second } = twoManifests(arcforgeRoot);
+    fs.rmSync(first.draftPaths[0]);
+    fs.rmSync(second.draftPaths[0]);
+
+    expect(findUsable(arcforgeRoot, candidate.candidate_id).materialization_id).toBe(
+      second.record.materialization_id,
+    );
+  });
+
+  // The twin of the reuse scan's regression, in the scanner that backs
+  // `learn inspect`, `learn drafts` and the dashboard's activate path — so the
+  // throw reached read commands, not only `materialize()`.
+  it('throws no TypeError when a `null` manifest sorts beside intact ones', () => {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    const { candidate, second } = twoManifests(arcforgeRoot);
+    writeRawManifest(arcforgeRoot, candidate.candidate_id, 'mat_zzzz_null', 'null');
+
+    expect(findUsable(arcforgeRoot, candidate.candidate_id).materialization_id).toBe(
+      second.record.materialization_id,
+    );
+  });
+
+  // The half `null` alone does not reach. This function ends
+  // `return newestIntact || newest`, so with no intact manifest left a manifest
+  // that parsed to a bare string or an array was handed back AS the record — a
+  // pre-existing hazard, not something the queue unification introduced.
+  it('never hands back a manifest that is not an object', () => {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    const approved = makeCandidateRecord({});
+    const only = materialize({
+      candidate: approved,
+      sourceActionId: 'act_001',
+      requestedArtifactType: 'instinct',
+      renderPolicy: defaultRenderPolicy(),
+      arcforgeRoot,
+    });
+    expect(only.ok).toBe(true);
+    // No intact manifest survives, so the `newest` fallback is what returns.
+    fs.rmSync(only.draftPaths[0]);
+    writeRawManifest(arcforgeRoot, approved.candidate_id, 'mat_0000_array', '[]');
+    writeRawManifest(arcforgeRoot, approved.candidate_id, 'mat_0001_string', '"str"');
+
+    expect(findUsable(arcforgeRoot, approved.candidate_id).materialization_id).toBe(
+      only.record.materialization_id,
+    );
+  });
+
+  // The array half, pinned where directory order cannot decide the outcome.
+  // Beside a real manifest a corrupt one only wins when `readdirSync` yields it
+  // first: read second, `undefined > <iso>` is false and `newest` keeps the real
+  // record whatever the guard does. A candidate whose only manifest is an array
+  // has no competitor — the guard returns null, and without `Array.isArray` the
+  // array is `newest` and comes back as the record.
+  //
+  // There is no counterpart in `findExistingMaterialization`: an array clearing
+  // the guard there is dropped on the very next line
+  // (`[].source_candidate?.candidate_record_hash !== candidateHash`), so its
+  // array clause guards a path nothing observes. Only this function can return
+  // the bad record, because only this one ends `newestIntact || newest`.
+  it('returns null when the only manifest is an array', () => {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    writeRawManifest(arcforgeRoot, 'cand_only_array', 'mat_0000_array', '[]');
+
+    expect(findUsable(arcforgeRoot, 'cand_only_array')).toBeNull();
+  });
+
+  it('returns null when the candidate has no manifest at all', () => {
+    expect(findUsable(path.join(tmpDir, '.arcforge'), 'cand_never_materialized')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// staleDraftArtifacts — the draft-integrity predicate, as cross-module API
+// ---------------------------------------------------------------------------
+
+// The reuse branch above screens manifests with this, and the `learn` candidate
+// commands ask it before printing a manifest's draft paths. One owner for the
+// comparison, so the CLI never re-implements the hashing.
+describe('staleDraftArtifacts', () => {
+  function materializedRecord() {
+    const arcforgeRoot = path.join(tmpDir, '.arcforge');
+    const result = materialize({
+      candidate: makeCandidateRecord({}),
+      sourceActionId: 'act_001',
+      requestedArtifactType: 'instinct',
+      renderPolicy: defaultRenderPolicy(),
+      arcforgeRoot,
+    });
+    expect(result.ok).toBe(true);
+    return result.record;
+  }
+
+  it('reports nothing for a draft still on disk and still matching its hash', () => {
+    expect(staleDraftArtifacts(materializedRecord())).toEqual([]);
+  });
+
+  it('reports a deleted draft as missing', () => {
+    const record = materializedRecord();
+    const draftPath = record.draft_artifacts[0].draft_path;
+    fs.rmSync(draftPath);
+
+    expect(staleDraftArtifacts(record)).toEqual([{ draft_path: draftPath, reason: 'missing' }]);
+  });
+
+  it('reports an edited draft as a hash mismatch', () => {
+    const record = materializedRecord();
+    const draftPath = record.draft_artifacts[0].draft_path;
+    fs.writeFileSync(draftPath, 'hand-edited draft body\n', 'utf8');
+
+    expect(staleDraftArtifacts(record)).toEqual([
+      { draft_path: draftPath, reason: 'hash_mismatch' },
+    ]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -555,6 +1036,66 @@ describe('L7-12: path policy — reject path traversal in name', () => {
     const result = callMaterialize({ name: 'some/path/traversal' });
     expect(result.ok).toBe(false);
     expect(result.failure.reason).toBe('path_policy_rejected');
+  });
+
+  // Layer 5 caps `name` at 120 UTF-16 code units, which a three-byte character
+  // spends 360 bytes on — past what a byte-limited filesystem gives a path
+  // component. Refusing here rather than at the write keeps the failure in the
+  // permanent class the policy owns, instead of the transient `write_failed`
+  // class `accept`'s preflight is entitled to skip.
+  it('rejects a name that is schema-valid but too many bytes for a filename', () => {
+    const result = callMaterialize({ name: '界'.repeat(120) });
+    expect(result.ok).toBe(false);
+    expect(result.failure.reason).toBe('path_policy_rejected');
+  });
+
+  // The bound is on the stem, in bytes, and it is 248 because `atomicWriteFile`
+  // writes `<stem>.md.tmp` first. ASCII so that bytes and characters agree and
+  // the boundary is unambiguous.
+  //
+  // The accepting half is the ONE assertion in this file that leans on the host
+  // filesystem: it performs a real write whose temporary component is 248 + 7 =
+  // 255 bytes, i.e. `NAME_MAX` inclusive. That is deliberate and is what the
+  // assertion is for — the refusing half and the agreement case below already
+  // pin the policy boundary against engine logic alone, so the only thing left
+  // for a real write to catch is `atomicWriteFile`'s suffix growing past the 7
+  // bytes the bound reserves for it, which no host-independent assertion can
+  // see (`.tmp` is a literal inside that helper, not an exported constant). It
+  // passes on APFS, which counts characters, and on ext4, which allows 255. A
+  // host with a stricter component limit would fail it, and that failure would
+  // be a true report about the host rather than a flake.
+  it('accepts a name at the byte limit and refuses the one byte past it', () => {
+    expect(callMaterialize({ name: 'a'.repeat(248) }).ok).toBe(true);
+
+    const overlong = callMaterialize({ name: 'a'.repeat(249) });
+    expect(overlong.ok).toBe(false);
+    expect(overlong.failure.reason).toBe('path_policy_rejected');
+  });
+
+  // `isMaterializableName` is exported so a front end that must refuse before it
+  // dispatches — the CLI's `accept` — asks Layer 7 instead of keeping a second
+  // copy of this rule. That front end never reaches the branch below, so a drift
+  // between the predicate and the branch would stay invisible until a candidate
+  // stranded. This is the assertion that keeps them together.
+  it('the exported predicate agrees with the branch that enforces the policy', () => {
+    const names = [
+      'use-edit-bash-workflow',
+      'a name with spaces',
+      'some/path/traversal',
+      'back\\slash',
+      '../../../etc/passwd',
+      '',
+      '   ',
+      'null\u0000byte',
+      '界'.repeat(120),
+      'a'.repeat(248),
+      'a'.repeat(249),
+    ];
+
+    for (const name of names) {
+      const rejected = callMaterialize({ name }).failure?.reason === 'path_policy_rejected';
+      expect({ name, allowed: isMaterializableName(name) }).toEqual({ name, allowed: !rejected });
+    }
   });
 });
 

@@ -109,12 +109,21 @@ describe('ARCFORGE_HOME redirects every arcforge-root resolver', () => {
     });
   });
 
-  it('learning.js resolves global config, queue and observations under it', () => {
+  it('learning.js resolves global config and observations under it', () => {
     withArcforgeHome(home, () => {
       const learning = freshRequire('../../scripts/lib/learning');
       expectIsolated(learning.getLearningConfigPath({ scope: 'global' }), 'global config');
-      expectIsolated(learning.getCandidateQueuePath({ scope: 'global' }), 'global queue');
       expectIsolated(learning.getObservationPath({ projectRoot: '/tmp/proj' }), 'observations');
+    });
+  });
+
+  // The canonical candidate queue's only owner is queue-writer.js — learning.js
+  // no longer resolves a global queue path at all, so the isolation assertion
+  // follows the path to its owner rather than disappearing with the accessor.
+  it('queue-writer resolves the canonical candidate queue under it', () => {
+    withArcforgeHome(home, () => {
+      const queueWriter = freshRequire('../../scripts/lib/learning-curator/queue-writer');
+      expectIsolated(queueWriter.getQueuePath(), 'canonical queue');
     });
   });
 
@@ -264,7 +273,13 @@ describe('with ARCFORGE_HOME unset the resolution is unchanged', () => {
       expect(learning.getLearningConfigPath({ scope: 'global' })).toBe(
         path.join(realRoot, 'learning', 'config.json'),
       );
-      expect(learning.getCandidateQueuePath({ scope: 'global' })).toBe(
+    });
+  });
+
+  it('the canonical candidate queue keeps its historical shape', () => {
+    withArcforgeHome(null, () => {
+      const queueWriter = freshRequire('../../scripts/lib/learning-curator/queue-writer');
+      expect(queueWriter.getQueuePath()).toBe(
         path.join(realRoot, 'learning', 'candidates', 'queue.jsonl'),
       );
     });

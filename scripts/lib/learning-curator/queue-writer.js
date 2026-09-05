@@ -5,6 +5,7 @@
  *   appendCandidate(record, options)  — validate, sanitize, append to queue.jsonl
  *   rejectProposal(reasons, source)   — append rejection record to rejections.jsonl
  *   readCurrentCandidates()           — replay queue.jsonl, return current candidate map
+ *   getQueuePath()                    — absolute path of the canonical queue.jsonl
  *
  * Paths are derived at call time through getArcforgeHome(), so ARCFORGE_HOME
  * redirects the whole candidate store (eval trials, e2e probes) and tests can
@@ -323,4 +324,4 @@ function readCurrentCandidates() {
   return candidates;
 }
 
-module.exports = { appendCandidate, rejectProposal, readCurrentCandidates };
+module.exports = { appendCandidate, rejectProposal, readCurrentCandidates, getQueuePath };

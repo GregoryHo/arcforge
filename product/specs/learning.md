@@ -61,16 +61,50 @@ was recorded about them.
   accepted — retiring an instinct is its own explicit deactivation.
 
 ### Integrity
-- **B-5 Transitions go through the engine, and are audited.** Curator-proposed
-  candidates live in one canonical queue and the dashboard is their surface: it
-  offers only the transitions legal from a candidate's current state, and every
-  action — accepted or rejected — lands in an audit log with its reason. The
-  CLI's candidate commands are a second, project-scoped path over the project's
-  own queue, not a front-end onto the canonical one; a global transition is
-  refused rather than written behind the curator's back. Hand-editing state
-  files is the one path with no checks and no record; the product treats it as
-  out of contract. The on-disk formats are append-only or atomically
-  overwritten, owned by the engine per the curator schema (cited above).
+- **B-5 One queue, one gate, one audit trail.** Every candidate lives in one
+  canonical queue, and both surfaces onto it — the dashboard and the CLI's
+  `learn` candidate commands — are front ends over that one store. Neither
+  keeps its own state machine: both offer only the transitions legal from a
+  candidate's current state, both name the behavior change before anything that
+  changes future behavior takes effect, and every action either takes —
+  accepted or refused — lands in the same audit log with its reason and with
+  who asked for it. Where the two differ is who supplies the acknowledgement
+  that gates activation: the dashboard collects it from the reviewer, while on
+  the CLI the typed `learn activate <id>` **is** the deliberate act, so the
+  warnings print and the command carries its own acknowledgement. A scripted
+  activation therefore has no second human in the loop — the typed command was
+  the human. What the CLI adds is scriptability, not a second store. It works
+  the candidates of the project it is run in — the queue is machine-wide, so
+  `--project` means *this* project, matched on the project name each card
+  prints — and refuses `--global`: a candidate that would apply to every
+  project on the machine is reviewed where the reviewer can see what it
+  changes. Scope is a refusal class the engine does not model, and so one the
+  CLI decides alone and leaves unaudited: neither `--global` nor an id this
+  project does not own — another project's, a global one, or one naming no
+  project at all — is a gate the engine models, so there is no refusal of its
+  own to dispatch and render; dispatching would *accept* the action and move a
+  candidate this project may not touch. An id that names no candidate anywhere
+  is not a scope question: that refusal the engine does model, so a transition
+  naming one is dispatched, refused and audited like every other. Its reach is
+  what the engine can actually build — the instinct artifact. That narrowing is
+  the curator's own refusal, which the CLI renders rather than re-decides, so
+  it too is audited; every single-step command renders that refusal rather than
+  pre-empting it. `accept`, the one compound command, is the exception that
+  proves the rule, and refuses unaudited too — for the opposite reason, since
+  the engine does model both of its checks: it would approve before meeting the
+  refusal, and the queue is append-only, so it decides for itself the two
+  things that no re-run clears — the artifact type, and whether the candidate's
+  name is one the draft writer can use as a filename — and refuses before its
+  first move: nothing applied, nothing recorded, the candidate untouched.
+  Hand-editing state files is the
+  one path with no checks and no record; the product treats it as out of
+  contract. A draft is the exception that is still owed a report, because
+  reviewing one is what the product asks of the user: no surface names a draft
+  as ready to review, hands its path back as a success, or offers the
+  activation that would refuse, when the draft it would name is not there —
+  the file missing, changed since it was written, or no usable record of it
+  left. The on-disk formats are append-only or atomically overwritten, owned
+  by the engine per the curator schema (cited above).
 - **B-6 Confidence sorts and caps — it never activates.** The confidence
   score orders instincts and bounds injection; no threshold ever flips one on.
   Its ceiling depends on source: a rule the user stated outright can climb
@@ -100,13 +134,19 @@ was recorded about them.
   directories are auto-approved rather than prompted, because a detached run
   has nobody to answer a prompt. What it no longer carries is the blanket
   bypass of every check. State
-  follows its scope: home-global
-  state under
-  `~/.arcforge/`, project-scoped state under the project's own
-  `.arcforge/learning/`, and materialized artifacts in the project tree itself,
-  as drafts the user reviews and commits. Commands print the absolute path
-  of anything they write. Candidate-transition commands are project-scope
-  only — a global flip of behavior-changing state is refused by the engine.
+  follows its scope: the candidate queue, the audit log, the drafts
+  materialization writes and the activated instincts are all home-global under
+  `~/.arcforge/`, and the project's own `.arcforge/learning/` holds that
+  scope's opt-in. Nothing in the review loop writes into the user's repository,
+  so a half-finished review never turns up in their `git status`. Commands
+  print the absolute path of anything they write. The candidate commands are
+  project-scope only — reads as well as transitions — and scoped to the project
+  they are run in, so a machine-wide store never lets one project list or
+  activate another's candidates; what they print is
+  the same allowlisted view the dashboard serves: never the hashed project id,
+  never a raw proposal body. A `--global` read would have printed the canonical
+  queue's records as they sit on disk; a global transition would have flipped
+  behavior-changing state for every project at once. Both are refused.
 
 ## Data / domain model
 
@@ -125,11 +165,9 @@ queue record carrying it — including the `project` / `global` scope kind — i
 owned by `scripts/lib/learning-curator/schema.js` and appended only by
 `scripts/lib/learning-curator/queue-writer.js`. The instinct file, the diary path,
 and the operation record are the three formats pinned by
-`scripts/lib/learning-schemas.js`. The second, project-scoped CLI queue of B-5
-carries its own narrower vocabularies in `scripts/lib/learning.js` —
-`VALID_SCOPES`, and a `VALID_STATUSES` whose first state is `pending`, not
-`pending_review`; that divergence is why it is not a front end onto the canonical
-queue.
+`scripts/lib/learning-schemas.js`. There is no second candidate vocabulary:
+`scripts/lib/learning.js` retains only the opt-in config and its `VALID_SCOPES`,
+so the statuses above are the ones both the dashboard and the CLI speak (D-012).
 
 The invariants: state is only ever advanced through the engine (B-5), scope decides
 location (B-9), and one session yields one diary (B-7).
@@ -144,3 +182,7 @@ data contracts live in `docs/decisions/learning-curator-schema/`.
   permissions (B-1, B-9).
 - **D-010** — session capture depth: counts always, verbatim user prose only
   under the opt-in ([hooks](hooks.md) B-6).
+- **D-011** — the CLI's candidate read commands fail closed on `--global`
+  (B-5, B-9).
+- **D-012** — the `learn` candidate commands are a front end onto the canonical
+  queue; the project-scoped queue is gone (B-5, B-9).

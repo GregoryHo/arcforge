@@ -3,30 +3,19 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
+const { execFileSync, spawnSync } = require('node:child_process');
 
 const {
-  acceptCandidate,
-  activateCandidate,
-  appendCandidate,
-  assertCanMaterialize,
-  getCandidateQueuePath,
   getLearningConfigPath,
-  inspectCandidate,
   isLearningEnabled,
   isLearningEnabledAnyScope,
   isInjectActivatedInstinctsEnabled,
   learningEnabledSince,
-  listLearningInbox,
-  loadCandidates,
-  materializeCandidate,
   readLearningConfig,
   setLearningEnabled,
-  transitionCandidate,
-  validateCandidate,
 } = require('../../scripts/lib/learning');
 
-describe('learning subsystem MVP-1', () => {
+describe('the learning opt-in', () => {
   let testDir;
   let projectRoot;
   let homeDir;
@@ -42,30 +31,6 @@ describe('learning subsystem MVP-1', () => {
   afterEach(() => {
     fs.rmSync(testDir, { recursive: true, force: true });
   });
-
-  function candidate(overrides = {}) {
-    return {
-      id: 'arc-releasing-20260501-001',
-      scope: 'project',
-      artifact_type: 'skill',
-      name: 'arc-releasing',
-      summary: 'Project release flow repeated across sessions.',
-      trigger: 'when the user asks to cut a release',
-      evidence: [
-        {
-          session_id: 'session-abc',
-          source: 'observation',
-          reason: 'version bump, changelog, tests, tag, push sequence',
-        },
-      ],
-      confidence: 0.72,
-      status: 'pending',
-      created_at: '2026-05-01T00:00:00Z',
-      updated_at: '2026-05-01T00:00:00Z',
-      ...overrides,
-    };
-  }
-
   it('is disabled by default for project and global scopes', () => {
     expect(readLearningConfig({ projectRoot, homeDir }).project.enabled).toBe(false);
     expect(readLearningConfig({ projectRoot, homeDir }).global.enabled).toBe(false);
@@ -313,303 +278,6 @@ describe('learning subsystem MVP-1', () => {
     });
   });
 
-  it('validates required candidate queue schema fields', () => {
-    expect(validateCandidate(candidate()).ok).toBe(true);
-
-    const invalid = candidate({ evidence: [] });
-    const result = validateCandidate(invalid);
-
-    expect(result.ok).toBe(false);
-    expect(result.errors).toContain('evidence must contain at least one item');
-  });
-
-  it('rejects evidence items that are not plain objects with required string fields', () => {
-    const validItem = {
-      session_id: 'session-abc',
-      source: 'observation',
-      reason: 'release sequence repeated across sessions',
-    };
-
-    // Analyzer-shaped evidence with multiple items still passes.
-    expect(
-      validateCandidate(
-        candidate({
-          evidence: [
-            validItem,
-            { session_id: 'session-xyz', source: 'observation', reason: 'changelog edit' },
-          ],
-        }),
-      ).ok,
-    ).toBe(true);
-
-    // Non-object evidence item (array).
-    expect(validateCandidate(candidate({ evidence: [['not', 'an', 'object']] })).ok).toBe(false);
-
-    // Null evidence item.
-    expect(validateCandidate(candidate({ evidence: [null] })).ok).toBe(false);
-
-    // Primitive evidence item.
-    expect(validateCandidate(candidate({ evidence: ['just-a-string'] })).ok).toBe(false);
-
-    // Missing session_id.
-    expect(
-      validateCandidate(candidate({ evidence: [{ source: 'observation', reason: 'r' }] })).ok,
-    ).toBe(false);
-
-    // Missing source.
-    expect(validateCandidate(candidate({ evidence: [{ session_id: 's', reason: 'r' }] })).ok).toBe(
-      false,
-    );
-
-    // Missing reason.
-    expect(
-      validateCandidate(candidate({ evidence: [{ session_id: 's', source: 'observation' }] })).ok,
-    ).toBe(false);
-
-    // Blank string session_id (whitespace only).
-    expect(
-      validateCandidate(
-        candidate({
-          evidence: [{ session_id: '   ', source: 'observation', reason: 'r' }],
-        }),
-      ).ok,
-    ).toBe(false);
-
-    // Non-string source (number).
-    expect(
-      validateCandidate(
-        candidate({
-          evidence: [{ session_id: 's', source: 7, reason: 'r' }],
-        }),
-      ).ok,
-    ).toBe(false);
-
-    // Nested object as a required field value.
-    expect(
-      validateCandidate(
-        candidate({
-          evidence: [{ session_id: 's', source: 'observation', reason: { nested: 'payload' } }],
-        }),
-      ).ok,
-    ).toBe(false);
-
-    // Nested array as a required field value.
-    expect(
-      validateCandidate(
-        candidate({
-          evidence: [{ session_id: ['s'], source: 'observation', reason: 'r' }],
-        }),
-      ).ok,
-    ).toBe(false);
-
-    // Extra evidence fields are rejected so raw payloads cannot persist in durable candidate records.
-    expect(
-      validateCandidate(
-        candidate({
-          evidence: [
-            {
-              session_id: 's',
-              source: 'observation',
-              reason: 'r',
-              raw_tool_output: 'private terminal transcript',
-            },
-          ],
-        }),
-      ).ok,
-    ).toBe(false);
-
-    // Custom-prototype objects are not accepted as plain JSON evidence records.
-    const customPrototypeItem = Object.create({ inherited: 'payload' });
-    customPrototypeItem.session_id = 's';
-    customPrototypeItem.source = 'observation';
-    customPrototypeItem.reason = 'r';
-    expect(validateCandidate(candidate({ evidence: [customPrototypeItem] })).ok).toBe(false);
-
-    // Surface a representative error message so the contract stays explicit.
-    const result = validateCandidate(
-      candidate({ evidence: [{ session_id: '', source: 'observation', reason: 'r' }] }),
-    );
-    expect(result.ok).toBe(false);
-    expect(result.errors.some((msg) => /evidence/i.test(msg))).toBe(true);
-  });
-
-  it('appends candidates to the project JSONL queue and loads them back', () => {
-    const written = appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
-
-    expect(written.path).toBe(
-      path.join(projectRoot, '.arcforge', 'learning', 'candidates', 'queue.jsonl'),
-    );
-    expect(fs.existsSync(getCandidateQueuePath({ scope: 'project', projectRoot, homeDir }))).toBe(
-      true,
-    );
-
-    const records = loadCandidates({ scope: 'project', projectRoot, homeDir });
-    expect(records).toHaveLength(1);
-    expect(records[0].id).toBe('arc-releasing-20260501-001');
-    expect(records[0].status).toBe('pending');
-  });
-
-  it('suppresses duplicate candidate ids instead of appending duplicate queue entries', () => {
-    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
-    const duplicate = appendCandidate(candidate({ summary: 'duplicate observation' }), {
-      scope: 'project',
-      projectRoot,
-      homeDir,
-    });
-
-    const records = loadCandidates({ scope: 'project', projectRoot, homeDir });
-    expect(duplicate.duplicate).toBe(true);
-    expect(records).toHaveLength(1);
-    expect(records[0].summary).toBe('Project release flow repeated across sessions.');
-  });
-
-  it('approve and reject transitions preserve provenance evidence', () => {
-    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
-
-    const updated = transitionCandidate('arc-releasing-20260501-001', 'approved', {
-      scope: 'project',
-      projectRoot,
-      homeDir,
-      now: '2026-05-01T00:02:00Z',
-    });
-
-    expect(updated.status).toBe('approved');
-    expect(updated.evidence).toHaveLength(1);
-    expect(updated.evidence[0].session_id).toBe('session-abc');
-    expect(updated.updated_at).toBe('2026-05-01T00:02:00Z');
-  });
-
-  it('refuses to transition a candidate under --global scope (store.lock safety)', () => {
-    expect(() =>
-      transitionCandidate('some-id', 'approved', { scope: 'global', projectRoot, homeDir }),
-    ).toThrow(/only project candidate transitions/);
-  });
-
-  it('materialization is rejected for non-approved candidates', () => {
-    expect(() => assertCanMaterialize(candidate({ status: 'pending' }))).toThrow(
-      'candidate must be approved before materialization',
-    );
-    expect(assertCanMaterialize(candidate({ status: 'approved' }))).toBe(true);
-  });
-
-  it('forbids bypassing approval when transitioning to materialized', () => {
-    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
-
-    expect(() =>
-      transitionCandidate('arc-releasing-20260501-001', 'materialized', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      }),
-    ).toThrow('candidate must be approved before materialization');
-
-    transitionCandidate('arc-releasing-20260501-001', 'approved', {
-      scope: 'project',
-      projectRoot,
-      homeDir,
-    });
-    expect(
-      transitionCandidate('arc-releasing-20260501-001', 'materialized', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      }).status,
-    ).toBe('materialized');
-  });
-
-  it('materializes approved project skill candidates as inactive draft artifacts', () => {
-    appendCandidate(candidate({ status: 'approved' }), { scope: 'project', projectRoot, homeDir });
-
-    const result = materializeCandidate('arc-releasing-20260501-001', {
-      scope: 'project',
-      projectRoot,
-      homeDir,
-      now: '2026-05-01T00:03:00Z',
-    });
-
-    expect(result.candidate.status).toBe('materialized');
-    expect(result.candidate.draft_paths).toEqual(['skills/arc-releasing/SKILL.md.draft']);
-    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(true);
-    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md'))).toBe(false);
-
-    const draft = fs.readFileSync(
-      path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'),
-      'utf8',
-    );
-    expect(draft).toContain('name: arc-releasing');
-    expect(draft).toContain('candidate: arc-releasing-20260501-001');
-    expect(draft).toContain('Draft artifact only');
-  });
-
-  it('refuses to materialize pending or rejected candidates', () => {
-    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
-
-    expect(() =>
-      materializeCandidate('arc-releasing-20260501-001', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      }),
-    ).toThrow('candidate must be approved before materialization');
-
-    transitionCandidate('arc-releasing-20260501-001', 'rejected', {
-      scope: 'project',
-      projectRoot,
-      homeDir,
-    });
-    expect(() =>
-      materializeCandidate('arc-releasing-20260501-001', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      }),
-    ).toThrow('candidate must be approved before materialization');
-  });
-
-  it('refuses to materialize candidates whose recorded scope does not match the queue scope', () => {
-    const queuePath = getCandidateQueuePath({ scope: 'project', projectRoot, homeDir });
-    fs.mkdirSync(path.dirname(queuePath), { recursive: true });
-    fs.writeFileSync(
-      queuePath,
-      `${JSON.stringify(candidate({ status: 'approved', scope: 'global' }))}\n`,
-      'utf8',
-    );
-
-    expect(() =>
-      materializeCandidate('arc-releasing-20260501-001', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      }),
-    ).toThrow('candidate scope must match requested materialization scope');
-    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(
-      false,
-    );
-  });
-
-  it('CLI learn materialize writes drafts after approval without activating a skill', () => {
-    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
-    const cli = path.join(__dirname, '../../scripts/cli.js');
-    const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
-
-    execFileSync('node', [cli, 'learn', 'approve', 'arc-releasing-20260501-001', '--project'], {
-      env,
-      encoding: 'utf8',
-    });
-    const materialized = JSON.parse(
-      execFileSync(
-        'node',
-        [cli, 'learn', 'materialize', 'arc-releasing-20260501-001', '--project', '--json'],
-        { env, encoding: 'utf8' },
-      ),
-    );
-
-    expect(materialized.candidate.status).toBe('materialized');
-    expect(materialized.candidate.draft_paths).toContain('skills/arc-releasing/SKILL.md.draft');
-    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(true);
-    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md'))).toBe(false);
-  });
-
   it('observe redaction removes common secrets before observations are stored', () => {
     // redactObservationText moved to scripts/lib/sanitize-observation (Slice C)
     delete require.cache[require.resolve('../../scripts/lib/sanitize-observation')];
@@ -675,852 +343,10 @@ describe('learning subsystem MVP-1', () => {
     expect(stderr).toMatch(/deprecated/i);
     expect(stderr).toMatch(/arc learn dashboard/);
     // After deprecation, the analyzer must not silently enqueue candidates.
-    expect(loadCandidates({ scope: 'project', projectRoot, homeDir })).toHaveLength(0);
+    expect(
+      fs.existsSync(path.join(homeDir, '.arcforge', 'learning', 'candidates', 'queue.jsonl')),
+    ).toBe(false);
   });
-  it('CLI learn review/approve/reject manages candidate lifecycle without deleting evidence', () => {
-    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
-    const cli = path.join(__dirname, '../../scripts/cli.js');
-    const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
-
-    const review = JSON.parse(
-      execFileSync('node', [cli, 'learn', 'review', '--project', '--json'], {
-        env,
-        encoding: 'utf8',
-      }),
-    );
-    expect(review.count).toBe(1);
-    expect(review.candidates[0].id).toBe('arc-releasing-20260501-001');
-
-    const approved = JSON.parse(
-      execFileSync(
-        'node',
-        [cli, 'learn', 'approve', 'arc-releasing-20260501-001', '--project', '--json'],
-        {
-          env,
-          encoding: 'utf8',
-        },
-      ),
-    );
-    expect(approved.status).toBe('approved');
-    expect(approved.evidence[0].session_id).toBe('session-abc');
-  });
-
-  it('lists an actionable learning inbox grouped by status and artifact type', () => {
-    appendCandidate(
-      candidate({ id: 'pending-instinct', artifact_type: 'instinct', name: 'prefer-tests' }),
-      {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      },
-    );
-    appendCandidate(
-      candidate({
-        id: 'approved-command',
-        artifact_type: 'command',
-        name: 'arc-fast-review',
-        status: 'approved',
-        confidence: 0.91,
-      }),
-      { scope: 'project', projectRoot, homeDir },
-    );
-    appendCandidate(
-      candidate({
-        id: 'rejected-skill',
-        artifact_type: 'skill',
-        name: 'obsolete-flow',
-        status: 'rejected',
-        confidence: 0.99,
-      }),
-      { scope: 'project', projectRoot, homeDir },
-    );
-
-    const inbox = listLearningInbox({ scope: 'project', projectRoot, homeDir });
-
-    expect(inbox.counts).toEqual({ pending: 1, approved: 1, rejected: 1 });
-    expect(inbox.groups.by_status.pending).toEqual(['pending-instinct']);
-    expect(inbox.groups.by_artifact_type.command).toEqual(['approved-command']);
-    expect(inbox.candidates.map((entry) => entry.id)).toEqual([
-      'approved-command',
-      'pending-instinct',
-      'rejected-skill',
-    ]);
-    expect(inbox.candidates[0]).toMatchObject({
-      id: 'approved-command',
-      next_command: 'arc learn materialize approved-command --project',
-    });
-    expect(inbox.candidates[0].evidence).toBeUndefined();
-  });
-
-  it('accepts a pending project candidate by approving and materializing drafts without activation', () => {
-    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
-
-    const result = acceptCandidate('arc-releasing-20260501-001', {
-      scope: 'project',
-      projectRoot,
-      homeDir,
-      now: '2026-05-01T00:05:00Z',
-    });
-
-    expect(result.scope).toBe('project');
-    expect(result.candidate.status).toBe('materialized');
-    expect(result.candidate.draft_paths).toEqual(['skills/arc-releasing/SKILL.md.draft']);
-    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(true);
-    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md'))).toBe(false);
-  });
-
-  it('keeps the accept shortcut project-only and fails closed for global candidates', () => {
-    appendCandidate(candidate({ scope: 'global' }), { scope: 'global', projectRoot, homeDir });
-
-    expect(() =>
-      acceptCandidate('arc-releasing-20260501-001', {
-        scope: 'global',
-        projectRoot,
-        homeDir,
-      }),
-    ).toThrow('only project candidate accept flow is supported');
-    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(
-      false,
-    );
-  });
-
-  it('points approved global inbox entries to inspection instead of unsupported materialization', () => {
-    appendCandidate(candidate({ scope: 'global', status: 'approved' }), {
-      scope: 'global',
-      projectRoot,
-      homeDir,
-    });
-
-    const inbox = listLearningInbox({ scope: 'global', projectRoot, homeDir });
-
-    expect(inbox.candidates[0]).toMatchObject({
-      id: 'arc-releasing-20260501-001',
-      next_command: 'arc learn inspect arc-releasing-20260501-001 --global',
-    });
-  });
-
-  it('CLI learn inbox and accept support the compact review flow', () => {
-    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
-    const cli = path.join(__dirname, '../../scripts/cli.js');
-    const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
-
-    const inbox = JSON.parse(
-      execFileSync('node', [cli, 'learn', 'inbox', '--project', '--json'], {
-        env,
-        encoding: 'utf8',
-      }),
-    );
-    expect(inbox.candidates[0].next_command).toBe(
-      'arc learn approve arc-releasing-20260501-001 --project',
-    );
-
-    const accepted = JSON.parse(
-      execFileSync(
-        'node',
-        [cli, 'learn', 'accept', 'arc-releasing-20260501-001', '--project', '--json'],
-        {
-          env,
-          encoding: 'utf8',
-        },
-      ),
-    );
-    expect(accepted.candidate.status).toBe('materialized');
-    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(true);
-  });
-
-  it('activates a materialized project candidate by promoting drafts to active artifacts', () => {
-    appendCandidate(candidate({ status: 'approved' }), { scope: 'project', projectRoot, homeDir });
-    materializeCandidate('arc-releasing-20260501-001', {
-      scope: 'project',
-      projectRoot,
-      homeDir,
-      now: '2026-05-01T00:03:00Z',
-    });
-
-    const result = activateCandidate('arc-releasing-20260501-001', {
-      scope: 'project',
-      projectRoot,
-      homeDir,
-      now: '2026-05-01T00:04:00Z',
-    });
-
-    expect(result.candidate.status).toBe('activated');
-    expect(result.candidate.active_paths).toEqual(['skills/arc-releasing/SKILL.md']);
-    expect(result.candidate.activated_at).toBe('2026-05-01T00:04:00Z');
-    expect(result.candidate.draft_paths).toEqual(['skills/arc-releasing/SKILL.md.draft']);
-    expect(result.candidate.evidence).toHaveLength(1);
-
-    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md'))).toBe(true);
-    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(
-      false,
-    );
-
-    const persisted = loadCandidates({ scope: 'project', projectRoot, homeDir });
-    expect(persisted).toHaveLength(1);
-    expect(persisted[0].status).toBe('activated');
-    expect(persisted[0].active_paths).toEqual(['skills/arc-releasing/SKILL.md']);
-  });
-
-  it('refuses to activate global scope candidates in this MVP', () => {
-    expect(() =>
-      activateCandidate('arc-releasing-20260501-001', {
-        scope: 'global',
-        projectRoot,
-        homeDir,
-      }),
-    ).toThrow(/only project candidate activation is supported/i);
-  });
-
-  it('refuses to activate candidates that are not materialized', () => {
-    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
-    expect(() =>
-      activateCandidate('arc-releasing-20260501-001', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      }),
-    ).toThrow(/must be materialized/i);
-
-    transitionCandidate('arc-releasing-20260501-001', 'approved', {
-      scope: 'project',
-      projectRoot,
-      homeDir,
-    });
-    expect(() =>
-      activateCandidate('arc-releasing-20260501-001', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      }),
-    ).toThrow(/must be materialized/i);
-  });
-
-  it('refuses to activate when the candidate cannot be found', () => {
-    expect(() =>
-      activateCandidate('nonexistent-id', { scope: 'project', projectRoot, homeDir }),
-    ).toThrow(/candidate not found/i);
-  });
-
-  it('refuses to activate malformed materialized candidates before writing artifacts', () => {
-    const queuePath = getCandidateQueuePath({ scope: 'project', projectRoot, homeDir });
-    fs.mkdirSync(path.dirname(queuePath), { recursive: true });
-    fs.writeFileSync(
-      queuePath,
-      `${JSON.stringify({ id: 'broken-candidate', scope: 'project', status: 'materialized' })}\n`,
-      'utf8',
-    );
-
-    expect(() =>
-      activateCandidate('broken-candidate', { scope: 'project', projectRoot, homeDir }),
-    ).toThrow(/invalid candidate/i);
-    expect(fs.existsSync(path.join(projectRoot, 'skills'))).toBe(false);
-  });
-
-  it('refuses to activate materialized candidates whose recorded draft paths are missing', () => {
-    const queuePath = getCandidateQueuePath({ scope: 'project', projectRoot, homeDir });
-    const draftSkillPath = path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft');
-    fs.mkdirSync(path.dirname(queuePath), { recursive: true });
-    fs.mkdirSync(path.dirname(draftSkillPath), { recursive: true });
-    fs.writeFileSync(draftSkillPath, '---\nname: arc-releasing\ndescription: draft\n---\n', 'utf8');
-    fs.writeFileSync(
-      queuePath,
-      `${JSON.stringify(candidate({ status: 'materialized' }))}\n`,
-      'utf8',
-    );
-
-    expect(() =>
-      activateCandidate('arc-releasing-20260501-001', { scope: 'project', projectRoot, homeDir }),
-    ).toThrow(/draft paths must match/i);
-    expect(fs.existsSync(draftSkillPath)).toBe(true);
-    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md'))).toBe(false);
-    expect(loadCandidates({ scope: 'project', projectRoot, homeDir })[0].status).toBe(
-      'materialized',
-    );
-  });
-
-  it('refuses to activate when stored candidate scope does not match requested scope', () => {
-    const queuePath = getCandidateQueuePath({ scope: 'project', projectRoot, homeDir });
-    fs.mkdirSync(path.dirname(queuePath), { recursive: true });
-    fs.writeFileSync(
-      queuePath,
-      `${JSON.stringify(
-        candidate({
-          status: 'materialized',
-          scope: 'global',
-          draft_paths: ['skills/arc-releasing/SKILL.md.draft'],
-        }),
-      )}\n`,
-      'utf8',
-    );
-    expect(() =>
-      activateCandidate('arc-releasing-20260501-001', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      }),
-    ).toThrow(/scope must match/i);
-  });
-
-  it('refuses to activate when draft artifacts are missing and leaves the queue untouched', () => {
-    appendCandidate(candidate({ status: 'approved' }), { scope: 'project', projectRoot, homeDir });
-    materializeCandidate('arc-releasing-20260501-001', {
-      scope: 'project',
-      projectRoot,
-      homeDir,
-    });
-
-    fs.rmSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'));
-
-    expect(() =>
-      activateCandidate('arc-releasing-20260501-001', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      }),
-    ).toThrow(/draft.*missing|missing.*draft/i);
-
-    const persisted = loadCandidates({ scope: 'project', projectRoot, homeDir });
-    expect(persisted[0].status).toBe('materialized');
-    expect(persisted[0].active_paths).toBeUndefined();
-  });
-
-  it('refuses to overwrite an existing active SKILL.md', () => {
-    appendCandidate(candidate({ status: 'approved' }), { scope: 'project', projectRoot, homeDir });
-    materializeCandidate('arc-releasing-20260501-001', {
-      scope: 'project',
-      projectRoot,
-      homeDir,
-    });
-    const activeSkillPath = path.join(projectRoot, 'skills/arc-releasing/SKILL.md');
-    fs.writeFileSync(activeSkillPath, 'pre-existing content', 'utf8');
-
-    expect(() =>
-      activateCandidate('arc-releasing-20260501-001', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      }),
-    ).toThrow(/already exists/i);
-
-    expect(fs.readFileSync(activeSkillPath, 'utf8')).toBe('pre-existing content');
-    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(true);
-
-    const persisted = loadCandidates({ scope: 'project', projectRoot, homeDir });
-    expect(persisted[0].status).toBe('materialized');
-  });
-
-  it('CLI learn activate promotes a materialized candidate to active artifacts', () => {
-    appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
-    const cli = path.join(__dirname, '../../scripts/cli.js');
-    const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
-
-    execFileSync('node', [cli, 'learn', 'approve', 'arc-releasing-20260501-001', '--project'], {
-      env,
-      encoding: 'utf8',
-    });
-    execFileSync('node', [cli, 'learn', 'materialize', 'arc-releasing-20260501-001', '--project'], {
-      env,
-      encoding: 'utf8',
-    });
-
-    const activated = JSON.parse(
-      execFileSync(
-        'node',
-        [cli, 'learn', 'activate', 'arc-releasing-20260501-001', '--project', '--json'],
-        { env, encoding: 'utf8' },
-      ),
-    );
-
-    expect(activated.candidate.status).toBe('activated');
-    expect(activated.candidate.active_paths).toContain('skills/arc-releasing/SKILL.md');
-    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md'))).toBe(true);
-    expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(
-      false,
-    );
-  });
-
-  it('CLI learn activate fails closed for global scope', () => {
-    const cli = path.join(__dirname, '../../scripts/cli.js');
-    const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
-
-    let exitCode = 0;
-    let stderr = '';
-    try {
-      execFileSync('node', [cli, 'learn', 'activate', 'arc-releasing-20260501-001', '--global'], {
-        env,
-        encoding: 'utf8',
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-    } catch (err) {
-      exitCode = err.status;
-      stderr = err.stderr ? err.stderr.toString() : '';
-    }
-    expect(exitCode).not.toBe(0);
-    expect(stderr).toMatch(/only project candidate activation is supported/i);
-  });
-
-  describe('inspectCandidate (draft review workflow)', () => {
-    it('requires an explicit valid scope', () => {
-      expect(() =>
-        inspectCandidate('arc-releasing-20260501-001', { projectRoot, homeDir }),
-      ).toThrow(/scope must be one of/);
-      expect(() =>
-        inspectCandidate('arc-releasing-20260501-001', {
-          scope: 'invalid',
-          projectRoot,
-          homeDir,
-        }),
-      ).toThrow(/scope must be one of/);
-    });
-
-    it('throws candidate not found for unknown ids', () => {
-      expect(() =>
-        inspectCandidate('nonexistent-id', { scope: 'project', projectRoot, homeDir }),
-      ).toThrow(/candidate not found/i);
-    });
-
-    it('throws when stored candidate scope does not match requested scope', () => {
-      const queuePath = getCandidateQueuePath({ scope: 'project', projectRoot, homeDir });
-      fs.mkdirSync(path.dirname(queuePath), { recursive: true });
-      fs.writeFileSync(
-        queuePath,
-        `${JSON.stringify(candidate({ status: 'approved', scope: 'global' }))}\n`,
-        'utf8',
-      );
-      expect(() =>
-        inspectCandidate('arc-releasing-20260501-001', {
-          scope: 'project',
-          projectRoot,
-          homeDir,
-        }),
-      ).toThrow(/scope must match/i);
-    });
-
-    it('throws invalid candidate when stored record fails schema validation', () => {
-      const queuePath = getCandidateQueuePath({ scope: 'project', projectRoot, homeDir });
-      fs.mkdirSync(path.dirname(queuePath), { recursive: true });
-      fs.writeFileSync(
-        queuePath,
-        `${JSON.stringify({ id: 'broken-id', scope: 'project', status: 'materialized' })}\n`,
-        'utf8',
-      );
-      expect(() =>
-        inspectCandidate('broken-id', { scope: 'project', projectRoot, homeDir }),
-      ).toThrow(/invalid candidate/i);
-    });
-
-    it('returns review-safe summary for pending candidate (approve/reject first)', () => {
-      appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
-      const summary = inspectCandidate('arc-releasing-20260501-001', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      });
-
-      expect(summary.scope).toBe('project');
-      expect(summary.candidate.id).toBe('arc-releasing-20260501-001');
-      expect(summary.candidate.status).toBe('pending');
-      expect(Array.isArray(summary.next_actions)).toBe(true);
-      const actionText = summary.next_actions.join(' ').toLowerCase();
-      expect(actionText).toMatch(/approve/);
-      expect(actionText).toMatch(/reject/);
-      expect(summary.artifacts).toBeDefined();
-    });
-
-    it('returns next_action materialize for approved candidate', () => {
-      appendCandidate(candidate({ status: 'approved' }), {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      });
-      const summary = inspectCandidate('arc-releasing-20260501-001', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      });
-      expect(summary.candidate.status).toBe('approved');
-      expect(summary.next_actions.join(' ').toLowerCase()).toMatch(/materialize/);
-    });
-
-    it('returns artifact paths with exists flags after materialization and guides explicit activation', () => {
-      appendCandidate(candidate({ status: 'approved' }), {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      });
-      materializeCandidate('arc-releasing-20260501-001', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      });
-      const summary = inspectCandidate('arc-releasing-20260501-001', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      });
-
-      expect(summary.candidate.status).toBe('materialized');
-      expect(summary.artifacts.draft_paths).toEqual([
-        { path: 'skills/arc-releasing/SKILL.md.draft', exists: true },
-      ]);
-      expect(summary.artifacts.active_paths).toEqual([
-        { path: 'skills/arc-releasing/SKILL.md', exists: false },
-      ]);
-      const actionText = summary.next_actions.join(' ').toLowerCase();
-      expect(actionText).toMatch(/review/);
-      expect(actionText).toMatch(/activate/);
-    });
-
-    it('does not embed file contents, unexpected raw candidate fields, or raw evidence payloads', () => {
-      appendCandidate(
-        candidate({
-          status: 'approved',
-          raw_tool_payload: 'raw terminal transcript should not be exposed in review summary',
-          evidence: [
-            {
-              session_id: 'session-abc',
-              source: 'observation',
-              reason: 'sanitized release evidence',
-            },
-          ],
-        }),
-        {
-          scope: 'project',
-          projectRoot,
-          homeDir,
-        },
-      );
-      materializeCandidate('arc-releasing-20260501-001', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      });
-      const summary = inspectCandidate('arc-releasing-20260501-001', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      });
-      const serialized = JSON.stringify(summary);
-      expect(serialized).not.toContain('Draft artifact only');
-      expect(serialized).not.toContain('## Workflow');
-      expect(serialized).not.toContain('raw terminal transcript');
-      expect(serialized).not.toContain('private terminal transcript');
-      expect(serialized).not.toContain('private nested payload');
-      expect(summary.candidate.raw_tool_payload).toBeUndefined();
-      expect(summary.candidate.evidence).toEqual([
-        {
-          session_id: 'session-abc',
-          source: 'observation',
-          reason: 'sanitized release evidence',
-        },
-      ]);
-      for (const entry of summary.artifacts.draft_paths) {
-        expect(Object.keys(entry).sort()).toEqual(['exists', 'path']);
-      }
-    });
-
-    it('does not probe project artifact paths when inspecting global candidates', () => {
-      const globalCandidate = candidate({ scope: 'global', status: 'materialized' });
-      appendCandidate(globalCandidate, { scope: 'global', projectRoot, homeDir });
-      const projectDraftPath = path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft');
-      fs.mkdirSync(path.dirname(projectDraftPath), { recursive: true });
-      fs.writeFileSync(projectDraftPath, 'project-local draft', 'utf8');
-
-      const summary = inspectCandidate('arc-releasing-20260501-001', {
-        scope: 'global',
-        projectRoot,
-        homeDir,
-      });
-
-      expect(summary.scope).toBe('global');
-      expect(summary.candidate.scope).toBe('global');
-      expect(summary.artifacts).toEqual({});
-      expect(JSON.stringify(summary)).not.toContain('skills/arc-releasing/SKILL.md.draft');
-    });
-
-    it('does not echo stored artifact path fields from the candidate payload', () => {
-      const queuePath = getCandidateQueuePath({ scope: 'project', projectRoot, homeDir });
-      fs.mkdirSync(path.dirname(queuePath), { recursive: true });
-      fs.writeFileSync(
-        queuePath,
-        `${JSON.stringify(
-          candidate({
-            status: 'materialized',
-            draft_paths: ['../../outside/SKILL.md.draft'],
-            active_paths: ['../../outside/SKILL.md'],
-          }),
-        )}\n`,
-        'utf8',
-      );
-
-      const summary = inspectCandidate('arc-releasing-20260501-001', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      });
-
-      expect(summary.candidate.draft_paths).toBeUndefined();
-      expect(summary.candidate.active_paths).toBeUndefined();
-      expect(summary.artifacts.draft_paths).toEqual([
-        { path: 'skills/arc-releasing/SKILL.md.draft', exists: false },
-      ]);
-      expect(JSON.stringify(summary)).not.toContain('../../outside');
-    });
-
-    it('reports already active for activated candidates', () => {
-      appendCandidate(candidate({ status: 'approved' }), {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      });
-      materializeCandidate('arc-releasing-20260501-001', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      });
-      activateCandidate('arc-releasing-20260501-001', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      });
-
-      const summary = inspectCandidate('arc-releasing-20260501-001', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      });
-      expect(summary.candidate.status).toBe('activated');
-      expect(summary.next_actions.join(' ').toLowerCase()).toMatch(/already active/);
-      expect(summary.artifacts.active_paths).toEqual([
-        { path: 'skills/arc-releasing/SKILL.md', exists: true },
-      ]);
-    });
-
-    it('reports rejected candidates as terminal with new-candidate guidance', () => {
-      appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
-      transitionCandidate('arc-releasing-20260501-001', 'rejected', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      });
-      const summary = inspectCandidate('arc-releasing-20260501-001', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      });
-      expect(summary.candidate.status).toBe('rejected');
-      const actionText = summary.next_actions.join(' ').toLowerCase();
-      expect(actionText).toMatch(/new candidate|create.*new/);
-    });
-
-    it('does not write or persist anything when inspecting', () => {
-      appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
-      const before = fs.readFileSync(
-        getCandidateQueuePath({ scope: 'project', projectRoot, homeDir }),
-        'utf8',
-      );
-      inspectCandidate('arc-releasing-20260501-001', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      });
-      const after = fs.readFileSync(
-        getCandidateQueuePath({ scope: 'project', projectRoot, homeDir }),
-        'utf8',
-      );
-      expect(after).toBe(before);
-      expect(fs.existsSync(path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft'))).toBe(
-        false,
-      );
-    });
-  });
-
-  describe('CLI learn inspect / drafts', () => {
-    it('CLI learn inspect returns review summary for a materialized candidate', () => {
-      appendCandidate(candidate({ status: 'approved' }), {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      });
-      materializeCandidate('arc-releasing-20260501-001', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      });
-      const cli = path.join(__dirname, '../../scripts/cli.js');
-      const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
-
-      const inspected = JSON.parse(
-        execFileSync(
-          'node',
-          [cli, 'learn', 'inspect', 'arc-releasing-20260501-001', '--project', '--json'],
-          { env, encoding: 'utf8' },
-        ),
-      );
-
-      expect(inspected.scope).toBe('project');
-      expect(inspected.candidate.id).toBe('arc-releasing-20260501-001');
-      expect(inspected.candidate.status).toBe('materialized');
-      expect(inspected.artifacts.draft_paths[0]).toEqual({
-        path: 'skills/arc-releasing/SKILL.md.draft',
-        exists: true,
-      });
-      expect(inspected.next_actions.join(' ').toLowerCase()).toMatch(/activate/);
-    });
-
-    it('CLI learn inspect requires a candidate id', () => {
-      const cli = path.join(__dirname, '../../scripts/cli.js');
-      const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
-
-      let exitCode = 0;
-      let stderr = '';
-      try {
-        execFileSync('node', [cli, 'learn', 'inspect', '--project'], {
-          env,
-          encoding: 'utf8',
-          stdio: ['pipe', 'pipe', 'pipe'],
-        });
-      } catch (err) {
-        exitCode = err.status;
-        stderr = err.stderr ? err.stderr.toString() : '';
-      }
-      expect(exitCode).not.toBe(0);
-      expect(stderr).toMatch(/candidate id/i);
-    });
-
-    it('CLI learn inspect fails closed without explicit scope', () => {
-      appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
-      const cli = path.join(__dirname, '../../scripts/cli.js');
-      const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
-
-      let exitCode = 0;
-      let stderr = '';
-      try {
-        execFileSync('node', [cli, 'learn', 'inspect', 'arc-releasing-20260501-001'], {
-          env,
-          encoding: 'utf8',
-          stdio: ['pipe', 'pipe', 'pipe'],
-        });
-      } catch (err) {
-        exitCode = err.status;
-        stderr = err.stderr ? err.stderr.toString() : '';
-      }
-      expect(exitCode).not.toBe(0);
-      expect(stderr).toMatch(/--project or --global/i);
-    });
-
-    it('CLI learn drafts lists only materialized candidates and excludes other statuses', () => {
-      appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
-
-      const otherPending = candidate({
-        id: 'arc-releasing-20260601-002',
-        status: 'approved',
-        created_at: '2026-06-01T00:00:00Z',
-        updated_at: '2026-06-01T00:00:00Z',
-      });
-      appendCandidate(otherPending, { scope: 'project', projectRoot, homeDir });
-
-      materializeCandidate('arc-releasing-20260601-002', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      });
-
-      const rejected = candidate({
-        id: 'arc-releasing-20260701-003',
-        status: 'pending',
-        created_at: '2026-07-01T00:00:00Z',
-        updated_at: '2026-07-01T00:00:00Z',
-      });
-      appendCandidate(rejected, { scope: 'project', projectRoot, homeDir });
-      transitionCandidate('arc-releasing-20260701-003', 'rejected', {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      });
-
-      const cli = path.join(__dirname, '../../scripts/cli.js');
-      const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
-
-      const drafts = JSON.parse(
-        execFileSync('node', [cli, 'learn', 'drafts', '--project', '--json'], {
-          env,
-          encoding: 'utf8',
-        }),
-      );
-
-      expect(drafts.scope).toBe('project');
-      expect(drafts.count).toBe(1);
-      expect(drafts.drafts).toHaveLength(1);
-      expect(drafts.drafts[0].candidate.id).toBe('arc-releasing-20260601-002');
-      expect(drafts.drafts[0].candidate.status).toBe('materialized');
-      expect(drafts.drafts[0].artifacts.draft_paths[0].path).toBe(
-        'skills/arc-releasing/SKILL.md.draft',
-      );
-    });
-
-    it('CLI learn drafts with global scope does not probe project-local artifact paths', () => {
-      appendCandidate(candidate({ scope: 'global', status: 'materialized' }), {
-        scope: 'global',
-        projectRoot,
-        homeDir,
-      });
-      const projectDraftPath = path.join(projectRoot, 'skills/arc-releasing/SKILL.md.draft');
-      fs.mkdirSync(path.dirname(projectDraftPath), { recursive: true });
-      fs.writeFileSync(projectDraftPath, 'project-local draft', 'utf8');
-      const cli = path.join(__dirname, '../../scripts/cli.js');
-      const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
-
-      const drafts = JSON.parse(
-        execFileSync('node', [cli, 'learn', 'drafts', '--global', '--json'], {
-          env,
-          encoding: 'utf8',
-        }),
-      );
-
-      expect(drafts.scope).toBe('global');
-      expect(drafts.count).toBe(1);
-      expect(drafts.drafts[0].artifacts).toEqual({});
-      expect(JSON.stringify(drafts)).not.toContain('skills/arc-releasing/SKILL.md.draft');
-    });
-
-    it('CLI learn drafts returns an empty list when no materialized candidates exist', () => {
-      appendCandidate(candidate(), { scope: 'project', projectRoot, homeDir });
-      const cli = path.join(__dirname, '../../scripts/cli.js');
-      const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
-
-      const drafts = JSON.parse(
-        execFileSync('node', [cli, 'learn', 'drafts', '--project', '--json'], {
-          env,
-          encoding: 'utf8',
-        }),
-      );
-
-      expect(drafts.count).toBe(0);
-      expect(drafts.drafts).toEqual([]);
-    });
-
-    it('CLI learn drafts requires explicit scope', () => {
-      const cli = path.join(__dirname, '../../scripts/cli.js');
-      const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
-
-      let exitCode = 0;
-      let stderr = '';
-      try {
-        execFileSync('node', [cli, 'learn', 'drafts'], {
-          env,
-          encoding: 'utf8',
-          stdio: ['pipe', 'pipe', 'pipe'],
-        });
-      } catch (err) {
-        exitCode = err.status;
-        stderr = err.stderr ? err.stderr.toString() : '';
-      }
-      expect(exitCode).not.toBe(0);
-      expect(stderr).toMatch(/--project or --global/i);
-    });
-  });
-
   it('CLI learn status/enable/disable uses explicit project scope', () => {
     const cli = path.join(__dirname, '../../scripts/cli.js');
     const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectRoot };
@@ -1555,212 +381,1445 @@ describe('learning subsystem MVP-1', () => {
   });
 });
 
-describe('learning subsystem MVP-2: multi-artifact-type, outcomes, transcripts', () => {
+// ---------------------------------------------------------------------------
+// The `learn` candidate commands over the canonical Layer-5 queue (D-011, D-012).
+//
+// Before the unification there were two disjoint queues. The curator wrote
+// `<arcforge home>/learning/candidates/queue.jsonl` — an append-only event log,
+// records keyed `candidate_id` + `lifecycle.status`, `scope` an object. The CLI
+// read `<project>/.arcforge/learning/candidates/queue.jsonl`, matching on `id`
+// and `status`, and nothing shipped ever wrote to it. So the CLI managed an
+// empty queue, `--global` reads printed the curator's records verbatim
+// (`scope.project_id` and `body` included), and `--global` list commands
+// silently matched nothing.
+// ---------------------------------------------------------------------------
+
+describe('learn candidate commands over the canonical queue', () => {
+  // Distinctive sentinels: asserting on the literal field names would break on
+  // any output that legitimately carries a redacted preview.
+  const BODY_CANARY = 'CANARY-BODY-must-never-be-printed-5f2a';
+  const PROJECT_ID_CANARY = 'canaryprojectid0';
+  const PROJECT_ID = 'proj_test';
+  // `--project` matches `scope.project` against the project directory's own
+  // name, so the temp project root is named for the project the records carry.
+  const PROJECT_NAME = 'arcforge';
+  const OTHER_PROJECT_CANDIDATE_ID = 'cand_instinct_20260901T030000Z_c3d4e5f6a1b2';
+  const CANDIDATE_ID = 'cand_instinct_20260901T010000Z_a1b2c3d4e5f6';
+  const GLOBAL_CANDIDATE_ID = 'cand_instinct_20260901T020000Z_b2c3d4e5f6a1';
+
+  const originalArcforgeHome = process.env.ARCFORGE_HOME;
   let testDir;
   let projectRoot;
-  let homeDir;
+  let arcforgeHome;
+  let cli;
+  let env;
 
-  beforeEach(() => {
-    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'arcforge-learning-mvp2-'));
-    projectRoot = path.join(testDir, 'project');
-    homeDir = path.join(testDir, 'home');
-    fs.mkdirSync(projectRoot, { recursive: true });
-    fs.mkdirSync(homeDir, { recursive: true });
-  });
-
-  afterEach(() => {
-    fs.rmSync(testDir, { recursive: true, force: true });
-  });
-
-  function baseCandidate(overrides = {}) {
+  function makeRecord(overrides = {}) {
     return {
-      id: 'arc-learned-project-test-001',
-      scope: 'project',
+      schema_version: 1,
+      candidate_id: CANDIDATE_ID,
+      created_at: '2026-09-01T01:00:00.000Z',
+      updated_at: '2026-09-01T01:00:00.000Z',
       artifact_type: 'instinct',
-      name: 'arc-learned-test',
-      summary: 'Test learned habit summary.',
-      trigger: 'when this scenario recurs',
+      scope: { kind: 'project', project: PROJECT_NAME, project_id: PROJECT_ID },
+      source: { source_type: 'layer4_llm_curator' },
+      name: 'grep-before-editing',
+      summary: 'Grep for existing patterns before making edits',
+      rationale: 'Prevents duplicate code and missed context',
+      domain: 'workflow',
+      body: 'When editing files, first grep for existing patterns to avoid duplication',
+      body_source: 'llm_curator',
       evidence: [
-        { session_id: 'session-1', source: 'observation', reason: 'recurs across sessions' },
+        {
+          evidence_id: 'ev_abc123',
+          evidence_type: 'observation',
+          relevance: 'User repeatedly grepped before editing files',
+          summary: 'Observed grep-first pattern 5 times across 3 sessions',
+        },
       ],
-      confidence: 0.6,
-      status: 'pending',
-      created_at: '2026-05-01T00:00:00Z',
-      updated_at: '2026-05-01T00:00:00Z',
+      evidence_quality: 'medium',
+      lifecycle: { status: 'pending_review', status_changed_at: '2026-09-01T01:00:00.000Z' },
       ...overrides,
     };
   }
 
-  describe('artifact_type validation', () => {
-    it('accepts the five new artifact types and rejects unknown ones', () => {
-      const learning = require('../../scripts/lib/learning');
-      for (const t of ['skill', 'instinct', 'command', 'agent', 'eval', 'repo_convention_patch']) {
-        expect(
-          learning.validateCandidate(baseCandidate({ artifact_type: t, name: 'arc-test' })).ok,
-        ).toBe(true);
-      }
-      const invalid = learning.validateCandidate(
-        baseCandidate({ artifact_type: 'arbitrary-type' }),
+  /** Append a raw `candidate.created` event, the shape readCurrentCandidates replays. */
+  function seed(record) {
+    const queuePath = path.join(arcforgeHome, 'learning', 'candidates', 'queue.jsonl');
+    fs.mkdirSync(path.dirname(queuePath), { recursive: true });
+    fs.appendFileSync(
+      queuePath,
+      `${JSON.stringify({
+        schema_version: 1,
+        event_id: `evt_${record.candidate_id}`,
+        ts: record.created_at,
+        candidate_id: record.candidate_id,
+        event_type: 'candidate.created',
+        actor: { layer: 5, actor_type: 'validator' },
+        record,
+      })}\n`,
+      'utf8',
+    );
+  }
+
+  // spawnSync, not execFileSync: the activate path writes its behavior-change
+  // warning to stderr on the SUCCESS path, which execFileSync discards.
+  function runCli(args) {
+    const result = spawnSync('node', [cli, 'learn', ...args], { env, encoding: 'utf8' });
+    return { status: result.status, stdout: result.stdout || '', stderr: result.stderr || '' };
+  }
+
+  function runJson(args) {
+    const result = runCli([...args, '--json']);
+    expect(result.status).toBe(0);
+    return JSON.parse(result.stdout);
+  }
+
+  /** The canonical queue verbatim — every transition appends an event to it. */
+  function queueBytes() {
+    const queuePath = path.join(arcforgeHome, 'learning', 'candidates', 'queue.jsonl');
+    return fs.existsSync(queuePath) ? fs.readFileSync(queuePath, 'utf8') : null;
+  }
+
+  /** One directory per materialization the curator actually wrote. */
+  function materializationDirs(candidateId = CANDIDATE_ID) {
+    const dir = path.join(arcforgeHome, 'learning', 'drafts', candidateId);
+    return fs.existsSync(dir) ? fs.readdirSync(dir) : [];
+  }
+
+  /** The whole on-disk record of a candidate's drafts — every manifest and file. */
+  function draftsDir(candidateId = CANDIDATE_ID) {
+    return path.join(arcforgeHome, 'learning', 'drafts', candidateId);
+  }
+
+  /** The manifest of a candidate's single materialization. */
+  function manifestPath(candidateId = CANDIDATE_ID) {
+    const [dir] = materializationDirs(candidateId);
+    return path.join(draftsDir(candidateId), dir, 'materialization.json');
+  }
+
+  /** The one audit log both front ends append to, newest last. */
+  function auditEntries() {
+    const logPath = path.join(arcforgeHome, 'learning', 'dashboard', 'actions.jsonl');
+    if (!fs.existsSync(logPath)) return [];
+    return fs
+      .readFileSync(logPath, 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+  }
+
+  /**
+   * Retire an activated candidate. `deactivate` is a dashboard-only action —
+   * the CLI has no verb for it — so drive the canonical handler in a child
+   * process that inherits the same ARCFORGE_HOME the CLI runs against.
+   */
+  function deactivate(candidateId) {
+    const dashboard = path.join(__dirname, '../../scripts/lib/learning-dashboard.js');
+    const script = `
+      const { handleDashboardAction } = require(${JSON.stringify(dashboard)});
+      const result = handleDashboardAction({
+        action: 'deactivate',
+        candidate_id: ${JSON.stringify(candidateId)},
+        expected_current_status: 'activated',
+        safety_ack: { reviewer_saw_behavior_change_warning: true },
+        actor: { layer: 8, actor_type: 'dashboard', reviewer: 'local_user' },
+      });
+      if (!result.accepted) { console.error(JSON.stringify(result)); process.exit(1); }
+    `;
+    const result = spawnSync('node', ['-e', script], { env, encoding: 'utf8' });
+    expect(result.status).toBe(0);
+  }
+
+  beforeEach(() => {
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'arcforge-candidates-'));
+    projectRoot = path.join(testDir, PROJECT_NAME);
+    arcforgeHome = path.join(testDir, 'home', '.arcforge');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    fs.mkdirSync(arcforgeHome, { recursive: true });
+
+    cli = path.join(__dirname, '../../scripts/cli.js');
+    env = {
+      ...process.env,
+      ARCFORGE_HOME: arcforgeHome,
+      CLAUDE_PROJECT_DIR: projectRoot,
+    };
+    process.env.ARCFORGE_HOME = arcforgeHome;
+  });
+
+  afterEach(() => {
+    if (originalArcforgeHome === undefined) delete process.env.ARCFORGE_HOME;
+    else process.env.ARCFORGE_HOME = originalArcforgeHome;
+    fs.rmSync(testDir, { recursive: true, force: true });
+  });
+
+  // -------------------------------------------------------------------------
+  // Reads
+  // -------------------------------------------------------------------------
+
+  describe('reads', () => {
+    it('lists the canonical queue as sanitized cards, keyed candidate_id/lifecycle_status', () => {
+      seed(makeRecord());
+
+      const review = runJson(['review', '--project']);
+
+      expect(review.count).toBe(1);
+      expect(review.candidates[0]).toMatchObject({
+        candidate_id: CANDIDATE_ID,
+        artifact_type: 'instinct',
+        lifecycle_status: 'pending_review',
+        available_actions: expect.arrayContaining(['approve', 'dismiss']),
+      });
+    });
+
+    it('prints neither the candidate body nor the project id', () => {
+      seed(
+        makeRecord({
+          body: BODY_CANARY,
+          scope: { kind: 'project', project: PROJECT_NAME, project_id: PROJECT_ID_CANARY },
+        }),
       );
-      expect(invalid.ok).toBe(false);
-      expect(invalid.errors.some((m) => /artifact_type/.test(m))).toBe(true);
-    });
-  });
 
-  describe('materialization across artifact types', () => {
-    function approvedCandidate(artifactType, name) {
-      return baseCandidate({
-        id: `arc-learned-project-${artifactType}-${name}`,
-        artifact_type: artifactType,
-        name,
-        status: 'approved',
-      });
-    }
+      const raw = JSON.stringify(runJson(['review', '--project']));
 
-    it('materializes an instinct candidate as a draft markdown file under the instincts dir', () => {
-      const learning = require('../../scripts/lib/learning');
-      const c = approvedCandidate('instinct', 'arc-learned-instinct-x');
-      learning.appendCandidate(c, { scope: 'project', projectRoot, homeDir });
-      const result = learning.materializeCandidate(c.id, {
-        scope: 'project',
-        projectRoot,
-        homeDir,
-      });
-      expect(result.candidate.draft_paths).toEqual([
-        '.arcforge/learning/instincts/arc-learned-instinct-x.md.draft',
-      ]);
-      expect(
-        fs.existsSync(
-          path.join(projectRoot, '.arcforge/learning/instincts/arc-learned-instinct-x.md.draft'),
-        ),
-      ).toBe(true);
-      expect(
-        fs.existsSync(
-          path.join(projectRoot, '.arcforge/learning/instincts/arc-learned-instinct-x.md'),
-        ),
-      ).toBe(false);
+      expect(raw).not.toContain(BODY_CANARY);
+      expect(raw).not.toContain(PROJECT_ID_CANARY);
     });
 
-    it('materializes command/agent/eval candidates as inactive drafts under their dirs', () => {
-      const learning = require('../../scripts/lib/learning');
-      const cases = [
-        { type: 'command', name: 'arc-learned-cmd', expected: 'commands/arc-learned-cmd.md.draft' },
-        { type: 'agent', name: 'arc-learned-agent', expected: 'agents/arc-learned-agent.md.draft' },
-        {
-          type: 'eval',
-          name: 'arc-learned-eval',
-          expected: 'evals/arc-learned-eval/EVAL.md.draft',
-        },
-      ];
-      for (const c of cases) {
-        const cand = approvedCandidate(c.type, c.name);
-        learning.appendCandidate(cand, { scope: 'project', projectRoot, homeDir });
-        const result = learning.materializeCandidate(cand.id, {
-          scope: 'project',
-          projectRoot,
-          homeDir,
+    it('shows only the project-scoped records — global candidates stay dashboard-only', () => {
+      seed(makeRecord());
+      seed(
+        makeRecord({
+          candidate_id: GLOBAL_CANDIDATE_ID,
+          scope: { kind: 'global' },
+          created_at: '2026-09-01T02:00:00.000Z',
+        }),
+      );
+
+      const review = runJson(['review', '--project']);
+
+      expect(review.count).toBe(1);
+      expect(review.candidates[0].candidate_id).toBe(CANDIDATE_ID);
+    });
+
+    it('refuses to inspect a global candidate by id from the project scope', () => {
+      seed(makeRecord({ candidate_id: GLOBAL_CANDIDATE_ID, scope: { kind: 'global' } }));
+
+      const result = runCli(['inspect', GLOBAL_CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      expect(JSON.parse(result.stdout).error).toMatch(/candidate not found/);
+      expect(JSON.parse(result.stdout).error).toMatch(/global-scoped candidate/);
+    });
+
+    // The canonical queue is home-global, so `--project` has to say WHICH
+    // project: without this filter every project on the machine listed — and
+    // could activate — every other project's candidates.
+    it("shows only this project — another project's candidates stay out", () => {
+      seed(makeRecord());
+      seed(
+        makeRecord({
+          candidate_id: OTHER_PROJECT_CANDIDATE_ID,
+          scope: { kind: 'project', project: 'some-other-project', project_id: 'proj_other' },
+          created_at: '2026-09-01T03:00:00.000Z',
+        }),
+      );
+
+      const review = runJson(['review', '--project']);
+
+      expect(review.count).toBe(1);
+      expect(review.candidates[0].candidate_id).toBe(CANDIDATE_ID);
+      expect(runJson(['inbox', '--project']).count).toBe(1);
+    });
+
+    // Every producer keys the project on the SANITIZED basename (`getProjectName()`
+    // — the same slug as `observations/<slug>/` and `instincts/<slug>/`). The CLI
+    // used to take the raw basename, so from any project root the sanitizer
+    // rewrites (`My Project` → `My-Project`) the whole front end came back empty.
+    it('matches the sanitized project slug, not the raw directory name', () => {
+      const rawRoot = path.join(testDir, 'My Project');
+      fs.mkdirSync(rawRoot, { recursive: true });
+      seed(
+        makeRecord({ scope: { kind: 'project', project: 'My-Project', project_id: PROJECT_ID } }),
+      );
+      const rawRootEnv = { ...env, CLAUDE_PROJECT_DIR: rawRoot };
+
+      const run = (args) => {
+        const result = spawnSync('node', [cli, 'learn', ...args, '--json'], {
+          env: rawRootEnv,
+          encoding: 'utf8',
         });
-        expect(result.candidate.draft_paths).toEqual([c.expected]);
-        expect(fs.existsSync(path.join(projectRoot, c.expected))).toBe(true);
-        // Active path must not exist after materialization.
-        expect(fs.existsSync(path.join(projectRoot, c.expected.replace('.draft', '')))).toBe(false);
-      }
+        expect(result.status).toBe(0);
+        return JSON.parse(result.stdout);
+      };
+
+      const inbox = run(['inbox', '--project']);
+      expect(inbox.count).toBe(1);
+      expect(inbox.candidates[0].candidate_id).toBe(CANDIDATE_ID);
+      expect(run(['review', '--project']).count).toBe(1);
     });
 
-    it('materializes repo_convention_patch candidates only as draft text proposals', () => {
-      const learning = require('../../scripts/lib/learning');
-      const c = approvedCandidate('repo_convention_patch', 'arc-learned-convention-x');
-      learning.appendCandidate(c, { scope: 'project', projectRoot, homeDir });
-      const result = learning.materializeCandidate(c.id, {
-        scope: 'project',
-        projectRoot,
-        homeDir,
+    it("names the owning project when an id belongs to another project's queue", () => {
+      seed(
+        makeRecord({
+          candidate_id: OTHER_PROJECT_CANDIDATE_ID,
+          scope: { kind: 'project', project: 'some-other-project', project_id: 'proj_other' },
+        }),
+      );
+      const queueBefore = queueBytes();
+
+      const result = runCli(['activate', OTHER_PROJECT_CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      expect(JSON.parse(result.stdout).error).toMatch(
+        /belongs to the project "some-other-project", not to "arcforge"/,
+      );
+      expect(fs.existsSync(path.join(arcforgeHome, 'instincts'))).toBe(false);
+      // The scope half of the same split, pinned against a "fix" that would
+      // route it through the engine: `handleDashboardAction` models no scope
+      // gate, so dispatching this id returns `accepted: true` and moves another
+      // project's candidate. The refusal is the front end's own, it records
+      // nothing, and the record it protects is untouched (B-5).
+      expect(auditEntries()).toEqual([]);
+      expect(queueBytes()).toBe(queueBefore);
+    });
+
+    // The other half: an id that names no candidate anywhere is exactly the
+    // `candidate_not_found` the shared handler models and audits, so the CLI
+    // dispatches it rather than refusing silently. Before this, a mistyped id
+    // was the one transition refusal the dashboard logged and the CLI did not.
+    it('audits an unknown candidate id like the dashboard does, with the CLI actor', () => {
+      seed(makeRecord());
+      const queueBefore = queueBytes();
+
+      const result = runCli(['approve', 'cand_no_such_candidate_0000', '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      expect(JSON.parse(result.stdout).error).toMatch(/candidate not found/);
+      expect(auditEntries()).toHaveLength(1);
+      expect(auditEntries()[0]).toMatchObject({
+        accepted: false,
+        action: 'approve',
+        candidate_id: 'cand_no_such_candidate_0000',
+        reason: 'candidate_not_found',
+        actor: { layer: 6, actor_type: 'cli', reviewer: 'local_user' },
       });
-      expect(result.candidate.draft_paths).toEqual([
-        '.arcforge/learning/patches/arc-learned-convention-x.patch.draft',
+      // Audited, not applied: the refusal appends no queue event.
+      expect(queueBytes()).toBe(queueBefore);
+    });
+
+    // `accept` records the move it would have dispatched first. Its own two
+    // prerequisites still refuse before anything is applied or recorded — that
+    // carve-out is about a candidate that exists, which this id does not name.
+    it('audits an unknown id under accept as the approve it would have dispatched', () => {
+      const result = runCli(['accept', 'cand_no_such_candidate_0000', '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      expect(auditEntries()).toEqual([
+        expect.objectContaining({
+          accepted: false,
+          action: 'approve',
+          reason: 'candidate_not_found',
+          actor: expect.objectContaining({ actor_type: 'cli' }),
+        }),
       ]);
-      expect(
-        fs.existsSync(
-          path.join(projectRoot, '.arcforge/learning/patches/arc-learned-convention-x.patch.draft'),
-        ),
-      ).toBe(true);
+    });
+
+    // Reads dispatch no action, so a miss on one is not an action to record.
+    it('leaves the audit log alone when a read command misses', () => {
+      const result = runCli(['inspect', 'cand_no_such_candidate_0000', '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      expect(auditEntries()).toEqual([]);
+    });
+
+    it('groups the inbox by status and artifact type with the next command for each', () => {
+      seed(makeRecord());
+
+      const inbox = runJson(['inbox', '--project']);
+
+      expect(inbox.counts).toEqual({ pending_review: 1 });
+      expect(inbox.groups.by_status.pending_review).toEqual([CANDIDATE_ID]);
+      expect(inbox.groups.by_artifact_type.instinct).toEqual([CANDIDATE_ID]);
+      expect(inbox.candidates[0].next_command).toBe(
+        `arcforge learn approve ${CANDIDATE_ID} --project`,
+      );
+      expect(inbox.candidates[0].next_actions[0]).toMatch(/approve or reject/);
+    });
+
+    it('points an approved instinct candidate at materialize', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+
+      const inbox = runJson(['inbox', '--project']);
+
+      expect(inbox.candidates[0].next_command).toBe(
+        `arcforge learn materialize ${CANDIDATE_ID} --project`,
+      );
+    });
+
+    // The dashboard's `evolve` action writes a project-scoped `skill` record
+    // into the same canonical queue, so an approved non-instinct candidate is
+    // reachable. The matrix allows `materialize` from `approved` — it is keyed
+    // on status alone — but the CLI refuses it for that artifact type, so the
+    // inbox must not name it as the next step.
+    it('never recommends a command the artifact-type narrowing would refuse', () => {
+      seed(makeRecord({ artifact_type: 'skill' }));
+      runJson(['approve', CANDIDATE_ID, '--project']);
+
+      const card = runJson(['inbox', '--project']).candidates[0];
+
+      expect(card.available_actions).toContain('materialize');
+      expect(card.next_command).toBe(`arcforge learn inspect ${CANDIDATE_ID} --project`);
+      expect(card.next_actions[0]).toMatch(/materializes instinct candidates only/);
+      expect(card.next_actions[1]).toMatch(/leave it queued/);
+
+      // The advertised next step has to run: drop the leading `arcforge learn`.
+      const argv = card.next_command.split(' ').slice(2);
+      expect(runCli([...argv, '--json']).status).toBe(0);
+    });
+
+    // The narrowing only has something to say where the status prose names a
+    // build step. A terminal status names none, so it keeps its own prose.
+    it('leaves a status that names no build step on its own prose', () => {
+      seed(makeRecord({ artifact_type: 'skill' }));
+      runJson(['reject', CANDIDATE_ID, '--project']);
+
+      const card = runJson(['inbox', '--project']).candidates[0];
+
+      expect(card.lifecycle_status).toBe('dismissed');
+      expect(card.next_actions).toEqual(['dismissed — no action available']);
+    });
+
+    it('inspects one candidate with a redacted body preview and no project id', () => {
+      seed(makeRecord());
+
+      const detail = runJson(['inspect', CANDIDATE_ID, '--project']);
+
+      expect(detail.candidate.candidate_id).toBe(CANDIDATE_ID);
+      expect(detail.candidate.body_preview.text).toContain('grep for existing patterns');
+      expect(detail.candidate.scope).toEqual({ kind: 'project', project: 'arcforge' });
+      expect(JSON.stringify(detail)).not.toContain(PROJECT_ID);
+      expect(detail.next_actions[0]).toMatch(/approve or reject/);
+    });
+
+    it('lists only materialized candidates under drafts, with their draft paths', () => {
+      seed(makeRecord());
+      expect(runJson(['drafts', '--project']).count).toBe(0);
+
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      runJson(['materialize', CANDIDATE_ID, '--project']);
+
+      const drafts = runJson(['drafts', '--project']);
+      expect(drafts.count).toBe(1);
+      expect(drafts.drafts[0].lifecycle_status).toBe('materialized');
+      expect(drafts.drafts[0].draft_paths[0]).toContain(
+        path.join('learning', 'drafts', CANDIDATE_ID),
+      );
+      expect(drafts.drafts[0].draft_paths_stale).toEqual([]);
+    });
+
+    // What the next three pin: a draft is the artifact the reviewer is told to
+    // read, so no surface may report one as ready to review when the file it
+    // names is missing or has changed since the manifest recorded it. The
+    // activation that would follow refuses on that very hash (activate.js L8-3).
+    it('marks a recorded draft that was deleted, instead of listing it as ready', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      const draftPath = runJson(['materialize', CANDIDATE_ID, '--project']).draft_paths[0];
+      fs.rmSync(draftPath);
+
+      const drafts = runJson(['drafts', '--project']);
+
+      expect(drafts.count).toBe(1);
+      expect(drafts.drafts[0].draft_paths_stale).toEqual([
+        { draft_path: draftPath, reason: 'missing' },
+      ]);
+    });
+
+    it('marks a recorded draft that was hand-edited', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      const draftPath = runJson(['materialize', CANDIDATE_ID, '--project']).draft_paths[0];
+      fs.writeFileSync(draftPath, 'hand-edited draft body\n', 'utf8');
+
+      const drafts = runJson(['drafts', '--project']);
+
+      expect(drafts.drafts[0].draft_paths_stale).toEqual([
+        { draft_path: draftPath, reason: 'hash_mismatch' },
+      ]);
+    });
+
+    // `activate` is the only action the matrix allows a materialized candidate,
+    // so every drafts entry named it — including the ones this listing has just
+    // marked stale, which activation refuses on the recorded content hash.
+    it('never recommends the activation a stale draft would refuse', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      const draftPath = runJson(['materialize', CANDIDATE_ID, '--project']).draft_paths[0];
+      expect(runJson(['drafts', '--project']).drafts[0].next_command).toBe(
+        `arcforge learn activate ${CANDIDATE_ID} --project`,
+      );
+
+      fs.writeFileSync(draftPath, 'hand-edited draft body\n', 'utf8');
+      const entry = runJson(['drafts', '--project']).drafts[0];
+
+      expect(entry.draft_paths_stale).toEqual([{ draft_path: draftPath, reason: 'hash_mismatch' }]);
+      expect(entry.next_command).toBe(`arcforge learn inspect ${CANDIDATE_ID} --project`);
+      // The advertised next step has to run: drop the leading `arcforge learn`.
+      const argv = entry.next_command.split(' ').slice(2);
+      expect(runCli([...argv, '--json']).status).toBe(0);
+      // …and the activation it stopped advertising is the one that refuses.
+      expect(runCli(['activate', CANDIDATE_ID, '--project', '--json']).status).not.toBe(0);
+    });
+
+    it('stops telling inspect to review a draft that is not there', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      const draftPath = runJson(['materialize', CANDIDATE_ID, '--project']).draft_paths[0];
+      expect(runJson(['inspect', CANDIDATE_ID, '--project']).next_actions[0]).toMatch(
+        /review the draft/,
+      );
+
+      fs.rmSync(draftPath);
+      const detail = runJson(['inspect', CANDIDATE_ID, '--project']);
+
+      expect(detail.draft_paths_stale).toEqual([{ draft_path: draftPath, reason: 'missing' }]);
+      expect(detail.next_actions.join(' ')).not.toMatch(/review the draft/);
+      expect(detail.next_actions[0]).toContain(draftPath);
+      expect(detail.next_actions[0]).toMatch(/is missing/);
+    });
+
+    // `deactivated` prose names two moves and a lost draft splits them: the
+    // matrix lets a retired candidate materialize afresh, which still runs, but
+    // activation reads the recorded draft and refuses on its content hash. So
+    // the status keeps a recovery — unlike `materialized`, where every command
+    // the CLI has would refuse — and the override says which half is left.
+    it('stops offering the activation a retired candidate no longer has', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      const draftPath = runJson(['materialize', CANDIDATE_ID, '--project']).draft_paths[0];
+      runJson(['activate', CANDIDATE_ID, '--project']);
+      deactivate(CANDIDATE_ID);
+      fs.rmSync(draftPath);
+
+      const detail = runJson(['inspect', CANDIDATE_ID, '--project']);
+
+      expect(detail.candidate.lifecycle_status).toBe('deactivated');
+      expect(detail.draft_paths_stale).toEqual([{ draft_path: draftPath, reason: 'missing' }]);
+      expect(detail.next_actions[0]).toContain(draftPath);
+      expect(detail.next_actions[0]).toMatch(/is missing.*activating it again refuses/s);
+      expect(detail.next_actions[1]).toMatch(/materialize it again/);
+      // The activation it stopped offering is the one that refuses…
+      expect(runCli(['activate', CANDIDATE_ID, '--project', '--json']).status).not.toBe(0);
+      // …and the recovery it names is the one the engine actually runs. This
+      // writes a fresh, non-stale manifest, so it goes last — assert against
+      // the deleted draft above this line, never below it.
+      expect(runCli(['accept', CANDIDATE_ID, '--project', '--json']).status).toBe(0);
+    });
+
+    // The divergence the override creates, pinned from both sides at once.
+    // `runInbox` does no per-card disk work, so it cannot know the draft is
+    // gone and keeps naming both moves; `inspect` reads the disk and drops the
+    // half that refuses. Asserting the inbox string alone would prove nothing —
+    // a retired candidate with an intact draft prints it on both surfaces — so
+    // what is pinned is the contrast on one candidate with one lost draft.
+    // The guide documents it (docs/guide/learning-dashboard.md, "learn inbox
+    // prints no paths and reads no drafts"); this is the check behind it.
+    it('keeps the inbox naming both moves where inspect has stopped', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      const draftPath = runJson(['materialize', CANDIDATE_ID, '--project']).draft_paths[0];
+      runJson(['activate', CANDIDATE_ID, '--project']);
+      deactivate(CANDIDATE_ID);
+      fs.rmSync(draftPath);
+
+      const card = runJson(['inbox', '--project']).candidates[0];
+      const detail = runJson(['inspect', CANDIDATE_ID, '--project']);
+
+      expect(card.lifecycle_status).toBe('deactivated');
+      expect(card.next_actions[0]).toMatch(/materialize or activate it again/);
+      expect(card.next_command).toBe(`arcforge learn materialize ${CANDIDATE_ID} --project`);
+      // Same candidate, same moment, the surface that read the disk:
+      expect(detail.next_actions.join(' ')).not.toMatch(/materialize or activate it again/);
+      expect(detail.next_actions[0]).toMatch(/activating it again refuses/);
+    });
+
+    // An edited draft is the third way to reach the same override, and the arm
+    // above renders it from the same list — so what is pinned here is that the
+    // claim it makes is true of this reason too: activation refuses on the hash
+    // while re-materializing still runs.
+    it('stops offering the activation an edited retired draft would refuse', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      const draftPath = runJson(['materialize', CANDIDATE_ID, '--project']).draft_paths[0];
+      runJson(['activate', CANDIDATE_ID, '--project']);
+      deactivate(CANDIDATE_ID);
+      fs.appendFileSync(draftPath, '\nedited by hand\n', 'utf8');
+
+      const detail = runJson(['inspect', CANDIDATE_ID, '--project']);
+
+      expect(detail.draft_paths_stale).toEqual([
+        { draft_path: draftPath, reason: 'hash_mismatch' },
+      ]);
+      expect(detail.next_actions[0]).toMatch(/has changed since it was written/);
+      expect(runCli(['activate', CANDIDATE_ID, '--project', '--json']).status).not.toBe(0);
+      expect(runCli(['accept', CANDIDATE_ID, '--project', '--json']).status).toBe(0);
+    });
+
+    // The artifact-type narrowing outranks the disk fact: there is no
+    // materialize or activate step for a missing draft to qualify, so the
+    // override must not print "materialize it again" at a candidate the curator
+    // refuses to build. Not reachable through the engine — nothing materializes
+    // a non-instinct candidate, so the status has to be seeded — but it is the
+    // precedence `nextActionsFor` already applies to these statuses, and it
+    // decides the cell the day the supported-type list changes.
+    it('keeps the type narrowing ahead of the missing draft', () => {
+      seed(
+        makeRecord({
+          artifact_type: 'skill',
+          lifecycle: { status: 'deactivated', status_changed_at: '2026-09-01T02:00:00.000Z' },
+        }),
+      );
+
+      const detail = runJson(['inspect', CANDIDATE_ID, '--project']);
+
+      expect(detail.candidate.lifecycle_status).toBe('deactivated');
+      expect(detail.draft_paths).toEqual([]);
+      expect(detail.next_actions[0]).toMatch(/materializes instinct candidates only/);
+      expect(detail.next_actions.join(' ')).not.toMatch(/materialize it again/);
+    });
+
+    // Activation reads the draft and never removes it, so a user who tidies the
+    // drafts directory afterwards is looking at an instinct that is already
+    // live — not at something with "nothing to activate".
+    it('keeps the activated prose when the read draft is gone', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      const draftPath = runJson(['materialize', CANDIDATE_ID, '--project']).draft_paths[0];
+      runJson(['activate', CANDIDATE_ID, '--project']);
+      fs.rmSync(draftPath);
+
+      const detail = runJson(['inspect', CANDIDATE_ID, '--project']);
+
+      expect(detail.candidate.lifecycle_status).toBe('activated');
+      expect(detail.draft_paths_stale).toEqual([{ draft_path: draftPath, reason: 'missing' }]);
+      expect(detail.next_actions).toEqual([
+        'already active — retire it by deactivating it from the dashboard',
+      ]);
+    });
+
+    // What the next four pin: the other way to have no draft. Not a recorded
+    // file that moved, but a manifest that is gone — `findUsableMaterialization`
+    // returns null when the drafts directory is deleted and silently skips a
+    // manifest it cannot parse. `draft_paths_stale` is then empty, because there
+    // is no recorded file left to call stale, and every surface used to read
+    // that empty list as a healthy draft.
+    it('sends drafts to inspect when the materialization record is gone', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      runJson(['materialize', CANDIDATE_ID, '--project']);
+      expect(runJson(['drafts', '--project']).drafts[0].next_command).toBe(
+        `arcforge learn activate ${CANDIDATE_ID} --project`,
+      );
+
+      fs.rmSync(draftsDir(), { recursive: true });
+      const entry = runJson(['drafts', '--project']).drafts[0];
+
+      expect(entry.draft_paths).toEqual([]);
+      expect(entry.draft_paths_stale).toEqual([]);
+      expect(entry.next_command).toBe(`arcforge learn inspect ${CANDIDATE_ID} --project`);
+      // The advertised next step has to run: drop the leading `arcforge learn`.
+      const argv = entry.next_command.split(' ').slice(2);
+      expect(runCli([...argv, '--json']).status).toBe(0);
+      // …and the activation it stopped advertising is the one that refuses.
+      expect(runCli(['activate', CANDIDATE_ID, '--project', '--json']).status).not.toBe(0);
+    });
+
+    // The draft file is untouched here — only the manifest describing it is
+    // unreadable, which is the case `findUsableMaterialization`'s silent catch
+    // turns into "no record" without saying so.
+    it('sends drafts to inspect when the manifest cannot be parsed', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      const draftPath = runJson(['materialize', CANDIDATE_ID, '--project']).draft_paths[0];
+      fs.writeFileSync(manifestPath(), 'not json {', 'utf8');
+
+      const entry = runJson(['drafts', '--project']).drafts[0];
+
+      expect(fs.existsSync(draftPath)).toBe(true);
+      expect(entry.draft_paths).toEqual([]);
+      expect(entry.draft_paths_stale).toEqual([]);
+      expect(entry.next_command).toBe(`arcforge learn inspect ${CANDIDATE_ID} --project`);
+      expect(runCli(['activate', CANDIDATE_ID, '--project', '--json']).status).not.toBe(0);
+    });
+
+    it('stops telling inspect to review a draft whose record is gone', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      runJson(['materialize', CANDIDATE_ID, '--project']);
+      expect(runJson(['inspect', CANDIDATE_ID, '--project']).next_actions[0]).toMatch(
+        /review the draft/,
+      );
+
+      fs.rmSync(draftsDir(), { recursive: true });
+      const detail = runJson(['inspect', CANDIDATE_ID, '--project']);
+
+      expect(detail.draft_paths).toEqual([]);
+      expect(detail.draft_paths_stale).toEqual([]);
+      expect(detail.next_actions.join(' ')).not.toMatch(/review the draft/);
+      expect(detail.next_actions[0]).toMatch(/no usable materialization record remains/);
+    });
+
+    // The record-absent case reaches both statuses whose prose names the draft,
+    // and only those: an activated candidate is already live whatever became of
+    // its drafts tree, so its prose stands unchanged.
+    it('keeps the activated prose but not the retired activation when the record is gone', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      runJson(['materialize', CANDIDATE_ID, '--project']);
+      runJson(['activate', CANDIDATE_ID, '--project']);
+      fs.rmSync(draftsDir(), { recursive: true });
+
+      const activated = runJson(['inspect', CANDIDATE_ID, '--project']);
+      expect(activated.candidate.lifecycle_status).toBe('activated');
+      expect(activated.next_actions).toEqual([
+        'already active — retire it by deactivating it from the dashboard',
+      ]);
+
+      deactivate(CANDIDATE_ID);
+      const detail = runJson(['inspect', CANDIDATE_ID, '--project']);
+
+      // A retired candidate keeps a recovery here, but not the activation: with
+      // no record left, activation refuses `materialization_missing` while
+      // materializing afresh still writes a draft.
+      expect(detail.candidate.lifecycle_status).toBe('deactivated');
+      expect(detail.next_actions[0]).toMatch(/no usable materialization record remains/);
+      expect(detail.next_actions[1]).toMatch(/materialize it again/);
+      expect(runCli(['activate', CANDIDATE_ID, '--project', '--json']).status).not.toBe(0);
+      expect(runCli(['accept', CANDIDATE_ID, '--project', '--json']).status).toBe(0);
     });
   });
 
-  describe('activation across artifact types', () => {
-    function setupMaterialized(artifactType, name) {
-      const learning = require('../../scripts/lib/learning');
-      const c = baseCandidate({
-        id: `arc-learned-project-${artifactType}-${name}`,
-        artifact_type: artifactType,
-        name,
-        status: 'approved',
+  // -------------------------------------------------------------------------
+  // --global fails closed (D-011)
+  // -------------------------------------------------------------------------
+
+  describe('--global', () => {
+    for (const [name, args] of [
+      ['review', ['review', '--global', '--json']],
+      ['inbox', ['inbox', '--global', '--json']],
+      ['inspect', ['inspect', CANDIDATE_ID, '--global', '--json']],
+      ['drafts', ['drafts', '--global', '--json']],
+      ['approve', ['approve', CANDIDATE_ID, '--global', '--json']],
+      ['activate', ['activate', CANDIDATE_ID, '--global', '--json']],
+    ]) {
+      it(`learn ${name} --global exits non-zero and points at the dashboard`, () => {
+        seed(makeRecord({ body: BODY_CANARY }));
+
+        const result = runCli(args);
+
+        // With --json the CLI renders a thrown error as `{ "error": ... }` on
+        // stdout (scripts/cli.js), so asserting the whole envelope proves the
+        // refusal is the ONLY thing printed.
+        expect(result.status).not.toBe(0);
+        expect(JSON.parse(result.stdout)).toEqual({
+          error: expect.stringContaining('arcforge learn dashboard'),
+        });
+        expect(`${result.stdout}${result.stderr}`).not.toContain(BODY_CANARY);
       });
-      learning.appendCandidate(c, { scope: 'project', projectRoot, homeDir });
-      learning.materializeCandidate(c.id, { scope: 'project', projectRoot, homeDir });
-      return c.id;
     }
 
-    it('activates instinct/command/agent/eval drafts by promoting to active artifacts', () => {
-      const learning = require('../../scripts/lib/learning');
-      const cases = [
-        {
-          type: 'instinct',
-          name: 'arc-learned-instinct-y',
-          active: '.arcforge/learning/instincts/arc-learned-instinct-y.md',
-        },
-        { type: 'command', name: 'arc-learned-cmd-y', active: 'commands/arc-learned-cmd-y.md' },
-        { type: 'agent', name: 'arc-learned-agent-y', active: 'agents/arc-learned-agent-y.md' },
-        { type: 'eval', name: 'arc-learned-eval-y', active: 'evals/arc-learned-eval-y/EVAL.md' },
-      ];
-      for (const c of cases) {
-        const id = setupMaterialized(c.type, c.name);
-        const result = learning.activateCandidate(id, { scope: 'project', projectRoot, homeDir });
-        expect(result.candidate.status).toBe('activated');
-        expect(result.candidate.active_paths).toEqual([c.active]);
-        expect(fs.existsSync(path.join(projectRoot, c.active))).toBe(true);
-        expect(fs.existsSync(path.join(projectRoot, `${c.active}.draft`))).toBe(false);
+    it('refuses when --global is named alongside --project, in either order', () => {
+      seed(makeRecord({ body: BODY_CANARY }));
+
+      // Naming both selectors is still naming `--global`, so the refusal holds
+      // rather than the command quietly resolving to project scope.
+      for (const args of [
+        ['review', '--global', '--project', '--json'],
+        ['approve', CANDIDATE_ID, '--project', '--global', '--json'],
+      ]) {
+        const result = runCli(args);
+
+        expect(result.status).not.toBe(0);
+        expect(JSON.parse(result.stdout)).toEqual({
+          error: expect.stringContaining('arcforge learn dashboard'),
+        });
+        expect(`${result.stdout}${result.stderr}`).not.toContain(BODY_CANARY);
       }
     });
 
-    it('refuses activation for repo_convention_patch — draft-only artifact type', () => {
-      const learning = require('../../scripts/lib/learning');
-      const id = setupMaterialized('repo_convention_patch', 'arc-learned-convention-y');
-      expect(() =>
-        learning.activateCandidate(id, { scope: 'project', projectRoot, homeDir }),
-      ).toThrow(/draft-only|cannot be activated|refus/i);
-      // Draft must remain on disk.
-      expect(
-        fs.existsSync(
-          path.join(projectRoot, '.arcforge/learning/patches/arc-learned-convention-y.patch.draft'),
-        ),
-      ).toBe(true);
+    it('still requires an explicit scope', () => {
+      const result = runCli(['review']);
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toMatch(/--project or --global/);
     });
   });
 
-  describe('path safety', () => {
-    it('refuses activation when the candidate name escapes the artifact dir', () => {
-      const learning = require('../../scripts/lib/learning');
-      // Inject a hostile candidate directly into the queue file (skipping append validation
-      // which already rejects bad names).
-      const queuePath = learning.getCandidateQueuePath({ scope: 'project', projectRoot, homeDir });
-      fs.mkdirSync(path.dirname(queuePath), { recursive: true });
-      fs.writeFileSync(
-        queuePath,
-        `${JSON.stringify(
-          baseCandidate({
-            id: 'evil-1',
-            artifact_type: 'instinct',
-            name: '../../escape',
-            status: 'materialized',
-            draft_paths: ['../../escape.md.draft'],
-          }),
-        )}\n`,
+  // -------------------------------------------------------------------------
+  // Transitions — dispatched through handleDashboardAction
+  // -------------------------------------------------------------------------
+
+  describe('transitions', () => {
+    it('drives approve → materialize → activate and writes the active instinct', () => {
+      seed(makeRecord());
+
+      expect(runJson(['approve', CANDIDATE_ID, '--project']).next_status).toBe('approved');
+
+      const materialized = runJson(['materialize', CANDIDATE_ID, '--project']);
+      expect(materialized.next_status).toBe('materialized');
+      expect(fs.existsSync(materialized.draft_paths[0])).toBe(true);
+
+      const activated = runJson(['activate', CANDIDATE_ID, '--project']);
+      expect(activated.next_status).toBe('activated');
+      expect(activated.candidate.lifecycle_status).toBe('activated');
+      expect(
+        fs.existsSync(path.join(arcforgeHome, 'instincts', 'arcforge', `${CANDIDATE_ID}.md`)),
+      ).toBe(true);
+    });
+
+    it('records every action in the shared audit log, attributed to the CLI', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+
+      const auditLog = fs.readFileSync(
+        path.join(arcforgeHome, 'learning', 'dashboard', 'actions.jsonl'),
         'utf8',
       );
-      expect(() =>
-        learning.activateCandidate('evil-1', { scope: 'project', projectRoot, homeDir }),
-      ).toThrow(/lowercase kebab-case|relative|parent|normalized/i);
+      const entries = auditLog
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line));
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0]).toMatchObject({
+        accepted: true,
+        action: 'approve',
+        candidate_id: CANDIDATE_ID,
+        actor: { layer: 6, actor_type: 'cli', reviewer: 'local_user' },
+      });
+    });
+
+    it('maps `reject` onto the matrix action `dismiss`', () => {
+      seed(makeRecord());
+
+      expect(runJson(['reject', CANDIDATE_ID, '--project']).next_status).toBe('dismissed');
+    });
+
+    it('refuses a transition the Action × Status matrix forbids, naming what is legal', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+
+      const result = runCli(['reject', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      expect(JSON.parse(result.stdout).error).toMatch(/policy_violation/);
+      expect(JSON.parse(result.stdout).error).toMatch(/is approved.*allows: materialize/);
+    });
+
+    it('names the instinct-only narrowing when asked to materialize another type', () => {
+      seed(makeRecord({ artifact_type: 'skill' }));
+      runJson(['approve', CANDIDATE_ID, '--project']);
+
+      const result = runCli(['materialize', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      expect(JSON.parse(result.stdout).error).toMatch(
+        /supports instinct candidates only.*is a skill candidate/s,
+      );
+      // B-5: the narrowing is the curator's refusal, so it lands in the shared
+      // audit log with its reason like every other one. A CLI-side pre-check
+      // would print the same sentence and record nothing.
+      expect(auditEntries()).toHaveLength(2);
+      expect(auditEntries()[1]).toMatchObject({
+        accepted: false,
+        action: 'materialize',
+        reason: 'artifact_type_mismatch',
+        candidate_id: CANDIDATE_ID,
+        actor: { layer: 6, actor_type: 'cli', reviewer: 'local_user' },
+      });
+    });
+
+    // `activate` on a candidate the curator cannot build is illegal from every
+    // status, because nothing ever materializes it — so the refusal is the
+    // matrix's, and the bare matrix answer would name a `materialize` that
+    // refuses in turn. Both facts print; both come off an audited refusal.
+    it('names the narrowing alongside the matrix when asked to activate another type', () => {
+      seed(makeRecord({ artifact_type: 'skill' }));
+      runJson(['approve', CANDIDATE_ID, '--project']);
+
+      const result = runCli(['activate', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      const { error } = JSON.parse(result.stdout);
+      expect(error).toMatch(/is approved.*allows: materialize/s);
+      expect(error).toMatch(/supports instinct candidates only.*is a skill candidate/s);
+      expect(auditEntries()[1]).toMatchObject({
+        accepted: false,
+        action: 'activate',
+        reason: 'policy_violation',
+        actor: { actor_type: 'cli' },
+      });
+    });
+
+    // `accept` is the CLI's one compound command, and the one place it decides
+    // the artifact-type narrowing itself rather than rendering the curator's
+    // refusal. Dispatching would land the approve — the queue is append-only,
+    // so it is not rolled back — and then meet a materialize refusal no re-run
+    // clears, stranding the candidate in `approved`, which the matrix allows
+    // neither to materialize nor to dismiss. So it refuses before it starts.
+    it('refuses accept up front for a type the curator cannot build, changing nothing', () => {
+      seed(makeRecord({ artifact_type: 'skill' }));
+      const queueBefore = queueBytes();
+
+      const result = runCli(['accept', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      const { error } = JSON.parse(result.stdout);
+      expect(error).toMatch(/supports instinct candidates only.*is a skill candidate/s);
+      expect(error).toMatch(/nothing was applied/);
+      expect(error).toMatch(new RegExp(`arcforge learn approve ${CANDIDATE_ID} --project`));
+      // Alongside it, never instead of it: the narrowing this message ends in
+      // always points at the dashboard, so the type refusal names both wherever
+      // the approval is legal. The guide documents that pairing.
+      expect(error).toMatch(/arcforge learn dashboard/);
+
+      // Zero state change: `approve` appends a transition event to the queue,
+      // so a byte-identical queue is what proves no half-dispatch happened.
+      expect(queueBytes()).toBe(queueBefore);
+      expect(auditEntries()).toEqual([]);
+      expect(runJson(['inbox', '--project']).candidates[0].lifecycle_status).toBe('pending_review');
+      expect(fs.existsSync(path.join(arcforgeHome, 'learning', 'drafts'))).toBe(false);
+    });
+
+    // The guard is on the command, not on the dispatch count. From `approved`,
+    // `accept` would have dispatched materialize alone — but the refusal it
+    // would render is one no re-run clears, so accept still answers up front
+    // and still logs nothing. `materialize` typed directly from here does
+    // dispatch, and its audited refusal is asserted above.
+    it('refuses accept up front from a status where it would dispatch one action', () => {
+      seed(makeRecord({ artifact_type: 'skill' }));
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      const queueBefore = queueBytes();
+      const auditBefore = auditEntries().length;
+
+      const result = runCli(['accept', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      expect(JSON.parse(result.stdout).error).toMatch(/nothing was applied/);
+      // …and it does not send the reviewer at the approval it already has.
+      // `approve` is legal only from `pending_review`, so from here the matrix
+      // refuses it with `policy_violation` — a loop the refusal would otherwise
+      // open, since `materialize` refuses on the type in turn. `check:docs`
+      // cannot catch this: it resolves that a command and flag exist, not which
+      // refusal may recommend them. This assertion is the guard.
+      expect(JSON.parse(result.stdout).error).not.toMatch(/arcforge learn approve/);
+      expect(queueBytes()).toBe(queueBefore);
+      expect(auditEntries()).toHaveLength(auditBefore);
+      expect(runJson(['inbox', '--project']).candidates[0].lifecycle_status).toBe('approved');
+      // The command it stopped naming is the one the matrix refuses. Last,
+      // because a refused dispatch appends its own audited rejection.
+      expect(runCli(['approve', CANDIDATE_ID, '--project', '--json']).status).not.toBe(0);
+    });
+
+    // `needs_more_evidence` is the one status where `dismiss` is legal and
+    // `approve` is not, so it is the only place this refusal ends up naming no
+    // command at all. Deliberate, and not because rejecting is wrong there:
+    // the narrowing is about a renderer that does not exist yet, not about the
+    // candidate's merit, so it leaves the reject call to the status prose —
+    // which still makes it, for this very card. Layer 5 writes this status; no
+    // CLI verb reaches it, so it is seeded.
+    it('names no command from the one status that allows only dismiss', () => {
+      seed(
+        makeRecord({
+          artifact_type: 'skill',
+          lifecycle: {
+            status: 'needs_more_evidence',
+            status_changed_at: '2026-09-01T02:00:00.000Z',
+          },
+        }),
+      );
+
+      const result = runCli(['accept', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      const { error } = JSON.parse(result.stdout);
+      expect(error).toMatch(/nothing was applied/);
+      expect(error).not.toMatch(/arcforge learn approve/);
+      expect(error).not.toMatch(/arcforge learn reject/);
+      // The dashboard survives the one status that names no command: it comes
+      // from the narrowing, not from the conditional recovery.
+      expect(error).toMatch(/arcforge learn dashboard/);
+      expect(runJson(['inspect', CANDIDATE_ID, '--project']).next_actions[0]).toMatch(
+        /reject it, or leave it for the curator/,
+      );
+    });
+
+    // A name Layer 7 can never write to disk is as non-transient as an artifact
+    // type it cannot render, and it strands the candidate the same way: approve
+    // is legal, materialize then refuses `path_policy_rejected` forever, and the
+    // matrix allows an `approved` candidate neither materialize nor dismiss.
+    // Layer 5 admits such a name — its schema checks presence, type and length,
+    // and nothing about path policy — so `accept` decides it up front too.
+    it('refuses a name the draft writer cannot use, without approving it', () => {
+      seed(makeRecord({ name: 'some/path/traversal' }));
+      const queueBefore = queueBytes();
+
+      const result = runCli(['accept', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      const { error } = JSON.parse(result.stdout);
+      expect(error).toMatch(/name is not one the draft writer can use/);
+      expect(error).toMatch(/nothing was applied/);
+
+      expect(queueBytes()).toBe(queueBefore);
+      expect(auditEntries()).toEqual([]);
+      expect(materializationDirs()).toEqual([]);
+      expect(runJson(['inbox', '--project']).candidates[0].lifecycle_status).toBe('pending_review');
+    });
+
+    // The refusal is built from the raw queue name's verdict, never from the
+    // name. Interpolating the value back in would put a field the card redacts
+    // and truncates onto stdout unsanitized. `accept` is held to the strict
+    // form — it does not echo the name at all. The single-step commands still
+    // render the engine's own `path_policy_rejected` detail, which does name
+    // it, but through the same redactor the card applies (see below).
+    it('never prints the name it refused', () => {
+      seed(makeRecord({ name: 'some/path/traversal' }));
+
+      const result = runCli(['accept', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      expect(result.stdout).not.toContain('some/path/traversal');
+      expect(result.stderr).not.toContain('some/path/traversal');
+    });
+
+    // The other half of that boundary. A refusal detail is the one value the
+    // prose module renders that no card sanitized, and several engine modules
+    // build theirs out of the raw `name` — so a name the card shows redacted
+    // has to stay redacted when the transition refuses, or the reviewer safely
+    // reads `[REDACTED]` while the very next command puts the secret in a shell
+    // log. Parity with the card is asserted here, not just absence.
+    it('redacts the engine detail it renders, as the card does', () => {
+      seed(makeRecord({ name: 'api_key=SUPERSECRETVALUE1234/x' }));
+
+      expect(runJson(['inbox', '--project']).candidates[0].name).toBe('api_key=[REDACTED]');
+      expect(runCli(['approve', CANDIDATE_ID, '--project', '--json']).status).toBe(0);
+
+      const result = runCli(['materialize', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      expect(result.stdout).not.toContain('SUPERSECRETVALUE1234');
+      expect(result.stderr).not.toContain('SUPERSECRETVALUE1234');
+      // Redaction, not suppression: the audited reason still reaches the reviewer.
+      expect(JSON.parse(result.stdout).error).toMatch(/path_policy_rejected/);
+      expect(JSON.parse(result.stdout).error).toContain('api_key=[REDACTED]');
+    });
+
+    // The class is wider than the one reason the end-to-end case can reach:
+    // `activate.js` refuses `target_path_rejected` with a path it builds from
+    // the same name, and a name that is path-legal but secret-bearing gets
+    // there. Pinned on the exported function so a refusal reason with no
+    // reachable CLI fixture is still covered.
+    it('redacts every module failure detail, not one reason string', () => {
+      const { refusalMessage } = require('../../scripts/cli/learn-candidate-prose');
+      const card = { candidate_id: CANDIDATE_ID, lifecycle_status: 'materialized' };
+
+      const message = refusalMessage(
+        {
+          accepted: false,
+          reason: 'target_path_rejected',
+          module_failure: {
+            detail:
+              'Active path not within allowed roots: ' +
+              '/home/u/.arcforge/learning/active/api_key=SECRETVAL1234.md',
+          },
+        },
+        'activate',
+        card,
+      );
+
+      expect(message).not.toContain('SECRETVAL1234');
+      expect(message).toContain('[REDACTED]');
+      expect(message).toContain('target_path_rejected');
+    });
+
+    // Nothing the CLI offers renames a candidate, so declining it is the only
+    // way out — and the advertised next step has to run. `dismiss` is legal from
+    // `pending_review`, which is exactly where refusing up front leaves it.
+    it('names a recovery that actually runs', () => {
+      seed(makeRecord({ name: 'some/path/traversal' }));
+
+      const { error } = JSON.parse(runCli(['accept', CANDIDATE_ID, '--project', '--json']).stdout);
+      expect(error).toMatch(new RegExp(`arcforge learn reject ${CANDIDATE_ID} --project`));
+
+      expect(runCli(['reject', CANDIDATE_ID, '--project', '--json']).status).toBe(0);
+      expect(runJson(['inbox', '--project']).candidates[0].lifecycle_status).toBe('dismissed');
+    });
+
+    // The other arm of the same ternary, and the difference from the type
+    // refusal the guide draws: that one names the dashboard alongside its
+    // command, this one names it instead of one. `approve` is a single
+    // transition with no name pre-check, so a reviewer reaches `approved` with
+    // a name the draft writer can never use — and from there the matrix refuses
+    // to dismiss, so there is no `learn reject` left to offer.
+    it('sends the name refusal to the dashboard where declining is not legal', () => {
+      seed(makeRecord({ name: 'some/path/traversal' }));
+      expect(runCli(['approve', CANDIDATE_ID, '--project', '--json']).status).toBe(0);
+
+      const { error } = JSON.parse(runCli(['accept', CANDIDATE_ID, '--project', '--json']).stdout);
+
+      expect(error).toMatch(/name is not one the draft writer can use/);
+      expect(error).toMatch(/arcforge learn dashboard/);
+      expect(error).not.toMatch(/arcforge learn reject/);
+      // The command it stopped naming is the one the matrix refuses. Last,
+      // because a refused dispatch appends its own audited rejection.
+      expect(runCli(['reject', CANDIDATE_ID, '--project', '--json']).status).not.toBe(0);
+    });
+
+    // The other half of what the policy calls blank: `sanitizeFilename` rejects
+    // a whitespace-only name as well as an empty one, and the schema admits both.
+    it('refuses a blank name the same way', () => {
+      seed(makeRecord({ name: '   ' }));
+      const queueBefore = queueBytes();
+
+      const result = runCli(['accept', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      expect(JSON.parse(result.stdout).error).toMatch(/name is not one the draft writer can use/);
+      expect(queueBytes()).toBe(queueBefore);
+      expect(auditEntries()).toEqual([]);
+      expect(materializationDirs()).toEqual([]);
+    });
+
+    // The name policy is a byte budget as well as a shape rule, because the
+    // draft writer's temporary file has to fit in a path component. Layer 5's
+    // 120-character cap admits 360 bytes of CJK, so a schema-valid name can be
+    // one the draft writer could never write — and without the length clause
+    // `accept` approved first and met `ENAMETOOLONG` afterwards, stranding the
+    // candidate in `approved`, which the matrix gives no exit from.
+    it('refuses a name too long in bytes before it approves anything', () => {
+      seed(makeRecord({ name: '界'.repeat(120) }));
+      const queueBefore = queueBytes();
+
+      const result = runCli(['accept', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      expect(JSON.parse(result.stdout).error).toMatch(/name is not one the draft writer can use/);
+      expect(queueBytes()).toBe(queueBefore);
+      expect(auditEntries()).toEqual([]);
+      expect(materializationDirs()).toEqual([]);
+      expect(runJson(['inbox', '--project']).candidates[0].lifecycle_status).toBe('pending_review');
+    });
+
+    it('warns on stderr before activating, so the safety ack it sends is true', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      runJson(['materialize', CANDIDATE_ID, '--project']);
+
+      const result = runCli(['activate', CANDIDATE_ID, '--project', '--json']);
+
+      // The ack asserts the reviewer saw the target path, so the path printed
+      // has to be the file activation writes — pinned against the file that
+      // actually appeared, not against a shape a regex would also match while
+      // naming some other file.
+      const activePath = path.join(arcforgeHome, 'instincts', PROJECT_NAME, `${CANDIDATE_ID}.md`);
+      expect(result.status).toBe(0);
+      expect(result.stderr).toMatch(/changes how future sessions behave/);
+      expect(result.stderr).toContain(activePath);
+      expect(fs.existsSync(activePath)).toBe(true);
+      expect(result.stderr).not.toContain(PROJECT_ID);
+    });
+
+    it('accepts by approving and materializing, and never activates', () => {
+      seed(makeRecord());
+
+      const accepted = runJson(['accept', CANDIDATE_ID, '--project']);
+
+      expect(accepted.candidate.lifecycle_status).toBe('materialized');
+      expect(fs.existsSync(accepted.draft_paths[0])).toBe(true);
+      expect(fs.existsSync(path.join(arcforgeHome, 'instincts'))).toBe(false);
+
+      // Re-accepting an already-materialized candidate stays the no-op it has
+      // always been: the intact draft is reported again, nothing is dispatched,
+      // and no second materialization directory is allocated.
+      const again = runJson(['accept', CANDIDATE_ID, '--project']);
+      expect(again.draft_paths).toEqual(accepted.draft_paths);
+      expect(materializationDirs()).toHaveLength(1);
+    });
+
+    // `accept` used to pin the materialize dispatch to a literal `approved`, so
+    // every starting status other than pending_review came back as a
+    // `stale_status` race that had not happened — and re-running, which is what
+    // that message tells you to do, could never clear it.
+    it('accepts a deactivated candidate, which the matrix allows to materialize', () => {
+      seed(makeRecord());
+      runJson(['approve', CANDIDATE_ID, '--project']);
+      runJson(['materialize', CANDIDATE_ID, '--project']);
+      runJson(['activate', CANDIDATE_ID, '--project']);
+      deactivate(CANDIDATE_ID);
+
+      const accepted = runJson(['accept', CANDIDATE_ID, '--project']);
+
+      // The dispatch goes through and hands back the draft.
+      expect(accepted.materialization_id).toBeTruthy();
+      expect(fs.existsSync(accepted.draft_paths[0])).toBe(true);
+
+      // The re-materialization transition lands even though L7-11 hands back the
+      // manifest it already wrote, so the candidate re-enters the drafts queue
+      // rather than reporting success while still reading `deactivated`.
+      expect(accepted.candidate.lifecycle_status).toBe('materialized');
+
+      const drafts = runJson(['drafts', '--project']);
+      expect(drafts.count).toBe(1);
+      expect(drafts.drafts[0].candidate_id).toBe(CANDIDATE_ID);
+
+      // The intact draft is reused, so re-accepting from `materialized` is
+      // still the reporting no-op and allocates no second draft directory.
+      expect(runJson(['accept', CANDIDATE_ID, '--project']).draft_paths).toEqual(
+        accepted.draft_paths,
+      );
+      expect(materializationDirs()).toHaveLength(1);
+    });
+
+    /**
+     * Two manifests, one reusable: an older A whose draft is intact, and a newer
+     * B whose draft is gone. `materialize()` reuses A — candidate hash, render
+     * policy and intact drafts — while B is merely the newest on disk. Two full
+     * review cycles put the candidate there without touching anything but the
+     * draft files.
+     */
+    function divergentManifests() {
+      const first = runJson(['accept', CANDIDATE_ID, '--project']);
+      const draftA = first.draft_paths[0];
+      const bodyA = fs.readFileSync(draftA, 'utf8');
+      runJson(['activate', CANDIDATE_ID, '--project']);
+      deactivate(CANDIDATE_ID);
+
+      // Hand-edit A so the reuse lookup skips it: this accept writes manifest B.
+      fs.writeFileSync(draftA, 'hand-edited draft body\n', 'utf8');
+      const second = runJson(['accept', CANDIDATE_ID, '--project']);
+      const draftB = second.draft_paths[0];
+      expect(draftB).not.toBe(draftA);
+      runJson(['activate', CANDIDATE_ID, '--project']);
+      deactivate(CANDIDATE_ID);
+
+      // Restore A byte-for-byte and lose B's draft. Now the reusable manifest
+      // is A and the newest manifest on disk is B.
+      fs.writeFileSync(draftA, bodyA, 'utf8');
+      fs.rmSync(draftB);
+      return { draftA, draftB };
+    }
+
+    // A caller that re-derives the paths after the dispatch resolves the
+    // manifest on its own criteria, and pairs A's `materialization_id` with B's
+    // path — a success exit naming a file that is not there.
+    it('pairs the accepted draft paths with the manifest it materialized', () => {
+      seed(makeRecord());
+      const { draftA } = divergentManifests();
+
+      const accepted = runJson(['accept', CANDIDATE_ID, '--project']);
+
+      // Pin that the two manifests are distinct, or the pairing assertion below
+      // passes vacuously.
+      expect(materializationDirs()).toHaveLength(2);
+      expect(accepted.materialization_id).toBeTruthy();
+      expect(accepted.draft_paths[0]).toContain(accepted.materialization_id);
+      expect(accepted.draft_paths[0]).toBe(draftA);
+      // `existsSync` alone is not the guard: it passes in the divergent state
+      // whenever the newest manifest happens to be intact.
+      expect(fs.existsSync(accepted.draft_paths[0])).toBe(true);
+    });
+
+    // One step past the pairing above: the state has to stay ACTIVATABLE. While
+    // activation resolved the newest manifest, it refused on B's missing draft
+    // — from `materialized`, the one status the matrix allows neither another
+    // materialize nor a dismiss from — so a candidate that had just been
+    // re-materialized onto an intact draft could never be reviewed again.
+    it('activates the draft it re-materialized, with a newer manifest lost', () => {
+      seed(makeRecord());
+      const { draftA } = divergentManifests();
+      expect(runJson(['accept', CANDIDATE_ID, '--project']).draft_paths).toEqual([draftA]);
+
+      const activated = runJson(['activate', CANDIDATE_ID, '--project']);
+
+      expect(activated.next_status).toBe('activated');
+      // What was activated is what accept reported, and the reviewer is told so.
+      expect(activated.draft_paths).toEqual([draftA]);
+      expect(
+        fs.existsSync(path.join(arcforgeHome, 'instincts', PROJECT_NAME, `${CANDIDATE_ID}.md`)),
+      ).toBe(true);
+      // The record names the manifest that was consumed: A, whose directory the
+      // reported path sits under — not B, the newest one.
+      const activationsDir = path.join(arcforgeHome, 'learning', 'activations');
+      const [activation] = fs
+        .readdirSync(activationsDir)
+        .map((entry) => JSON.parse(fs.readFileSync(path.join(activationsDir, entry), 'utf8')))
+        .filter((record) => record.action === 'activate')
+        .sort((a, b) => b.created_at.localeCompare(a.created_at));
+      expect(draftA).toContain(activation.materialization_id);
+    });
+
+    // The other half of that pairing's contract. DH-1 attaches the paths to the
+    // action RESULT, deliberately outside `accept()`, whose argument is written
+    // verbatim to the B-5 audit trail. Folding the spread back inside would
+    // start writing absolute filesystem paths into the log, and nothing else
+    // here would fail.
+    it('keeps the accepted draft paths out of the shared audit log', () => {
+      seed(makeRecord());
+      const accepted = runJson(['accept', CANDIDATE_ID, '--project']);
+      expect(accepted.draft_paths[0]).toContain(path.join('learning', 'drafts'));
+
+      const materialize = auditEntries().find((entry) => entry.action === 'materialize');
+      expect(materialize).toMatchObject({ accepted: true, candidate_id: CANDIDATE_ID });
+      expect(materialize.materialization_id).toBeTruthy();
+      expect(materialize.draft_paths).toBeUndefined();
+      // No path under any other key either — the id travels, the paths do not.
+      expect(JSON.stringify(auditEntries())).not.toContain(path.join('learning', 'drafts'));
+    });
+
+    // What the next two pin: the `materialized` short-circuit dispatches nothing
+    // and reports the draft the candidate already has, so when that draft is
+    // gone or edited the only thing it can get wrong is the report — and a path
+    // that does not resolve is exactly what the activation behind it refuses on.
+    it('refuses to accept a materialized candidate whose draft is gone', () => {
+      seed(makeRecord());
+      const draftPath = runJson(['accept', CANDIDATE_ID, '--project']).draft_paths[0];
+      fs.rmSync(draftPath);
+      const before = queueBytes();
+
+      const result = runCli(['accept', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      const { error } = JSON.parse(result.stdout);
+      expect(error).toContain(draftPath);
+      expect(error).toMatch(/is missing/);
+      expect(error).toMatch(/nothing was applied/);
+      // The refusal replaces a report, not a transition — so it is provably
+      // state-free: the append-only queue is byte-identical.
+      expect(queueBytes()).toBe(before);
+    });
+
+    it('refuses to accept a materialized candidate whose draft was hand-edited', () => {
+      seed(makeRecord());
+      const draftPath = runJson(['accept', CANDIDATE_ID, '--project']).draft_paths[0];
+      fs.writeFileSync(draftPath, 'hand-edited draft body\n', 'utf8');
+      const before = queueBytes();
+
+      const result = runCli(['accept', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      const { error } = JSON.parse(result.stdout);
+      expect(error).toContain(draftPath);
+      expect(error).toMatch(/has changed since it was written/);
+      expect(error).toMatch(/nothing was applied/);
+      expect(queueBytes()).toBe(before);
+    });
+
+    // The third way `accept`'s no-op branch can have nothing to hand back: the
+    // manifest itself is gone, so there is no recorded file to report as stale
+    // and the refusal has to name the missing record instead.
+    it('refuses to accept a materialized candidate whose record is gone', () => {
+      seed(makeRecord());
+      runJson(['accept', CANDIDATE_ID, '--project']);
+      fs.rmSync(draftsDir(), { recursive: true });
+      const before = queueBytes();
+
+      const result = runCli(['accept', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      const { error } = JSON.parse(result.stdout);
+      expect(error).toMatch(/No usable materialization record remains/);
+      expect(error).toMatch(/nothing was applied/);
+      // Not the stale-file wording, which would name no file after its colon.
+      expect(error).not.toMatch(/is no longer what was written/);
+      expect(queueBytes()).toBe(before);
+    });
+
+    // `activate` is still the command the guide names for a materialized
+    // candidate, so a reviewer can reach this refusal by typing it after
+    // `drafts` stops advertising it. Nothing resolved at all here, so the
+    // shared handler rejects it itself and puts its detail at the top level of
+    // the result, where the `module_failure` fallback never sees it — without
+    // prose of its own it prints as the bare reason.
+    it('renders reviewer prose when activation finds no materialization record', () => {
+      seed(makeRecord());
+      runJson(['accept', CANDIDATE_ID, '--project']);
+      fs.rmSync(draftsDir(), { recursive: true });
+
+      const result = runCli(['activate', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      const { error } = JSON.parse(result.stdout);
+      expect(error).toMatch(/no usable materialization record remains for/);
+      expect(error).toMatch(/arcforge learn dashboard/);
+      expect(error).not.toBe('arcforge learn activate refused: materialization_missing');
+    });
+
+    // The other two ways to reach `materialization_missing`, both from Layer 8
+    // and both about a manifest that IS on disk. They arrive with a real
+    // `module_failure.detail` naming the defect, so the prose above — which
+    // asserts no usable record remains — must not be printed over them.
+    it('keeps Layer 8 detail when the record names no draft artifact', () => {
+      seed(makeRecord());
+      const draftPath = runJson(['accept', CANDIDATE_ID, '--project']).draft_paths[0];
+      const manifest = JSON.parse(fs.readFileSync(manifestPath(), 'utf8'));
+      fs.writeFileSync(
+        manifestPath(),
+        JSON.stringify({ ...manifest, draft_artifacts: [] }, null, 2),
+        'utf8',
+      );
+
+      const result = runCli(['activate', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      const { error } = JSON.parse(result.stdout);
+      expect(error).toMatch(/No draft artifact in materialization record/);
+      expect(error).not.toMatch(/no usable materialization record remains/);
+      // The record the refusal would have denied the existence of is right here.
+      expect(fs.existsSync(manifestPath())).toBe(true);
+      expect(fs.existsSync(draftPath)).toBe(true);
+    });
+
+    it('keeps Layer 8 detail when the record belongs to another candidate', () => {
+      seed(makeRecord());
+      runJson(['accept', CANDIDATE_ID, '--project']);
+      const manifest = JSON.parse(fs.readFileSync(manifestPath(), 'utf8'));
+      fs.writeFileSync(
+        manifestPath(),
+        JSON.stringify({ ...manifest, candidate_id: OTHER_PROJECT_CANDIDATE_ID }, null, 2),
+        'utf8',
+      );
+
+      const result = runCli(['activate', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      const { error } = JSON.parse(result.stdout);
+      expect(error).toMatch(/Materialization record does not match candidate/);
+      expect(error).not.toMatch(/no usable materialization record remains/);
+      expect(fs.existsSync(manifestPath())).toBe(true);
+    });
+
+    it('refuses to accept an activated candidate as a policy violation, not a race', () => {
+      seed(makeRecord());
+      runJson(['accept', CANDIDATE_ID, '--project']);
+      runJson(['activate', CANDIDATE_ID, '--project']);
+
+      const result = runCli(['accept', CANDIDATE_ID, '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      const { error } = JSON.parse(result.stdout);
+      expect(error).toMatch(/policy_violation/);
+      expect(error).toMatch(/is activated.*allows: deactivate/);
+      expect(error).not.toMatch(/stale_status|re-run/);
+    });
+
+    it('reports an unknown candidate id rather than acting on nothing', () => {
+      const result = runCli(['approve', 'cand_missing', '--project', '--json']);
+
+      expect(result.status).not.toBe(0);
+      expect(JSON.parse(result.stdout).error).toMatch(/candidate not found/);
     });
   });
 });
