@@ -73,11 +73,14 @@ agrees with the code no matter what the code does.
 
 ## 4. Build with the spec in sync
 
-Starting the build is one edit with two halves: the roadmap row flips `next` →
-`building`, and the spec header flips to `building vX.Y.Z` — or to the compound
-form in `references/conventions.md` when an earlier version already shipped this
-spec. The tag cell stays `—` until the version ships. A row still reading
-`next` while implementation merges is a ledger claiming work has not started.
+Starting the build flips the roadmap row `next` → `building`, and re-reads the
+spec header off the **highest row linking that spec**. When the row that just
+started is that highest row, the header becomes `building vX.Y.Z` — or the
+compound form in `references/conventions.md` if a lower row has already
+shipped. When a later unshipped row is the highest, the header does not move:
+promotion already wrote what that row says. The tag cell stays `—` until the
+version ships. A row still reading `next` while implementation merges is a
+ledger claiming work has not started.
 
 Work the spec's numbered behaviors (`B-1`, `B-2`, …) one at a time;
 implementation code goes through `/tdd`. Reality will diverge from some behavior
