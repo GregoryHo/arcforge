@@ -31,9 +31,9 @@ docs/description
 
 1. `npm run lint:fix` — auto-fix formatting
 2. `npm test` — all 5 runners must pass
-3. The 5 static checks (`check:versions`, `check:docs`, `check:cli-consumers`,
-   `check:hooks`, `check:eval-targets`) — they run in CI and are not part of
-   `npm test`; see `.claude/rules/testing.md`
+3. The 6 static checks (`check:versions`, `check:docs`, `check:cli-consumers`,
+   `check:hooks`, `check:eval-targets`, `check:product`) — they run in CI and are
+   not part of `npm test`; see `.claude/rules/testing.md`
 4. No secrets in diff — stop and remove before committing
 
 ## Skill PRs

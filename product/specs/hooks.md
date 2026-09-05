@@ -81,6 +81,25 @@ down, never block the user, and never observe them uninvited.
   reviews, where the last session left off — and is close to silent when
   learning has never been enabled.
 
+## Data / domain model
+
+Hooks own one durable format: the per-session JSON record that B-8 keeps
+unconditionally and B-6 bounds. Its path and its safe read/write belong to
+`scripts/lib/utils.js`; the fields are assembled by the three hooks that write it —
+`hooks/session-tracker/start.js` opens the record, `hooks/session-tracker/end.js`
+closes it with the counts and, above the diary threshold, with the summary
+`scripts/lib/transcript.js` parses out of the harness transcript (with no parsed
+transcript — below the threshold, or above it with none to read — `filesModified`
+is cleared while `userMessageContent` and `toolsUsed` are neither written nor
+cleared, so a record an earlier parse filled keeps that turn's prose and tool list
+until a later parse refreshes them), and
+`hooks/pre-compact/main.js` appends each compaction. The diary is
+not a hooks format but learning's ([learning](learning.md)); what this area owns is its
+trigger — the threshold gate and background enrichment `scripts/lib/diary-capture.js`
+coordinates for both Stop and PreCompact. Everything else a hook handles — tool
+names, paths, prompts arriving in an event — is untrusted input with no persistence
+of its own (B-5).
+
 ## Decisions
 
 The warn-only and fail-open stances predate this log; their rationale is

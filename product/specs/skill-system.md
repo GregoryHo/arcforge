@@ -86,6 +86,16 @@ situations to skills.
   registers) are enforced mechanically per skill-schema §6, so review effort
   goes to behavior, not formatting.
 
+## Data / domain model
+
+The one format is a skill's `SKILL.md` frontmatter, frozen in
+`docs/decisions/skill-schema.md` and enforced mechanically per its §6. Its
+invariants: `name` equals the directory name and carries no prefix (B-1), a skill
+declares exactly one of the two invocation kinds (B-4), and the bucket directory it
+sits in is a shelf rather than part of its identity (B-8). The router table in
+`using` is the second structural artifact — a bijection with the shipped skill set,
+asserted by test (B-3).
+
 ## Decisions
 
 - **D-002** — the skill set targets Claude Code as its only harness for 6.0.0;

@@ -39,7 +39,7 @@ harness-neutral.** Nothing here changes what arcforge targets.
 ```bash
 npm test                      # 5 runners, all must pass
 npm run check:versions && npm run check:docs && npm run check:cli-consumers \
-  && npm run check:hooks && npm run check:eval-targets
+  && npm run check:hooks && npm run check:eval-targets && npm run check:product
 npm run lint
 ```
 

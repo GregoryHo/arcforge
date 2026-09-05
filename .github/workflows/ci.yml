@@ -68,6 +68,7 @@ jobs:
       - run: npm run check:cli-consumers
       - run: npm run check:hooks
       - run: npm run check:eval-targets
+      - run: npm run check:product
       - run: npm run test:scripts
       - run: npm run test:hooks
       - run: npm run test:node
