@@ -398,7 +398,13 @@ plausibility rather than cost: a correct roadmap whose `## Decision Log` heading
 is indented is a shape a real file has, while a fenced markdown example inside
 `ROADMAP.md` whose content line is an indented `##` is not. Nothing in the
 prompt asks for one, and none of the six surviving transcripts writes a fence
-into `ROADMAP.md` at all.
+into `ROADMAP.md` at all. A fourth, found after the fact and recorded rather
+than closed: `^\s*` opens the log at any indent — the same four-space reading
+that closes nothing opens nothing either — so a trial that renames the real
+heading and plants a four-space `## Decision Log` above the entries scores 4/4
+on a file whose log the engine does not see and C6 rejects. The shape needs two
+edits nothing in the prompt pressures and no transcript writes, and tightening
+the opening to column 1 is the narrowing this section already declines.
 
 **Version 7, continued — A3's "appended" read numerically.** `new_ids` was a set
 difference against the seven ids the fixture wrote, so any three-digit id
