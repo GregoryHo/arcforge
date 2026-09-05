@@ -265,7 +265,7 @@ function SessionLearning({theme:t}) {
 function Platforms({theme:t}) {
   const plats = [
     {name:'Claude Code',tag:'IN FULL',cmd:'/plugin install arcforge@arcforge-dev',note:'Skills, hooks, and the CLI engine all load natively from the plugin marketplace.',primary:true},
-    {name:'Codex CLI',tag:'SKILLS ONLY',cmd:['codex plugin marketplace add GregoryHo/arcforge','codex plugin add arcforge@arcforge-dev'],note:'All 15 skills load from the same tree \u2014 8 of them work in full. The other 7 shell out to the arcforge CLI, and those steps fail with command not found: Codex does not put a plugin\u2019s bin/ on PATH. Hooks, the learning subsystem, the eval harness and the unattended loop stay Claude Code\u2019s. The README names all 15 before you install.'},
+    {name:'Codex CLI',tag:'SKILLS ONLY',cmd:['codex plugin marketplace add GregoryHo/arcforge','codex plugin add arcforge@arcforge-dev'],note:'All 16 skills load from the same tree \u2014 9 of them work in full. The other 7 shell out to the arcforge CLI, and those steps fail with command not found: Codex does not put a plugin\u2019s bin/ on PATH. Hooks, the learning subsystem, the eval harness and the unattended loop stay Claude Code\u2019s. The README names all 16 before you install.'},
     {name:'Node.js',tag:'THAT IS ALL',cmd:'dependencies: {}',note:'The engine is standard library only. Nothing to audit, nothing to update, nothing to break.'},
   ];
   return (
@@ -296,7 +296,7 @@ function Platforms({theme:t}) {
   );
 }
 
-// ─── Skills Grid (all 15) ───
+// ─── Skills Grid (every shipped skill) ───
 function SkillsGrid({theme:t}) {
   const layers = [
     ['Self-contained', t.ember, 'no shared state', 'Every skill is a closed unit. It can be read, moved, or deleted without touching anything else — and it reaches the engine one way only, through the CLI.'],
@@ -310,6 +310,7 @@ function SkillsGrid({theme:t}) {
     ['Doing the work', t.ember, [
       ['brainstorming','explore before the design settles'],
       ['executing','task list, then run it'],
+      ['speccing','specs and decision log move with the code'],
       ['dispatching','parallel work, isolated writers'],
       ['looping','unattended across fresh sessions'],
       ['finishing','merge, PR, keep, or discard'],
@@ -337,7 +338,7 @@ function SkillsGrid({theme:t}) {
       <SectionHeader
         n="02"
         kicker="SKILLS"
-        title={<>15 skills. <em style={{color:t.brass,fontStyle:'italic'}}>No pipeline</em> to enter through.</>}
+        title={<>One skill per situation. <em style={{color:t.brass,fontStyle:'italic'}}>No pipeline</em> to enter through.</>}
         sub="Each one is a closed unit that fires from its own description when the situation matches, and stays quiet when it doesn't. Three of them never auto-fire at all — looping, learning, and writing-skills wait to be asked."
         theme={t}
       />

@@ -1,12 +1,12 @@
 # Skills
 
-arcforge ships fifteen skills. Each one is a self-contained workflow that changes
+arcforge ships sixteen skills. Each one is a self-contained workflow that changes
 how the agent works on a particular kind of problem — not a library of prompts to
 copy, but instructions that load into the session when they apply.
 
 ## How a skill fires
 
-Twelve of the fifteen are **model-invoked**: the agent reaches for them on its
+Thirteen of the sixteen are **model-invoked**: the agent reaches for them on its
 own when the situation matches. You do not have to know they exist. Ask for a bug
 to be fixed and `debugging` applies itself; say a branch is finished and
 `finishing` takes over.
@@ -64,6 +64,20 @@ already tried did not hold. Its law: no fix before the cause is named.
 
 Between the two: `debugging` while the failure is unexplained, `tdd` once you
 know what to change.
+
+## Running the product
+
+**`speccing`** — for a repo that keeps its product intent in files: a living spec
+per area, a versioned roadmap, an append-only decision log, and a backlog of
+wishes. It applies when a wish needs capturing, when a version needs its spec
+written before the build starts, when a recorded decision is being reversed,
+when a shipped version needs its roadmap row and spec header flipped, or when
+the user asks to start keeping product state this way. Two rules carry it: the
+spec and the code merge in the same PR, and a recorded decision is superseded
+rather than edited. It never creates product files in a repo whose user has not
+asked for them.
+
+`brainstorming` settles what to build; `speccing` records what was settled.
 
 ## Handing it off
 
@@ -129,6 +143,7 @@ it on; nothing it proposes changes behavior until you activate it. See the
 | `using` | you are unsure which skill fits |
 | `brainstorming` | a design is not settled and alternatives have not been named |
 | `executing` | the work needs a task list and someone to run it |
+| `speccing` | a project's specs, roadmap, or decision log has to move with the code |
 | `tdd` | code is about to be written or changed |
 | `debugging` | something failed and the cause is not yet known |
 | `code-review` | a change is ready to hand off, or feedback came back |

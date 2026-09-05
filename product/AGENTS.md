@@ -171,8 +171,9 @@ one:
 - A `shipped` governing row collapses the header to `shipped v<that version>` — the
   earlier rows are history, and the roadmap already carries it.
 - An unshipped governing row over an already-shipped spec takes the **compound
-  form**, naming the last shipped version and the one extending it:
-  `shipped v6.0.0 · extended by 6.1.0 (building)`.
+  form**, naming the last shipped version and the one extending it, with that row's
+  own status in the parentheses: `shipped v6.0.0 · extended by 6.1.0 (building)`,
+  or `… (next)` while the extending row has not started.
 - With no shipped row at all, the header is just rule 1 applied to the governing row.
 
 Each version occupies **exactly one row** (C4), which is what makes "the
@@ -413,8 +414,15 @@ no estimate, no commitment. Low friction is the point.
    `- ~~**<slug>**~~ — graduated into <X.Y.Z> (D-NNN).`
 2. Record a Decision Log entry (next `D-id`) — *which version, why now*.
 3. Add the roadmap row: next free `X.Y.Z`, `Status: next`, `Tag: —`, a one-line
-   "what & why", and a link to its spec. Move `← we are here` onto it.
-4. Write `specs/<slug>.md` from the template **before building**.
+   "what & why", and a link to its spec. Move `← we are here` onto it only when
+   every row above it has shipped; a `building` row, or an earlier `next` row,
+   keeps it.
+4. Write the spec **before building** — `specs/<slug>.md` from the template for a
+   new area, or this version's behaviors added to the area's existing living spec,
+   never a second file for one area. An existing spec's header follows rule 2 from
+   the moment the new row links it: the compound form `shipped vX.Y.Z · extended
+   by <this version> (next)` once a lower row has shipped, and plain `draft` while
+   none has.
 
 ### Record a decision
 Append to the Decision Log with the next free `D-NNN` (zero-padded, monotonic,
@@ -451,9 +459,14 @@ rationale intact. A pivot is two small edits, not a rewrite.
 ### Build a milestone (`building`)
 Implementing a spec is ordinary disciplined development — this system bookends it, it
 does not add ceremony.
-1. Flip the row to `Status: building` **and** the spec header to `building vX.Y.Z`
-   (or the compound form, per mechanical rule 2). One edit, both halves; C4 in
-   `npm run check:product` proves you did both (the `Tag` stays `—` either way).
+1. Flip the row to `Status: building`, then re-read the spec header off the
+   **highest row linking that spec**, per mechanical rule 2. When the row that
+   just started is that highest row, the header becomes `building vX.Y.Z` — or
+   the compound form. When a later row is, the header does not move: promotion,
+   or that later row's own ship, already wrote what it says. C4 in
+   `npm run check:product` reads the header against the governing row either
+   way, so the no-op passes and a half-done flip does not (the `Tag` stays `—`
+   throughout).
 2. Branch from `main`. Build the spec's **Behavior** items test-first — a failing
    test per `B-id` → make it pass → refactor. Keep the 5 runners and the 6 static
    checks green.
@@ -469,8 +482,10 @@ does not add ceremony.
 ### Ship a version
 Run the `releasing` skill — it owns the mechanics and the ordering. Product-side, one
 commit flips all four things at once: the roadmap row to `shipped`, the `Tag` column
-to `vX.Y.Z`, every spec header the row governs, and the `← we are here` marker onto
-whatever is next. `npm run check:product` is green before the flip and green after —
+to `vX.Y.Z`, every spec header the row governs, and the `← we are here` marker, which
+sits on the earliest row that has not shipped and on the last row when every row has
+— so it stays put when this version shipped ahead of an earlier unshipped row.
+`npm run check:product` is green before the flip and green after —
 what it catches is a *half-done* flip, which is the failure mode that actually
 happens. Three of the four edits are gated: the row's Status, its `Tag` cell, and
 every spec header the row governs all have to agree. The fourth is not — C1 counts
@@ -500,7 +515,9 @@ and didn't passes green. Re-read that one yourself.
 ```
 
 Placeholders stand in for whatever the real choices are — the **shape** is what
-matters: the original entry keeps its text and gains one `Superseded-by:` line; the
-new entry carries `Supersedes:` and the reason for the change. Had only part of D-007
-died, the new entry would read `Supersedes: D-007 (clause 2)` and D-007's status would
-become `Accepted · partially superseded by D-011`.
+matters: the original entry keeps its `Decision:` and `Why:` text and has the value of
+its one `Status:` line replaced — `Accepted` becomes `Superseded-by: D-011`, never a
+second `Status:` line beside it; the new entry carries `Supersedes:` and the reason for
+the change. Had only part of D-007 died, the new entry would read
+`Supersedes: D-007 (clause 2)` and D-007's status would become
+`Accepted · partially superseded by D-011`.

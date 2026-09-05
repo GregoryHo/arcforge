@@ -98,7 +98,9 @@ rules, or tests.
 
 ## Skill Set and Routing
 
-- 15 self-contained skills, no name prefix (D7); `name` == directory name.
+- Self-contained skills, no name prefix (D7); `name` == directory name. The
+  shipped set is enumerated in `product/specs/skill-system.md` B-1 and pinned by
+  `EXPECTED_SKILL_COUNT` in `tests/skills/test_skill_structure.py`.
 - Invocation is **prose**: a skill fires because its description register
   matches the situation and the router maps that condition to it. There is no
   skill-type taxonomy (no Workflow / Discipline / Meta tiers) and no mandatory
@@ -124,10 +126,10 @@ that emits one target from the other.
 
 What each target gets is not symmetric, and that asymmetry is the contract:
 
-- **Skills port; nothing else does.** All 15 skills load on both hosts. Hooks,
-  learning, eval, and loop are Claude Code only — they depend on Claude Code's
-  hook protocol and on `claude` being spawnable, neither of which Codex offers.
-  Hooks go further than "do not run": the registry is named
+- **Skills port; nothing else does.** Every skill under `skills/core/` loads on
+  both hosts. Hooks, learning, eval, and loop are Claude Code only — they depend
+  on Claude Code's hook protocol and on `claude` being spawnable, neither of
+  which Codex offers. Hooks go further than "do not run": the registry is named
   `hooks/claude-code.json` precisely so Codex's hook auto-discovery cannot see
   it, and `check:hooks` keeps it that way.
 - **The D9 bare-`arcforge` boundary is Claude Code's.** Codex does not put a
