@@ -34,7 +34,17 @@ const DECISION_INDENT_RE = /^ {1,3}###/;
 // one to three spaces in still renders as a bullet a reader trusts, so a flip
 // appended beside the line it replaces is counted wherever it renders rather than
 // hidden by a stray indent. At four the line is an indented code block again.
-const STATUS_FIELD_RE = /^ {0,3}-\s+Status:\s*(.+?)\s*$/;
+//
+// The value is captured at `(.*?)`, not `(.+?)`, because the count is over the
+// lines a reader sees: `- Status:` with nothing after the colon is a status line
+// whether or not it carries a value, so whether the value is empty is decided
+// after the line has been counted rather than by whether the line matched at all.
+// Read at `(.+?)` a bare second field was not a line, so it never reached the
+// duplicate report — while the same field padded with trailing spaces backtracked
+// into capturing one of them and passed as a value, leaving three behaviours for
+// two adjacent shapes. The surrounding `\s*` collapse every whitespace-only value
+// to exactly `''`, so emptiness is a string comparison downstream, not a trim.
+const STATUS_FIELD_RE = /^ {0,3}-\s+Status:\s*(.*?)\s*$/;
 const RELATION_FIELD_RE =
   /^-\s+(Supersedes|Refines|Extends):\s+D-(\d{3})(\s*\(clause\s+\d+\))?\s*$/;
 // Candidate-shaped: any markdown bullet whose field label is one of the three
@@ -144,7 +154,15 @@ function parseDecisions(roadmap, errors) {
         current = null;
         continue;
       }
-      current = { id: `D-${m[1]}`, num: Number(m[1]), inFold, status: null, relations: [] };
+      current = {
+        id: `D-${m[1]}`,
+        num: Number(m[1]),
+        inFold,
+        status: null,
+        statusLines: 0,
+        statusRaw: null,
+        relations: [],
+      };
       entries.push(current);
       continue;
     }
@@ -154,13 +172,25 @@ function parseDecisions(roadmap, errors) {
       // Last-wins on purpose. First-wins would report the duplicate *and* claim
       // the flip is missing on an entry that carries it one line down, which
       // invites a third `Status:` line; last-wins keeps the appended flip a
-      // single-error mutant.
-      if (current.status !== null) {
+      // single-error mutant. Last *non-empty* wins, so an empty field appended
+      // below a valued one stays a single-error mutant too rather than erasing
+      // the value and adding a second error about the line it replaced.
+      //
+      // The count runs on `statusLines`, not on `status`, because a line whose
+      // value is empty is still a line: keyed on `status` the pair `- Status:`
+      // then `- Status: Accepted` reported nothing, since nothing had been
+      // recorded when the second line arrived.
+      if (current.statusLines > 0) {
         errors.push(
           `C3 ${current.id}: a second "- Status:" line ("${line.trim()}") — an entry carries exactly one, so a flip appended beside the line it replaces is reported rather than silently winning`,
         );
       }
-      current.status = status[1];
+      current.statusLines += 1;
+      if (status[1] === '') {
+        current.statusRaw = line.trim();
+      } else {
+        current.status = status[1];
+      }
     }
     if (RELATION_ANY_RE.test(line)) {
       const rel = line.match(RELATION_FIELD_RE);
@@ -212,12 +242,20 @@ function checkDecisionNumbering(entries, errors) {
  * a later reversal finds no line to flip. Counting needs no vocabulary, so this
  * runs on every entry — unlike the *value* check below, which stays scoped to
  * entries something supersedes (D-006 records that scope as a deliberate residual).
+ *
+ * Three states, not two, because a line can be present and still record nothing:
+ * no line at all, a line with nothing after the colon, and a line with a value.
+ * The middle one gets its own message rather than reusing the first — a line the
+ * reader can see must not be reported as absent, or the fix the message asks for
+ * (add a `Status:` line) is one the entry already has.
  */
 function checkStatusPresence(entries, errors) {
   for (const e of entries) {
     if (e.status !== null) continue;
     errors.push(
-      `C3 ${e.id}: no "- Status:" line — an entry carries exactly one, so a decision that never records whether it still governs is reported rather than read as live`,
+      e.statusLines === 0
+        ? `C3 ${e.id}: no "- Status:" line — an entry carries exactly one, so a decision that never records whether it still governs is reported rather than read as live`
+        : `C3 ${e.id}: a "- Status:" line with nothing after the colon ("${e.statusRaw}") — a line that records nothing about whether the decision still governs is reported rather than read as live`,
     );
   }
 }

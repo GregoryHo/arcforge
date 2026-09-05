@@ -137,8 +137,14 @@ const SPEC_DECISIONS_HEADING_RE = /^##\s+Decisions\s*$/;
 // the ` {0,3}` bound the rest of the linter reads structure at: CommonMark opens a
 // block quote at up to three leading spaces, so a `> Status:` line in that band still
 // renders as the header a reader trusts and the count below has to see it. At four
-// the line is an indented code block, and an illustration again.
-const SPEC_STATUS_HEADER_RE = /^ {0,3}>\s*Status:\s*(.+?)\s*$/;
+// the line is an indented code block, and an illustration again. The value is
+// captured at `(.*?)` for the reason `STATUS_FIELD_RE` is: the count is over the
+// header lines a reader sees, so `> Status:` with nothing after the colon is one
+// of them. Read at `(.+?)` it was not a line at all, and a stale header left
+// beside an emptied one lost silently. A lone empty header needs no message of
+// its own here — it falls through to the value comparison below, which reports
+// it against the state its governing row makes it.
+const SPEC_STATUS_HEADER_RE = /^ {0,3}>\s*Status:\s*(.*?)\s*$/;
 // Matches a citation-shaped token and its trailing identifier characters, so a
 // suffixed id (`D-001a`) is reported as malformed rather than skipped. The
 // leading `\d` keeps ordinary prose (`D-Bus`) out of the scan. The alphabet is

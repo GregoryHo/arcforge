@@ -675,6 +675,27 @@ describe('check-product', () => {
       expect(errors[0]).toMatch(/a second "- Status:" line/);
     });
 
+    it('rejects an empty second `- Status:` line', () => {
+      // A field label with nothing after the colon is a line the reader sees, so
+      // the entry renders two status fields. Read at `(.+?)` the empty one was not
+      // a line at all, so it never reached the count and C3 passed the entry.
+      const decisions = [decision({ id: 'D-001', extra: ['- Status:'] })];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/a second "- Status:" line/);
+    });
+
+    it('rejects the same pair with the empty line written first', () => {
+      // What the line counter exists for: keyed on the recorded *value*, nothing
+      // had been recorded when the second line arrived, so this order reported
+      // nothing while the order above reported the duplicate. Both are the same
+      // two-field entry and get the same error.
+      const decisions = [decision({ id: 'D-001', extra: ['- Status:'], status: 'Proposed' })];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/a second "- Status:" line/);
+    });
+
     it('rejects a second `- Status:` line indented one to three spaces', () => {
       // A bullet one space in still renders, so the entry a reader sees carries two
       // states. Read at column 1 the appended line was invisible and C3 passed it —
@@ -700,6 +721,30 @@ describe('check-product', () => {
       const errors = of('C3', run({ roadmap: { decisions } }));
       expect(errors).toHaveLength(1);
       expect(errors[0]).toMatch(/no "- Status:" line/);
+    });
+
+    it('reports an entry whose only `- Status:` line carries no value', () => {
+      // The third state of the same count: present, but recording nothing. Read at
+      // `(.+?)` the trailing spaces backtracked into the capture, so the entry held
+      // a status of `" "` — non-null, so the presence check skipped it and the
+      // entry passed as live while saying nothing about whether it governs.
+      const decisions = [decision({ id: 'D-001', status: null, extra: ['- Status:   '] })];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/a "- Status:" line with nothing after the colon/);
+    });
+
+    it('reports both halves of the count on an entry carrying two empty lines', () => {
+      // The two clauses are independent: two lines is a duplicate however empty
+      // they are, and an entry recording no status is reported whether it got
+      // there with one such line or two.
+      const decisions = [
+        decision({ id: 'D-001', status: null, extra: ['- Status:', '- Status:'] }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(2);
+      expect(errors[0]).toMatch(/a second "- Status:" line/);
+      expect(errors[1]).toMatch(/a "- Status:" line with nothing after the colon/);
     });
 
     it('reports a superseded entry with no status line once, not once per superseder', () => {
@@ -1351,6 +1396,16 @@ describe('check-product', () => {
       // here and nothing in the case above, so one corpus got two verdicts decided
       // by typing order. Both orders are the same defect and get the same error.
       const specs = [spec({ preamble: ['> Status: draft', ''] })];
+      const errors = of('C4', validateProduct({ roadmap: roadmap(), specs }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/a second "> Status:" header line/);
+    });
+
+    it('rejects an empty second `> Status:` header', () => {
+      // The header's half of the same one-character gap: `> Status:` with nothing
+      // after the colon renders as a second blockquote header, so the spec shows
+      // two states. Read at `(.+?)` it was not a header line and C4 passed the spec.
+      const specs = [spec({ intro: ['> Status:', ''] })];
       const errors = of('C4', validateProduct({ roadmap: roadmap(), specs }));
       expect(errors).toHaveLength(1);
       expect(errors[0]).toMatch(/a second "> Status:" header line/);

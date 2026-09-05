@@ -203,7 +203,10 @@ An entry carries exactly one `- Status:` line, written in column 1 and counted
 wherever it still renders as a bullet — one to three spaces in is no hiding place —
 and C3 counts them from both sides: a second one is reported as malformed, and so is
 a missing one — an entry with no `Status:` records nothing about whether it still
-governs, and leaves a later reversal no line to flip. The flip in step 2 of *Change a
+governs, and leaves a later reversal no line to flip. A line with nothing after the
+colon is counted as a line and reported for what it is: it counts toward the second
+one, and when it is the only one it gets its own message naming the line rather than
+the missing-line message, because the line is there and the value is not. The flip in step 2 of *Change a
 decision* **replaces** the existing line rather than being appended below it — two
 `Status:` lines are the same contradiction spelled with a newline instead of a `·`.
 
@@ -349,11 +352,14 @@ reports the header as missing.
 
 A spec carries exactly one such header, and C4 counts them the way C3 counts an
 entry's `Status:` lines, at the same indent bound: a `> Status:` line one to three
-spaces in still renders as a blockquote, so it counts. A second one in the preamble
-is reported rather than losing silently to the one above it — two headers are the
-same contradiction the log's two `- Status:` lines are, spelled in a different scope,
-and read first-wins the verdict over one visibly two-state spec was decided by which
-line was typed first.
+spaces in still renders as a blockquote, so it counts, and so does a `> Status:` with
+nothing after the colon. A second one in the preamble is reported rather than losing
+silently to the one above it — two headers are the same contradiction the log's two
+`- Status:` lines are, spelled in a different scope, and read first-wins the verdict
+over one visibly two-state spec was decided by which line was typed first. An empty
+header needs no message of its own the way an empty `- Status:` line does: as the
+spec's only header it is compared against its governing row like any other value, and
+reported as the state it is not.
 The header flips in *Build a milestone* and *Ship a version* **replace** that one
 line; neither adds a second below it.
 
