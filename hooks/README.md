@@ -6,7 +6,7 @@ Hooks for extending Claude Code behavior in arcforge.
 
 ```
 hooks/
-├── hooks.json              # Hook configuration (9 entries, each with a stable `id`)
+├── claude-code.json        # Hook registry (9 entries, each with a stable `id`)
 ├── README.md
 ├── secrets-guard/          # Warn-only scan for hardcoded credentials
 │   └── main.js
@@ -31,9 +31,16 @@ hooks/
 
 ## Active Hooks
 
-`hooks.json` registers **9 entries**, each with a stable `id`. Every hook is its
-own registration; the observers are async entries so their daemon I/O never
-joins the blocking path.
+`claude-code.json` registers **9 entries**, each with a stable `id`. Every hook
+is its own registration; the observers are async entries so their daemon I/O
+never joins the blocking path.
+
+The registry is named for its host rather than by convention. Claude Code loads
+it because `.claude-plugin/plugin.json` declares
+`"hooks": "./hooks/claude-code.json"`; the conventional `hooks/hooks.json` is <!-- doc-ref-lint: ignore R1 names the path that must NOT exist; its absence is the guard (check:hooks) -->
+left empty on purpose, because that is the path Codex auto-discovers plugin
+hooks at and these hooks speak Claude Code's protocol. `npm run check:hooks`
+fails if either the declaration or the emptiness goes away.
 
 | Event | id | Kind | What runs |
 |-------|----|------|-----------|
@@ -66,20 +73,22 @@ cannot block, so its output only reminds). Today no shipped hook denies:
 Every hook is **fail-open** (any internal error → allow) and a **no-op** outside
 its self-gated context.
 
-### hooks.json schema check
+### Registry schema check
 
 `node scripts/check-hooks-schema.js` (npm: `check:hooks`) statically validates
-`hooks.json` — known event names, valid matchers, stable unique ids,
+`hooks/claude-code.json` — known event names, valid matchers, stable unique ids,
 `${CLAUDE_PLUGIN_ROOT}` command form, and the one-sync-entry-per-blocking-event
-rule. The e2e suite spawns entry files directly, so this linter is the only guard
-on the registration wiring itself.
+rule. It also checks the registration path itself: that `.claude-plugin/plugin.json`
+declares the registry, that `.codex-plugin/plugin.json` declares no hooks, and
+that neither `hooks.json` nor `hooks/hooks.json` exists. The e2e suite spawns <!-- doc-ref-lint: ignore R1 names the path that must NOT exist; its absence is the guard (check:hooks) -->
+entry files directly, so this linter is the only guard on the wiring itself.
 
 ## Adding New Hooks
 
 1. Create a folder named after the hook's purpose (e.g., `my-hook/`)
 2. Add `main.js` as the entry point (Node.js for cross-platform support)
 3. Add `README.md` documenting the hook
-4. Register in `hooks.json`
+4. Register in `claude-code.json`
 
 ### Hook Template
 
@@ -100,7 +109,7 @@ function main() {
 main();
 ```
 
-### hooks.json Entry
+### Registry Entry
 
 ```json
 {

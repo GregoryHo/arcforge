@@ -29,7 +29,7 @@ const path = require('node:path');
 const OBSERVE_HOOK = path.join(__dirname, '../../hooks/observe/main.js');
 
 /**
- * Fire the real observe hook the way hooks.json does: phase as argv[2], the
+ * Fire the real observe hook the way the registry does: phase as argv[2], the
  * hook payload on stdin. Returns nothing; the hook appends to observations.jsonl.
  */
 function observe(phase, home, projectDir, payload) {

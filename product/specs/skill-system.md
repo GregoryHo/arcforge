@@ -33,7 +33,9 @@ situations to skills.
   `debugging`, `code-review`, `finishing`, `dispatching`, `looping`, `sessions`,
   `maintaining-obsidian`, `diagramming-obsidian`, `writing-skills`, `evaluating`,
   `learning`. A skill's `name` equals its directory name, carries no prefix, and
-  is namespaced at install time to `/arcforge:<name>`.
+  is namespaced at install time — `/arcforge:<name>` on Claude Code,
+  `arcforge:<name>` (no leading slash) on Codex CLI
+  ([codex-harness](codex-harness.md) B-2).
 - **B-2 The router is an index, not a gate.** `using` holds one table mapping
   situations to skills. It exists for the moment the user is unsure which
   workflow fits; it points at one skill and gets out of the way. No workflow is

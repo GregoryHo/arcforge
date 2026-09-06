@@ -11,7 +11,7 @@ own when the situation matches. You do not have to know they exist. Ask for a bu
 to be fixed and `debugging` applies itself; say a branch is finished and
 `finishing` takes over.
 
-Three are **user-invoked** — they load only when you type the slash command,
+Three are **user-invoked** — they load only when you ask for them by name,
 because starting them is a deliberate act rather than something to infer:
 
 ```
@@ -21,7 +21,11 @@ because starting them is a deliberate act rather than something to infer:
 ```
 
 Any skill can be invoked by name this way — installing the plugin namespaces
-them, so the form is always `/arcforge:<name>`.
+them. The form is host-specific: `/arcforge:<name>` on Claude Code, and
+`arcforge:<name>` (no leading slash) on Codex CLI, which has no slash commands
+for skills — you reach one from the composer's `$` mention picker. Every
+`/arcforge:<name>` spelling in this guide is Claude Code's. What a skill can do
+once it loads differs too — see the [CLI guide](cli-invocation.md).
 
 ## Start here: `using`
 

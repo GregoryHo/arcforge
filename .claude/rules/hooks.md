@@ -14,7 +14,7 @@ paths:
 
 ```
 hooks/
-  hooks.json              # Hook registration
+  claude-code.json        # Hook registry (named by the plugin manifest)
   __tests__/              # Node --test suites
   <hook-name>/
     main.js               # Entry point
@@ -23,7 +23,7 @@ hooks/
 
 `session-tracker` is the one component with multiple entry points
 (`start.js`, `end.js`, `inject-context.js`) because it spans the session
-lifecycle; each is registered separately in `hooks.json`.
+lifecycle; each is registered separately in `claude-code.json`.
 
 ## Error Handling
 
@@ -97,7 +97,11 @@ Import from `scripts/lib/utils.js` (canonical source):
 
 ## Registration
 
-Register hooks in `hooks/hooks.json`:
+Register hooks in `hooks/claude-code.json` — the path
+`.claude-plugin/plugin.json` declares as its `hooks` key, which is the only
+thing that loads the registry. It is deliberately NOT `hooks/hooks.json`: that
+is the path Codex auto-discovers plugin hooks at, and `npm run check:hooks`
+fails if a file reappears there.
 - Use `"async": true` for non-blocking hooks (e.g., logging, tracking)
 - Use `${CLAUDE_PLUGIN_ROOT}` (with braces) for all path references
 - Handler types: `command` (shell), `prompt` (LLM evaluation), `agent` (multi-turn subagent)

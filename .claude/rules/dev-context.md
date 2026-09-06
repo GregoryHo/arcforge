@@ -59,7 +59,7 @@ them, whether through the installed plugin or the public repo.
 | `skills/` | Yes | arcforge users on their own projects |
 | `hooks/` | Yes | users (loaded into their sessions) |
 | `scripts/cli.js`, `scripts/lib/` | Yes | users (the engine) |
-| `.claude-plugin/`, `bin/` | Yes | plugin manifest and CLI shim |
+| `.claude-plugin/`, `.codex-plugin/`, `.agents/`, `bin/` | Yes | plugin manifests (both hosts) and CLI shim |
 | `README.md`, `CHANGELOG.md` | Yes | users deciding whether to install |
 | `docs/guide/` | Yes | users (how-to documentation) |
 | `website/` | Yes | prospective users |

@@ -1,0 +1,8 @@
+# Codex-only metadata. Claude Code ignores this file; it reads
+# `disable-model-invocation: true` in SKILL.md instead. Both say the same thing:
+# this skill is an explicit-intent gate that only a person opens.
+interface:
+  display_name: "Looping"
+  short_description: "Supervise an unattended loop over a task list"
+policy:
+  allow_implicit_invocation: false

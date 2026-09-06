@@ -726,10 +726,15 @@ function Platforms({
 }) {
   const plats = [{
     name: 'Claude Code',
-    tag: 'THE TARGET',
+    tag: 'IN FULL',
     cmd: '/plugin install arcforge@arcforge-dev',
     note: 'Skills, hooks, and the CLI engine all load natively from the plugin marketplace.',
     primary: true
+  }, {
+    name: 'Codex CLI',
+    tag: 'SKILLS ONLY',
+    cmd: ['codex plugin marketplace add GregoryHo/arcforge', 'codex plugin add arcforge@arcforge-dev'],
+    note: 'All 15 skills load from the same tree \u2014 8 of them work in full. The other 7 shell out to the arcforge CLI, and those steps fail with command not found: Codex does not put a plugin\u2019s bin/ on PATH. Hooks, the learning subsystem, the eval harness and the unattended loop stay Claude Code\u2019s. The README names all 15 before you install.'
   }, {
     name: 'Node.js',
     tag: 'THAT IS ALL',
@@ -742,20 +747,20 @@ function Platforms({
   }, /*#__PURE__*/React.createElement(SectionHeader, {
     n: "09",
     kicker: "PLATFORM",
-    title: /*#__PURE__*/React.createElement(React.Fragment, null, "One harness, ", /*#__PURE__*/React.createElement("em", {
+    title: /*#__PURE__*/React.createElement(React.Fragment, null, "One tree, ", /*#__PURE__*/React.createElement("em", {
       style: {
         color: t.brass,
         fontStyle: 'italic'
       }
-    }, "done properly.")),
-    sub: "arcforge targets Claude Code and nothing else. No portability layer, no lowest-common-denominator features, no second packaging target to drift out of sync.",
+    }, "two manifests.")),
+    sub: "One codebase, no portability layer, no per-host copy of anything. Claude Code gets the whole toolkit; Codex CLI installs the skills. What each host gets is stated up front, and version parity across both manifests is a CI gate, not a habit.",
     theme: t
   }), /*#__PURE__*/React.createElement("div", {
     "data-af-reveal": true,
-    className: "af-grid-2col",
+    className: "af-grid-3col",
     style: {
       display: 'grid',
-      gridTemplateColumns: '1fr 1fr',
+      gridTemplateColumns: '1fr 1fr 1fr',
       gap: 24
     }
   }, plats.map(p => /*#__PURE__*/React.createElement("div", {
@@ -764,7 +769,9 @@ function Platforms({
       background: t.card,
       border: `${p.primary ? 1.5 : 1}px solid ${p.primary ? t.ember : t.line}`,
       padding: '28px 32px',
-      position: 'relative'
+      position: 'relative',
+      display: 'flex',
+      flexDirection: 'column'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -800,9 +807,12 @@ function Platforms({
       color: p.primary ? t.ember : t.dim,
       background: t.bg,
       padding: '10px 14px',
-      border: `1px dashed ${t.line}`
+      border: `1px dashed ${t.line}`,
+      marginTop: 'auto'
     }
-  }, p.cmd)))));
+  }, Array.isArray(p.cmd) ? p.cmd.map(c => /*#__PURE__*/React.createElement("div", {
+    key: c
+  }, c)) : p.cmd)))));
 }
 
 // ─── Skills Grid (all 15) ───
@@ -882,7 +892,7 @@ function SkillsGrid({
       borderTop: `1px dashed ${t.line}`,
       paddingTop: 18
     }
-  }, "The full catalog \xB7 invoke any of them as /arcforge:<name>"), groups.map(([name, color, items]) => /*#__PURE__*/React.createElement("div", {
+  }, "The full catalog \xB7 invoke any of them as /arcforge:<name> \xB7 arcforge:<name> on Codex"), groups.map(([name, color, items]) => /*#__PURE__*/React.createElement("div", {
     key: name
   }, /*#__PURE__*/React.createElement("div", {
     style: {
