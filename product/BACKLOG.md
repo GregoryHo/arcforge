@@ -35,9 +35,7 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   nothing. Fix direction: merge over the previous config instead of replacing it
   (it is already in hand as `previous`). Pre-existing — the same full-replacement
   object predates the #146/#147 branch; surfaced during its review.
-- **unify-candidate-queues** — point the `learn` transition commands at the
-  canonical Layer-5 candidate queue, so the CLI and the dashboard manage the
-  same candidates instead of two disjoint queues · issue: [#148](https://github.com/GregoryHo/arcforge/issues/148).
+- ~~**unify-candidate-queues**~~ — graduated into 6.1.0 (D-012).
 - **bound-transcript-parse** — `parseTranscript` reads and splits the whole
   session transcript on every above-threshold Stop and PreCompact even though
   every output it returns is a capped tail (about 5 ms per MB on real transcripts);
@@ -48,3 +46,15 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   first 2 KB, so thirty long paths push the marker past the window and a stale
   draft reads as enriched; bound the rendered block so the markers sit inside
   the probe window by construction · issue: [#177](https://github.com/GregoryHo/arcforge/issues/177).
+- **dashboard-activation-ack** — the learning dashboard's Activate and Deactivate
+  buttons are refused by their own gate: the page posts the action with no
+  `safety_ack`, and shows neither the behavior-change warning nor the active
+  target path it would be acknowledging, so the CLI is the only surface that can
+  activate today · issue: [#173](https://github.com/GregoryHo/arcforge/issues/173).
+- **cli-draft-path-redaction** — Layer 5 stores a candidate's `name` unredacted
+  while every card renders it through the redactor, so a keyword-shaped name
+  reaches four artifacts: the queue, the draft filename, the draft body and the
+  activated instinct the runtime loads — and `draft_paths` prints the filename
+  while the dashboard's detail wire redacts the same path. Reject at ingestion or
+  normalize at the Layer-5 write is the product call D-012 leaves open; either
+  moves `candidate_record_hash` · issue: [#175](https://github.com/GregoryHo/arcforge/issues/175).

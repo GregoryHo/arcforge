@@ -539,7 +539,8 @@ describe('observe: statistical auto-trigger is retired', () => {
       .join('\n');
     fs.writeFileSync(observationPath, `${seed}\n`, 'utf8');
 
-    const queuedBefore = learning.loadCandidates({ scope: 'project', projectRoot });
+    const { readCurrentCandidates } = require('../../scripts/lib/learning-curator/queue-writer');
+    const queuedBefore = Object.keys(readCurrentCandidates());
 
     const hookInput = {
       session_id: 'no-autotrigger',
@@ -556,7 +557,7 @@ describe('observe: statistical auto-trigger is retired', () => {
     });
     assert.strictEqual(result.status, 0, `stderr: ${result.stderr}`);
 
-    const queuedAfter = learning.loadCandidates({ scope: 'project', projectRoot });
+    const queuedAfter = Object.keys(readCurrentCandidates());
     assert.strictEqual(
       queuedAfter.length,
       queuedBefore.length,

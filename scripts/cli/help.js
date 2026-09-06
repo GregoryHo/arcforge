@@ -69,14 +69,15 @@ COMMANDS:
                                      Disable new learning observations/analyzer runs for a scope.
   learn analyze                      DEPRECATED — the statistical analyzer was retired;
                                      use 'learn dashboard' for candidate review.
-  learn inbox --project|--global [--json]
-                                     Compact grouped review queue with next commands.
-  learn review --project|--global [--json]
-                                     List queued learning candidates for review.
-  learn drafts --project|--global [--json]
-                                     List candidates with materialized drafts awaiting activation.
-  learn inspect <candidate-id> --project|--global [--json]
-                                     Read-only review summary for a candidate (paths and next actions).
+  learn inbox --project [--json]
+                                     Compact grouped review queue with next commands (project scope only).
+  learn review --project [--json]
+                                     Every candidate for this project, as the dashboard's cards (project scope only).
+  learn drafts --project [--json]
+                                     List candidates with materialized drafts awaiting activation (project scope only).
+  learn inspect <candidate-id> --project [--json]
+                                     Read-only review summary: evidence summaries, a redacted body
+                                     preview, draft paths and next actions (project scope only).
   learn approve|reject <candidate-id> --project [--json]
                                      Record user authorization decision for a candidate (project scope only).
   learn accept <candidate-id> --project [--json]

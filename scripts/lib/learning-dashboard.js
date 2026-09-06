@@ -41,7 +41,7 @@ const {
   deactivate: deactivateLayer8,
   defaultActivationPolicy,
   findLatestActivation,
-  findLatestMaterialization,
+  findUsableMaterialization,
 } = require('./learning-curator/activate');
 
 // ---------------------------------------------------------------------------
@@ -478,17 +478,33 @@ function handleDashboardAction({
     if (!matResult.ok) {
       return reject(matResult.failure.reason, { module_failure: matResult.failure });
     }
-    return accept({
+    const accepted = accept({
       next_status: 'materialized',
       materialization_id: matResult.record.materialization_id,
     });
+    // The paths travel with the id `materialize()` chose. A caller that
+    // re-derives them scans the manifests a second time with different criteria
+    // — both screen on intact drafts, but `findExistingMaterialization` screens
+    // on the candidate hash and the render policy version as well, which
+    // `findUsableMaterialization` does not — so it can pair one manifest's id
+    // with another manifest's paths. Handing back what materialize() already
+    // computed makes that divergence structurally impossible.
+    //
+    // Deliberately outside `accept()`: its argument is written verbatim to the
+    // audit log, and the B-5 audit trail should not gain absolute filesystem
+    // paths on every materialize.
+    return { ...accepted, draft_paths: matResult.draftPaths };
   }
 
   // DH-2: activate — delegates to Layer 8 activate.js
   if (action === LIFECYCLE_ACTION.ACTIVATE) {
     const arcforgeRoot = getArcforgeRoot();
-    // Find the latest materialization record on disk for this candidate
-    const materializationRecord = findLatestMaterialization(arcforgeRoot, candidateId);
+    // The manifest every draft surface resolves to, which is the one
+    // `materialize()` reused or wrote: activating the newest instead can pick a
+    // manifest Layer 7 skipped as stale, and the refusal that follows lands on a
+    // `materialized` candidate the matrix lets neither re-materialize nor
+    // dismiss. See `findUsableMaterialization`.
+    const materializationRecord = findUsableMaterialization(arcforgeRoot, candidateId);
     if (!materializationRecord) {
       return reject('materialization_missing', {
         detail: 'No materialization record found for this candidate',

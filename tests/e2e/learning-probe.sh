@@ -34,7 +34,11 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-WORK_DIR="${1:-$(mktemp -d "${TMPDIR:-/tmp}/arcforge-learning-probe-XXXXXX")}"
+# `${TMPDIR%/}`: macOS sets TMPDIR with a trailing slash, so mktemp hands back a
+# path carrying a `//` that Node normalizes away — which would leave the
+# isolation self-check below comparing two spellings of the same directory.
+TMP_BASE="${TMPDIR:-/tmp}"
+WORK_DIR="${1:-$(mktemp -d "${TMP_BASE%/}/arcforge-learning-probe-XXXXXX")}"
 PROJECT_DIR="${WORK_DIR}/probe-app"
 EVIDENCE_DIR="${WORK_DIR}/evidence"
 
@@ -62,8 +66,8 @@ step "0. Isolation self-check"
 RESOLVED_HOME=$(node -e "console.log(require('${REPO_ROOT}/scripts/lib/utils').getArcforgeHome())")
 [ "${RESOLVED_HOME}" = "${ARCFORGE_HOME}" ] || fail "getArcforgeHome() = ${RESOLVED_HOME}"
 RESOLVED_QUEUE=$(node -e "
-  const l = require('${REPO_ROOT}/scripts/lib/learning');
-  console.log(l.getCandidateQueuePath({ scope: 'global' }));
+  const q = require('${REPO_ROOT}/scripts/lib/learning-curator/queue-writer');
+  console.log(q.getQueuePath());
 ")
 case "${RESOLVED_QUEUE}" in
   "${ARCFORGE_HOME}"/*) pass "curator queue resolves inside the probe home" ;;

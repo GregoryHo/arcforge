@@ -11,7 +11,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 
-const { sanitizeFilename, atomicWriteFile, sha256Truncated, getArcforgeHome } = require('../utils');
+const {
+  sanitizeFilename,
+  atomicWriteFile,
+  sha256Truncated,
+  getArcforgeHome,
+  readFileSafe,
+} = require('../utils');
 const { redactObservationText, SANITIZER_POLICY_VERSION } = require('../sanitize-observation');
 const { appendTransitionEvent } = require('./dashboard-events');
 
@@ -20,6 +26,97 @@ const { appendTransitionEvent } = require('./dashboard-events');
 // ---------------------------------------------------------------------------
 
 const FIRST_SLICE_SUPPORTED_TYPES = ['instinct'];
+
+/**
+ * Whether Layer 7 has a renderer for an artifact type.
+ *
+ * Exported so the CLI can describe the narrowing without keeping a second copy
+ * of the list. The refusal itself still happens here — `materialize()` calls
+ * this too, so there is exactly one predicate behind both.
+ *
+ * @param {string} artifactType
+ * @returns {boolean}
+ */
+function isMaterializableType(artifactType) {
+  return FIRST_SLICE_SUPPORTED_TYPES.includes(artifactType);
+}
+
+/**
+ * The longest draft filename stem L7-12 will accept, in bytes.
+ *
+ * `NAME_MAX` is 255 *bytes* per path component on byte-limited filesystems —
+ * ext4 and friends, which is where CI runs and where a large share of users
+ * are. The binding write is not the `.md` draft: `atomicWriteFile` puts the
+ * content in `<stem>.md.tmp` and renames it into place, so the temporary name,
+ * 7 bytes longer than the stem, is the one that has to fit. 255 - 7 = 248.
+ *
+ * A fixed byte bound rather than a probe of the target filesystem, because
+ * `accept`'s preflight and the write it protects can only be one rule if both
+ * compute the same answer — and a probe would make that answer depend on where
+ * the draft root happens to live. macOS/APFS counts characters rather than
+ * bytes, so this is stricter than that platform needs: a 120-character CJK name
+ * is 360 bytes and is now refused there too, deliberately.
+ */
+const MAX_DRAFT_NAME_BYTES = 248;
+
+/**
+ * The name policy of L7-12, in words a reviewer can act on.
+ *
+ * Exported for the same reason the type list is: the front end that has to
+ * explain a refusal reads this rather than keeping a second description of a
+ * rule it does not own. "Blank" covers both halves of what `sanitizeFilename`
+ * rejects at the top — an empty string and a whitespace-only one. The length is
+ * in bytes because the filesystem limit is, so a non-ASCII name reaches it well
+ * short of that many characters.
+ */
+const NAME_POLICY_SUMMARY =
+  'a draft filename may not be blank, may not contain a path separator, ".." or a control ' +
+  `character, and may not exceed ${MAX_DRAFT_NAME_BYTES} bytes once encoded`;
+
+/**
+ * The whole name policy of L7-12, as the one check that enforces it.
+ *
+ * `sanitizeFilename` owns the shape rules and is shared with the rest of the
+ * engine; the length is Layer 7's own, because it is derived from the file this
+ * module writes. Both call sites below go through here so that neither the
+ * predicate nor the enforcing branch can grow a clause the other lacks.
+ *
+ * @param {string} name
+ * @returns {string} The validated name, unchanged.
+ * @throws {Error} If the name cannot be a draft filename.
+ */
+function checkDraftName(name) {
+  const safeName = sanitizeFilename(name);
+  const bytes = Buffer.byteLength(safeName, 'utf8');
+  if (bytes > MAX_DRAFT_NAME_BYTES) {
+    throw new Error(
+      `Invalid filename: ${bytes} bytes exceeds the ${MAX_DRAFT_NAME_BYTES}-byte limit`,
+    );
+  }
+  return safeName;
+}
+
+/**
+ * Whether L7-12 would accept this name as a draft filename.
+ *
+ * Exported so a front end that must refuse BEFORE it dispatches — the CLI's
+ * `accept`, which approves first and would strand the candidate on a refusal it
+ * could never clear — asks this module instead of keeping a second copy of the
+ * policy. `materialize()` below calls `checkDraftName` too, so the enforced
+ * branch and this predicate share one implementation of the rule and differ
+ * only in what they do with the answer.
+ *
+ * @param {string} name
+ * @returns {boolean}
+ */
+function isMaterializableName(name) {
+  try {
+    checkDraftName(name);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // candidate_record_hash — stable hash over semantic fields
@@ -74,6 +171,13 @@ function getLockPath(arcforgeRoot, candidateId) {
  */
 function defaultRenderPolicy() {
   return {
+    // Bumping this reopens a divergence the two manifest selectors were aligned
+    // to close. `findExistingMaterialization` below screens on the policy
+    // version; `findUsableMaterialization` (activate.js) screens on intact
+    // drafts alone. With one version in play they cannot disagree — with two, a
+    // candidate could hold an intact v1 manifest beside a lost v2 one, and
+    // activation would resolve the manifest reuse had just refused. Align the
+    // two screens before moving off 'v1'.
     policy_version: 'v1',
     allowed_artifact_types: FIRST_SLICE_SUPPORTED_TYPES,
     draft_root: path.join(getArcforgeHome(), 'learning', 'drafts'),
@@ -256,6 +360,70 @@ function makeFailure(opts) {
 // Idempotence — scan for existing materializations
 // ---------------------------------------------------------------------------
 
+/**
+ * The draft artifacts a manifest records that are no longer what it recorded.
+ *
+ * The first-slice default returns "the latest existing draft" for a duplicate
+ * request — an existing *draft*, not merely an existing manifest. A manifest
+ * whose draft was deleted or edited no longer describes one, so it is not
+ * reusable: reusing it would report success and hand `learn drafts` a stale
+ * path, while the later activation refuses on this very hash check (L8-3, see
+ * activate.js).
+ *
+ * Exported because the same question is asked one layer up: the `learn`
+ * candidate commands print draft paths, and a path they print must resolve to
+ * the file the manifest describes. They ask here rather than re-implementing
+ * the hash comparison (Canonical Source Rule).
+ *
+ * @param {object} record MaterializationRecord
+ * @returns {Array<{draft_path: string, reason: 'missing'|'hash_mismatch'}>}
+ */
+function staleDraftArtifacts(record) {
+  const artifacts = record?.draft_artifacts;
+  if (!Array.isArray(artifacts)) return [];
+  const stale = [];
+  for (const artifact of artifacts) {
+    if (!artifact || !artifact.draft_path) continue;
+    const content = readFileSafe(artifact.draft_path);
+    if (content === null) {
+      stale.push({ draft_path: artifact.draft_path, reason: 'missing' });
+    } else if (sha256Truncated(content, 64) !== artifact.content_hash) {
+      stale.push({ draft_path: artifact.draft_path, reason: 'hash_mismatch' });
+    }
+  }
+  return stale;
+}
+
+/**
+ * Whether every draft artifact a manifest records is still on disk and still
+ * hashes to what the manifest recorded.
+ *
+ * A manifest with no `draft_artifacts` array, an empty one, or an entry that
+ * names no path describes no draft at all, so it is not intact either — it has
+ * nothing to hand back. `staleDraftArtifacts` reports only the entries it can
+ * name a file for, so those structural checks belong here.
+ *
+ * @param {object} record MaterializationRecord
+ * @returns {boolean}
+ */
+function draftArtifactsIntact(record) {
+  const artifacts = record?.draft_artifacts;
+  if (!Array.isArray(artifacts) || artifacts.length === 0) return false;
+  if (!artifacts.every((artifact) => artifact?.draft_path)) return false;
+  return staleDraftArtifacts(record).length === 0;
+}
+
+/**
+ * The latest reusable materialization for a candidate, or null.
+ *
+ * Reusable means all three of: the candidate record hash matches, the render
+ * policy version matches, and the recorded drafts are still intact. A manifest
+ * failing any of those is skipped, so the caller materializes afresh — and a
+ * manifest left stale by a deleted or edited draft keeps failing the intactness
+ * check on every later call, so it can never be handed back once superseded.
+ * `created_at` only picks between manifests that are all still reusable, which
+ * is what the contract means by "the latest existing draft".
+ */
 function findExistingMaterialization(arcforgeRoot, candidateId, candidateHash, policyVersion) {
   const candidateDraftsDir = path.join(getDraftsBase(arcforgeRoot), candidateId);
   if (!fs.existsSync(candidateDraftsDir)) return null;
@@ -267,23 +435,26 @@ function findExistingMaterialization(arcforgeRoot, candidateId, candidateHash, p
     return null;
   }
 
+  let latest = null;
   for (const entry of entries) {
     const manifestPath = path.join(candidateDraftsDir, entry, 'materialization.json');
     if (!fs.existsSync(manifestPath)) continue;
+    let record;
     try {
-      const record = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-      if (
-        record.source_candidate &&
-        record.source_candidate.candidate_record_hash === candidateHash &&
-        record.render_policy_version === policyVersion
-      ) {
-        return record;
-      }
+      record = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     } catch {
-      // Corrupted manifest — skip
+      continue; // Corrupted manifest — skip
     }
+    // `JSON.parse` throws on bad syntax, but `null`, a bare string and an array
+    // all parse cleanly and describe no manifest. Reject them here so the skip
+    // above holds for every corruption shape, not only the unparseable one.
+    if (!record || typeof record !== 'object' || Array.isArray(record)) continue;
+    if (record.source_candidate?.candidate_record_hash !== candidateHash) continue;
+    if (record.render_policy_version !== policyVersion) continue;
+    if (!draftArtifactsIntact(record)) continue;
+    if (!latest || record.created_at > latest.created_at) latest = record;
   }
-  return null;
+  return latest;
 }
 
 // ---------------------------------------------------------------------------
@@ -332,20 +503,28 @@ function materialize({
   // Reject if candidate artifact_type is not supported (regardless of requestedArtifactType)
   const artifactType = requestedArtifactType || candidate.artifact_type;
   const candidateArtifactType = candidate.artifact_type;
-  if (
-    !FIRST_SLICE_SUPPORTED_TYPES.includes(candidateArtifactType) ||
-    !FIRST_SLICE_SUPPORTED_TYPES.includes(artifactType)
-  ) {
+  if (!isMaterializableType(candidateArtifactType) || !isMaterializableType(artifactType)) {
     return fail(
       'artifact_type_mismatch',
       `First-slice supports instinct only; got: ${candidateArtifactType}`,
     );
   }
 
-  // L7-12: Validate name with sanitizeFilename
+  // L7-12: Validate name against the draft-filename policy.
+  //
+  // This runs BEFORE the L7-11 idempotence branch below, so it screens the
+  // re-materialization of an existing record as well as a fresh write. That
+  // ordering predates the byte bound, and the bound gives it one retroactive
+  // consequence worth naming: a legacy candidate whose name is over 248 bytes
+  // — only reachable if it materialized on a character-counting filesystem
+  // such as APFS — is refused here on `deactivated → materialize`, where it
+  // used to get its existing record back. It is not a dead end. The matrix
+  // leaves `deactivated → activate` legal and `activate` resolves its path
+  // from `candidate_id` rather than from `name`, so the draft that is already
+  // on disk is still reachable by the one command that reads it.
   let safeName;
   try {
-    safeName = sanitizeFilename(candidate.name);
+    safeName = checkDraftName(candidate.name);
   } catch (err) {
     return fail('path_policy_rejected', `Invalid candidate name: ${err.message}`);
   }
@@ -365,7 +544,25 @@ function materialize({
     effectivePolicy.policy_version,
   );
   if (existingRecord) {
+    // Reaching here means `findExistingMaterialization` also confirmed every
+    // recorded draft is still on disk and still matches its content hash, so the
+    // paths handed back name real files. A manifest whose draft went missing or
+    // was edited is not returned at all — the fall-through below writes a fresh
+    // materialization instead of advancing the lifecycle on a stale path.
     const existingDraftPaths = existingRecord.draft_artifacts.map((a) => a.draft_path);
+    // L7-8/AC-10: the report to Layer 5 is owed on this branch exactly as on the
+    // fresh one — the manifest is already durable on disk, which is the condition
+    // AC-10 attaches the report to, and only a FAILED materialization (AC-11) is
+    // allowed to leave no `materialized` lifecycle event. Skipping it is what let
+    // `deactivated → materialize` report success while the candidate stayed
+    // `deactivated` and `learn drafts` listed nothing.
+    //
+    // This cannot double-log: `handleDashboardAction` delegates the materialize
+    // action to this module and returns before its own appendTransitionEvent, so
+    // this is the sole appender for the action; and the matrix forbids
+    // `materialized → materialize`, so only `approved` and `deactivated` reach
+    // here, both of which legally become `materialized`.
+    appendTransitionEvent(candidate.candidate_id, 'materialize', 'materialized', actor);
     return { ok: true, record: existingRecord, draftPaths: existingDraftPaths };
   }
 
@@ -483,4 +680,10 @@ module.exports = {
   buildDraftContent,
   getDraftRoot,
   defaultRenderPolicy,
+  FIRST_SLICE_SUPPORTED_TYPES,
+  isMaterializableType,
+  isMaterializableName,
+  NAME_POLICY_SUMMARY,
+  staleDraftArtifacts,
+  draftArtifactsIntact,
 };
