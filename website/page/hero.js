@@ -200,7 +200,7 @@ function Hero({
       letterSpacing: 1.5,
       fontFamily: '"JetBrains Mono",monospace'
     }
-  }, "MIT \xB7 15 SKILLS \xB7 6 HOOKS \xB7 0 DEPS")), /*#__PURE__*/React.createElement("div", {
+  }, "MIT \xB7 16 SKILLS \xB7 6 HOOKS \xB7 0 DEPS")), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 56,
       display: 'flex',
@@ -338,7 +338,7 @@ function HeroSchematic({
     fontSize: "9",
     letterSpacing: "1.5",
     fontFamily: "JetBrains Mono,monospace"
-  }, "15 AVAILABLE"), ['brainstorming', 'executing', 'tdd', 'debugging', 'code-review', 'sessions', 'learning', 'finishing'].map((s, i) => {
+  }, "16 AVAILABLE"), ['brainstorming', 'executing', 'tdd', 'debugging', 'code-review', 'sessions', 'learning', 'finishing'].map((s, i) => {
     const a = i / 8 * Math.PI * 2 - Math.PI / 2;
     const r = 95;
     const x = Math.cos(a) * r,

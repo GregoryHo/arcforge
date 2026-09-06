@@ -3,7 +3,7 @@
 Start with the guides in `guide/` — they cover the full shipped surface:
 
 - **CLI**: `guide/cli-invocation.md` — the `arcforge` command and its five groups
-- **Skills**: `guide/skills-reference.md` — the 15 core skills and how they route
+- **Skills**: `guide/skills-reference.md` — the core skills and how they route
 - **Hooks**: `guide/hooks-system.md` — the six event-driven components
 - **Worktrees**: `guide/worktree-workflow.md` — isolated working copies
 - **Eval**: `guide/eval-system.md` — scenarios, preflight, A/B runs, benchmarks

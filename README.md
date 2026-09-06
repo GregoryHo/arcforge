@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml/badge.svg)](https://github.com/GregoryHo/arcforge/actions/workflows/ci.yml)
 
-arcforge is a skill toolkit for coding agents. It gives your agent 15 self-contained skills, a small CLI engine, and six background hooks — so disciplined workflows are available when the work needs them, and never in the way when it doesn't. Claude Code gets all of it; Codex CLI installs the skills.
+arcforge is a skill toolkit for coding agents. It gives your agent 16 self-contained skills, a small CLI engine, and six background hooks — so disciplined workflows are available when the work needs them, and never in the way when it doesn't. Claude Code gets all of it; Codex CLI installs the skills.
 
 ## Why arcforge
 
@@ -16,7 +16,7 @@ arcforge takes the middle path. Every skill is a self-contained unit that fires 
 
 Three pieces, and that is the whole system:
 
-1. **Skills** — 15 markdown skills under `skills/core/`, each a closed unit. A skill is selected because its description matches the situation in front of you, not because a pipeline scheduled it.
+1. **Skills** — 16 markdown skills under `skills/core/`, each a closed unit. A skill is selected because its description matches the situation in front of you, not because a pipeline scheduled it.
 2. **CLI engine** — the `arcforge` command, five subcommand groups. Skills reach engine functionality only by calling this CLI; nothing else crosses the boundary.
 3. **Hooks** — six background components on Claude Code lifecycle events: session continuity, observation logging, a secrets guard, and compaction handling.
 
@@ -52,11 +52,11 @@ codex plugin marketplace add GregoryHo/arcforge
 codex plugin add arcforge@arcforge-dev
 ```
 
-All 15 skills load, listed as `arcforge:<name>`. Codex has no slash commands for skills: you invoke one from the composer's `$` mention picker, so every `/arcforge:<name>` spelling elsewhere in this README is Claude Code's. The same mapping covers the handoffs skills write to each other: wherever a skill says `/<name>` — `/tdd`, `/finishing` — that is the `arcforge:<name>` skill on Codex, reached from the same picker. **Skills are all that loads.** The rest of the toolkit is Claude Code only, and it is worth knowing which half you get:
+All 16 skills load, listed as `arcforge:<name>`. Codex has no slash commands for skills: you invoke one from the composer's `$` mention picker, so every `/arcforge:<name>` spelling elsewhere in this README is Claude Code's. The same mapping covers the handoffs skills write to each other: wherever a skill says `/<name>` — `/tdd`, `/finishing` — that is the `arcforge:<name>` skill on Codex, reached from the same picker. **Skills are all that loads.** The rest of the toolkit is Claude Code only, and it is worth knowing which half you get:
 
 | On Codex | Status |
 |---|---|
-| The 8 skills that need no engine — `using`, `brainstorming`, `executing`, `tdd`, `debugging`, `code-review`, `sessions`, `diagramming-obsidian` | Work fully |
+| The 9 skills that need no engine — `using`, `brainstorming`, `speccing`, `executing`, `tdd`, `debugging`, `code-review`, `sessions`, `diagramming-obsidian` | Work fully |
 | The 7 skills that shell out to the `arcforge` CLI — `dispatching`, `looping`, `finishing`, `evaluating`, `learning`, `writing-skills`, `maintaining-obsidian` | Load and read correctly, but their CLI steps report `command not found`: Codex does not put a plugin's `bin/` on `PATH` |
 | Hooks, the learning subsystem, the eval harness, the unattended loop | Do not run — they are built on Claude Code's hook protocol and on spawning `claude` |
 
@@ -81,7 +81,7 @@ Those are the Claude Code spellings. On Codex CLI the same skills are listed as 
 
 Most skills also fire on their own when their trigger condition shows up. The three marked _user-invoked_ below never do, on either host.
 
-## The 15 skills
+## The 16 skills
 
 **Getting oriented**
 
@@ -91,6 +91,7 @@ Most skills also fire on their own when their trigger condition shows up. The th
 
 - **brainstorming** — structured exploration before a design is settled
 - **executing** — break work into a checkbox task list and run it, attended or unattended
+- **speccing** — keep a project's living specs, roadmap, and append-only decision log in step with the code
 - **dispatching** — split work that can run in parallel, isolate each writer, accept on evidence
 - **looping** _(user-invoked)_ — hand a task list to an unattended loop that keeps working across fresh sessions
 - **finishing** — integrate completed work: merge, PR, keep, or discard

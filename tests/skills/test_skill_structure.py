@@ -51,7 +51,7 @@ MIN_SKILL_COUNT = 10
 # that broke to zero; this catches one that broke to "some". A real change to the
 # shipped skill set is a deliberate edit here, not a mystery failure — update it
 # in the same commit that adds or removes a skill.
-EXPECTED_SKILL_COUNT = 15
+EXPECTED_SKILL_COUNT = 16
 
 # Supporting-file references: references/, scripts/, templates/, agents/ paths ending
 # in a known extension. The lookbehind skips matches embedded in a longer path

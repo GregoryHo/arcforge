@@ -30,6 +30,15 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   Claude-Code-shaped: give the Claude Code card its two-command form and add a
   Codex CLI skills-only block to the install section, so the site carries both
   install paths the README already documents.
+- **host-neutral-skill-handoffs** — every cross-skill handoff is written in the
+  slash form (`/<skill>`), which is Claude Code's spelling; Codex resolves the same skill as
+  `arcforge:name` from the `$` picker and has no slash commands. Today one
+  sentence in `using` maps the two, and whether an agent follows that mapping
+  mid-workflow on Codex is unmeasured. A notation that reads correctly on both
+  hosts without per-host branching (codex-harness B-7) would need
+  `docs/decisions/skill-schema.md` §4.1/§5 reopened and both cross-reference
+  parsers taught the new shape — a maintainer decision about a frozen contract,
+  not a cleanup · needs: harness-neutral-model-runner.
 
 ## Learning
 
@@ -45,7 +54,7 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   any-scope authorization was continuous; genuine enricher failures in the
   window between the two opt-ins stop being reported. Fix direction: persist the
   enable stamp across a disable and take the start of the continuous effective
-  any-scope opt-in. Recorded as the accepted cost in D-009 for 6.1.0.
+  any-scope opt-in. Recorded as the accepted cost in D-009 for 6.1.0 · issue: [#164](https://github.com/GregoryHo/arcforge/issues/164).
 - **learn-enable-erases-config** — `setLearningEnabled`
   (scripts/lib/learning.js) writes a fresh `{ scope, enabled, updated_at }`
   object, so every other key on the learning config is dropped. The only such
@@ -57,6 +66,7 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   nothing. Fix direction: merge over the previous config instead of replacing it
   (it is already in hand as `previous`). Pre-existing — the same full-replacement
   object predates the #146/#147 branch; surfaced during its review.
+
 - ~~**unify-candidate-queues**~~ — graduated into 6.1.0 (D-012).
 - **bound-transcript-parse** — `parseTranscript` reads and splits the whole
   session transcript on every above-threshold Stop and PreCompact even though
@@ -80,3 +90,55 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   while the dashboard's detail wire redacts the same path. Reject at ingestion or
   normalize at the Layer-5 write is the product call D-012 leaves open; either
   moves `candidate_record_hash` · issue: [#175](https://github.com/GregoryHo/arcforge/issues/175).
+- **project-keyspace-collision** — two project roots whose basenames sanitize to
+  the same slug share one observation store, one instincts tree and therefore one
+  candidate set; `learn --project` keys on that slug (D-012) because filtering on
+  `scope.project_id` would hide candidates (the id is taken from whichever
+  observation wrote first, or a name hash). Separating them is a keyspace
+  decision (ICL-3 territory), not a CLI filter.
+
+- **strand-free-candidate-names** — Layer 5 admits a candidate `name` that
+  Layer 7 can never render (`schema.js` checks presence, type and length only;
+  `materialize.js` refuses it with `path_policy_rejected`); decide
+  reject-at-ingestion vs normalize-at-materialization, then close the
+  `approve` + `materialize` stranding that the `accept` guard does not cover
+  (D-012 residual).
+## Product method
+- **product-cli** — an `arcforge product check` command that verifies a
+  project's own product state: dense monotonic decision ids, every
+  `Supersedes:` paired with its status flip, spec headers agreeing with their
+  roadmap rows, exactly one `← we are here` · needs: D-016.
+- **speccing-spec-in-sync-eval** — a third `speccing` scenario for the
+  mid-build case: a behavior item diverges while the code is being written, and
+  the measured question is whether the spec moves in the same change or is left
+  for later. Held back from 6.1.0 on ceiling risk — the two shipped scenarios
+  spent the redesign budget — so it needs its own trap designed from a fresh
+  baseline observation. The 6.1.0 pools say where to aim it: the baseline knows
+  ADR discipline cold, and only bends when a user tells it to defer the ledger.
+- **speccing-router-adjacency-eval** — the scenario that would actually measure
+  D-014's accepted cost: one turn genuinely ambiguous between settling a design
+  and recording a settled one, put in front of the router, scored on which of
+  `brainstorming` / `speccing` it picks. 6.1.0 ships the adjacency unmeasured —
+  `eval-router-skill-selection` asks a `tdd` vs `finishing` question and says
+  nothing about this pair · needs: D-014.
+- **eval-void-trial-detection** — the trial runner scores a provider refusal
+  (`You've hit your session limit`, 0 tokens, a 72-byte transcript) as a real
+  trial. The fixture's own files satisfy some assertions with no agent action,
+  so an exhausted quota reads as a behavioral regression rather than an error
+  trial excluded from the denominator, which the coverage rules already require.
+  Cost one false REGRESSED verdict during 6.1.0.
+- **check-product-spec-sections** — extend `check:product` with a rule asserting
+  every `product/specs/*.md` carries the template's section headings (`Purpose`,
+  `Scope`, `Behavior`, `Data / domain model`, `Decisions`), so the spec shape is
+  a gate rather than a habit · needs: a decision refining D-006 (its recorded
+  text enumerates seven rules).
+- **speccing-a5-floor-executes-nothing** — `eval-speccing-spec-before-code`'s A5
+  floor greps `src/exporter.js` for a quoted `csv` token instead of exercising
+  the CSV branch, so a trial can pass the floor without the feature working; the
+  repair is a grader-owned `node -e` probe of `formatFor('csv', run)` and must
+  ride the next `## Version` bump + k=10 rerun of the scenario · issue: [#156](https://github.com/GregoryHo/arcforge/issues/156).
+- **supersede-v7-preflight** — `eval-speccing-supersede-not-overwrite` ships at
+  `## Version` 7 with no preflight ever scored under its current grader (the
+  recorded BLOCK is the k=3 Version-3 sample); run one k=3 preflight under the
+  Version-7 text so the ceiling claim rests on the shipped instrument · cost:
+  three baseline trials.
