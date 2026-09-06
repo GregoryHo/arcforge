@@ -24,19 +24,15 @@ const {
   log,
 } = require('../../scripts/lib/utils');
 const { addPendingAction } = require('../../scripts/lib/pending-actions');
-const { runDiaryCapture, readCounts } = require('../../scripts/lib/diary-capture');
+const {
+  runDiaryCapture,
+  readCounts,
+  pruneUngatedProse,
+  applyTranscriptToSession,
+  buildSessionSummary,
+} = require('../../scripts/lib/diary-capture');
 const { shouldTrigger } = require('../../scripts/lib/thresholds');
-const { parseTranscript } = require('../../scripts/lib/transcript');
 const { checkReflectReady: reflectReady } = require('../../scripts/lib/learning-workflow');
-
-/**
- * Calculate duration in minutes between two ISO timestamps
- */
-function calculateDurationMinutes(startISO, endISO) {
-  if (!startISO || !endISO) return null;
-  const durationMs = new Date(endISO) - new Date(startISO);
-  return Math.round(durationMs / 60000);
-}
 
 /**
  * Create default session if none exists
@@ -87,22 +83,6 @@ function checkReflectReady(project) {
 }
 
 /**
- * Format session stats as a one-liner.
- */
-function formatStats(session) {
-  const duration = calculateDurationMinutes(session.started, session.lastUpdated);
-
-  let stats = `${session.userMessages || 0} messages, ${session.toolCalls} tool calls`;
-  if (duration > 0) {
-    stats = `~${duration} min, ${stats}`;
-  }
-  if (session.filesModified?.length > 0) {
-    stats += `, ${session.filesModified.length} files modified`;
-  }
-  return stats;
-}
-
-/**
  * Format the below-threshold session-paused message. Logged to stderr only —
  * counters are genuinely preserved because the diary threshold did not fire.
  */
@@ -130,27 +110,36 @@ function main() {
   setSessionIdFromInput(input);
 
   const session = getOrCreateSession();
+  const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
   const { userCount, toolCount } = readCounts();
 
   session.lastUpdated = getTimestamp();
   session.userMessages = userCount;
   session.toolCalls = toolCount;
 
+  // D-010 governs both halves: the opt-in decides whether prose is written AND
+  // whether prose an earlier, opted-in Stop wrote may stay. Pruning before the
+  // stamp is what makes the second half true — the record is reloaded and
+  // rewritten on every Stop, so an ungated field would otherwise be
+  // re-serialized forever. The returned answer is the opt-in itself, so both
+  // the stamp below and the reflect-ready gate further down (D-009) reuse this
+  // one config read rather than asking again.
+  const learningOn = pruneUngatedProse(session, { projectRoot });
+
   // Enrich with transcript data ONLY when the diary threshold fired. Below
   // threshold, parsing the transcript is wasted work (the diary won't capture),
   // so it is skipped entirely (documented delta: below-threshold session JSON
-  // loses userMessageContent/toolsUsed/filesModified enrichment).
-  const transcriptPath = input?.transcript_path;
-  const transcriptData =
-    shouldTrigger(userCount, toolCount) && transcriptPath ? parseTranscript(transcriptPath) : null;
+  // loses userMessageContent/toolsUsed/filesModified enrichment). Counts, tool
+  // names and paths are the continuity record and are stamped either way;
+  // verbatim user prose only under the opt-in (D-010) — the shared helper the
+  // PreCompact path also calls owns that split.
+  const stamped =
+    shouldTrigger(userCount, toolCount) &&
+    applyTranscriptToSession(session, input?.transcript_path, { learningOn });
 
-  if (transcriptData) {
-    session.userMessageContent = transcriptData.userMessages;
-    session.toolsUsed = transcriptData.toolsUsed;
-    session.filesModified = transcriptData.filesModified;
-  } else {
-    session.filesModified = [];
-  }
+  // Nothing parsed: Stop clears the paths rather than carrying the previous
+  // turn's into a record it just closed.
+  if (!stamped) session.filesModified = [];
 
   saveSessionJson(session);
 
@@ -161,22 +150,25 @@ function main() {
     project: session.project,
     date: session.date,
     sessionId: session.sessionId,
-    transcriptData: {
-      userMessages: session.userMessageContent || [],
-      toolsUsed: session.toolsUsed || [],
-      filesModified: session.filesModified || [],
-      stats: formatStats(session),
-    },
+    projectRoot,
+    transcriptData: buildSessionSummary(session),
   });
 
   const systemMessages = [];
   if (triggered) {
-    const reflectStatus = checkReflectReady(session.project);
-    if (reflectStatus?.ready) {
-      addPendingAction(session.project, 'reflect-ready', {
-        strategy: reflectStatus.strategy,
-        count: reflectStatus.count,
-      });
+    // The reflection nudge is behind the same opt-in as the enrichment it
+    // follows (D-009). Reflection IS the learning loop — learning.md B-1 says
+    // that loop does not run when learning is off — and the diaries it counts
+    // are permanent stubs in that state, so an ungated nudge would recur at
+    // every Stop above the threshold, forever, about work the user declined.
+    if (learningOn) {
+      const reflectStatus = checkReflectReady(session.project);
+      if (reflectStatus?.ready) {
+        addPendingAction(session.project, 'reflect-ready', {
+          strategy: reflectStatus.strategy,
+          count: reflectStatus.count,
+        });
+      }
     }
     // Only surface the 'Session paused' notification when the diary threshold
     // actually fired — a Stop worth telling the user about. Below threshold a
@@ -195,10 +187,8 @@ function main() {
 
 // Export for testing
 module.exports = {
-  calculateDurationMinutes,
   getOrCreateSession,
   saveSessionJson,
-  formatStats,
   formatShortMessage,
   formatTriggeredMessage,
   checkReflectReady,

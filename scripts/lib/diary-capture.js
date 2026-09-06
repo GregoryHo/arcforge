@@ -17,6 +17,13 @@
  * (getSuggesterStatePath) so ICL-9's compaction reset re-uses one filename
  * instead of re-deriving it, and the SOLE stale-draft probe (draftIsStale)
  * imported by inject-context and the curator batch-assembler.
+ *
+ * Consent split (D-009 / D-010): the draft is continuity and is written either
+ * way, from the session record's counts, tool names and modified paths.
+ * ENRICHMENT is not — it hands a session summary to a
+ * model — so it runs only when learning is enabled in some scope. With learning
+ * off the draft therefore keeps its `TO BE ENRICHED` stubs permanently; that is
+ * the contract, not a failure.
  */
 
 const fs = require('node:fs');
@@ -114,6 +121,169 @@ function draftIsStale(filePath) {
 }
 
 // ---------------------------------------------------------------------------
+// Consent gate
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether the learning opt-in authorizes handing session content to a model.
+ *
+ * `./learning` is required LAZILY on purpose: compact-suggester imports this
+ * module on the synchronous PostToolUse path (hooks B-7), and that path must
+ * not pay learning.js's module-load cost on every tool call. The gate is only
+ * ever consulted from the Stop/PreCompact paths, which are already off it.
+ *
+ * Fails CLOSED on a missing projectRoot rather than falling back to
+ * process.cwd(): consent belongs to a project the caller named, and a cwd is
+ * whatever directory the host happened to start the hook in. Answering from it
+ * would let an unrelated project's opt-in authorize this one's capture. A
+ * caller that forgets the argument gets "no consent", never a guess.
+ *
+ * @param {Object} [opts]
+ * @param {string} [opts.projectRoot] - Project root whose scoped config to
+ *   read. Omitted or blank means no consent.
+ * @returns {boolean}
+ */
+function learningCaptureEnabled({ projectRoot } = {}) {
+  if (typeof projectRoot !== 'string' || projectRoot.trim() === '') return false;
+  try {
+    const { isLearningEnabledAnyScope } = require('./learning');
+    return isLearningEnabledAnyScope({ projectRoot });
+  } catch {
+    // Unreadable config is not consent.
+    return false;
+  }
+}
+
+/**
+ * D-010's retention half: verbatim user prose lives in the session record only
+ * while the learning opt-in is on. The record outlives a single event — Stop
+ * fires once per turn and PreCompact once per compaction, both reloading and
+ * rewriting the whole record — so a gate that only skipped the write would keep
+ * re-serializing prose captured before the user opted out.
+ *
+ * Mutates `session` in place and returns whether capture is currently allowed,
+ * so a caller that also writes prose reuses this one gate read.
+ *
+ * @param {Object|null} session - Session record, mutated in place.
+ * @param {Object} [opts]
+ * @param {string} [opts.projectRoot] - Omitted or blank means no consent
+ *   (learningCaptureEnabled fails closed), which prunes.
+ * @returns {boolean} true when the opt-in allows verbatim prose.
+ */
+function pruneUngatedProse(session, { projectRoot } = {}) {
+  const allowed = learningCaptureEnabled({ projectRoot });
+  if (!allowed && session && session.userMessageContent !== undefined) {
+    delete session.userMessageContent;
+  }
+  return allowed;
+}
+
+/**
+ * Stamp a parsed harness transcript's summary onto a session record.
+ *
+ * Shared by the two hooks that write the record above the diary threshold —
+ * Stop (session-tracker/end.js) and PreCompact (pre-compact/main.js) — so both
+ * render their draft from the same fields instead of one path re-deriving them.
+ *
+ * `./transcript` is required LAZILY for the same reason `./learning` is:
+ * compact-suggester imports this module on the synchronous PostToolUse path
+ * (hooks B-7), and only the Stop/PreCompact paths ever parse a transcript.
+ *
+ * The consent split (D-010) is the caller's: counts, tool names and paths are
+ * continuity and are stamped either way, verbatim prose only under the opt-in.
+ * The caller has already read that gate (pruneUngatedProse returns it), so it is
+ * passed in rather than read a second time here.
+ *
+ * A missing or unparseable transcript leaves the record's existing fields
+ * untouched and reports false. Refreshing what can be read is this function's
+ * job; CLEARING what cannot is the caller's call, and the two callers differ —
+ * Stop clears the paths, a compaction keeps the ones an earlier Stop wrote
+ * rather than blanking a record it cannot refresh.
+ *
+ * @param {Object} session - Session record, mutated in place.
+ * @param {string} [transcriptPath] - Harness transcript to parse.
+ * @param {Object} [opts]
+ * @param {boolean} [opts.learningOn=false] - Whether verbatim prose may be written.
+ * @returns {boolean} true when a transcript was parsed and stamped.
+ */
+function applyTranscriptToSession(session, transcriptPath, { learningOn = false } = {}) {
+  if (!session || !transcriptPath) return false;
+
+  const { parseTranscript } = require('./transcript');
+  const data = parseTranscript(transcriptPath);
+  if (!data) return false;
+
+  if (learningOn) session.userMessageContent = data.userMessages;
+  session.toolsUsed = data.toolsUsed;
+  session.filesModified = data.filesModified;
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// The enricher's session summary — built once, from the record both hooks write
+// ---------------------------------------------------------------------------
+
+/**
+ * Duration in minutes between two ISO timestamps, or null if either is missing.
+ * Moved here verbatim from the Stop hook when PreCompact needed the same stats
+ * line; it is a pure function of the record, never Stop-specific.
+ *
+ * @param {string} startISO
+ * @param {string} endISO
+ * @returns {number|null}
+ */
+function calculateDurationMinutes(startISO, endISO) {
+  if (!startISO || !endISO) return null;
+  const durationMs = new Date(endISO) - new Date(startISO);
+  return Math.round(durationMs / 60000);
+}
+
+/**
+ * Format the session's activity as the one-liner the enricher prompt carries.
+ * @param {Object} session
+ * @returns {string}
+ */
+function formatSessionStats(session) {
+  const duration = calculateDurationMinutes(session.started, session.lastUpdated);
+
+  let stats = `${session.userMessages || 0} messages, ${session.toolCalls} tool calls`;
+  if (duration > 0) {
+    stats = `~${duration} min, ${stats}`;
+  }
+  if (session.filesModified?.length > 0) {
+    stats += `, ${session.filesModified.length} files modified`;
+  }
+  return stats;
+}
+
+/**
+ * Build the session summary handed to the background enricher — the shape
+ * spawnDiaryEnricher serializes into its prompt and runDiaryCapture documents.
+ *
+ * Both event paths build it from the same place: Stop from the record it just
+ * closed, PreCompact from the record it just stamped. A compaction used to hand
+ * the enricher `{}`, so the draft's prose sections were enriched from nothing
+ * even after its metrics were correct.
+ *
+ * The opt-in needs no check here and deliberately gets none: `userMessageContent`
+ * is only ever in the record while learning is on (pruneUngatedProse removes it
+ * otherwise, and applyTranscriptToSession never writes it), so with learning off
+ * this yields `userMessages: []` by construction — and runDiaryCapture does not
+ * spawn the enricher at all in that state.
+ *
+ * @param {Object} session - Session record.
+ * @returns {{ userMessages: string[], toolsUsed: string[], filesModified: string[], stats: string }}
+ */
+function buildSessionSummary(session) {
+  return {
+    userMessages: session.userMessageContent || [],
+    toolsUsed: session.toolsUsed || [],
+    filesModified: session.filesModified || [],
+    stats: formatSessionStats(session),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Draft generation + background enrichment
 // ---------------------------------------------------------------------------
 
@@ -147,6 +317,30 @@ function tryGenerateAutoDiary(project, date, sessionId) {
  * (inject-context) skips consuming the user's pending actions — otherwise the
  * detached enricher's session would eat diary-ready / reflect-ready /
  * ratify-pending before the user's next session sees them.
+ *
+ * Permissions (D-009). The run used to pass --dangerously-skip-permissions,
+ * which bypasses every check in the child. It now carries the narrowest set
+ * that still enriches, verified by spike against the real CLI:
+ *   --tools Read,Write        the only tools that exist in the child at all.
+ *   --add-dir <draft dir>     the draft lives outside the spawning cwd, so
+ *                             without this the write is refused outright.
+ *   --permission-mode acceptEdits
+ *                             auto-approves file edits inside those
+ *                             directories, replacing the blanket bypass. It is
+ *                             required, not a convenience: a detached run has
+ *                             nobody to answer a permission prompt, so without
+ *                             it the write simply hangs and the draft is never
+ *                             filled in.
+ *
+ * A per-file --allowed-tools allowlist was tried and deliberately left out: it
+ * pre-approves, it does not deny, so it changed nothing here and would have
+ * read like a confinement it does not provide.
+ *
+ * What this is NOT, so no caller or doc overstates it: no `cwd` is passed, so
+ * the child inherits this process's working directory — the user's project —
+ * and --add-dir ADDS the draft's directory alongside it rather than restricting
+ * the run to it. Together with acceptEdits that means edits are auto-approved
+ * across both. This is a narrowing of the old blanket bypass, not a sandbox.
  *
  * @param {string} draftPath - Path to the draft to enrich.
  * @param {Object} transcriptData - { userMessages, toolsUsed, filesModified, stats }.
@@ -185,7 +379,10 @@ function spawnDiaryEnricher(draftPath, transcriptData, project) {
         '--max-turns',
         '10',
         '--print',
-        '--dangerously-skip-permissions',
+        '--add-dir',
+        path.dirname(draftPath),
+        '--permission-mode',
+        'acceptEdits',
         '--system-prompt',
         systemPrompt,
         '--tools',
@@ -221,33 +418,48 @@ function spawnDiaryEnricher(draftPath, transcriptData, project) {
  * Shared diary-capture core for Stop and PreCompact.
  *
  * Reads the counters, gates on the shared threshold, and on a hit: generates a
- * draft, spawns the background enricher (BOTH event paths), then resets the
- * counters (the sole reset). Callers handle event-specific work (queuing
- * diary-ready vs reflect-ready, session-file updates).
+ * draft, spawns the background enricher when the learning opt-in allows it
+ * (BOTH event paths), then resets the counters (the sole reset). Callers handle
+ * event-specific work (queuing diary-ready vs reflect-ready, session-file
+ * updates).
+ *
+ * `projectRoot` carries the consent gate and is deliberately explicit: it is
+ * never defaulted to process.cwd(), which would make the answer depend on
+ * wherever the caller happened to be running from. Omit it and the gate reads
+ * as "no consent" (learningCaptureEnabled fails closed) — the draft is still
+ * written, the enricher is not spawned. That is a degraded call, not an error:
+ * hooks silently catch, so throwing here would take the draft down with it.
  *
  * @param {Object} opts
  * @param {string} opts.project
  * @param {string} opts.date
  * @param {string} opts.sessionId
+ * @param {string} opts.projectRoot - Project root the learning opt-in is read
+ *   from. Omitted means no consent: draft yes, enrichment no.
  * @param {Object} [opts.transcriptData] - { userMessages, toolsUsed, filesModified, stats }.
- * @returns {{ triggered: boolean, draftPath: string|null, userCount: number, toolCount: number }}
+ * @returns {{ triggered: boolean, draftPath: string|null, enriched: boolean,
+ *   userCount: number, toolCount: number }}
  */
 function runDiaryCapture(opts) {
-  const { project, date, sessionId, transcriptData = {} } = opts;
+  const { project, date, sessionId, projectRoot, transcriptData = {} } = opts;
   const { userCount, toolCount } = readCounts();
 
   if (!shouldTrigger(userCount, toolCount)) {
-    return { triggered: false, draftPath: null, userCount, toolCount };
+    return { triggered: false, draftPath: null, enriched: false, userCount, toolCount };
   }
 
   const draftPath = tryGenerateAutoDiary(project, date, sessionId);
-  if (draftPath) {
+
+  // The draft is continuity and is always written; enrichment sends a session
+  // summary to a model, so it waits for the opt-in (D-009).
+  const enriched = Boolean(draftPath) && learningCaptureEnabled({ projectRoot });
+  if (enriched) {
     spawnDiaryEnricher(draftPath, transcriptData, project);
   }
 
   resetCounters();
 
-  return { triggered: true, draftPath, userCount, toolCount };
+  return { triggered: true, draftPath, enriched, userCount, toolCount };
 }
 
 module.exports = {
@@ -257,6 +469,11 @@ module.exports = {
   incrementSharedToolCount,
   getSuggesterStatePath,
   draftIsStale,
+  learningCaptureEnabled,
+  pruneUngatedProse,
+  applyTranscriptToSession,
+  calculateDurationMinutes,
+  buildSessionSummary,
   tryGenerateAutoDiary,
   spawnDiaryEnricher,
   runDiaryCapture,

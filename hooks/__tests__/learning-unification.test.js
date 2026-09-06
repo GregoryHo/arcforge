@@ -292,13 +292,19 @@ describe('end.js does not reference /learn', () => {
     );
   });
 
-  it('should export formatStats instead of formatStopReason', () => {
+  it('has no stop-reason formatter; the session summary is the shared builder', () => {
     const endModule = require('../session-tracker/end');
-    assert.ok(typeof endModule.formatStats === 'function', 'formatStats should be exported');
     assert.strictEqual(
       endModule.formatStopReason,
       undefined,
       'formatStopReason should no longer be exported',
+    );
+    // The stats line moved to scripts/lib when PreCompact needed the same
+    // summary; end.js no longer owns a formatter of its own.
+    const { buildSessionSummary } = require('../../scripts/lib/diary-capture');
+    assert.ok(
+      typeof buildSessionSummary === 'function',
+      'the enricher summary comes from the shared diary-capture builder',
     );
   });
 });

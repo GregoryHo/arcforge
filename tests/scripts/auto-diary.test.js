@@ -10,6 +10,8 @@ const {
   summarizeObservations,
   parseArgs,
 } = require('../../scripts/lib/auto-diary');
+const { getSessionDir } = require('../../scripts/lib/utils');
+const { getObservationsPath } = require('../../scripts/lib/session-utils');
 
 describe('auto-diary', () => {
   const testDir = path.join(os.tmpdir(), `auto-diary-test-${Date.now()}`);
@@ -83,6 +85,80 @@ describe('auto-diary', () => {
     it('includes draft timestamp', () => {
       const draft = generateDraft('test-project', '2026-02-08', 'test-session');
       expect(draft).toContain('_Draft generated at');
+    });
+
+    // The always-on draft carries more than counts: the file paths the session
+    // touched, and a tool-usage aggregate when observations already exist. What
+    // it does NOT carry is the session record's tool NAMES — those reach a draft
+    // only through the aggregate, which is itself gated on observation.
+    // product/specs/hooks.md B-6 documents all three — these pin them.
+    describe('what the always-on draft actually renders (hooks B-6)', () => {
+      const project = 'draft-content-project';
+      const date = '2026-02-08';
+      const sessionId = 'sess-1';
+      const originalArcforgeHome = process.env.ARCFORGE_HOME;
+
+      beforeEach(() => {
+        // getArcforgeHome() reads ARCFORGE_HOME first — without this an
+        // inherited value would point these tests at a real diary store.
+        process.env.ARCFORGE_HOME = path.join(testDir, 'arcforge-home');
+        const sessionDir = getSessionDir(project, date);
+        fs.mkdirSync(sessionDir, { recursive: true });
+        fs.writeFileSync(
+          path.join(sessionDir, `${sessionId}.json`),
+          JSON.stringify({
+            started: '2026-02-08T10:00:00.000Z',
+            lastUpdated: '2026-02-08T10:30:00.000Z',
+            toolCalls: 5,
+            userMessages: 2,
+            compactions: [],
+            toolsUsed: ['Read', 'Edit', 'Bash'],
+            filesModified: ['src/billing.ts', 'notes/private.md'],
+          }),
+        );
+      });
+
+      afterEach(() => {
+        if (originalArcforgeHome === undefined) delete process.env.ARCFORGE_HOME;
+        else process.env.ARCFORGE_HOME = originalArcforgeHome;
+      });
+
+      it('renders the modified-file paths from the session record', () => {
+        const draft = generateDraft(project, date, sessionId);
+        expect(draft).toContain('**Files modified**:');
+        expect(draft).toContain('src/billing.ts');
+        expect(draft).toContain('notes/private.md');
+      });
+
+      // The session record holds toolsUsed either way, but the draft never reads
+      // it. With no observations log — a fresh learning-off install — a draft
+      // therefore names no tool at all. Pinning the absence keeps the spec
+      // honest: nothing else in the gate can evaluate that claim.
+      it('renders no tool names when there is no observations log', () => {
+        const draft = generateDraft(project, date, sessionId);
+        expect(draft).not.toContain('Tools Used');
+        for (const tool of ['Read', 'Edit', 'Bash']) {
+          expect(draft).not.toContain(tool);
+        }
+      });
+
+      it('includes the tool-usage aggregate only when an observations log exists', () => {
+        expect(generateDraft(project, date, sessionId)).not.toContain('## Tool Usage Summary');
+
+        const obsPath = getObservationsPath(project);
+        fs.mkdirSync(path.dirname(obsPath), { recursive: true });
+        fs.writeFileSync(
+          obsPath,
+          `${[
+            JSON.stringify({ event: 'tool_start', tool: 'Read' }),
+            JSON.stringify({ event: 'tool_start', tool: 'Edit' }),
+          ].join('\n')}\n`,
+        );
+
+        const withObservations = generateDraft(project, date, sessionId);
+        expect(withObservations).toContain('## Tool Usage Summary');
+        expect(withObservations).toContain('**Most used**:');
+      });
     });
   });
 

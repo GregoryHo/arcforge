@@ -16,6 +16,7 @@ const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 
 const INJECT_CONTEXT = path.join(__dirname, '..', 'session-tracker', 'inject-context.js');
+const { loadStaleDraftWarning } = require(INJECT_CONTEXT);
 
 // ─────────────────────────────────────────────
 // loadPendingActions relay isolation (S7-1)
@@ -69,6 +70,126 @@ describe('loadPendingActions relay isolation (S7-1)', () => {
     const result = loadPendingActions(project);
     assert.strictEqual(result.text, null, 'renders nothing for a spawned session');
     assert.strictEqual(unconsumedCount(project), 1, 'action survives for the user');
+  });
+});
+
+// ─────────────────────────────────────────────
+// reflect-ready delivery gate (D-009)
+//
+// The nudge is gated at queue time in end.js so it never accumulates while
+// learning is off. That cannot retract one already queued: disabling learning
+// between the queuing Stop and the next SessionStart must drop it too, or the
+// learning-off session gets the exact invitation hooks B-6 promises it will not.
+// ─────────────────────────────────────────────
+
+describe('reflect-ready delivery gate (D-009)', () => {
+  const originalEnv = { ...process.env };
+  let homeDir;
+  let projectDir;
+
+  beforeEach(() => {
+    homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'inject-reflect-home-'));
+    projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'inject-reflect-proj-'));
+    process.env.HOME = homeDir;
+    delete process.env.ARCFORGE_SPAWNED;
+    delete require.cache[require.resolve('../session-tracker/inject-context')];
+    delete require.cache[require.resolve('../../scripts/lib/pending-actions')];
+    delete require.cache[require.resolve('../../scripts/lib/utils')];
+  });
+
+  afterEach(() => {
+    fs.rmSync(homeDir, { recursive: true, force: true });
+    fs.rmSync(projectDir, { recursive: true, force: true });
+    for (const key of Object.keys(process.env)) delete process.env[key];
+    Object.assign(process.env, originalEnv);
+  });
+
+  function seedAction(project, type, payload) {
+    const { addPendingAction } = require('../../scripts/lib/pending-actions');
+    return addPendingAction(project, type, payload);
+  }
+
+  function unconsumedCount(project) {
+    const { getPendingActions } = require('../../scripts/lib/pending-actions');
+    return getPendingActions(project).length;
+  }
+
+  /** Turn the project-scope learning opt-in on for the temp project root. */
+  function enableLearning() {
+    const configPath = path.join(projectDir, '.arcforge', 'learning', 'config.json');
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, JSON.stringify({ scope: 'project', enabled: true }));
+  }
+
+  it('learning off: a queued reflect-ready is suppressed and consumed, not deferred', () => {
+    const project = 'reflect-delivery-off';
+    seedAction(project, 'reflect-ready', { strategy: 'batch', count: 4 });
+    const { loadPendingActions } = require('../session-tracker/inject-context');
+
+    const result = loadPendingActions(project, { projectRoot: projectDir });
+    assert.strictEqual(result.text, null, 'no reflection line with learning off');
+    assert.strictEqual(result.summary, null, 'and nothing in the user summary either');
+    assert.strictEqual(unconsumedCount(project), 0, 'suppressed, not deferred to a later start');
+  });
+
+  it('learning off: diary-ready still renders and reflect-ready leaves no trace', () => {
+    const project = 'reflect-delivery-mixed';
+    seedAction(project, 'diary-ready', { trigger: 'compaction' });
+    seedAction(project, 'reflect-ready', { strategy: 'batch', count: 4 });
+    const { loadPendingActions } = require('../session-tracker/inject-context');
+
+    const result = loadPendingActions(project, { projectRoot: projectDir });
+    assert.ok(result.text.includes('Diary draft ready'), 'diary-ready is unaffected by the gate');
+    assert.ok(
+      !result.text.includes('reflect-ready'),
+      'a suppressed nudge must not fall through to the raw Pending line',
+    );
+    assert.ok(!result.text.includes('ready for reflection'), 'nor to the reflection line');
+    assert.strictEqual(unconsumedCount(project), 0, 'both actions consumed');
+  });
+
+  it('learning on: the queued nudge renders exactly as before', () => {
+    const project = 'reflect-delivery-on';
+    enableLearning();
+    seedAction(project, 'reflect-ready', { strategy: 'batch', count: 4 });
+    const { loadPendingActions } = require('../session-tracker/inject-context');
+
+    const result = loadPendingActions(project, { projectRoot: projectDir });
+    assert.ok(
+      result.text.includes('4 unprocessed diaries ready for reflection'),
+      `expected the reflection line: ${result.text}`,
+    );
+    assert.strictEqual(result.summary, '4 diaries pending reflection');
+    assert.strictEqual(unconsumedCount(project), 0, 'consumed as before');
+  });
+
+  // The gate fails closed on a missing projectRoot, so a main() that never
+  // threaded one through would suppress the nudge for opted-in users too — and
+  // every direct-call case above would still pass. This one spawns the real
+  // hook to pin the wiring.
+  it('main(): SessionStart delivers the nudge to an opted-in project', () => {
+    const project = path.basename(projectDir);
+    enableLearning();
+    seedAction(project, 'reflect-ready', { strategy: 'batch', count: 4 });
+
+    const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectDir };
+    delete env.ARCFORGE_SPAWNED;
+    delete env.ARCFORGE_HOME;
+    const res = spawnSync('node', [INJECT_CONTEXT], {
+      input: JSON.stringify({
+        cwd: projectDir,
+        hook_event_name: 'SessionStart',
+        source: 'startup',
+      }),
+      encoding: 'utf-8',
+      env,
+    });
+
+    assert.strictEqual(res.status, 0, res.stderr);
+    assert.ok(
+      res.stdout.includes('unprocessed diaries ready for reflection'),
+      `main() must pass the project root through: ${res.stdout}`,
+    );
   });
 });
 
@@ -162,4 +283,171 @@ describe('inject-context SessionStart child process (S7-1)', () => {
       'unmarked session consumed the action',
     );
   });
+});
+
+// ─────────────────────────────────────────────
+// Stale-draft warning is gated on the learning opt-in (D-009)
+// ─────────────────────────────────────────────
+
+// The creation-time half of the floor only exists where the filesystem records
+// one. Where it does not, the engine degrades to last-write alone by design
+// (product/specs/hooks.md B-6), so the case below has nothing to assert and is
+// skipped rather than failed. Probed on the same filesystem the tests use.
+const recordsBirthtime = (() => {
+  const probeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'inject-birthtime-'));
+  const probe = path.join(probeDir, 'probe');
+  try {
+    fs.writeFileSync(probe, 'x');
+    return fs.statSync(probe).birthtimeMs > 0;
+  } catch {
+    return false;
+  } finally {
+    fs.rmSync(probeDir, { recursive: true, force: true });
+  }
+})();
+
+describe('inject-context stale-draft warning gate (D-009)', () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  let homeDir;
+  let projectDir;
+  let project;
+
+  beforeEach(() => {
+    homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'inject-stale-home-'));
+    projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'inject-stale-proj-'));
+    project = path.basename(projectDir);
+  });
+
+  afterEach(() => {
+    fs.rmSync(homeDir, { recursive: true, force: true });
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  });
+
+  /**
+   * Write one unenriched draft — the shape the warning fires on — stamped
+   * `ageMs` in the past. Ages are whole days apart so filesystem timestamp
+   * granularity never decides an assertion.
+   */
+  function writeStaleDraft(name, ageMs) {
+    const dir = path.join(homeDir, '.arcforge', 'diaries', project, '2026-09-01');
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, name);
+    fs.writeFileSync(file, '# Diary\n\n## Decisions\n<!-- TO BE ENRICHED -->\n- \n');
+    const at = new Date(Date.now() - ageMs);
+    fs.utimesSync(file, at, at);
+    return file;
+  }
+
+  /** Turn the project-scope opt-in on, as of `ageMs` in the past. */
+  function enableLearning(ageMs) {
+    const configPath = path.join(projectDir, '.arcforge', 'learning', 'config.json');
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        scope: 'project',
+        enabled: true,
+        updated_at: new Date(Date.now() - ageMs).toISOString(),
+      }),
+    );
+  }
+
+  function runInject() {
+    const env = { ...process.env, HOME: homeDir, CLAUDE_PROJECT_DIR: projectDir };
+    delete env.ARCFORGE_SPAWNED;
+    delete env.ARCFORGE_HOME;
+    return spawnSync('node', [INJECT_CONTEXT], {
+      input: JSON.stringify({
+        cwd: projectDir,
+        hook_event_name: 'SessionStart',
+        source: 'startup',
+      }),
+      encoding: 'utf-8',
+      env,
+    });
+  }
+
+  it('stays silent with learning off — unenriched drafts are the contract, not a failure', () => {
+    writeStaleDraft('diary-session-xyz-draft.md', 2 * DAY_MS);
+
+    const res = runInject();
+    assert.strictEqual(res.status, 0, res.stderr);
+    assert.ok(
+      !res.stdout.includes('unenriched'),
+      `learning-off session must not warn about unenriched drafts. stdout: ${res.stdout}`,
+    );
+  });
+
+  it('warns about a draft written after the opt-in — the enricher really should have run', () => {
+    enableLearning(3 * DAY_MS);
+    writeStaleDraft('diary-session-xyz-draft.md', 2 * DAY_MS);
+
+    const res = runInject();
+    assert.strictEqual(res.status, 0, res.stderr);
+    assert.ok(
+      res.stdout.includes('unenriched'),
+      `learning-on session must surface the stale-draft warning. stdout: ${res.stdout}`,
+    );
+  });
+
+  it('opting in does not report the learning-off backlog, only what came after', () => {
+    // Three drafts accumulated while learning was off — all by-design stubs.
+    writeStaleDraft('diary-session-a-draft.md', 5 * DAY_MS);
+    writeStaleDraft('diary-session-b-draft.md', 4 * DAY_MS);
+    writeStaleDraft('diary-session-c-draft.md', 3 * DAY_MS);
+    enableLearning(0);
+
+    const first = runInject();
+    assert.strictEqual(first.status, 0, first.stderr);
+    assert.ok(
+      !first.stdout.includes('unenriched'),
+      `the first session after opting in must not report the backlog. stdout: ${first.stdout}`,
+    );
+
+    // A draft the enricher was authorized for, and left stale, still warns —
+    // and reports only itself.
+    writeStaleDraft('diary-session-d-draft.md', 0);
+    const second = runInject();
+    assert.strictEqual(second.status, 0, second.stderr);
+    assert.ok(
+      second.stdout.includes('1 diary draft unenriched'),
+      `only the post-opt-in draft should be counted. stdout: ${second.stdout}`,
+    );
+  });
+
+  // Direct call, not a spawn: only mtime can be backdated portably, and this
+  // case is about the CREATION stamp — so the draft is written now and the
+  // floor is placed after it, which is the same ordering a pre-opt-in stub has.
+  it(
+    'keeps a pre-opt-in draft suppressed after it is hand-edited or touched',
+    { skip: recordsBirthtime ? false : 'filesystem records no creation time' },
+    () => {
+      const previousHome = process.env.ARCFORGE_HOME;
+      process.env.ARCFORGE_HOME = path.join(homeDir, '.arcforge');
+      try {
+        const draft = writeStaleDraft('diary-session-old-draft.md', 0);
+        const enabledSince = Date.now() + DAY_MS;
+
+        assert.strictEqual(
+          loadStaleDraftWarning(project, enabledSince),
+          null,
+          'a draft that existed before the opt-in must not be reported',
+        );
+
+        // A hand-edit or `touch` moves mtime past the floor. Creation time does
+        // not move, so the draft is still recognized as a pre-opt-in stub.
+        const after = new Date(Date.now() + 3 * DAY_MS);
+        fs.utimesSync(draft, after, after);
+
+        assert.strictEqual(
+          loadStaleDraftWarning(project, enabledSince),
+          null,
+          'touching a pre-opt-in stub must not turn it into a reported failure',
+        );
+      } finally {
+        if (previousHome === undefined) delete process.env.ARCFORGE_HOME;
+        else process.env.ARCFORGE_HOME = previousHome;
+      }
+    },
+  );
 });

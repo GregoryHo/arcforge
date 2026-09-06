@@ -12,11 +12,15 @@ const os = require('node:os');
 describe('diary-capture', () => {
   let homeDir;
   let tmpDir;
+  let projectRoot;
   let savedSession;
 
   beforeEach(() => {
     homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diary-capture-home-'));
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diary-capture-tmp-'));
+    // Consent is read from projectRoot, never from the runner's cwd — a temp
+    // root keeps the gate's answer independent of local repo state.
+    projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'diary-capture-proj-'));
     jest.spyOn(os, 'homedir').mockReturnValue(homeDir);
     process.env.TMPDIR = tmpDir;
     savedSession = process.env.CLAUDE_SESSION_ID;
@@ -30,7 +34,15 @@ describe('diary-capture', () => {
     else process.env.CLAUDE_SESSION_ID = savedSession;
     fs.rmSync(homeDir, { recursive: true, force: true });
     fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(projectRoot, { recursive: true, force: true });
   });
+
+  /** Turn the project-scope learning opt-in on for the temp projectRoot. */
+  function enableLearning() {
+    const configPath = path.join(projectRoot, '.arcforge', 'learning', 'config.json');
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, JSON.stringify({ scope: 'project', enabled: true }));
+  }
 
   describe('counter ownership', () => {
     it('readCounts reflects both counters', () => {
@@ -81,6 +93,146 @@ describe('diary-capture', () => {
     });
   });
 
+  // D-010's retention half: the opt-in decides how long verbatim prose may stay
+  // in the session record, not only whether it is written there.
+  describe('pruneUngatedProse', () => {
+    it('deletes carried prose when the opt-in is off and reports no consent', () => {
+      const { pruneUngatedProse } = require('../../scripts/lib/diary-capture');
+      const session = { userMessageContent: ['a secret sentence'], toolsUsed: ['Edit'] };
+
+      expect(pruneUngatedProse(session, { projectRoot })).toBe(false);
+      expect(session.userMessageContent).toBeUndefined();
+      expect(session.toolsUsed).toEqual(['Edit']);
+    });
+
+    it('leaves the record alone when the opt-in is on', () => {
+      enableLearning();
+      const { pruneUngatedProse } = require('../../scripts/lib/diary-capture');
+      const session = { userMessageContent: ['a secret sentence'] };
+
+      expect(pruneUngatedProse(session, { projectRoot })).toBe(true);
+      expect(session.userMessageContent).toEqual(['a secret sentence']);
+    });
+
+    it('fails closed on a missing projectRoot and tolerates a null session', () => {
+      const { pruneUngatedProse } = require('../../scripts/lib/diary-capture');
+
+      expect(pruneUngatedProse(null)).toBe(false);
+      const session = { userMessageContent: ['a secret sentence'] };
+      expect(pruneUngatedProse(session, {})).toBe(false);
+      expect(session.userMessageContent).toBeUndefined();
+    });
+  });
+
+  // The stamp both hooks run above the threshold: Stop closes the record with
+  // it, PreCompact refreshes the record the draft is about to be rendered from.
+  describe('applyTranscriptToSession', () => {
+    /** A transcript carrying user prose plus Edit/Write/Bash tool uses. */
+    function writeTranscript() {
+      const transcriptPath = path.join(tmpDir, 'transcript.jsonl');
+      fs.writeFileSync(
+        transcriptPath,
+        `${[
+          JSON.stringify({
+            type: 'user',
+            message: { role: 'user', content: [{ type: 'text', text: 'ship the fix' }] },
+          }),
+          JSON.stringify({
+            type: 'assistant',
+            message: {
+              content: [{ type: 'tool_use', name: 'Edit', input: { file_path: '/repo/a.js' } }],
+            },
+          }),
+          JSON.stringify({
+            type: 'assistant',
+            message: { content: [{ type: 'tool_use', name: 'Bash', input: {} }] },
+          }),
+        ].join('\n')}\n`,
+      );
+      return transcriptPath;
+    }
+
+    it('stamps tool names and paths but no prose when the opt-in is off', () => {
+      const { applyTranscriptToSession } = require('../../scripts/lib/diary-capture');
+      const session = {};
+
+      expect(applyTranscriptToSession(session, writeTranscript(), { learningOn: false })).toBe(
+        true,
+      );
+      expect(session.toolsUsed).toEqual(['Edit', 'Bash']);
+      expect(session.filesModified).toEqual(['/repo/a.js']);
+      expect(session.userMessageContent).toBeUndefined();
+    });
+
+    it('stamps the verbatim prose when the opt-in is on', () => {
+      const { applyTranscriptToSession } = require('../../scripts/lib/diary-capture');
+      const session = {};
+
+      expect(applyTranscriptToSession(session, writeTranscript(), { learningOn: true })).toBe(true);
+      expect(session.userMessageContent).toEqual(['ship the fix']);
+    });
+
+    it('defaults to no prose when the gate is not passed at all', () => {
+      const { applyTranscriptToSession } = require('../../scripts/lib/diary-capture');
+      const session = {};
+
+      expect(applyTranscriptToSession(session, writeTranscript())).toBe(true);
+      expect(session.userMessageContent).toBeUndefined();
+    });
+
+    it('leaves the record untouched when there is nothing to parse', () => {
+      const { applyTranscriptToSession } = require('../../scripts/lib/diary-capture');
+      const carried = { toolsUsed: ['Edit'], filesModified: ['/repo/carried.js'] };
+      const empty = path.join(tmpDir, 'empty.jsonl');
+      fs.writeFileSync(empty, '');
+
+      // Missing path, unreadable path, and a file that parses to nothing all
+      // report false — a compaction keeps the paths an earlier Stop wrote
+      // rather than blanking a record it cannot refresh.
+      expect(applyTranscriptToSession(carried, undefined, { learningOn: true })).toBe(false);
+      expect(applyTranscriptToSession(carried, path.join(tmpDir, 'nope.jsonl'))).toBe(false);
+      expect(applyTranscriptToSession(carried, empty)).toBe(false);
+      expect(carried).toEqual({ toolsUsed: ['Edit'], filesModified: ['/repo/carried.js'] });
+      expect(applyTranscriptToSession(null, writeTranscript())).toBe(false);
+    });
+  });
+
+  // The summary the enricher prompt carries. Both hooks build it here so the
+  // compaction path cannot drift from Stop's.
+  describe('buildSessionSummary', () => {
+    it("carries the record's prose, tool names, paths and a stats line", () => {
+      const { buildSessionSummary } = require('../../scripts/lib/diary-capture');
+      const summary = buildSessionSummary({
+        started: '2025-01-01T10:00:00Z',
+        lastUpdated: '2025-01-01T10:30:00Z',
+        userMessages: 12,
+        toolCalls: 55,
+        userMessageContent: ['ship the fix'],
+        toolsUsed: ['Edit', 'Bash'],
+        filesModified: ['/repo/a.js'],
+      });
+
+      expect(summary).toEqual({
+        userMessages: ['ship the fix'],
+        toolsUsed: ['Edit', 'Bash'],
+        filesModified: ['/repo/a.js'],
+        stats: '~30 min, 12 messages, 55 tool calls, 1 files modified',
+      });
+    });
+
+    it('yields empty lists — never undefined — for a record with nothing parsed', () => {
+      const { buildSessionSummary } = require('../../scripts/lib/diary-capture');
+      // The learning-off shape: pruneUngatedProse has removed the prose, so the
+      // summary carries none by construction rather than by a second gate.
+      const summary = buildSessionSummary({ userMessages: 0, toolCalls: 3 });
+
+      expect(summary.userMessages).toEqual([]);
+      expect(summary.toolsUsed).toEqual([]);
+      expect(summary.filesModified).toEqual([]);
+      expect(summary.stats).toBe('0 messages, 3 tool calls');
+    });
+  });
+
   describe('runDiaryCapture threshold gating', () => {
     it('does NOT trigger or reset below threshold', () => {
       const { createSessionCounter } = require('../../scripts/lib/utils');
@@ -92,6 +244,7 @@ describe('diary-capture', () => {
         project: 'demo',
         date: '2026-06-14',
         sessionId: 'diary-capture-session',
+        projectRoot,
       });
 
       expect(result.triggered).toBe(false);
@@ -109,6 +262,7 @@ describe('diary-capture', () => {
         project: 'demo',
         date: '2026-06-14',
         sessionId: 'diary-capture-session',
+        projectRoot,
       });
 
       expect(result.triggered).toBe(true);
@@ -148,7 +302,27 @@ describe('diary-capture', () => {
       return null;
     }
 
-    it('spawns the enricher with ARCFORGE_SPAWNED=enricher when triggered', async () => {
+    it('spawns the enricher with ARCFORGE_SPAWNED=enricher when learning is on', async () => {
+      const { createSessionCounter } = require('../../scripts/lib/utils');
+      const { runDiaryCapture } = require('../../scripts/lib/diary-capture');
+      enableLearning();
+      createSessionCounter('user-count').write(15);
+
+      const result = runDiaryCapture({
+        project: 'demo',
+        date: '2026-06-14',
+        sessionId: 'diary-capture-session',
+        projectRoot,
+      });
+      expect(result.triggered).toBe(true);
+      expect(result.enriched).toBe(true);
+
+      const marker = path.join(binDir, 'spawned.marker');
+      const content = await waitForMarker(marker, 5000);
+      expect(content).toBe('enricher');
+    });
+
+    it('writes the draft but does NOT spawn the enricher when learning is off', async () => {
       const { createSessionCounter } = require('../../scripts/lib/utils');
       const { runDiaryCapture } = require('../../scripts/lib/diary-capture');
       createSessionCounter('user-count').write(15);
@@ -157,12 +331,116 @@ describe('diary-capture', () => {
         project: 'demo',
         date: '2026-06-14',
         sessionId: 'diary-capture-session',
+        projectRoot,
       });
+
+      // Continuity survives the gate; enrichment does not (D-009).
       expect(result.triggered).toBe(true);
+      expect(result.draftPath).toBeTruthy();
+      expect(fs.existsSync(result.draftPath)).toBe(true);
+      expect(result.enriched).toBe(false);
 
       const marker = path.join(binDir, 'spawned.marker');
-      const content = await waitForMarker(marker, 5000);
-      expect(content).toBe('enricher');
+      expect(await waitForMarker(marker, 1000)).toBeNull();
+    });
+
+    it('fails closed when projectRoot is omitted — draft yes, enricher no', async () => {
+      const { createSessionCounter } = require('../../scripts/lib/utils');
+      const { runDiaryCapture } = require('../../scripts/lib/diary-capture');
+      // A GLOBAL opt-in answers true for any projectRoot, so nothing but the
+      // fail-closed guard can stop the spawn here: if the gate ever falls back
+      // to process.cwd() again, this test spawns and fails.
+      const globalConfig = path.join(homeDir, '.arcforge', 'learning', 'config.json');
+      fs.mkdirSync(path.dirname(globalConfig), { recursive: true });
+      fs.writeFileSync(globalConfig, JSON.stringify({ scope: 'global', enabled: true }));
+      createSessionCounter('user-count').write(15);
+
+      const result = runDiaryCapture({
+        project: 'demo',
+        date: '2026-06-14',
+        sessionId: 'diary-capture-session',
+        // projectRoot deliberately omitted.
+      });
+
+      expect(result.triggered).toBe(true);
+      expect(fs.existsSync(result.draftPath)).toBe(true);
+      expect(result.enriched).toBe(false);
+      expect(await waitForMarker(path.join(binDir, 'spawned.marker'), 1000)).toBeNull();
+    });
+
+    it('spawns the enricher on a GLOBAL-scope opt-in too', async () => {
+      const { createSessionCounter } = require('../../scripts/lib/utils');
+      const { runDiaryCapture } = require('../../scripts/lib/diary-capture');
+      const globalConfig = path.join(homeDir, '.arcforge', 'learning', 'config.json');
+      fs.mkdirSync(path.dirname(globalConfig), { recursive: true });
+      fs.writeFileSync(globalConfig, JSON.stringify({ scope: 'global', enabled: true }));
+      createSessionCounter('user-count').write(15);
+
+      const result = runDiaryCapture({
+        project: 'demo',
+        date: '2026-06-14',
+        sessionId: 'diary-capture-session',
+        projectRoot,
+      });
+      expect(result.enriched).toBe(true);
+
+      const marker = path.join(binDir, 'spawned.marker');
+      expect(await waitForMarker(marker, 5000)).toBe('enricher');
+    });
+  });
+
+  describe('enricher permissions (D-009)', () => {
+    let binDir;
+    let savedPath;
+
+    beforeEach(() => {
+      binDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diary-capture-argv-'));
+      savedPath = process.env.PATH;
+      process.env.PATH = `${binDir}${path.delimiter}${savedPath}`;
+      // Stub `claude` so the REAL argv the enricher spawns with is recorded,
+      // one argument per line (paths contain no newlines). The lines go to a
+      // temp file and are renamed into place, so the poller below can never
+      // read a half-written argv and miss a flag that is simply not there yet.
+      const argvFile = path.join(binDir, 'argv.txt');
+      fs.writeFileSync(
+        path.join(binDir, 'claude'),
+        `#!/bin/sh\ncat > /dev/null\nfor a in "$@"; do printf '%s\\n' "$a"; done > "${argvFile}.tmp"\nmv "${argvFile}.tmp" "${argvFile}"\n`,
+        { mode: 0o755 },
+      );
+    });
+
+    afterEach(() => {
+      process.env.PATH = savedPath;
+      fs.rmSync(binDir, { recursive: true, force: true });
+    });
+
+    async function recordedArgv(timeoutMs) {
+      const file = path.join(binDir, 'argv.txt');
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        if (fs.existsSync(file)) {
+          const lines = fs.readFileSync(file, 'utf-8').split('\n');
+          lines.pop();
+          if (lines.length > 0) return lines;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      return null;
+    }
+
+    it('drops --dangerously-skip-permissions and adds the draft dir with acceptEdits', async () => {
+      const { spawnDiaryEnricher } = require('../../scripts/lib/diary-capture');
+      const draftPath = path.join(homeDir, '.arcforge', 'diaries', 'demo', '2026-06-14', 'd.md');
+      fs.mkdirSync(path.dirname(draftPath), { recursive: true });
+
+      spawnDiaryEnricher(draftPath, { userMessages: [] }, 'demo');
+      const argv = await recordedArgv(5000);
+      expect(argv).not.toBeNull();
+
+      expect(argv).not.toContain('--dangerously-skip-permissions');
+      expect(argv[argv.indexOf('--add-dir') + 1]).toBe(path.dirname(draftPath));
+      expect(argv[argv.indexOf('--permission-mode') + 1]).toBe('acceptEdits');
+      expect(argv[argv.indexOf('--tools') + 1]).toBe('Read,Write');
     });
   });
 });
