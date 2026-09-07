@@ -1,6 +1,6 @@
 ---
 name: speccing
-description: Spec-driven product state a project is maintained from. Use when the user asks to start that state, or when product/ holds living specs and a decision log and one of these applies — a wish to capture, code about to change, a decision reversed, a version picked up or shipped.
+description: Spec-driven product state a project is maintained from. Use when a repo keeps living specs and a decision log under product/ and the code is about to change, when a recorded decision is being reversed, when a milestone is picked up or shipped, or when asked to start that state.
 argument-hint: "[milestone, wish, or spec slug]"
 ---
 
