@@ -1544,3 +1544,15 @@ A/B, or compare was run.
   gradeable only via an arcforge flag name (every v1 trial reported `arcforge` not
   on PATH); `## Max Turns` 45; and the required `re:` form is used on both
   behavioral assertions.
+
+## 6.1.0 release benchmark（plugin-routed，非注入）
+
+`releasing` 的 benchmark-freshness gate 要求本版重跑受影響的 scenario。三支以 `arcforge eval run <name> --k 5 --plugin-dir .` 重跑（plugin 真正載入，skill 由 description 自行觸發，不注入），`eval report --since 2026-08-15T02:09:09Z` 重建快照 `evals/benchmarks/2026-09-07.json`。
+
+| scenario | k | 結果 | 讀法 |
+|---|---|---|---|
+| eval-router-skill-selection | 5 | 4/5 PASS @0.8，1 trial 0.6 | 與 #170 的 Edit/Write 鍵斷言失效一致；A5 4/5 |
+| eval-speccing-supersede-not-overwrite | 5 | 4/5 PASS @1.0，1 trial 0.75（A3） | 與 Version 7 的 corpus-only 判定不衝突 |
+| eval-speccing-spec-before-code | 5 + 5 | 0/10，全部 0.33（A1–A4 ✗，A5/A6 ✓） | baseline 簽名：模型直接實作 CSV，從未路由到 `speccing` |
+
+上表最後一列是本版**已分類的已知缺口**（[#179](https://github.com/GregoryHo/arcforge/issues/179)）：本檔記錄的 +0.67 CI[0.67, 0.67] 來自 A/B 的 treatment 臂，那一臂以 `--skill-file` 注入 skill 本文，量的是 skill 的指示，不是 description 能否讓模型自行路由。prompt 明說「不要花時間在 product docs」時，只靠 description 拉不進來。把 description 還原成 A/B 當時的觸發語（review 期間曾被改寫）後再跑 5 trial 仍為 0/5，故不是措辭問題。兩次 run 的 transcript 都看得到使用者環境的「advisor」步驟與只用 Bash 的工具型態（#170 漏進 trial）。這一列的 fail row 在原始快照裡沒有分類欄位；本段就是它的分類。
