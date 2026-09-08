@@ -462,6 +462,10 @@ A `Synthesis` with 3+ sources must cite key factual paragraphs with `[[Source-No
 - More than 5 Sources on the same question without a Synthesis → suggest a Synthesis.
 - More than 20 notes in one topic without a MOC → suggest a MOC.
 - `log.md` > 200 entries or > 200 KB → suggest log rotation.
+- Field empty in 90%+ of a type → EVOLVE candidate (`--field-empty-pct 90`).
+- Undeclared field in 80%+ of a type → EVOLVE candidate (`--undeclared-pct 80`).
+- Tag used 10+ times outside the taxonomy → EVOLVE candidate (`--tag-min 10`).
+- Title similarity 0.8+ against an existing note → GROW drops the proposal (`--title-match 0.8`).
 
 ## Audit Report
 
