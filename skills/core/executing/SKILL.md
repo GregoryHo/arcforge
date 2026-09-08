@@ -93,7 +93,7 @@ wait. A checkpoint the user never gets a chance to answer is not a checkpoint.
 verify passes, so a crash leaves the file honest. Nobody is going to answer a
 question, so a task that needs a decision is `[!]` with the question in its
 `note:`, not a guess. Handing individual tasks to subagents is a dispatch
-problem — the `dispatching` skill covers fan-out, isolation, and model tier. If
+problem — the `dispatching` skill covers fan-out, isolation, and acceptance. If
 the user wants the whole list driven unattended in a loop, that is theirs to
 start, not yours.
 

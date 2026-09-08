@@ -146,7 +146,7 @@ Then retry this skill.
 | Merge or delete because the user said "just handle it" | Present the four options — blanket trust names none of them |
 | Announce the plan ("verify, then merge and clean up") before Step 3 | Stop at the options; the plan after Step 2 is to ask, not to integrate |
 | Present the options with tests failing or unrun | Emit the Blocked format and stop |
-| `git checkout <base-branch>` inside a linked worktree | Merge into the base from the base checkout — git 2.52 exits 128 on that checkout |
+| `git checkout <base-branch>` inside a linked worktree | Merge into the base from the base checkout — git refuses (exit 128) to check out a branch another worktree already holds |
 | Remove the worktree while standing inside it | `cd "$BASE_WORKTREE"` first |
 | Delete the branch before the worktree is removed | Remove the worktree, then delete the branch |
 | `git branch -D` after `-d` refused | Stop — the merge did not land |

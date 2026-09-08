@@ -22,8 +22,6 @@ Come back only for:
   verbatim and wait.
 - Completion: what you did, what you changed, and what you verified.
 
-Progress updates between stages are neither needed nor read.
-
 ## Your workspace
 
 Work in <absolute-worktree-path>. Every path below is absolute; nothing in
