@@ -251,6 +251,48 @@ function buildBlindComparatorPrompt(taskPrompt, outputA, outputB, agentDef) {
   ].join('\n');
 }
 
+/** Margin below which two weighted totals count as a tie. */
+const BLIND_TIE_MARGIN = 0.1;
+
+/**
+ * Compute the blind comparator's weighted totals and winner. The agent supplies
+ * the judgment (rubric weights and per-criterion scores); the arithmetic and the
+ * tie threshold live here, where they are deterministic and testable, rather
+ * than in the prompt.
+ * @param {Array<{criterion: string, weight: number}>} rubric
+ * @param {number[]} scoresA - Per-criterion scores for Output A (rubric order)
+ * @param {number[]} scoresB - Per-criterion scores for Output B (rubric order)
+ * @returns {{ winner: 'A'|'B'|'tie', scoreA: number, scoreB: number }|null}
+ *   null when the rubric is empty or carries a non-finite / negative weight,
+ *   when either score array is missing or not rubric-length, or when any score
+ *   element is not a finite number within [0, 1] inclusive. Nothing is
+ *   coerced or clamped: a string '0.9', a null, a NaN, or a 5 is a malformed
+ *   response and never maps to a winner.
+ */
+function scoreBlindRubric(rubric, scoresA, scoresB) {
+  if (!Array.isArray(rubric) || rubric.length === 0) return null;
+  if (!Array.isArray(scoresA) || !Array.isArray(scoresB)) return null;
+  if (scoresA.length !== rubric.length || scoresB.length !== rubric.length) return null;
+  const weights = rubric.map((r) => (typeof r?.weight === 'number' ? r.weight : Number.NaN));
+  if (weights.some((w) => !Number.isFinite(w) || w < 0)) return null;
+  const totalWeight = weights.reduce((a, b) => a + b, 0);
+  if (totalWeight <= 0) return null;
+  const validScore = (s) => typeof s === 'number' && Number.isFinite(s) && s >= 0 && s <= 1;
+  if (!scoresA.every(validScore) || !scoresB.every(validScore)) return null;
+  const weighted = (scores) =>
+    scores.reduce((sum, s, i) => sum + s * (weights[i] / totalWeight), 0);
+  // Compare in integer hundredths: subtracting two-decimal floats puts an
+  // exact-margin gap on either side of the threshold depending on the operands'
+  // binary representation (0.8 - 0.7 > 0.1, but 0.7 - 0.6 is not).
+  const hundredthsA = Math.round(weighted(scoresA) * 100);
+  const hundredthsB = Math.round(weighted(scoresB) * 100);
+  const marginHundredths = Math.round(BLIND_TIE_MARGIN * 100);
+  let winner = 'tie';
+  if (hundredthsA - hundredthsB > marginHundredths) winner = 'A';
+  else if (hundredthsB - hundredthsA > marginHundredths) winner = 'B';
+  return { winner, scoreA: hundredthsA / 100, scoreB: hundredthsB / 100 };
+}
+
 /**
  * Run the eval-blind-comparator agent on two outputs.
  * Randomly shuffles (baseline, treatment) → (A, B) to prevent label bias,
@@ -315,31 +357,31 @@ function runBlindComparator(taskPrompt, baselineOutput, treatmentOutput, project
 
   if (exitCode !== 0) return null;
 
-  const parsed = extractJsonObject(stdout, ['winner']);
+  const parsed = extractJsonObject(stdout, ['rubric', 'scores_a', 'scores_b']);
   if (!parsed) return null;
 
-  const winner = parsed.winner; // expect 'A', 'B', or 'tie'
-  let winnerOriginalLabel;
-  if (winner === 'tie') {
-    winnerOriginalLabel = 'tie';
-  } else if (winner === 'A') {
-    winnerOriginalLabel = baselineIsA ? 'baseline' : 'treatment';
-  } else if (winner === 'B') {
-    winnerOriginalLabel = baselineIsA ? 'treatment' : 'baseline';
-  } else {
-    // Unknown / malformed winner value (e.g. lowercase 'b', 'baseline',
-    // whitespace-padded 'B '). Surface the failure rather than silently
-    // mapping it to a concrete baseline/treatment outcome — that would
-    // bias the supplementary preference signal.
+  // Malformed, out-of-range, or misaligned scores surface as a failure rather
+  // than being coerced and mapped to a concrete baseline/treatment outcome —
+  // that would bias the supplementary preference signal.
+  const scored = scoreBlindRubric(parsed.rubric, parsed.scores_a, parsed.scores_b);
+  if (!scored) {
+    process.stderr.write(
+      'Warning: blind comparator returned a malformed rubric or scores — dropping this pair.\n',
+    );
     return null;
   }
+
+  const { winner, scoreA, scoreB } = scored;
+  let winnerOriginalLabel = 'tie';
+  if (winner === 'A') winnerOriginalLabel = baselineIsA ? 'baseline' : 'treatment';
+  if (winner === 'B') winnerOriginalLabel = baselineIsA ? 'treatment' : 'baseline';
 
   return {
     winner_original_label: winnerOriginalLabel,
     reasoning: parsed.reasoning || '',
-    rubric: parsed.rubric || [],
-    score_baseline: baselineIsA ? (parsed.score_a ?? 0) : (parsed.score_b ?? 0),
-    score_treatment: baselineIsA ? (parsed.score_b ?? 0) : (parsed.score_a ?? 0),
+    rubric: parsed.rubric,
+    score_baseline: baselineIsA ? scoreA : scoreB,
+    score_treatment: baselineIsA ? scoreB : scoreA,
   };
 }
 
@@ -348,5 +390,7 @@ module.exports = {
   compareWithModel,
   buildBlindComparatorPrompt,
   runBlindComparator,
+  scoreBlindRubric,
   BLIND_COMPARATOR_FORBIDDEN,
+  BLIND_TIE_MARGIN,
 };

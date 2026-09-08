@@ -63,14 +63,13 @@ function makeScenario(grader = 'model', overrides = {}) {
 }
 
 function makeBlindAgentResponse(winner = 'A') {
+  // The harness derives the winner from the scores; shape them to match.
+  const scores = { A: [[0.8], [0.6]], B: [[0.6], [0.8]], tie: [[0.7], [0.7]] }[winner];
   return JSON.stringify({
-    winner,
     reasoning: `Output ${winner} was more complete.`,
-    score_a: 0.8,
-    score_b: 0.6,
     rubric: [{ criterion: 'Task completion', weight: 1.0 }],
-    scores_a: [0.8],
-    scores_b: [0.6],
+    scores_a: scores[0],
+    scores_b: scores[1],
   });
 }
 
