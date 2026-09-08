@@ -4,8 +4,7 @@ This folder runs the product **spec-driven**: the specs ARE the living documenta
 the product is maintained from. This guide says how to keep them — and the roadmap
 and the decision history — current. The rule that matters most: **lightweight means
 less ceremony and a readable format, NOT less substance.** A spec here is plain
-markdown instead of a PRD → XML → DAG → tasks pipeline, but it stays complete enough
-to maintain and extend the area from.
+markdown, complete enough to maintain and extend the area from.
 
 ## What lives here
 
@@ -37,16 +36,14 @@ read and update it whenever you touch that area.
 
 1. **Spec-driven.** Change the product → change its spec in the same PR. The spec
    describes the *current* product, not the original plan.
-2. **Lightweight ≠ thin.** Cut ceremony, not content. A spec must stay substantive
-   enough to onboard from and extend from.
-3. **Big picture first.** `ROADMAP.md` answers "where are we, what's next" at a
+2. **Big picture first.** `ROADMAP.md` answers "where are we, what's next" at a
    glance and links to each spec.
-4. **Append, never overwrite (history).** A recorded decision's text is immutable;
+3. **Append, never overwrite (history).** A recorded decision's text is immutable;
    change direction by *adding* a decision that supersedes the old one.
-5. **Semver is the spine.** Each milestone is a semver version; shipped → an
+4. **Semver is the spine.** Each milestone is a semver version; shipped → an
    annotated `vX.Y.Z` tag, with the version string synced across the locations
    `npm run check:versions` enforces.
-6. **A norm worth writing is worth checking.** Everything below that *can* be
+5. **A norm worth writing is worth checking.** Everything below that *can* be
    mechanically enforced is, by `npm run check:product`
    (`scripts/check-product.js`). Prose-only conventions are labelled as such, so
    nobody mistakes a habit for a gate.
