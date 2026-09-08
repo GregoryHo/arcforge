@@ -9,7 +9,6 @@
 
 const path = require('node:path');
 const { execCommand } = require('./utils');
-const { DELTA_IMPROVED_THRESHOLD, DELTA_REGRESSED_THRESHOLD } = require('./eval-stats');
 const {
   loadAgentDef,
   captureTrialArtifacts,
@@ -73,7 +72,8 @@ function gradeWithModel(result, scenario, projectRoot) {
   for (let attempt = 1; attempt <= 2; attempt++) {
     const { stdout, exitCode } = execCommand(
       'claude',
-      ['-p', '--output-format', 'text', '--no-session-persistence'],
+      // The grader reads and never edits ("Your Tools" in eval-grader.md); enforce it.
+      ['-p', '--output-format', 'text', '--no-session-persistence', '--tools', 'Read,Grep,Glob'],
       {
         input: prompt,
         cwd: projectRoot,
@@ -146,13 +146,10 @@ function gradeWithModel(result, scenario, projectRoot) {
  * @returns {{ analysis: string, delta_explanation?: string, weak_assertions_patterns?: string[], variance_notes?: string[], improvements?: string[], regressions?: string[], limitations?: string[] }|null}
  */
 function compareWithModel(scenario, baseline, treatment, projectRoot, metrics) {
-  const rawDef = loadAgentDef(
+  const agentDef = loadAgentDef(
     path.join(projectRoot, 'scripts', 'lib', 'prompts', 'eval-analyzer.md'),
   );
-  if (!rawDef) return null;
-  const agentDef = rawDef
-    .replace(/\{IMPROVED_THRESHOLD\}/g, String(DELTA_IMPROVED_THRESHOLD))
-    .replace(/\{REGRESSED_THRESHOLD\}/g, String(DELTA_REGRESSED_THRESHOLD));
+  if (!agentDef) return null;
   const assertions = scenario.assertions.map((a, i) => `${i + 1}. ${a}`).join('\n');
   const fmtResults = (results) =>
     results
@@ -186,14 +183,15 @@ function compareWithModel(scenario, baseline, treatment, projectRoot, metrics) {
     '### Required Response Format (automated comparison)',
     'Respond with ONLY a JSON object:',
     '```json',
-    '{"analysis": "...", "improvements": ["..."], "regressions": ["..."], "limitations": ["..."], "recommendation": "SHIP"}',
+    '{"analysis": "...", "improvements": ["..."], "regressions": ["..."], "limitations": ["..."], "delta_explanation": "...", "weak_assertions_patterns": ["..."], "variance_notes": ["..."]}',
     '```',
     'Use the provided programmatic metrics as numeric truth. Do not invent missing per-assertion numbers.',
   ].join('\n');
 
   const { stdout, exitCode } = execCommand(
     'claude',
-    ['-p', '--output-format', 'text', '--no-session-persistence'],
+    // The analyzer reads and never edits ("Your Tools" in eval-analyzer.md); enforce it.
+    ['-p', '--output-format', 'text', '--no-session-persistence', '--tools', 'Read,Grep,Glob'],
     {
       input: prompt,
       cwd: projectRoot,

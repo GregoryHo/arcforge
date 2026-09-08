@@ -171,7 +171,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     claudeArgs.push('--strict-mcp-config');
     claudeArgs.push(
       '--append-system-prompt',
-      `IMPORTANT: You are running in an isolated eval trial. Your working directory is ${trialDir}. Do NOT read, search, or access any files outside this directory. All files you need are already in the working directory.`,
+      `You are running in an isolated eval trial. Your working directory is ${trialDir}, and every file you need is already in it — do not read, search, or access files outside this directory.`,
     );
   }
   if (pluginDir) {
