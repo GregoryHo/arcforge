@@ -13,17 +13,17 @@ Read this BEFORE writing the EA build script. Good spacing prevents 80% of overl
 Before calling any EA API method, plan your layout on a virtual grid:
 
 ```
-Columns: x = 50, 250, 450, 650, 850, ...  (200px increments)
+Columns: x = 50, 270, 490, 710, 930, ...  (220px increments)
 Rows:    y = 50, 200, 350, 500, 650, ...   (150px increments)
 ```
 
-This ensures minimum 40px gap between Primary-sized elements (180px wide, 200px column spacing = 20px gap on each side).
+220px columns leave a 40px gap between Primary-sized elements (180px wide) — the same-level minimum in the spacing table below.
 
 For Hero elements (300px wide), skip a column — they occupy two grid slots.
 
 ### Zone Layout Template
 
-For multi-zone diagrams (like the teammates architecture), plan vertical space per zone:
+For multi-zone diagrams, plan vertical space per zone:
 
 ```
 Zone 1 title:    y = 30
@@ -40,7 +40,7 @@ Each zone gets 170px of element space + 30px gap to separator. Adjust zone heigh
 
 ### Evidence Artifact Placement
 
-Evidence artifacts (code/JSON blocks) are large — typically 250-300px wide and 200-280px tall. They MUST NOT share Y-space with flow elements.
+Evidence artifacts (code/JSON blocks) are large — typically 250-300px wide and 200-280px tall. They need their own lane: either their own Y-range (Strategy A, below the step) or their own X-range (Strategy B, side lane). Never inline with flow elements.
 
 **Two strategies:**
 
@@ -164,8 +164,8 @@ Read this when the overlap checker or visual inspection reveals issues.
 - Hero elements need 120px+ clearance on all sides
 
 **Prevention during Phase 1:**
-- Plan coordinates on a grid: x increments of 200px for columns, y increments of 150px for rows
-- Leave 200px vertical gap between zone separator lines and the elements above/below them
+- Plan coordinates on a grid: x increments of 220px for columns, y increments of 150px for rows
+- Leave at least 30px between a zone separator and the nearest element on each side, 60px where an arrow must cross the separator
 
 ## Text Overlapping Shapes
 

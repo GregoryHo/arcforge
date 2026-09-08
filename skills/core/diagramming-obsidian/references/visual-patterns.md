@@ -71,7 +71,7 @@
 ### 6. Cloud (Abstract State)
 
 **Use when:** Context, memory, conversations, mental states — anything fuzzy/unbounded.
-**Implementation:** 3-5 overlapping ellipses with varied sizes and slight opacity.
+**Implementation:** 3-5 overlapping ellipses with varied sizes; opacity stays 100 — vary fill lightness within the palette instead of transparency.
 **Size:** Varied — largest = Primary, others = Secondary/Small.
 
 ### 7. Assembly Line (Transformation)

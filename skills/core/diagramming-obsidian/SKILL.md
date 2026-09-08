@@ -79,9 +79,9 @@ built: `references/layout-heuristics.md` Part 2.
 
 HARD keeps a diagram valid; SOFT is what makes it good.
 
-**Think first, draw second.** For each major concept, answer before reaching for
-shapes: what does it DO (the verb)? What is the core transformation — input to
-output, state A to state B? What would someone need to SEE to understand it?
+**Every concept has a verb.** For each major concept: what does it DO? What is
+the core transformation — input to output, state A to state B? What would
+someone need to SEE to understand it?
 
 **Every element serves the concept.** Before adding anything, ask what it
 communicates that labels alone do not. "Nothing" means it is noise; "this is
