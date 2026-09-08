@@ -60,9 +60,9 @@ describe('parseVerdict', () => {
   it('takes the LAST verdict line when multiple appear', () => {
     expect(parseVerdict('Final verdict: FAIL\nrecheck\nFinal verdict: PASS')).toBe('PASS');
   });
-  it('returns null for SHIP-only output (verifier.md vocabulary divergence)', () => {
-    // The agent body's own report format says SHIP/NEEDS WORK/BLOCKED — that must
-    // NEVER be mapped to PASS. No `Final verdict:` line → null → block.
+  it('returns null for SHIP-only output (no verdict line)', () => {
+    // A session that answers in some other vocabulary must never be mapped to
+    // PASS. No `Final verdict:` line → null → block.
     expect(parseVerdict('### Final Assessment\nSHIP')).toBeNull();
   });
   it('returns null for garbage / no verdict line', () => {
@@ -108,15 +108,17 @@ describe('assembleVerifierPrompt', () => {
     verifyCommand: ['npm', 'test'],
   };
 
-  it('layers body + criteria + verify-cmd evidence + verdict override', () => {
+  it('layers body + criteria + verify-cmd evidence + verdict protocol', () => {
     const prompt = assembleVerifierPrompt(base);
     expect(prompt).toContain('AGENT BODY');
     expect(prompt).toContain('criterion one');
     expect(prompt).toContain('npm test');
     expect(prompt).toContain('Final verdict: PASS');
     expect(prompt).toContain('Final verdict: FAIL');
-    // The override must forcefully supersede the SHIP/NEEDS WORK/BLOCKED wording.
-    expect(prompt).toContain('Disregard the SHIP');
+    // The protocol is stated once, next to the parser; nothing in the assembled
+    // prompt carries the retired SHIP / NEEDS WORK / BLOCKED vocabulary.
+    expect(prompt).toContain('## Verdict Protocol');
+    expect(prompt).not.toContain('SHIP');
   });
 
   it('prepends verbatim feedback when provided', () => {
