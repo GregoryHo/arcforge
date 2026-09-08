@@ -1,11 +1,11 @@
 ---
 name: releasing
-description: Use this skill whenever the user (an arcforge contributor) says they want to bump arcforge's version, cut a release, "ship vX.Y.Z", "準備發版", "ready to release", or any equivalent intent on the arcforge repo itself — even if they don't use the word "release". Runs the canonical release workflow: pre-flight checks → vault ingest → outdated-doc audit → CHANGELOG → product-state flip → 9-file version bump (incl. website + Codex manifest) → commit/push/PR → post-merge tag. Contributor-only; do NOT trigger inside projects that merely install arcforge as a plugin.
+description: Use this skill whenever the user (an arcforge contributor) says they want to bump arcforge's version, cut a release, "ship vX.Y.Z", "準備發版", "ready to release", or any equivalent intent on the arcforge repo itself — even if they don't use the word "release". Runs the canonical release workflow: pre-flight checks → vault ingest → outdated-doc audit → CHANGELOG → product-state flip → version bump across every canonical location → commit/push/PR → post-merge tag. Contributor-only; do NOT trigger inside projects that merely install arcforge as a plugin.
 ---
 
 # releasing
 
-You are helping an arcforge contributor ship a new version. The goal of this skill is zero silent drift between the canonical version files, the CHANGELOG, shipped documentation, and the Obsidian vault knowledge base. Those four surfaces get out of sync surprisingly easily — a prior release (v1.4.0) discovered that `marketplace.json` had been stuck two versions behind, and v1.4.1 discovered the observer daemon and the JS side had diverged state roots. The checklist below is designed to catch exactly those classes of drift before they ship.
+You are helping an arcforge contributor ship a new version. The goal of this skill is zero silent drift between the canonical version files, the CHANGELOG, shipped documentation, and the Obsidian vault knowledge base. Those four surfaces drift independently — a manifest left behind by a bump, a state root moved in code but not in docs — and the checklist below exists to catch those classes of drift before they ship.
 
 This is a **project-local, contributor-only** skill. It lives in `.claude/skills/` (not the shipped `skills/` directory) because releasing arcforge is a maintainer activity, not a user activity. If you see this skill trigger inside a project that merely *installs* arcforge, something is wrong — stop and tell the user.
 
@@ -60,11 +60,11 @@ Do these in order. Each step depends on the previous one being correct.
 
 ### 1. Ingest the release into the Obsidian vault
 
-Invoke `/arcforge:maintaining-obsidian` in **ingest** mode. Scope depends on the release shape — always propose scope before bulk-processing, because ingest is the most expensive step in the workflow:
+Ingest with the `maintaining-obsidian` skill in **ingest** mode (the arcforge plugin is disabled in this repo, so the skill resolves only in a session started with `claude --plugin-dir .`). Scope depends on the release shape — always propose scope before bulk-processing, because ingest is the most expensive step in the workflow:
 
 | Release shape | Ingest scope |
 |---|---|
-| Patch with an architectural decision inside (e.g., v1.4.1's `~/.arcforge/` consolidation) | Decision note + refresh Source notes whose content substantively changed + propagate + index/log + daily note |
+| Patch with an architectural decision inside | Decision note + refresh Source notes whose content substantively changed + propagate + index/log + daily note |
 | Patch with only small fixes | Skip, or just append a single `log.md` entry |
 | Minor release (new skill or feature) | Full sync: new Source notes for new skills/guides, Decision notes for any architectural shifts, update affected MOCs, propagate cross-refs |
 | Major release | Everything above, plus update `MOC-ArcForge.md` to reflect the new surface |
@@ -109,7 +109,7 @@ A release that changes skill behavior must ship a benchmark that reflects *this*
 
 1. **Regenerate the benchmark** against the release branch (manual/CI live-eval run — see `skills/core/evaluating/SKILL.md` for the regeneration procedure). This refreshes `evals/benchmarks/latest.json` and `evals/benchmarks/raw/latest.json`.
 
-   > Path note: the canonical report location is `evals/benchmarks/` (`latest.json` + `raw/latest.json`), each carrying a top-level `generated` ISO-8601 timestamp. Older notes that say `evals/reports/latest.json` are referring to this same artifact under its prior name.
+   > Path note: the canonical report location is `evals/benchmarks/` (`latest.json` + `raw/latest.json`), each carrying a top-level `generated` ISO-8601 timestamp.
 
 2. **Assert freshness.** The `generated` timestamp in both `evals/benchmarks/latest.json` and `evals/benchmarks/raw/latest.json` must be **newer than the previous release tag's commit date**. If the timestamp predates the last tag, the benchmark was never re-run for this release — stop and regenerate.
 
@@ -196,10 +196,13 @@ git add product/
 git commit -m "docs(product): flip vX.Y.Z to shipped"
 ```
 
-Keeping it separate is deliberate — the release commit in step 7 stays exactly the 10
-release files, so reverting a bad bump does not drag the product history back with it.
+Keeping it separate is deliberate — the release commit in step 7 stays exactly the
+version files plus `CHANGELOG.md`, so reverting a bad bump does not drag the product
+history back with it.
 
-### 6. Bump the version in **all 9 canonical locations**
+### 6. Bump the version in every canonical location
+
+The list is `LOCATIONS` in `scripts/check-version-sync.js`; the table below shows what each location holds and is illustrative, not the list.
 
 | File | Where in the file |
 |---|---|
@@ -227,7 +230,7 @@ Verify with a single grep after bumping + building:
 grep -rn "X\.Y\.Z" package.json .claude-plugin/ .codex-plugin/ README.md website/page/
 ```
 
-Expect **exactly 9 hits**. Fewer means a split-brain bump (dangerous — Claude Code, Codex, or the website disagree about the current version). More means a stale copy elsewhere that also needs attention.
+Every hit must be one of the `LOCATIONS` files. A location with no hit means a split-brain bump (dangerous — Claude Code, Codex, or the website disagree about the current version); a hit outside the list means a stale copy elsewhere that also needs attention.
 
 For an authoritative pass/fail that compares every location against the canonical `plugin.json` version, run `npm run check:versions` (zero-dep `scripts/check-version-sync.js`). It prints a location → version table and exits non-zero on any drift. The same check runs in CI and gates `release.yml` before the GitHub Release is created, so a drifted bump fails the release rather than shipping silently.
 
@@ -238,13 +241,13 @@ For releases that change **shipped surface area** (new skill, removed CLI flag, 
 ### 7. Commit, push, open PR
 
 - Commit message: `chore(release): vX.Y.Z` with a brief body summarizing scope
-- Stage exactly the 10 release files (9 version locations + `CHANGELOG.md`) — the product-state flip from step 5 is already its own commit on this branch, so do not fold it in. Avoid `git add -A` — it tends to pull in lock files, editor droppings, and workspace metadata
+- Stage exactly the release files (the version locations + `CHANGELOG.md`) — the product-state flip from step 5 is already its own commit on this branch, so do not fold it in. Avoid `git add -A` — it tends to pull in lock files, editor droppings, and workspace metadata
 - `git push -u origin <branch>`
-- `gh pr create` with a test-plan checklist in the body: 5 runners green, 6 static checks green, lint green, secret scan clean, canonical 9-location grep returned exactly 9 hits
+- `gh pr create` with a test-plan checklist in the body: 5 runners green, 6 static checks green, lint green, secret scan clean, `check:versions` green and the version grep returned only canonical locations
 
 ### 8. After PR merges to main — tag it
 
-Arcforge has tagged every release since `v1.0.0`. Skipping a tag breaks the `git log vPREV..HEAD` workflow that the *next* release relies on to scope its CHANGELOG.
+Every release is tagged. Skipping a tag breaks the `git log vPREV..HEAD` workflow that the *next* release relies on to scope its CHANGELOG.
 
 ```bash
 git checkout main && git pull
@@ -254,7 +257,7 @@ git push origin vX.Y.Z
 
 If the user is merging via GitHub UI (squash or merge), run the tag commands against `main` after the merge completes — the merge commit on main is what represents the release on the main timeline, not the source branch's tip.
 
-## Things That Are Easy to Forget
+## Easy to forget
 
 These are the steps that get skipped when a contributor is in a hurry. The skill's job is to surface them even when the user doesn't ask:
 
@@ -264,16 +267,9 @@ These are the steps that get skipped when a contributor is in a hurry. The skill
 - **Secret scan.** Release commits are large diffs. `git diff --cached | grep -iE "api[_-]?key|token|secret|password"` before pushing. The cost of a false positive is low; the cost of a committed secret is very high.
 - **Daily note append.** After the release ships, `obsidian daily:append` with a one-line release summary so the release is preserved in the vault's chronological log, not only in `log.md`.
 - **The product-state flip.** The roadmap row, its `Tag` cell, the spec headers, and the `← we are here` marker are four edits in four files, and a version bump touches none of them. `npm run check:product` proves the first three; where the marker ended up is on you.
-- **The post-merge tag.** Merging the PR does not auto-tag. This is the single most commonly skipped step.
-
-## Anti-Patterns (from real arcforge release incidents)
-
-- **Silent version drift** — v1.4.0 discovered `.claude-plugin/marketplace.json` had been stuck two versions behind. The 9-location grep is designed to catch exactly this. v3.0.1 expanded the surface to include `website/page/{hero,sections}.{jsx,js}` after the website was found to have been silently bumped manually during v3.0.0; 6.1.0 added `.codex-plugin/plugin.json`, which is hand-maintained beside its Claude Code twin and drifts the same way.
-- **Version bump without CHANGELOG entry** — the marketplace release cache is version-keyed. A bump with no CHANGELOG entry ships to users who have no way to tell what changed. The checklist order (CHANGELOG *before* version bump) enforces pairing them.
-- **Editing past CHANGELOG entries** — downstream users and vault Decision notes depend on past entries being stable. Add corrections to the current entry; never stealth-edit the past.
-- **Partial bump shipped** — bumping a subset of the 9 locations produces a release where Claude Code, Codex, the marketplace JSON, or the website disagree about the current version. Always use the 9-location grep as a post-bump gate.
-- **Mixing release commit with other work** — `chore(release): vX.Y.Z` should be *only* the 10 release files (9 version locations + `CHANGELOG.md`). Unrelated fixes bundled in make bisect and rollback painful. Commit work-in-progress separately *before* the release commit.
-- **Skipping the post-merge tag** — without the tag, the next release can't use `git log vPREV..HEAD` to scope its CHANGELOG. Missing tags cause the *next* release to either drop entries or include already-shipped ones.
+- **Version bump without a CHANGELOG entry.** The marketplace release cache is version-keyed, so a bump with no entry ships to users who have no way to tell what changed. The checklist order (CHANGELOG before bump) pairs them, and `release.yml` fails without the section.
+- **A release commit that carries other work.** `chore(release): vX.Y.Z` is the version files plus `CHANGELOG.md`, nothing else — unrelated fixes bundled in make bisect and rollback painful. Commit work-in-progress separately *before* the release commit.
+- **The post-merge tag.** Merging the PR does not auto-tag, and without the tag the next release can't use `git log vPREV..HEAD` to scope its CHANGELOG. This is the single most commonly skipped step.
 
 ## After the Release
 
