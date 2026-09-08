@@ -55,6 +55,7 @@ created: YYYY-MM-DD
 langs: [en, zh]
 source_url: ""
 source_author: ""
+sha256: ""                # of the captured body, after frontmatter (B-4 provenance pair)
 tags: []
 aliases: []
 ---

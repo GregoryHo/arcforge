@@ -34,6 +34,7 @@ created: YYYY-MM-DD          # ingestion date (when wiki note was created)
 published_date: YYYY-MM-DD   # publication date from the source
 source_url: ""               # canonical URL (deduplicated)
 source_author: ""            # publisher / outlet (e.g., "Bloomberg", "Reuters")
+sha256: ""                   # of the captured body, after frontmatter (provenance pair)
 source_language: en          # ISO code if differs from vault language
 authors: []                  # bylines, if available
 topic: ""                    # wikilink-resolvable Topic name (or empty for standalone)

@@ -254,3 +254,20 @@ def test_skip_drops_a_folder_and_bad_scope_is_rejected(vault):
     )
     assert proc.returncode != 0
     assert "scope must be" in proc.stderr
+
+
+PRESETS = Path(__file__).resolve().parents[2] / "skills" / "core" / "maintaining-obsidian" / "presets"
+
+
+@pytest.mark.parametrize("preset,type_name", [("llm-wiki", "source"), ("news", "article")])
+def test_preset_source_types_declare_the_provenance_pair(tmp_path, preset, type_name):
+    # obsidian.md B-4: the typed note carries source_url and sha256; a preset whose
+    # schema omits sha256 makes every conformant note an undeclared-field finding.
+    (tmp_path / "SCHEMA.md").write_text((PRESETS / preset / "SCHEMA.md").read_text(encoding="utf-8"), encoding="utf-8")
+    (tmp_path / "AGENTS.md").write_text("# Contract\n", encoding="utf-8")
+    (tmp_path / "note.md").write_text(
+        f"---\ntype: {type_name}\nsource_url: https://example.com/x\nsha256: {'0' * 64}\n---\nbody\n",
+        encoding="utf-8",
+    )
+    undeclared = _run(tmp_path)["types"][type_name]["undeclared"]
+    assert "sha256" not in undeclared and "source_url" not in undeclared
