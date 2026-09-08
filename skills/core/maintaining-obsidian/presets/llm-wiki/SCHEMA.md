@@ -279,10 +279,6 @@ only skip when the synthesis is purely explanatory.
   domains with spatial layout Mermaid can't capture.
 - **Embed:** Re-embed source images relevant to the argument.
 
-**Anti-pattern:** Skipping Mermaid because "the layered architecture is
-simple enough for prose." If the synthesis IS about relationships, the
-shape makes the insight instantly graspable.
-
 ## MOC (Map of Content)
 
 ```yaml

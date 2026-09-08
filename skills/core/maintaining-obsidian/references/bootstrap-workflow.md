@@ -46,7 +46,7 @@ Then **write a fresh AGENTS.md** for the user's vault, filling in their actual v
 - Rephrase or extend where the user's case warrants.
 - Keep the Schema Authority section verbatim — those 6 rules are the stable contract baseline across all presets.
 
-**The preset is one-shot reading guidance, not a template to copy verbatim.** Do not leave unsubstituted placeholders like `<Vault Name>` in the written file — those are pedagogical markers in the preset, not literal output.
+The preset's `<...>` markers and `<TODO: ...>` blocks are instructions to you, not content: resolve each with the user's answer, or, where the user deferred, leave a `<TODO>` in SCHEMA.md and name it in the closing report.
 
 ### 5. Author `<path>/SCHEMA.md`
 
@@ -155,44 +155,3 @@ Specifically:
 - If step 4 / 5 fails after step 1 / 2, no files were written — clean.
 - If step 6 fails after step 4 / 5 succeeded, leave AGENTS.md + SCHEMA.md (they're useful even without CLAUDE.md), warn user.
 - If step 9 (register) fails after files are written, files stay; tell user to retry `arcforge obsidian register --name <name> --path <path>` once the failure cause is addressed.
-
-## Worked Example
-
-To make "author from preset, don't copy" concrete, here's how step 4 actually plays out for a real bootstrap:
-
-**User input:** `init-vault /tmp/news-feed --name news-feed --preset=news`
-
-**Question phase (step 3) responses:**
-- Scope: `"AI policy news"`
-- Search backend: filesystem baseline; user accepts optional QMD (`obsidian-news-feed`)
-- Bilingual: `news` preset is mono-only, so the LLM doesn't ask.
-
-**Step 4 execution:**
-
-The LLM reads `presets/news/AGENTS.md` (the canonical news preset). It contains:
-- Frontmatter with `<YYYY-MM-DD>` and `<Vault Scope>` placeholders.
-- `## Schema Authority` baseline (6 rules — keep verbatim).
-- `## Identity` describing news-pipeline LLM behavior.
-- `## Layer 1` declaring Raw Source adopted under `Raw/<YYYY-MM-DD>/<source-slug>.md`.
-- `## Language Policy` with `<TODO: declare e.g., English | 中文>`.
-- `## Domain Policy` pointing agents to SCHEMA.md for taxonomy, thresholds, and type rules.
-
-The LLM then **authors** `/tmp/news-feed/AGENTS.md` — NOT a literal copy. Concretely:
-
-- Frontmatter: `created: 2026-05-06`, `scope: AI policy news`, `preset: news`, `schema_path: SCHEMA.md`, `raw_source: adopted`.
-- `# news-feed — Agent Runtime Contract (News Pipeline)` (real name, not `<Vault Name>`).
-- Schema Authority section: copied verbatim (the 6 rules are stable).
-- Identity / Layer 1 / Layer 2 / Layer 3 sections: copied with substitutions.
-- Language Policy: `Single language: English. Note bodies in English; no callouts.` (User said English; LLM resolved the TODO directly.)
-- Domain Policy: points to `SCHEMA.md` for tag taxonomy, source validation rules, audit thresholds, and aggregation triggers.
-
-**What the LLM does NOT do:**
-
-- Does not leave any `<Vault Name>`, `<YYYY-MM-DD>`, `<Vault Scope>`, `<QMD Collection>` strings in the written file.
-- Does not include the bilingual section (preset's news AGENTS.md doesn't have one anyway, but if it did and user said mono, LLM would skip it).
-- Does not auto-fill tag taxonomy in SCHEMA.md with guesses — if user defers, leave a TODO in SCHEMA.md and tell the user where it is.
-- Does not literally copy preset's `<TODO: ...>` instructions in the user's AGENTS.md (those are LLM-facing pedagogy, not user-facing content).
-
-Step 5 (SCHEMA.md authoring) follows the same pattern with `presets/news/SCHEMA.md`.
-
-This worked example is the load-bearing piece of "author from preset" — once the LLM internalizes that presets are guidance for authoring, the rest of the workflow is mechanical.
