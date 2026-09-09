@@ -42,7 +42,7 @@ Vault may extend this baseline (e.g., `langs: [en, zh]` for bilingual,
 
 Example skeleton (copy, customize, and add a new section per type):
 
-```
+````
 ## TypeName
 
 ```yaml
@@ -66,7 +66,7 @@ aliases: []
 - **Mermaid:** when to add a relationship diagram.
 - **Canvas:** when to use Obsidian Canvas.
 - **Excalidraw:** when to delegate to `/diagramming-obsidian`.
-```
+````
 
 When you've added at least one type, ingest mode can classify and create
 notes against this schema.>
@@ -89,7 +89,8 @@ Common examples:
 - MOC/map trigger: total typed notes > N → suggest creating a map/index note.
 - Log rotation: `log.md` > N entries OR > N KB → rotate.
 - Stale detection: typed notes older than N days without updates.
-- GROW thresholds: notes-without-synthesis count, mentions-without-entity count, notes-without-map count.>
+- GROW thresholds: notes-without-synthesis count, mentions-without-entity count, notes-without-map count.
+- LINT script flags (`lint_vault.py`): `--field-empty-pct N` (field empty in N%+ of a type), `--undeclared-pct N` (undeclared field in N%+ of a type), `--tag-min N` (tag used N+ times outside the taxonomy), `--title-match R` (title similarity ratio R+ for the duplicate guard).>
 
 ## Domain Rules
 

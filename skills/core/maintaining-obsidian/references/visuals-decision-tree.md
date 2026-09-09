@@ -34,9 +34,8 @@ Q4: Is the spatial/architectural layout complex enough to warrant manual positio
 
 ## Conservative defaults
 
-If you reach Q3 = yes, generate Mermaid. Do not second-guess with "but
-text could also work" — the question is whether the shape communicates
-faster. Mermaid is cheap; Canvas and Excalidraw are expensive tiers
-that wait for user approval.
+If Q3 is yes, generate Mermaid: for relationship content the shape
+communicates faster than text. Mermaid is cheap; Canvas and Excalidraw
+are expensive tiers that wait for user approval.
 
 When in doubt, skip visuals. Noise diagrams are worse than none.

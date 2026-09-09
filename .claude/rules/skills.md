@@ -39,7 +39,8 @@ the skill.
 
 ## Test file convention
 
-- Single generic checker: `tests/skills/test_skill_structure.py` (no per-skill file)
+- Single generic structure checker: `tests/skills/test_skill_structure.py` (no
+  per-skill structure file)
 - Runner: pytest — discovers every `skills/core/*/SKILL.md` dynamically, so
   merges, renames, and new skills need zero test edits. Adding or removing a
   skill does need one edit: `EXPECTED_SKILL_COUNT`, which pins the scan against
@@ -47,6 +48,10 @@ the skill.
 - Validates frontmatter against the frozen schema, `name` == dirname, the
   description register, section/body structure, referenced supporting files,
   and the line budget
+- A skill-local script (`skills/core/<name>/references/*.py`) ships its
+  contract test as `tests/skills/test_<script>.py`, driving the script as the
+  subprocess the skill runs and asserting on its output — it tests the
+  script, never a skill's structure, which stays with the generic checker
 
 The line budget is a hard cap owned by that test. Do not negotiate an exemption
 for a skill that doesn't fit — split it into references or move behavior into

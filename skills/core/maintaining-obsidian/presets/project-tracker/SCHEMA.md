@@ -329,6 +329,10 @@ Project:
 - Milestone past `target_date` and status not `done`/`missed` → milestone slippage.
 - Project with 10+ Tasks and no Milestone → suggest milestone planning.
 - `log.md` > 200 entries or > 200 KB → suggest log rotation.
+- Field empty in 90%+ of a type → EVOLVE candidate (`--field-empty-pct 90`).
+- Undeclared field in 80%+ of a type → EVOLVE candidate (`--undeclared-pct 80`).
+- Tag used 10+ times outside the taxonomy → EVOLVE candidate (`--tag-min 10`).
+- Title similarity 0.8+ against an existing note → GROW drops the proposal (`--title-match 0.8`).
 
 ## GROW Rules
 

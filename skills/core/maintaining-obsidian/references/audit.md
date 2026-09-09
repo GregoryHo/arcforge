@@ -24,6 +24,17 @@ as declared by the resolved vault's `SCHEMA.md`. Skip:
   in frontmatter. Skip in LINT, exclude from the index.
 - **Folders the vault's AGENTS.md declares out of scope.**
 
+Hand each skipped folder to the LINT script as `--skip <folder>`. On its own the
+script leaves out only dot-dirs, Excalidraw drawings, the root contract files
+(AGENTS.md, SCHEMA.md, CLAUDE.md, README.md, index.md, log.md), and the standard
+`_audits/` report folder — a vault that keeps its reports elsewhere names that
+folder with `--skip`, or every run's report would take a `recent:N` slot. A `.md` note
+that carries `sha256` but no `type:` is a Raw Source to the script: it is
+drift-checked whatever the scope, never counted as untyped, and never a subject
+of the schema, link, tag, or title checks — so `Raw/` needs no `--skip` and does
+not eat into `recent:N`. A `[[wikilink]]` inside a code fence or inline code is
+an example to the script, not a link.
+
 ## LINK — resolve relationships
 
 The only sub-check that modifies existing notes.
@@ -44,58 +55,106 @@ Single-file mode — `audit link --file=<path>` — runs on one note only; inges
 
 ## LINT — mechanical checks
 
-**Verify before fix.** Every finding here is a hypothesis. Read the actual file
-before acting on it.
+The deterministic scans run in code. `lint_vault.py` ships in this skill's
+`references/` directory — its absolute path came with the skill on the line
+reading `Base directory for this skill`; resolve `references/` against that,
+never against the user's working directory:
+
+```bash
+cd "<base directory>/references"
+python3 lint_vault.py <vault> --json                              # default scope: recent:50
+python3 lint_vault.py <vault> --scope all --skip Templates --json
+python3 lint_vault.py <vault> --field-empty-pct 90 --undeclared-pct 80 --tag-min 10 --title-match 0.8 --json
+```
+
+The four threshold flags take the vault's numbers from its SCHEMA.md
+`## Audit Thresholds`; each figure in the JSON then carries an `exceeds`
+boolean. Omit a flag the vault does not declare and `exceeds` stays `null` —
+report the observation instead of inventing a number.
+
+The JSON is the fact base for every check below: `untyped` and
+`types.<type>.fields` / `.undeclared` (frontmatter parsed as a block, so a
+YAML block list reads as filled), `links.notes` / `links.orphans`,
+`raw_sources`, `log.missing_files`, `tags`, and `duplicate_titles`.
+
+**Verify before fix.** Every figure is a hypothesis about a file. Read the
+actual file before acting on it.
 
 ### Schema compliance
 
 Validate each note's frontmatter against the shape its `type:` declares in the
-vault's SCHEMA.md. Obsidian accepts two equivalent list spellings and both are
-valid:
+vault's SCHEMA.md. The script reads the declared fields from SCHEMA.md's yaml
+fences: `types.<type>.fields.<field>` counts present / filled / empty per
+field over the notes it is `expected` of, and `types.<type>.undeclared` lists
+fields the type does not declare. A fence naming several types, or one type
+under a heading that does not name it (`## Universal Frontmatter`), is a base
+every note of the type carries; a fence under the type's own heading is a
+variant. A type declared by more than one such fence (the llm-wiki Source and
+its Paper variant, both `type: source`) has that many `variants`; each note is
+measured against the variant it fits — the one whose
+discriminator tag it carries (the Paper fence declares `tags: [paper]`), else
+the one whose fields it carries most of — so a Paper-only field is expected of
+the papers, not of every Source, and a paper missing every paper field is still
+measured as a paper. `variant_notes` counts the notes fitting each fence.
+Obsidian accepts three equivalent list spellings; all are valid and all read
+as filled:
 
 ```yaml
 tags: [arcforge, tdd]     # inline
 tags:                     # block
   - arcforge
   - tdd
+tags:                     # block, unindented
+- arcforge
+- tdd
 ```
-
-A field with no inline value is **not** empty when the next lines are indented
-`- ` items. Read the whole frontmatter block — this is the most common false
-positive in the whole audit.
 
 ### Orphans, untyped notes, log consistency
 
-- **Orphans** — notes with zero inbound and zero outbound links.
-- **Untyped** — no `type:` field. Report; never auto-fix.
-- **Log consistency** — `log.md` entries that name files which no longer exist,
-  and notes whose `created:` predates any log entry for them.
+- **Orphans** — `links.orphans`: zero inbound and zero outbound links, with the
+  graph built over the whole wiki layer even when the scope is `recent:N`. Raw
+  Source captures are not in the graph — neither a `[[link]]` inside captured
+  text nor a typed note's provenance link to its capture counts — and a target
+  with an extension other than `.md` is an attachment embed, not a link.
+- **Untyped** — `untyped`: no `type:` field; `has_frontmatter` separates a note
+  with no frontmatter from one whose frontmatter lacks the field. Report; never
+  auto-fix.
+- **Log consistency** — `log.missing_files`: `log.md` entries that name files
+  which no longer exist. Notes whose `created:` predates any log entry for them
+  are a read-through check, not in the JSON.
 
 ### Source Drift (sha256)
 
-For each Raw Source: re-hash the body bytes after the frontmatter (UTF-8, line
-endings normalized to `\n`) per `raw-sources.md`; for remote URLs, re-fetch first
-when fetchable. Then:
+`raw_sources[]` lists every in-scope note with a `sha256` key: the stored
+digest, the digest recomputed per `raw-sources.md`, the `hashed_file` it was
+recomputed from, and a `status`. The file hashed is the `source_url` target
+when that is a file inside the vault; otherwise a Raw Source note (`sha256`,
+no `type:`) hashes its own body, and a typed note — the provenance pair, whose
+`source_url` is usually the remote original — hashes the one Raw Source note
+its body wikilinks (the news preset's `## Source` line). Then:
 
-| Comparison | Action |
+| `status` | Action |
 |---|---|
-| New == stored | Fresh. No log line. |
-| New ≠ stored | **Drift.** Append `drift \| <filename> \| sha=<old>→<new>` to `log.md` and report it. Informational only. |
-| Stored is empty | **Unhashed.** Compute and write `sha256` + `ingested`. Offer `audit lint --backfill-sha256` for the rest. |
+| `fresh` | No log line. |
+| `drift` | Append `drift \| <filename> \| sha=<old>→<new>` to `log.md` and report it. Informational only. |
+| `unhashed` | Report it and propose the backfill; LINT writes nothing (only LINK modifies notes — obsidian B-5). The digest is written by re-ingest, or by `audit lint --backfill-sha256` when the user asks for it explicitly. |
+| `unresolved` | A typed note whose original is remote and whose body links no single Raw Source note, so nothing in the vault stands in for it — with a stored digest or without one (there is nothing to backfill from). Re-fetch when fetchable and compare the fetched body by hand; otherwise report it. Never a drift line. |
 
 Drift never auto-fixes the wiki layer — a changed source is a fact for the user
-to act on, not a licence to rewrite their note.
+to act on, not a licence to rewrite their note — and neither does an empty
+digest: the backfill is a proposal until the user runs it.
 
 ### EVOLVE — schema drift
 
 Patterns in actual usage suggesting the vault's own schema should change. These
-are observations, not errors; the user decides.
+are observations, not errors; the user decides. The figures come from the JSON;
+the cut-off is the vault's, passed as the flag named in the table.
 
-| Check | Pattern | Example |
-|---|---|---|
-| Field usage | A field 90%+ empty across a type, or an undeclared field in 80%+ of a type | "`source_author` empty in 90% of Source notes" |
-| Type fit | Section structure that does not match the declared type | "12 Entity notes carry `## Steps` — a tutorial type?" |
-| Tag drift | A tag used 10+ times that is not in the declared taxonomy | "`#distributed-systems` used 15× — formalize?" |
+| Check | Fact in the JSON | Flag | Example |
+|---|---|---|---|
+| Field usage | `types.<type>.fields.<field>.empty_pct`; `types.<type>.undeclared.<field>.present_pct` | `--field-empty-pct`, `--undeclared-pct` | "`source_author` empty in 9 of 10 Source notes" |
+| Type fit | Section structure that does not match the declared type — read the notes; not in the JSON | — | "12 Entity notes carry `## Steps` — a tutorial type?" |
+| Tag drift | `tags.<tag>.count` with `declared` read from the backticked list items under SCHEMA.md's `## Tag Taxonomy` (a sub-tag counts through its top-level segment); `exceeds` is set for undeclared tags only | `--tag-min` | "`#distributed-systems` used 15× — formalize?" |
 
 ### Vault-declared LINT
 
@@ -138,8 +197,10 @@ Files with real content and no typed note pointing at them — detection table i
 
 ### Duplicate guard
 
-Before proposing any new artifact, check for an 80%+ title match against
-existing notes and drop the suggestion if one exists.
+Before proposing any new artifact, check its title against existing notes at
+the vault's title-match ratio (`--title-match`) and drop the suggestion when
+one matches. `duplicate_titles` in the JSON lists the pairs of existing notes
+already at that ratio, with `exceeds` set — a proposal must not add a third.
 
 ## The report
 

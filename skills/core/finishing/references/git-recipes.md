@@ -47,7 +47,7 @@ For a plain branch with no worktree, that single line is the whole recipe.
 
 ## What never appears in either recipe
 
-`git checkout <base-branch>` from inside a linked worktree. Git 2.52 exits 128
-because the branch is already checked out in the base, and every variation of
-the command hits the same wall. The merge target is reached with `git -C`, not
-by moving onto it.
+`git checkout <base-branch>` from inside a linked worktree. Git refuses with
+exit 128 because the branch is already checked out in the base, and every
+variation of the command hits the same wall. The merge target is reached with
+`git -C`, not by moving onto it.

@@ -34,6 +34,7 @@ created: YYYY-MM-DD          # ingestion date (when wiki note was created)
 published_date: YYYY-MM-DD   # publication date from the source
 source_url: ""               # canonical URL (deduplicated)
 source_author: ""            # publisher / outlet (e.g., "Bloomberg", "Reuters")
+sha256: ""                   # of the Raw Source body linked under ## Source (provenance pair)
 source_language: en          # ISO code if differs from vault language
 authors: []                  # bylines, if available
 topic: ""                    # wikilink-resolvable Topic name (or empty for standalone)
@@ -257,6 +258,10 @@ LINT checks:
 - Week with 10+ Articles and no WeeklyAggregate → flag.
 - Article not referenced by any DailyAggregate or Topic after 7 days → flag as freshness orphan.
 - `log.md` > 200 entries or > 200 KB → suggest log rotation.
+- Field empty in 90%+ of a type → EVOLVE candidate (`--field-empty-pct 90`).
+- Undeclared field in 80%+ of a type → EVOLVE candidate (`--undeclared-pct 80`).
+- Tag used 10+ times outside the taxonomy → EVOLVE candidate (`--tag-min 10`).
+- Title similarity 0.8+ against an existing note → GROW drops the proposal (`--title-match 0.8`).
 
 ## Audit Report
 

@@ -55,6 +55,7 @@ created: YYYY-MM-DD
 langs: [en, zh]
 source_url: ""
 source_author: ""
+sha256: ""                # of the captured body, after frontmatter (B-4 provenance pair)
 tags: []
 aliases: []
 ---
@@ -107,13 +108,14 @@ created: YYYY-MM-DD
 langs: [en, zh]
 source_url: ""
 source_author: []          # list — papers have multiple authors
+sha256: ""                 # of the captured body, after frontmatter (B-4 provenance pair)
 venue: ""                  # conference or journal name
 year: null                 # publication year
 methodology: ""            # empirical | theoretical | survey | meta-analysis
 reading_status: queued     # queued | skimmed | deep-read | extracted
 cites: []                  # papers this one references
 cited_by: []               # papers in vault that cite this one (LINK updates)
-tags: []
+tags: [paper]              # the variant's discriminator (taxonomy: `paper`); add topic tags
 aliases: []
 ---
 ```
@@ -278,10 +280,6 @@ only skip when the synthesis is purely explanatory.
 - **Excalidraw (suggest for complex syntheses):** 5+ concepts across
   domains with spatial layout Mermaid can't capture.
 - **Embed:** Re-embed source images relevant to the argument.
-
-**Anti-pattern:** Skipping Mermaid because "the layered architecture is
-simple enough for prose." If the synthesis IS about relationships, the
-shape makes the insight instantly graspable.
 
 ## MOC (Map of Content)
 
@@ -466,6 +464,10 @@ A `Synthesis` with 3+ sources must cite key factual paragraphs with `[[Source-No
 - More than 5 Sources on the same question without a Synthesis → suggest a Synthesis.
 - More than 20 notes in one topic without a MOC → suggest a MOC.
 - `log.md` > 200 entries or > 200 KB → suggest log rotation.
+- Field empty in 90%+ of a type → EVOLVE candidate (`--field-empty-pct 90`).
+- Undeclared field in 80%+ of a type → EVOLVE candidate (`--undeclared-pct 80`).
+- Tag used 10+ times outside the taxonomy → EVOLVE candidate (`--tag-min 10`).
+- Title similarity 0.8+ against an existing note → GROW drops the proposal (`--title-match 0.8`).
 
 ## Audit Report
 

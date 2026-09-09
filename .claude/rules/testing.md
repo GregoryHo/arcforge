@@ -81,7 +81,7 @@ commit. Lowering the floor requires a written reason in the same commit.
 
 ## Custom Runner (`tests/node/`)
 
-- CLI integration, schema validation, model definitions, YAML parsing
+- CLI manifest contract, CLI integration (eval flags, obsidian, finishing/worktree), eval graders, YAML parser, file locking
 - Lightweight — no test framework overhead
 
 ## Principles

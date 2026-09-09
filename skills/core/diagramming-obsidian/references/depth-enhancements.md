@@ -1,6 +1,6 @@
 # Depth Enhancements for Comprehensive Diagrams
 
-Read this file when Step 0 determines the diagram is **Comprehensive/Technical**. These enhancements add steps to the main pipeline — they don't replace it.
+Read this file when the SOFT design pass decides the diagram is **Comprehensive/Technical**. These enhancements add steps to the main pipeline — they don't replace it.
 
 ## When to Use
 
@@ -10,7 +10,7 @@ If the diagram is a conceptual mental model (abstract relationships, philosophie
 
 ## Enhancement 1: Research Mandate
 
-**When:** After Step 1 (Understand), before Step 2 (Pattern).
+**When:** During the SOFT design pass, before picking a visual pattern.
 
 Before drawing anything technical, research the actual specifications:
 
@@ -26,7 +26,7 @@ Research makes diagrams accurate AND educational.
 
 ## Enhancement 2: Multi-Zoom Architecture
 
-**When:** During Step 2 (Pattern) — plan the zoom levels as part of pattern mapping.
+**When:** While picking the visual pattern — plan the zoom levels as part of that choice.
 
 Comprehensive diagrams operate at multiple zoom levels simultaneously, like a map with both country borders and street names:
 
