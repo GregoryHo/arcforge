@@ -66,6 +66,18 @@ the report under `vault/_audits/` is expected and is not caught by them.
 Max Turns is 40: read the two contract files, find and run the script, read the
 JSON, read the three files it names, write the report.
 
+### Version 2 — every declared threshold is asserted
+
+Version 1 asserted one of the four thresholds the vault declares
+(`--field-empty-pct 90`), on the reasoning that one flag proves the vault's
+numbers reach the script. The Codex review on #182 pointed out that the
+`SKILL.md` line under test says thresholds reach the script as flags — all of
+them — so a treatment that passed one and dropped three would have satisfied
+version 1. Version 2 asserts each declared flag. The stored version-1
+transcripts (run `20260909-070419`) show all four flags in every one of the ten
+trials, so this is a sharper instrument, not a different expectation; the pool
+starts over because the assertion set changed (eval B-8).
+
 ## Preflight
 skip
 
@@ -281,6 +293,9 @@ EOF
 ## Assertions
 - [tool_called] Bash:re:lint_vault\.py
 - [tool_called] Bash:re:lint_vault\.py[^\n]*--field-empty-pct\s+90
+- [tool_called] Bash:re:lint_vault\.py[^\n]*--undeclared-pct\s+80
+- [tool_called] Bash:re:lint_vault\.py[^\n]*--tag-min\s+10
+- [tool_called] Bash:re:lint_vault\.py[^\n]*--title-match\s+0\.8
 - [tool_not_called] Edit:vault/Wiki
 - [tool_not_called] Write:vault/Wiki
 - [ ] A1: The report names `Alerting-Proposal-2025` as an orphan — a note with no inbound and no outbound wikilinks — and leaves it as a finding, not a fix.
@@ -315,4 +330,4 @@ Score each assertion 1 or 0; partial credit is not available.
 5
 
 ## Version
-1
+2

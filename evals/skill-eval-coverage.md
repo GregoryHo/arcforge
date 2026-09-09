@@ -105,7 +105,7 @@ as one; FAIL on either half means the edited sentence is the suspect.
 | `eval-finishing-verify-before-options` | `20260908-141154` | 0.43 (0/5) | 1.00 (5/5) | **+0.57 CI[0.57, 0.57]** | +0.54 [0.46, 0.62] | PASS both halves — IMPROVED |
 | `eval-executing-verify-decides-done` | `20260908-141154` + top-up `20260908-162050` | 0.80 (4/5) | 1.00 (5/5 scorable; one trial per run killed at the runner timeout) | **+0.20 CI[−0.36, 0.76]** | +0.40 [0.03, 0.77] | INCONCLUSIVE — half 1 not met, half 2 met; recorded, not rerun |
 | `eval-diagramming-obsidian-unverified-save-claim` | `20260908-141154` (instrument-capped: 4 of 5 treatment trials killed at 900 s), rerun `20260909-015919` with `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000` | 0.50 (0/5) | 0.90 (3/5) | **+0.40 CI[0.16, 0.64]** | +0.23 [0.09, 0.38] | PASS both halves — IMPROVED (on the rerun) |
-| `eval-maintaining-obsidian-audit-runs-lint-script` (new, v1 — `## Verdict Policy non-regression`, `## Preflight skip`) | `20260909-070419` | 1.00 (5/5) | 1.00 (5/5) | 0.00 CI[0, 0] — not the instrument here | — (no standing row) | PASS — strict bar, 5 of 5 treatment trials |
+| `eval-maintaining-obsidian-audit-runs-lint-script` (new — `## Verdict Policy non-regression`, `## Preflight skip`) | v1 `20260909-070419`; v2 `20260909-125045` (every declared threshold flag asserted) | 1.00 (5/5) both | 1.00 (5/5) both | 0.00 CI[0, 0] — not the instrument here | — (no standing row) | PASS on both — strict bar, 5 of 5 treatment trials each |
 
 **Verdict.** finishing: PASS on both halves — the new interval sits inside the
 standing one, so B2 (the `git 2.52` cell) moved nothing. executing: **half 1 not met, half 2 met — recorded as INCONCLUSIVE, not rerun.**
@@ -144,8 +144,9 @@ and never reaches the audit — so a new scenario is the runtime acceptance the
 line needs: a vault with an orphan note, a `log.md` entry naming a deleted note,
 and a Raw Source whose stored `sha256` no longer matches its body; the user asks
 for `audit lint` and the findings. Behavioral assertions require the script to be
-executed with the vault's declared `--field-empty-pct 90` and no `Edit` / `Write`
-under `vault/Wiki`; three model-graded assertions require the orphan, the missing
+executed with each of the vault's four declared thresholds as flags (version 2;
+version 1 asserted `--field-empty-pct 90` alone) and no `Edit` / `Write` under
+`vault/Wiki`; three model-graded assertions require the orphan, the missing
 file, and the drift to be reported. A skill-scope trial injects `SKILL.md` alone,
 so `## Setup` copies the skill's `references/` from `$PROJECT_ROOT` into the
 trial directory to stand in for the base directory a real skill load announces —
@@ -157,7 +158,12 @@ than a delta: baseline agents explored, found, and ran the script too (5 of 5),
 so the delta is 0 by construction, and the claim — that with the line in context
 the agent reliably locates the script, passes the thresholds, and reports its
 facts — is read from the treatment arm alone: 5 of 5 at 1.00, mean 284 s per
-trial, no trial killed. `--plugin-dir` was not used: headless trials carry
+trial, no trial killed. Version 2 exists because the Codex review asked that
+every declared threshold be asserted rather than one: the stored version-1
+transcripts already showed all four flags in every trial, v2 asserts each, and
+since the assertion set changed (B-8) it was rerun — `20260909-125045`, again
+5 of 5 at 1.00 in both arms, treatment mean 206 s, all four flags in every
+`lint_vault.py` invocation of every trial, no trial killed. `--plugin-dir` was not used: headless trials carry
 `--disable-slash-commands`, the Skill tool never exists in them, and the 6.1.0
 benchmark recorded a skill that never routed under that modality (#179), so a
 plugin-dir run would have measured routing, not this line.
