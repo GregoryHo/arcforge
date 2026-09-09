@@ -3,6 +3,7 @@
 """
 
 import os
+import hashlib
 from pathlib import Path
 
 from .lint_vault_support import (
@@ -148,6 +149,14 @@ def test_links_in_yaml_comments_are_not_edges_but_links_in_values_are(vault):
     links = _run(vault)["links"]
     assert links["notes"]["Wiki/gamma-orphan.md"]["outbound"] == 1
     assert links["notes"]["Wiki/alpha-note.md"]["inbound"] == 2
+    # A block scalar is a value too.
+    (vault / "Wiki" / "gamma-orphan.md").write_text(
+        GAMMA.replace("extra_field: yes\n", "extra_field: yes\nrelated: |\n  See [[alpha-note]]\n  and more\n"),
+        encoding="utf-8",
+    )
+    links = _run(vault)["links"]
+    assert links["notes"]["Wiki/gamma-orphan.md"]["outbound"] == 1
+    assert links["notes"]["Wiki/alpha-note.md"]["inbound"] == 2
 
 
 def test_self_links_under_any_spelling_are_not_edges(vault):
@@ -208,6 +217,23 @@ def test_provenance_link_to_a_capture_is_not_a_wiki_relationship(vault):
     assert "Wiki/gamma-orphan.md" not in links["orphans"]
     assert links["notes"]["Wiki/gamma-orphan.md"]["outbound"] == 1
     assert links["notes"]["Wiki/alpha-note.md"]["inbound"] == 1
+
+
+def test_note_relative_source_url_normalises_but_never_leaves_the_vault(vault):
+    raw = vault / "Raw"
+    raw.mkdir()
+    (raw / "capture.md").write_text("---\nsource_url: https://x/c\nsha256: " + "0" * 64 + "\n---\ncaptured\n", encoding="utf-8")
+    digest = hashlib.sha256(b"captured\n").hexdigest()
+    (vault / "Wiki" / "typed.md").write_text(
+        f"---\ntype: source\nsource_url: ../Raw/capture.md\nsha256: {digest}\n---\nbody\n", encoding="utf-8"
+    )
+    (vault / "Wiki" / "escape.md").write_text(
+        f"---\ntype: source\nsource_url: ../../capture.md\nsha256: {digest}\n---\nbody\n", encoding="utf-8"
+    )
+    by_path = {i["path"]: i for i in _run(vault)["raw_sources"]}
+    assert by_path["Wiki/typed.md"]["status"] == "fresh"
+    assert by_path["Wiki/typed.md"]["hashed_file"] == "Raw/capture.md"
+    assert by_path["Wiki/escape.md"]["status"] == "unresolved"
 
 
 def test_bare_provenance_link_colliding_with_a_wiki_name_is_unresolved(vault):

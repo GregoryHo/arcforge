@@ -41,10 +41,11 @@ the auditor reads before acting on:
      body, and a typed note hashes the one Raw Source note its body wikilinks.
      A typed note with neither is `unresolved`, whether or not it stores a
      digest: its original is remote, and nothing in the vault stands in for it.
-  5. `log.md` entries naming files that do not exist anywhere in the vault. A
-     field counts as a path when it ends in an extension and has no whitespace
-     before its first `/` (`Wiki/My Note.md`; a root note with spaces is logged
-     as `./My Note.md`); `query` and `schema` entries are free text, not checked.
+  5. `log.md` entries naming files that do not exist anywhere in the vault. The
+     last field of an entry is its path whatever it contains (`create | source |
+     My Note.md`); any other field counts as a path only when it ends in an
+     extension and has no whitespace before its first `/`. `query` and `schema`
+     entries are free text, not checked.
   6. Frontmatter tag counts, each marked `declared` when the tag or its top-level
      segment is a backticked list item under SCHEMA.md's `## Tag Taxonomy`;
      `--tag-min` sets `exceeds` for undeclared tags only.
@@ -344,9 +345,13 @@ def log_facts(vault: Path, files: dict[str, Path]) -> dict:
             entries += 1
             if (entry.group(1) or "").lower() in FREE_TEXT_OPS:
                 continue
-        for part in line.split("|"):
-            token = part.strip().strip("`")
-            if not is_path_token(token):
+        fields = [part.strip().strip("`") for part in line.split("|")]
+        for index, token in enumerate(fields):
+            # The last field of a path-valued entry is the path whatever it
+            # contains (`create | source | My Note.md`); any other field is a
+            # path only when it reads as one.
+            last_field = entry is not None and index == len(fields) - 1
+            if not (is_path_token(token) or (last_field and FILE_TOKEN_RE.match(token))):
                 continue
             if token in files or token.lstrip("./") in files:
                 continue

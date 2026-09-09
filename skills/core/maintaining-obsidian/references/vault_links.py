@@ -10,6 +10,7 @@ only; imported by lint_vault.py in this directory.
 from __future__ import annotations
 
 import hashlib
+import posixpath
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -129,9 +130,11 @@ def _source_url_file(note: dict, files: dict[str, Path]) -> Path | None:
     source_url = note["fm"].get("source_url")
     if not isinstance(source_url, str) or not source_url or "://" in source_url:
         return None
-    candidate = files.get(source_url.lstrip("/")) or files.get(
-        (Path(note["rel"]).parent / source_url).as_posix()
-    )
+    # Vault-relative first, then note-relative with `..` normalised away — and
+    # never a path that climbs out of the vault.
+    relative = posixpath.normpath(posixpath.join(posixpath.dirname(note["rel"]), source_url))
+    inside = relative != ".." and not relative.startswith("../")
+    candidate = files.get(source_url.lstrip("/")) or (files.get(relative) if inside else None)
     return candidate if candidate is not None and candidate != note["path"] else None
 
 

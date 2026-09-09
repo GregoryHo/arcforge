@@ -59,7 +59,8 @@ def _scalar(raw: str):
 
 
 def parse_frontmatter(text: str) -> dict:
-    """Parse a frontmatter block. Block lists and nested mappings are read whole."""
+    """Parse a frontmatter block. Block lists, nested mappings, and block scalars
+    (`key: |` / `key: >`) are read whole."""
     data: dict = {}
     lines = text.split("\n")
     i = 0
@@ -69,6 +70,16 @@ def parse_frontmatter(text: str) -> dict:
         if not match:
             continue
         key, rest = match.group(1), match.group(2)
+        indicator = rest.split("#", 1)[0].strip()
+        if indicator in ("|", "|-", "|+", ">", ">-", ">+"):
+            # A block scalar: the indented lines that follow are the value.
+            scalar: list[str] = []
+            while i < len(lines) and (not lines[i].strip() or lines[i][:1] in (" ", "\t")):
+                scalar.append(lines[i].strip())
+                i += 1
+            joiner = "\n" if indicator[0] == "|" else " "
+            data[key] = joiner.join(s for s in scalar if s).strip()
+            continue
         if rest.strip() and not rest.strip().startswith("#"):
             data[key] = _scalar(rest)
             continue
