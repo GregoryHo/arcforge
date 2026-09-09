@@ -24,9 +24,12 @@ the auditor reads before acting on:
      discriminator: a note carrying that tag fits the variant whatever fields
      it lacks — that is how a paper missing every paper field is still measured
      as a paper rather than passing as a generic Source.
-  3. Link graph from [[wikilinks]] over the whole vault: inbound / outbound per
-     in-scope note, and the orphans (zero of each). Embeds of non-note files
-     (`![[image.png]]`) are not links.
+  3. Link graph from [[wikilinks]] over the wiki layer: inbound / outbound per
+     in-scope note, and the orphans (zero of each). A target with an explicit
+     extension other than `.md` is an attachment embed (`![[image.png]]`,
+     `![[clip.mp4]]`), not a link, unless a note of that exact name exists.
+     Raw Source captures are not in the graph: a `[[link]]` inside captured
+     text is the source's, not the vault's.
   4. Raw Source sha256 drift per raw-sources.md: strip the frontmatter, normalize
      line endings to `\\n`, sha256 the UTF-8 bytes of what follows the closing
      fence line. A note carries a hash when its frontmatter has a `sha256` key.
@@ -44,10 +47,10 @@ the auditor reads before acting on:
 
 Scope: `recent:N` (default recent:50) takes the N most recently modified
 wiki-layer notes as subjects; the link graph, the file index, and duplicate
-comparison still cover the whole vault. Raw Source notes (`sha256`, no `type:`)
-are never subjects of the schema, link, tag, or title checks and are all
-drift-checked whatever the scope, so `Raw/` neither needs `--skip` nor eats
-into `recent:N`. A `[[wikilink]]` inside a fenced code block or inline code is
+comparison still cover the whole wiki layer. Raw Source notes (`sha256`, no
+`type:`) are never subjects of the schema, link, tag, or title checks, never
+sources or targets in the link graph, and are all drift-checked whatever the
+scope, so `Raw/` neither needs `--skip` nor eats into `recent:N`. A `[[wikilink]]` inside a fenced code block or inline code is
 an example, not a link. `--skip <folder>` drops a folder from the note set (plugin-
 managed folders, `_audits`, folders AGENTS.md declares out of scope). Dot-dirs,
 Excalidraw drawings (`excalidraw-plugin:` in frontmatter), the root-level
@@ -91,8 +94,10 @@ LOG_FILE = "log.md"
 SCHEMA_FILE = "SCHEMA.md"
 DUP_CANDIDATE_FLOOR = 0.6
 
-# Link targets with these extensions are embeds, not note relationships.
-NON_NOTE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".pdf", ".canvas", ".html", ".excalidraw"}
+# A link target with an explicit extension other than .md is an attachment
+# embed, not a note relationship — unless a note of that exact name exists
+# (`[[Node.js]]` is a note when Node.js.md is).
+EXTENSION_RE = re.compile(r"\.[A-Za-z0-9]{1,8}$")
 FILE_TOKEN_RE = re.compile(r"\.(md|pdf|png|jpe?g|gif|svg|html|canvas)$", re.IGNORECASE)
 WIKILINK_RE = re.compile(r"\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]")
 TYPE_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -314,13 +319,17 @@ def link_facts(notes: list[dict], scoped: list[dict]) -> dict:
         hits = by_stem.get(name.lower())
         return hits[0] if hits else None
 
+    def is_attachment(target: str) -> bool:
+        ext = EXTENSION_RE.search(target)
+        return bool(ext) and ext.group(0).lower() != ".md" and resolve(target) is None
+
     outbound: dict[str, int] = {}
     inbound: Counter = Counter()
     for note in notes:
         targets = set()
         for match in WIKILINK_RE.finditer(strip_code(note["text"])):
             raw = match.group(1).strip()
-            if raw and Path(raw).suffix.lower() not in NON_NOTE_EXTS:
+            if raw and not is_attachment(raw):
                 targets.add(raw)
         resolved = {resolve(raw) for raw in targets}
         outbound[note["rel"]] = len(targets) - (1 if note["rel"] in resolved else 0)
@@ -510,7 +519,7 @@ def lint_vault(vault: Path, scope: str, skip: set[str], thresholds: dict) -> dic
         },
         "untyped": untyped,
         "types": types,
-        "links": link_facts(notes, scoped),
+        "links": link_facts(wiki, scoped),
         "raw_sources": raw_source_facts(scoped + raw, vault, files),
         "log": log_facts(vault, files),
         "tags": tag_facts(scoped, taxonomy, thresholds["tag_min"]),

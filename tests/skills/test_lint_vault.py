@@ -311,6 +311,27 @@ def test_log_entries_naming_missing_files(vault):
     assert log["missing_files"] == [{"line": 4, "file": "Wiki/deleted-note.md"}]
 
 
+def test_raw_captures_and_attachment_embeds_are_not_edges(vault):
+    raw = vault / "Raw"
+    raw.mkdir()
+    # Captured text mentioning the orphan is the source's link, not the vault's.
+    (raw / "capture.md").write_text(
+        "---\nsource_url: https://example.com/c\nsha256: " + "0" * 64 + "\n---\nSee [[Wiki/gamma-orphan]] and [[alpha-note]].\n",
+        encoding="utf-8",
+    )
+    # Attachments of any extension are embeds; a dotted note name still resolves.
+    (vault / "Wiki" / "Node.js.md").write_text("---\ntype: entity\n---\nabout node\n", encoding="utf-8")
+    (vault / "Wiki" / "gamma-orphan.md").write_text(
+        GAMMA + "\n![[recording.mp3]] ![[clip.webp]] ![[deck.pdf]]\n", encoding="utf-8"
+    )
+    (vault / "Wiki" / "alpha-note-draft.md").write_text(DRAFT + "\nRuntime: [[Node.js]].\n", encoding="utf-8")
+    links = _run(vault)["links"]
+    assert "Wiki/gamma-orphan.md" in links["orphans"]
+    assert links["notes"]["Wiki/alpha-note.md"]["inbound"] == 1
+    assert links["notes"]["Wiki/Node.js.md"]["inbound"] == 1
+    assert links["notes"]["Wiki/alpha-note-draft.md"]["outbound"] == 2
+
+
 def test_log_path_tokens_are_not_satisfied_by_a_basename_elsewhere(vault):
     # `Wiki/deleted-note.md` stays missing when only `Archive/deleted-note.md`
     # exists; a bare basename in the log still matches any file of that name.

@@ -112,7 +112,9 @@ tags:                     # block, unindented
 ### Orphans, untyped notes, log consistency
 
 - **Orphans** — `links.orphans`: zero inbound and zero outbound links, with the
-  graph built over the whole vault even when the scope is `recent:N`.
+  graph built over the whole wiki layer even when the scope is `recent:N`. Raw
+  Source captures are not in the graph, and a target with an extension other
+  than `.md` is an attachment embed, not a link.
 - **Untyped** — `untyped`: no `type:` field; `has_frontmatter` separates a note
   with no frontmatter from one whose frontmatter lacks the field. Report; never
   auto-fix.
