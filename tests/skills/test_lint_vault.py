@@ -340,6 +340,10 @@ def test_ambiguous_bare_links_resolve_by_folder_or_not_at_all(vault):
     (vault / "Wiki" / "gamma-orphan.md").write_text(GAMMA + "\nAlso [[foo]].\n", encoding="utf-8")
     links = _run(vault)["links"]
     assert links["notes"]["B/foo.md"]["inbound"] == 1      # same folder as B/source.md
+    assert links["notes"]["A/foo.md"]["inbound"] == 0      # not handed the link by sort order
+    assert "A/foo.md" in links["orphans"]
+    assert links["notes"]["Wiki/gamma-orphan.md"]["outbound"] == 1   # ambiguous from Wiki/: unresolved, still a link
+    assert "Wiki/gamma-orphan.md" not in links["orphans"]
     # The same-folder rule also decides the attachment and provenance prefilters:
     # a dotted name shared by two folders, and a bare name a capture also has.
     for folder in ("A", "B"):
@@ -351,10 +355,9 @@ def test_ambiguous_bare_links_resolve_by_folder_or_not_at_all(vault):
     assert links["notes"]["B/Node.js.md"]["inbound"] == 1
     assert links["notes"]["B/foo.md"]["inbound"] == 1
     assert links["notes"]["B/source.md"]["outbound"] == 2
-    assert links["notes"]["A/foo.md"]["inbound"] == 0      # not handed the link by sort order
-    assert "A/foo.md" in links["orphans"]
-    assert links["notes"]["Wiki/gamma-orphan.md"]["outbound"] == 1   # ambiguous from Wiki/: unresolved, still a link
-    assert "Wiki/gamma-orphan.md" not in links["orphans"]
+    # With a wiki `foo` in two folders and a capture `foo`, the ambiguous link
+    # from Wiki/ is still a wiki link (unresolved), not provenance.
+    assert links["notes"]["Wiki/gamma-orphan.md"]["outbound"] == 1
 
 
 def test_provenance_link_to_a_capture_is_not_a_wiki_relationship(vault):

@@ -340,10 +340,12 @@ def link_facts(notes: list[dict], scoped: list[dict], raw: list[dict]) -> dict:
         return bool(ext) and ext.group(0).lower() != ".md" and resolve(target, source) is None
 
     def is_raw_capture(target: str, source: str) -> bool:
+        # Provenance is a link that can only mean a capture: by path, or by a
+        # bare name no wiki note has. An ambiguous wiki name stays a wiki link.
         name = target[:-3] if target.endswith(".md") else target
         if "/" in name:
             return f"{name}.md" in raw_rels
-        return name.lower() in raw_stems and resolve(target, source) is None
+        return name.lower() in raw_stems and name.lower() not in by_stem
 
     outbound: dict[str, int] = {}
     inbound: Counter = Counter()
