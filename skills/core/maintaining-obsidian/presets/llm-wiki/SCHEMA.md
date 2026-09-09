@@ -108,6 +108,7 @@ created: YYYY-MM-DD
 langs: [en, zh]
 source_url: ""
 source_author: []          # list — papers have multiple authors
+sha256: ""                 # of the captured body, after frontmatter (B-4 provenance pair)
 venue: ""                  # conference or journal name
 year: null                 # publication year
 methodology: ""            # empirical | theoretical | survey | meta-analysis

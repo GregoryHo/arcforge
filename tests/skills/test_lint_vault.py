@@ -158,7 +158,7 @@ def test_scans_only_notes_and_reads_declared_types(vault):
 
 def test_block_list_frontmatter_reads_as_filled(vault):
     tags = _run(vault)["types"]["source"]["fields"]["tags"]
-    assert tags == {"present": 2, "filled": 2, "empty": 0, "empty_pct": 0.0, "exceeds": None}
+    assert tags == {"expected": 2, "present": 2, "filled": 2, "empty": 0, "empty_pct": 0.0, "exceeds": None}
 
 
 def test_unindented_block_list_reads_as_filled(vault):
@@ -168,7 +168,7 @@ def test_unindented_block_list_reads_as_filled(vault):
         encoding="utf-8",
     )
     tags = _run(vault)["types"]["source"]["fields"]["tags"]
-    assert tags == {"present": 3, "filled": 3, "empty": 0, "empty_pct": 0.0, "exceeds": None}
+    assert tags == {"expected": 3, "present": 3, "filled": 3, "empty": 0, "empty_pct": 0.0, "exceeds": None}
 
 
 def test_raw_source_note_without_type_is_drift_checked_not_untyped(vault):
@@ -187,6 +187,7 @@ def test_raw_source_note_without_type_is_drift_checked_not_untyped(vault):
 def test_undeclared_fields_are_counted_against_schema(vault):
     entity = _run(vault)["types"]["entity"]
     assert entity["declared"] == ["aliases", "created", "tags", "type"]
+    assert entity["variants"] == 1
     assert entity["undeclared"] == {"extra_field": {"present": 1, "present_pct": 100.0, "exceeds": None}}
 
 
@@ -362,6 +363,45 @@ def test_preset_taxonomies_declare_their_top_level_tags(tmp_path, preset, type_n
     assert tag.split("/")[0] in report["schema"]["declared_tags"]
     assert report["tags"][tag] == {"count": 1, "declared": True, "exceeds": False}
     assert report["tags"]["made-up"] == {"count": 1, "declared": False, "exceeds": True}
+
+
+GENERIC_SOURCE = (
+    "---\ntype: source\ncreated: 2026-05-06\nlangs: [en, zh]\n"
+    "source_url: https://example.com/{n}\nsource_author: Someone\nsha256: {digest}\n"
+    "tags: [source]\naliases: []\n---\nbody\n"
+)
+PAPER_SOURCE = (
+    "---\ntype: source\ncreated: 2026-05-06\nlangs: [en, zh]\n"
+    "source_url: https://arxiv.org/abs/1\nsource_author: [A, B]\nsha256: {digest}\n"
+    "venue: NeurIPS\nyear: 2025\nmethodology: ''\nreading_status: queued\n"
+    "cites: []\ncited_by: []\ntags: [paper]\naliases: []\n---\nbody\n"
+)
+
+
+def test_variant_only_fields_are_expected_of_the_notes_fitting_that_variant(tmp_path):
+    # llm-wiki declares Source twice — the generic fence and the Paper variant —
+    # both as `type: source`. Paper-only fields are measured over the notes that
+    # fit the Paper variant, not reported 100% empty across every Source.
+    (tmp_path / "SCHEMA.md").write_text((PRESETS / "llm-wiki" / "SCHEMA.md").read_text(encoding="utf-8"), encoding="utf-8")
+    (tmp_path / "AGENTS.md").write_text("# Contract\n", encoding="utf-8")
+    for n in range(3):
+        (tmp_path / f"source-{n}.md").write_text(GENERIC_SOURCE.format(n=n, digest="0" * 64), encoding="utf-8")
+    (tmp_path / "paper.md").write_text(PAPER_SOURCE.format(digest="1" * 64), encoding="utf-8")
+    source = _run(tmp_path, "--field-empty-pct", "90")["types"]["source"]
+    assert source["notes"] == 4 and source["variants"] == 2
+    assert source["undeclared"] == {}
+    fields = source["fields"]
+    assert fields["source_author"]["expected"] == 4 and fields["sha256"]["expected"] == 4
+    assert fields["venue"] == {"expected": 1, "present": 1, "filled": 1, "empty": 0, "empty_pct": 0.0, "exceeds": False}
+    assert fields["methodology"] == {"expected": 1, "present": 1, "filled": 0, "empty": 1, "empty_pct": 100.0, "exceeds": True}
+    assert fields["cites"]["exceeds"] is True  # the paper's own empty list, over one expected note
+    # A generic Source that carries a paper-only field anyway is counted for it.
+    (tmp_path / "source-0.md").write_text(
+        GENERIC_SOURCE.format(n=0, digest="0" * 64).replace("aliases: []", "aliases: []\nvenue: Blog"),
+        encoding="utf-8",
+    )
+    fields = _run(tmp_path)["types"]["source"]["fields"]
+    assert fields["venue"] == {"expected": 2, "present": 2, "filled": 2, "empty": 0, "empty_pct": 0.0, "exceeds": None}
 
 
 def test_minimal_preset_placeholders_declare_no_types_or_tags(tmp_path):

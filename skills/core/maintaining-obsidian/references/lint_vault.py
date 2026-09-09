@@ -12,8 +12,13 @@ the auditor reads before acting on:
   2. `type:` presence; per-type field fill counts and undeclared-field counts.
      Declared fields come from the top-level yaml fences in `<vault>/SCHEMA.md`
      (a fence nested inside another fence is an illustration). A fence whose
-     `type:` lists several names (`source | entity`) declares for each; a
-     placeholder name (`<one of the types declared below>`) declares nothing.
+     `type:` lists several names (`source | entity`) is a base every note of
+     those types carries; each fence naming one type is a variant of it (the
+     llm-wiki Source and its Paper variant), and a placeholder name (`<one of
+     the types declared below>`) declares nothing. A note is measured against
+     the variant whose fields it carries most of, so a field only one variant
+     declares is `expected` of the notes fitting that variant, not of every
+     note of the type.
   3. Link graph from [[wikilinks]] over the whole vault: inbound / outbound per
      in-scope note, and the orphans (zero of each). Embeds of non-note files
      (`![[image.png]]`) are not links.
@@ -235,22 +240,34 @@ def select_scope(notes: list[dict], scope: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def declared_fields(vault: Path) -> dict[str, set[str]] | None:
-    """Fields each type declares in SCHEMA.md's yaml fences; None without a SCHEMA.md."""
+def declared_fields(vault: Path) -> dict[str, list[set[str]]] | None:
+    """Per type, one field set per variant SCHEMA.md declares; None without a SCHEMA.md.
+
+    A fence naming several types is a base shared by every variant of each; a
+    fence naming one type is a variant. A type with no fence of its own has its
+    base as the single variant.
+    """
     schema = vault / SCHEMA_FILE
     if not schema.is_file():
         return None
-    declared: dict[str, set[str]] = defaultdict(set)
+    base: dict[str, set[str]] = defaultdict(set)
+    variants: dict[str, list[set[str]]] = defaultdict(list)
     for fence in yaml_fences(read_text(schema)):
         lines = [line for line in fence.split("\n") if line.strip() != "---"]
         fm = parse_frontmatter("\n".join(lines))
         type_value = fm.get("type")
         if not isinstance(type_value, str):
             continue
-        for name in (part.strip() for part in type_value.split("|")):
-            if TYPE_NAME_RE.match(name):
-                declared[name].update(fm.keys())
-    return dict(declared)
+        names = [n for n in (part.strip() for part in type_value.split("|")) if TYPE_NAME_RE.match(n)]
+        for name in names:
+            if len(names) == 1:
+                variants[name].append(set(fm.keys()))
+            else:
+                base[name].update(fm.keys())
+    return {
+        name: [base[name] | fields for fields in variants[name]] or [base[name]]
+        for name in sorted(set(base) | set(variants))
+    }
 
 
 def declared_tags(vault: Path) -> list[str]:
@@ -288,15 +305,32 @@ def type_facts(scoped: list[dict], declared, field_empty_pct, undeclared_pct) ->
     types = {}
     for type_name, fms in sorted(by_type.items()):
         total = len(fms)
-        decl = declared.get(type_name) if declared is not None else None
+        variants = declared.get(type_name) if declared is not None else None
+        decl = set().union(*variants) if variants else None
         observed = set().union(*(fm.keys() for fm in fms))
+        # Each note is measured against the variant whose fields it carries most
+        # of (ties go to the earlier fence, the generic one). A field every
+        # variant declares — or none — is expected of every note; a field only
+        # some variants declare is expected of the notes fitting them, plus any
+        # note carrying it anyway.
+        fits = [
+            max(range(len(variants)), key=lambda i, fm=fm: (len(variants[i] & fm.keys()), -i))
+            for fm in fms
+        ] if variants else []
         fields = {}
         for field in sorted(observed | (decl or set())):
-            present = sum(1 for fm in fms if field in fm)
-            filled = sum(1 for fm in fms if field in fm and not is_empty(fm[field]))
-            empty = total - filled
-            pct = round(100.0 * empty / total, 1)
+            if variants and any(field not in v for v in variants) and field in decl:
+                expected = [fm for i, fm in zip(fits, fms) if field in variants[i] or field in fm]
+            else:
+                expected = fms
+            if not expected:
+                continue
+            present = sum(1 for fm in expected if field in fm)
+            filled = sum(1 for fm in expected if field in fm and not is_empty(fm[field]))
+            empty = len(expected) - filled
+            pct = round(100.0 * empty / len(expected), 1)
             fields[field] = {
+                "expected": len(expected),
                 "present": present,
                 "filled": filled,
                 "empty": empty,
@@ -317,6 +351,7 @@ def type_facts(scoped: list[dict], declared, field_empty_pct, undeclared_pct) ->
         types[type_name] = {
             "notes": total,
             "declared": sorted(decl) if decl is not None else None,
+            "variants": len(variants) if variants else 0,
             "fields": fields,
             "undeclared": undeclared,
         }

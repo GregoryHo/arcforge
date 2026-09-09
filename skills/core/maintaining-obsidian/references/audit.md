@@ -80,7 +80,11 @@ actual file before acting on it.
 Validate each note's frontmatter against the shape its `type:` declares in the
 vault's SCHEMA.md. The script reads the declared fields from SCHEMA.md's yaml
 fences: `types.<type>.fields.<field>` counts present / filled / empty per
-field, and `types.<type>.undeclared` lists fields the type does not declare.
+field over the notes it is `expected` of, and `types.<type>.undeclared` lists
+fields the type does not declare. A type declared by more than one fence (the
+llm-wiki Source and its Paper variant, both `type: source`) has that many
+`variants`; each note is measured against the variant whose fields it carries
+most of, so a Paper-only field is expected of the papers, not of every Source.
 Obsidian accepts three equivalent list spellings; all are valid and all read
 as filled:
 
