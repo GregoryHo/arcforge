@@ -209,7 +209,8 @@ def test_typed_note_with_remote_source_and_no_raw_link_is_unresolved_not_drift(v
         "stored": "0" * 64,
         "recomputed": None,
     }
-    assert by_path["Wiki/alpha-note-draft.md"]["status"] == "unhashed"
+    # An empty digest with nothing to backfill from is unresolved too, not unhashed.
+    assert by_path["Wiki/alpha-note-draft.md"]["status"] == "unresolved"
 
 
 RAW_BODY = "# Fed statement\n\nRates unchanged.\n"
@@ -244,6 +245,14 @@ def test_typed_note_hashes_the_raw_source_its_body_links(vault):
         "recomputed": RAW_DIGEST,
     }
     assert by_path["Raw/2026-05-06/bloomberg-fed.md"]["status"] == "fresh"
+    # A legacy empty digest on a note whose capture resolves is unhashed: backfill from it.
+    (vault / "Wiki" / "fed-article-legacy.md").write_text(
+        "---\ntype: source\nsource_url: https://example.com/fed\nsha256: \"\"\n---\n"
+        "## Source\n[[Raw/2026-05-06/bloomberg-fed]]\n",
+        encoding="utf-8",
+    )
+    legacy = {item["path"]: item for item in _run(vault)["raw_sources"]}["Wiki/fed-article-legacy.md"]
+    assert legacy["status"] == "unhashed" and legacy["recomputed"] == RAW_DIGEST
     # --skip Raw takes the capture out of the note set, not out of the drift check.
     by_path = {item["path"]: item for item in _run(vault, "--skip", "Raw")["raw_sources"]}
     assert by_path["Wiki/fed-article.md"]["status"] == "fresh"
@@ -388,7 +397,7 @@ def test_variant_only_fields_are_expected_of_the_notes_fitting_that_variant(tmp_
         (tmp_path / f"source-{n}.md").write_text(GENERIC_SOURCE.format(n=n, digest="0" * 64), encoding="utf-8")
     (tmp_path / "paper.md").write_text(PAPER_SOURCE.format(digest="1" * 64), encoding="utf-8")
     source = _run(tmp_path, "--field-empty-pct", "90")["types"]["source"]
-    assert source["notes"] == 4 and source["variants"] == 2
+    assert source["notes"] == 4 and source["variants"] == 2 and source["variant_notes"] == [3, 1]
     assert source["undeclared"] == {}
     fields = source["fields"]
     assert fields["source_author"]["expected"] == 4 and fields["sha256"]["expected"] == 4
@@ -402,6 +411,22 @@ def test_variant_only_fields_are_expected_of_the_notes_fitting_that_variant(tmp_
     )
     fields = _run(tmp_path)["types"]["source"]["fields"]
     assert fields["venue"] == {"expected": 2, "present": 2, "filled": 2, "empty": 0, "empty_pct": 0.0, "exceeds": None}
+
+
+def test_paper_missing_every_paper_field_still_fits_the_paper_variant(tmp_path):
+    # By keys alone a malformed paper is a generic Source; the Paper fence's
+    # `tags: [paper]` is its discriminator, so the missing fields are expected.
+    (tmp_path / "SCHEMA.md").write_text((PRESETS / "llm-wiki" / "SCHEMA.md").read_text(encoding="utf-8"), encoding="utf-8")
+    (tmp_path / "AGENTS.md").write_text("# Contract\n", encoding="utf-8")
+    (tmp_path / "source-0.md").write_text(GENERIC_SOURCE.format(n=0, digest="0" * 64), encoding="utf-8")
+    (tmp_path / "malformed-paper.md").write_text(
+        GENERIC_SOURCE.format(n=1, digest="1" * 64).replace("tags: [source]", "tags: [source/paper]"),
+        encoding="utf-8",
+    )
+    source = _run(tmp_path, "--field-empty-pct", "90")["types"]["source"]
+    assert source["variant_notes"] == [1, 1]
+    assert source["fields"]["venue"] == {"expected": 1, "present": 0, "filled": 0, "empty": 1, "empty_pct": 100.0, "exceeds": True}
+    assert source["fields"]["source_author"]["expected"] == 2
 
 
 def test_minimal_preset_placeholders_declare_no_types_or_tags(tmp_path):

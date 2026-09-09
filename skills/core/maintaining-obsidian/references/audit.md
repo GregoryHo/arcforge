@@ -83,8 +83,11 @@ fences: `types.<type>.fields.<field>` counts present / filled / empty per
 field over the notes it is `expected` of, and `types.<type>.undeclared` lists
 fields the type does not declare. A type declared by more than one fence (the
 llm-wiki Source and its Paper variant, both `type: source`) has that many
-`variants`; each note is measured against the variant whose fields it carries
-most of, so a Paper-only field is expected of the papers, not of every Source.
+`variants`; each note is measured against the variant it fits — the one whose
+discriminator tag it carries (the Paper fence declares `tags: [paper]`), else
+the one whose fields it carries most of — so a Paper-only field is expected of
+the papers, not of every Source, and a paper missing every paper field is still
+measured as a paper. `variant_notes` counts the notes fitting each fence.
 Obsidian accepts three equivalent list spellings; all are valid and all read
 as filled:
 
@@ -124,7 +127,7 @@ its body wikilinks (the news preset's `## Source` line). Then:
 | `fresh` | No log line. |
 | `drift` | Append `drift \| <filename> \| sha=<old>→<new>` to `log.md` and report it. Informational only. |
 | `unhashed` | Compute and write `sha256` + `ingested`. Offer `audit lint --backfill-sha256` for the rest. |
-| `unresolved` | A typed note whose original is remote and whose body links no single Raw Source note, so nothing in the vault stands in for it. Re-fetch when fetchable and compare the fetched body by hand; otherwise report it. Never a drift line. |
+| `unresolved` | A typed note whose original is remote and whose body links no single Raw Source note, so nothing in the vault stands in for it — with a stored digest or without one (there is nothing to backfill from). Re-fetch when fetchable and compare the fetched body by hand; otherwise report it. Never a drift line. |
 
 Drift never auto-fixes the wiki layer — a changed source is a fact for the user
 to act on, not a licence to rewrite their note.

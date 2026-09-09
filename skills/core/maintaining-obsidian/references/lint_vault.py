@@ -18,7 +18,10 @@ the auditor reads before acting on:
      the types declared below>`) declares nothing. A note is measured against
      the variant whose fields it carries most of, so a field only one variant
      declares is `expected` of the notes fitting that variant, not of every
-     note of the type.
+     note of the type. A variant fence that declares a `tags:` value names its
+     discriminator: a note carrying that tag fits the variant whatever fields
+     it lacks — that is how a paper missing every paper field is still measured
+     as a paper rather than passing as a generic Source.
   3. Link graph from [[wikilinks]] over the whole vault: inbound / outbound per
      in-scope note, and the orphans (zero of each). Embeds of non-note files
      (`![[image.png]]`) are not links.
@@ -28,8 +31,8 @@ the auditor reads before acting on:
      The file hashed is the `source_url` target when that is a file inside the
      vault; otherwise a Raw Source note (`sha256`, no `type:`) hashes its own
      body, and a typed note hashes the one Raw Source note its body wikilinks.
-     A typed note with neither is `unresolved`: its original is remote, and
-     nothing in the vault stands in for it.
+     A typed note with neither is `unresolved`, whether or not it stores a
+     digest: its original is remote, and nothing in the vault stands in for it.
   5. `log.md` entries naming files that do not exist anywhere in the vault.
   6. Frontmatter tag counts, each marked `declared` when the tag or its top-level
      segment is a backticked list item under SCHEMA.md's `## Tag Taxonomy`;
@@ -154,6 +157,16 @@ def is_empty(value) -> bool:
     return value == "" or value == [] or value == {}
 
 
+def note_tags(fm: dict | None) -> list[str]:
+    """The note's frontmatter tags as bare strings (inline, block, or comma/space-separated)."""
+    tags = (fm or {}).get("tags", [])
+    if isinstance(tags, str):
+        tags = [t for t in re.split(r"[,\s]+", tags) if t]
+    elif isinstance(tags, dict):
+        tags = list(tags)
+    return [tag.lstrip("#") for tag in tags if isinstance(tag, str) and tag]
+
+
 def note_type(fm: dict | None) -> str | None:
     """The note's `type:` when it is a non-empty string; None for an untyped note."""
     value = fm.get("type") if fm else None
@@ -240,18 +253,19 @@ def select_scope(notes: list[dict], scope: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def declared_fields(vault: Path) -> dict[str, list[set[str]]] | None:
-    """Per type, one field set per variant SCHEMA.md declares; None without a SCHEMA.md.
+def declared_fields(vault: Path) -> dict[str, list[dict]] | None:
+    """Per type, one variant per fence SCHEMA.md declares; None without a SCHEMA.md.
 
     A fence naming several types is a base shared by every variant of each; a
-    fence naming one type is a variant. A type with no fence of its own has its
-    base as the single variant.
+    fence naming one type is a variant, with `fields` (its keys plus the base)
+    and `tags` (the tags its `tags:` value lists — the variant's discriminator).
+    A type with no fence of its own has its base as the single variant.
     """
     schema = vault / SCHEMA_FILE
     if not schema.is_file():
         return None
     base: dict[str, set[str]] = defaultdict(set)
-    variants: dict[str, list[set[str]]] = defaultdict(list)
+    variants: dict[str, list[dict]] = defaultdict(list)
     for fence in yaml_fences(read_text(schema)):
         lines = [line for line in fence.split("\n") if line.strip() != "---"]
         fm = parse_frontmatter("\n".join(lines))
@@ -261,13 +275,24 @@ def declared_fields(vault: Path) -> dict[str, list[set[str]]] | None:
         names = [n for n in (part.strip() for part in type_value.split("|")) if TYPE_NAME_RE.match(n)]
         for name in names:
             if len(names) == 1:
-                variants[name].append(set(fm.keys()))
+                variants[name].append({"fields": set(fm.keys()), "tags": set(note_tags(fm))})
             else:
                 base[name].update(fm.keys())
     return {
-        name: [base[name] | fields for fields in variants[name]] or [base[name]]
+        name: [{"fields": base[name] | v["fields"], "tags": v["tags"]} for v in variants[name]]
+        or [{"fields": base[name], "tags": set()}]
         for name in sorted(set(base) | set(variants))
     }
+
+
+def _fit(fm: dict, variants: list[dict]) -> int:
+    """Index of the variant a note fits: a discriminator tag it carries wins, then the most
+    declared fields it carries, then the earlier (generic) fence."""
+    tags = set(note_tags(fm)) | {tag.rsplit("/", 1)[-1] for tag in note_tags(fm)}
+    return max(
+        range(len(variants)),
+        key=lambda i: (bool(variants[i]["tags"] & tags), len(variants[i]["fields"] & fm.keys()), -i),
+    )
 
 
 def declared_tags(vault: Path) -> list[str]:
@@ -306,21 +331,19 @@ def type_facts(scoped: list[dict], declared, field_empty_pct, undeclared_pct) ->
     for type_name, fms in sorted(by_type.items()):
         total = len(fms)
         variants = declared.get(type_name) if declared is not None else None
-        decl = set().union(*variants) if variants else None
+        decl = set().union(*(v["fields"] for v in variants)) if variants else None
         observed = set().union(*(fm.keys() for fm in fms))
-        # Each note is measured against the variant whose fields it carries most
-        # of (ties go to the earlier fence, the generic one). A field every
+        # Each note is measured against the variant it fits (_fit). A field every
         # variant declares — or none — is expected of every note; a field only
         # some variants declare is expected of the notes fitting them, plus any
         # note carrying it anyway.
-        fits = [
-            max(range(len(variants)), key=lambda i, fm=fm: (len(variants[i] & fm.keys()), -i))
-            for fm in fms
-        ] if variants else []
+        fits = [_fit(fm, variants) for fm in fms] if variants else []
         fields = {}
         for field in sorted(observed | (decl or set())):
-            if variants and any(field not in v for v in variants) and field in decl:
-                expected = [fm for i, fm in zip(fits, fms) if field in variants[i] or field in fm]
+            if variants and any(field not in v["fields"] for v in variants) and field in decl:
+                expected = [
+                    fm for i, fm in zip(fits, fms) if field in variants[i]["fields"] or field in fm
+                ]
             else:
                 expected = fms
             if not expected:
@@ -352,6 +375,7 @@ def type_facts(scoped: list[dict], declared, field_empty_pct, undeclared_pct) ->
             "notes": total,
             "declared": sorted(decl) if decl is not None else None,
             "variants": len(variants) if variants else 0,
+            "variant_notes": [fits.count(i) for i in range(len(variants))] if variants else [],
             "fields": fields,
             "undeclared": undeclared,
         }
@@ -453,10 +477,10 @@ def raw_source_facts(scoped: list[dict], vault: Path, files: dict[str, Path]) ->
             hashed_file, recomputed = note["rel"], sha256_body(note["body"])
         else:
             hashed_file, recomputed = None, None
-        if not stored:
-            status = "unhashed"
-        elif recomputed is None:
+        if recomputed is None:
             status = "unresolved"
+        elif not stored:
+            status = "unhashed"
         else:
             status = "fresh" if stored == recomputed else "drift"
         out.append(
@@ -495,14 +519,7 @@ def tag_facts(scoped: list[dict], declared: list[str], tag_min) -> dict:
     """Tag counts; `exceeds` only for a tag outside the taxonomy (top-level segment undeclared)."""
     counts: Counter = Counter()
     for note in scoped:
-        tags = (note["fm"] or {}).get("tags", [])
-        if isinstance(tags, str):
-            tags = [t for t in re.split(r"[,\s]+", tags) if t]
-        elif isinstance(tags, dict):
-            tags = list(tags)
-        for tag in tags:
-            if isinstance(tag, str) and tag:
-                counts[tag.lstrip("#")] += 1
+        counts.update(note_tags(note["fm"]))
     out = {}
     for tag, n in sorted(counts.items()):
         is_declared = tag in declared or tag.split("/", 1)[0] in declared

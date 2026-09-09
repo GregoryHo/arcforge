@@ -202,7 +202,7 @@ history back with it.
 
 ### 6. Bump the version in every canonical location
 
-The list is `LOCATIONS` in `scripts/check-version-sync.js`; the table below shows what each location holds and is illustrative, not the list.
+The authoritative set is `CANONICAL_FILE` plus `LOCATIONS` in `scripts/check-version-sync.js` — the canonical `.claude-plugin/plugin.json` is the version every `LOCATIONS` entry is compared against, so it is bumped too, never inferred. The table below shows what each location holds and is illustrative, not the list.
 
 | File | Where in the file |
 |---|---|
@@ -230,7 +230,7 @@ Verify with a single grep after bumping + building:
 grep -rn "X\.Y\.Z" package.json .claude-plugin/ .codex-plugin/ README.md website/page/
 ```
 
-Every hit must be one of the `LOCATIONS` files. A location with no hit means a split-brain bump (dangerous — Claude Code, Codex, or the website disagree about the current version); a hit outside the list means a stale copy elsewhere that also needs attention.
+Every hit must be `CANONICAL_FILE` or one of the `LOCATIONS` files. A location with no hit means a split-brain bump (dangerous — Claude Code, Codex, or the website disagree about the current version); a hit outside the list means a stale copy elsewhere that also needs attention.
 
 For an authoritative pass/fail that compares every location against the canonical `plugin.json` version, run `npm run check:versions` (zero-dep `scripts/check-version-sync.js`). It prints a location → version table and exits non-zero on any drift. The same check runs in CI and gates `release.yml` before the GitHub Release is created, so a drifted bump fails the release rather than shipping silently.
 

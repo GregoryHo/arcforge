@@ -115,7 +115,7 @@ methodology: ""            # empirical | theoretical | survey | meta-analysis
 reading_status: queued     # queued | skimmed | deep-read | extracted
 cites: []                  # papers this one references
 cited_by: []               # papers in vault that cite this one (LINK updates)
-tags: []
+tags: [paper]              # the variant's discriminator (taxonomy: `paper`); add topic tags
 aliases: []
 ---
 ```
