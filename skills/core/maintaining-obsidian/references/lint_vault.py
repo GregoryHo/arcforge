@@ -180,10 +180,11 @@ def select_scope(notes: list[dict], scope: str) -> list[dict]:
 def declared_fields(vault: Path) -> dict[str, list[dict]] | None:
     """Per type, one variant per fence SCHEMA.md declares; None without a SCHEMA.md.
 
-    A fence naming several types, or naming one type under a heading that does
-    not mention it (`## Universal Frontmatter` over `type: book`), is a base
+    A fence naming several types, or naming one type under a heading path that
+    does not mention it (`## Universal Frontmatter` over `type: book`), is a base
     shared by every variant of each type it names; a fence naming one type under
-    that type's own heading is a variant, with `fields` (its keys plus the base)
+    that type's own heading — or a subheading of it (`## Source / ### Frontmatter`)
+    — is a variant, with `fields` (its keys plus the base)
     and `tags` (the tags its `tags:` value lists — the variant's discriminator).
     A type with no variant fence has its base as the single variant.
     """
@@ -398,7 +399,14 @@ def _source_url_file(note: dict, files: dict[str, Path]) -> Path | None:
 
 def _linked_raw_source(note: dict, files: dict[str, Path], md_by_stem: dict) -> Path | None:
     """The Raw Source note (`sha256`, no `type:`) the body wikilinks — when it links exactly one.
-    A link with a path resolves by that path only; a bare name by basename."""
+    A link with a path resolves by that path only; a bare name by basename, and only
+    when every note of that name is a capture (a wiki note of the same name makes
+    the link a wiki relationship, not provenance)."""
+
+    def frontmatter_of(rel: str) -> dict | None:
+        fm_text, _ = split_frontmatter(read_text(files[rel]))
+        return parse_frontmatter(fm_text) if fm_text is not None else None
+
     hits: set[Path] = set()
     for match in WIKILINK_RE.finditer(strip_code(note["body"])):
         target = match.group(1).strip()
@@ -407,9 +415,10 @@ def _linked_raw_source(note: dict, files: dict[str, Path], md_by_stem: dict) -> 
             rels = [f"{name}.md"] if f"{name}.md" in files else []
         else:
             rels = md_by_stem.get(name.lower(), [])
+            if not all(is_raw_source(frontmatter_of(rel)) for rel in rels):
+                continue
         for rel in rels:
-            fm_text, _ = split_frontmatter(read_text(files[rel]))
-            if is_raw_source(parse_frontmatter(fm_text) if fm_text is not None else None):
+            if is_raw_source(frontmatter_of(rel)):
                 hits.add(files[rel])
     return hits.pop() if len(hits) == 1 else None
 

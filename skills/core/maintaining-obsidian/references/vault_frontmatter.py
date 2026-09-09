@@ -14,7 +14,7 @@ import re
 from pathlib import Path
 
 KEY_RE = re.compile(r"^([A-Za-z0-9_-]+):(.*)$")
-HEADING_RE = re.compile(r"^#{1,6}\s+(.*\S)")
+HEADING_RE = re.compile(r"^(#{1,6})\s+(.*\S)")
 # A fence delimiter may be indented by at most three spaces (CommonMark); four
 # is an indented code block whose backticks are literal text. A fence inside a
 # blockquote or Obsidian callout carries the container's `> ` prefix.
@@ -115,8 +115,9 @@ def note_type(fm: dict | None) -> str | None:
 
 
 def _walk_fences(text: str):
-    """Yield (state, info, line) per line: `text` outside any fence; `open`, `body`,
-    `close` inside one. A fence closes only at a delimiter of its own character and
+    """Yield (state, info, line, quoted) per line: `text` outside any fence; `open`,
+    `body`, `close` inside one; `quoted` when the fence sits in a blockquote or
+    callout. A fence closes only at a delimiter of its own character and
     at least its own length (CommonMark), so a ```yaml inside a ```` illustration
     fence is body, the illustration's closer does not open a new fence, and a
     ``` fence closed by ```` ends where the longer delimiter is. A delimiter
@@ -134,39 +135,44 @@ def _walk_fences(text: str):
             match = FENCE_OPEN_RE.match(line[len(prefix):].rstrip())
             if match:
                 marker, info = match.group(1), match.group(2).lower()
-                yield "open", info, line
+                yield "open", info, line, bool(prefix)
             else:
-                yield "text", "", line
+                yield "text", "", line, False
             continue
         inner = line[len(prefix):] if line.startswith(prefix) else line
         if re.fullmatch(rf" {{0,3}}{re.escape(marker[0])}{{{len(marker)},}}\s*", inner):
-            yield "close", info, line
+            yield "close", info, line, bool(prefix)
             marker = None
         else:
-            yield "body", info, inner
+            yield "body", info, inner, bool(prefix)
 
 
 def yaml_fences(text: str) -> list[tuple[str, str]]:
-    """(heading, body) per top-level ```yaml fence — the heading is the nearest one
-    above the fence, "" before any (see _walk_fences for nesting)."""
+    """(headings, body) per top-level ```yaml fence. `headings` is the enclosing
+    heading path joined with " / " (`Source / Frontmatter`), "" before any. A
+    fence inside a blockquote or callout is an illustration and is not returned
+    (see _walk_fences for nesting)."""
     fences: list[tuple[str, str]] = []
-    heading = ""
+    stack: list[str] = []
     buf: list[str] = []
-    for state, info, line in _walk_fences(text):
+    for state, info, line, quoted in _walk_fences(text):
         if state == "text":
             match = HEADING_RE.match(line)
             if match:
-                heading = match.group(1)
+                level = len(match.group(1))
+                del stack[level - 1 :]
+                stack.extend([""] * (level - 1 - len(stack)))
+                stack.append(match.group(2))
         elif state == "open":
             buf = []
         elif state == "body":
             buf.append(line)
-        elif state == "close" and info in ("yaml", "yml"):
-            fences.append((heading, "\n".join(buf)))
+        elif state == "close" and info in ("yaml", "yml") and not quoted:
+            fences.append((" / ".join(h for h in stack if h), "\n".join(buf)))
     return fences
 
 
 def strip_code(text: str) -> str:
     """The text with fenced code blocks and inline code spans removed."""
-    kept = [line for state, _, line in _walk_fences(text) if state == "text"]
+    kept = [line for state, _, line, _ in _walk_fences(text) if state == "text"]
     return INLINE_CODE_RE.sub("", "\n".join(kept))

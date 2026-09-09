@@ -571,6 +571,35 @@ def test_single_type_universal_fence_is_a_base_not_a_variant(tmp_path):
     assert book["fields"]["tags"]["empty"] == 1
 
 
+def test_variant_fences_under_subheadings_keep_their_type_section(tmp_path):
+    # `## Source` / `### Frontmatter` and `## Source — Paper Variant` /
+    # `### Frontmatter`: the enclosing section names the type, so both fences
+    # are variants of `source`, not a union under "Frontmatter".
+    (tmp_path / "SCHEMA.md").write_text(
+        "# Schema\n\n## Source\n\n### Frontmatter\n\n```yaml\n---\ntype: source\nsource_url: \"\"\n---\n```\n\n"
+        "## Source — Paper Variant\n\n### Frontmatter\n\n```yaml\n---\ntype: source\nsource_url: \"\"\nvenue: \"\"\n---\n```\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "AGENTS.md").write_text("# Contract\n", encoding="utf-8")
+    (tmp_path / "plain.md").write_text("---\ntype: source\nsource_url: https://x/p\n---\nbody\n", encoding="utf-8")
+    source = _run(tmp_path, "--field-empty-pct", "90")["types"]["source"]
+    assert source["variants"] == 2 and source["variant_notes"] == [1, 0]
+    assert "venue" not in source["fields"]
+
+
+def test_bare_provenance_link_colliding_with_a_wiki_name_is_unresolved(vault):
+    raw = vault / "Raw"
+    raw.mkdir()
+    (raw / "foo.md").write_text("---\nsource_url: https://x/foo\nsha256: " + "0" * 64 + "\n---\ncapture\n", encoding="utf-8")
+    (vault / "Wiki" / "foo.md").write_text("---\ntype: entity\n---\nwiki foo\n", encoding="utf-8")
+    (vault / "Wiki" / "typed.md").write_text(
+        "---\ntype: source\nsource_url: https://x/t\nsha256: " + "0" * 64 + "\n---\nSee [[foo]].\n", encoding="utf-8"
+    )
+    by_path = {i["path"]: i for i in _run(vault)["raw_sources"]}
+    assert by_path["Wiki/typed.md"]["status"] == "unresolved"
+    assert by_path["Wiki/typed.md"]["hashed_file"] is None
+
+
 def test_links_with_a_path_resolve_by_that_path_only(vault):
     raw = _news_shaped_pair(vault)
     # The Article's link names the wrong day: the only bloomberg-fed.md lives
@@ -608,7 +637,9 @@ def test_minimal_preset_placeholders_declare_no_types_or_tags(tmp_path):
     report = _run(tmp_path)
     assert report["schema"]["declared_types"] == ["book"]
     assert report["types"]["typename"]["declared"] is None
-    # A fence indented four spaces is an indented code block, not a declaration.
+    # A fence indented four spaces is an indented code block, and a fence inside
+    # a callout is an illustration: neither declares.
     with (tmp_path / "SCHEMA.md").open("a", encoding="utf-8") as schema:
         schema.write("\nIndented example:\n\n    ```yaml\n    type: ghost\n    ```\n")
+        schema.write("\n> [!example]\n> ```yaml\n> type: ghost\n> ```\n")
     assert _run(tmp_path)["schema"]["declared_types"] == ["book"]
