@@ -4,8 +4,9 @@ Reads a note as UTF-8 with line endings normalized, splits its frontmatter from
 its body, and parses the frontmatter as a block: inline values, inline lists,
 block lists (indented or at column 0), and one-level nested mappings. Also
 extracts the top-level ```yaml fences of a SCHEMA.md, and masks fenced code
-blocks and inline code so a literal `[[link]]` shown as an example is not a
-link. Stdlib only; imported by lint_vault.py in this directory.
+blocks, inline code, and Obsidian / HTML comments so a literal `[[link]]` shown
+as an example or hidden in a comment is not a link. Stdlib only; imported by
+lint_vault.py in this directory.
 """
 
 from __future__ import annotations
@@ -24,6 +25,9 @@ FENCE_OPEN_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})\s*(\S*)")
 # length: `a`, ``a ` b``, ```a``` — never a run of another length. It may cross
 # a line break but not a blank line (a paragraph end).
 INLINE_CODE_RE = re.compile(r"(?<!`)(`+)(?!`)((?:(?!\n\n)[\s\S])+?)(?<!`)\1(?!`)")
+# Obsidian comments (`%% hidden %%`) and HTML comments are not rendered, so a
+# [[link]] inside one is not a link.
+COMMENT_RE = re.compile(r"%%.*?%%|<!--.*?-->", re.DOTALL)
 
 
 def read_text(path: Path) -> str:
@@ -201,5 +205,6 @@ def text_lines(text: str) -> list[str]:
 
 
 def strip_code(text: str) -> str:
-    """The text with fenced code blocks and inline code spans removed."""
-    return INLINE_CODE_RE.sub("", "\n".join(text_lines(text)))
+    """The text with fenced code blocks, inline code spans, and Obsidian / HTML
+    comments removed."""
+    return COMMENT_RE.sub("", INLINE_CODE_RE.sub("", "\n".join(text_lines(text))))

@@ -159,6 +159,16 @@ def test_links_in_yaml_comments_are_not_edges_but_links_in_values_are(vault):
     assert links["notes"]["Wiki/alpha-note.md"]["inbound"] == 2
 
 
+def test_links_inside_obsidian_and_html_comments_are_not_edges(vault):
+    (vault / "Wiki" / "gamma-orphan.md").write_text(
+        GAMMA + "\n%% draft: [[alpha-note]] %%\n\n<!-- todo: [[alpha-note-draft]]\nlater -->\n%%\nmulti-line [[alpha-note]]\n%%\n",
+        encoding="utf-8",
+    )
+    links = _run(vault)["links"]
+    assert "Wiki/gamma-orphan.md" in links["orphans"]
+    assert links["notes"]["Wiki/alpha-note.md"]["inbound"] == 1
+
+
 def test_self_links_under_any_spelling_are_not_edges(vault):
     (vault / "Wiki" / "gamma-orphan.md").write_text(
         GAMMA + "\nSelf: [[gamma-orphan]] and [[Wiki/gamma-orphan]] and [[gamma-orphan#Heading|me]].\n",
