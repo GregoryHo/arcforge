@@ -3172,3 +3172,24 @@ Do something.
     });
   });
 });
+
+describe('resolveTrialTimeoutMs — per-run ceiling override', () => {
+  const { resolveTrialTimeoutMs, DEFAULT_TRIAL_TIMEOUT_MS } = require('../../scripts/lib/eval');
+
+  it('defaults to the standing 900s instrument when the variable is unset or empty', () => {
+    expect(resolveTrialTimeoutMs({})).toBe(DEFAULT_TRIAL_TIMEOUT_MS);
+    expect(resolveTrialTimeoutMs({ ARCFORGE_EVAL_TRIAL_TIMEOUT_MS: '' })).toBe(900000);
+  });
+
+  it('reads a positive integer of milliseconds', () => {
+    expect(resolveTrialTimeoutMs({ ARCFORGE_EVAL_TRIAL_TIMEOUT_MS: '1800000' })).toBe(1800000);
+  });
+
+  it('fails loudly on anything that is not a positive integer', () => {
+    for (const bad of ['abc', '0', '-5', '1.5', '30m']) {
+      expect(() => resolveTrialTimeoutMs({ ARCFORGE_EVAL_TRIAL_TIMEOUT_MS: bad })).toThrow(
+        /ARCFORGE_EVAL_TRIAL_TIMEOUT_MS/,
+      );
+    }
+  });
+});

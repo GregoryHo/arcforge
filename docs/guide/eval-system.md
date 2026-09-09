@@ -85,6 +85,11 @@ Runs both arms and stores every trial. Useful flags:
 | `--max-turns` | Turn budget per trial, overriding the scenario |
 | `--plugin-dir` | Load a plugin directory into the treatment arm |
 
+Each trial's `claude -p` session is capped at 900 s; a trial killed at the cap is
+an infra error and never scores. Set `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=<milliseconds>`
+to move that ceiling for one run — for a treatment whose pipeline builds or
+renders and runs past the cap on a loaded machine.
+
 `--skill-file` injects a skill body into the treatment prompt — that measures a
 **skill**. `--plugin-dir` loads a real plugin instead — that measures a
 **workflow**, the whole environment. They answer different questions; using

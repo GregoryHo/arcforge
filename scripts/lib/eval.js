@@ -33,6 +33,29 @@ const {
 const { parseStreamJsonOutput, parseActionsFromTranscript } = require('./eval-transcript');
 const { isTrialKilled, isOutputComplete } = require('./eval-trial-outcome');
 
+// Per-trial ceiling for the spawned `claude -p` session. 900s is the standing
+// instrument (see the lineage note at the execCommand call); a treatment whose
+// pipeline builds or renders can run past it on a loaded machine, so one run can
+// move the ceiling without editing the engine. A killed trial never scores.
+const DEFAULT_TRIAL_TIMEOUT_MS = 900000;
+
+/**
+ * Resolve the per-trial timeout: ARCFORGE_EVAL_TRIAL_TIMEOUT_MS when set, else the default.
+ * @param {NodeJS.ProcessEnv} [env] - Environment to read (injectable for tests)
+ * @returns {number} Timeout in milliseconds
+ */
+function resolveTrialTimeoutMs(env = process.env) {
+  const raw = env.ARCFORGE_EVAL_TRIAL_TIMEOUT_MS;
+  if (raw === undefined || raw === '') return DEFAULT_TRIAL_TIMEOUT_MS;
+  const ms = Number(raw);
+  if (!Number.isInteger(ms) || ms <= 0) {
+    throw new Error(
+      `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS must be a positive integer of milliseconds, got ${JSON.stringify(raw)}`,
+    );
+  }
+  return ms;
+}
+
 /**
  * Eval scenario parsed from a markdown file
  * @typedef {Object} EvalScenario
@@ -208,7 +231,8 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     // (killed AND incomplete must not score). Raising the ceiling is an
     // instrument fix, not a rubric change (scenario hashes unaffected).
     // P4 history: 300s clipped four of five two-axis treatment trials.
-    timeout: 900000,
+    // ARCFORGE_EVAL_TRIAL_TIMEOUT_MS moves the ceiling for one run.
+    timeout: resolveTrialTimeoutMs(),
     maxBuffer: CLAUDE_MAX_BUFFER,
     // Redirect ONLY the arcforge data home (not HOME) to the trial's isolated
     // fixture. getArcforgeHome() honors ARCFORGE_HOME before falling back to
@@ -668,6 +692,8 @@ module.exports = {
   resolveMaxTurns,
   runTrial,
   buildTrialPrompt,
+  resolveTrialTimeoutMs,
+  DEFAULT_TRIAL_TIMEOUT_MS,
   executeAndGradeTrial,
   runSkillEval,
   runWorkflowEval,
