@@ -86,9 +86,12 @@ Validate each note's frontmatter against the shape its `type:` declares in the
 vault's SCHEMA.md. The script reads the declared fields from SCHEMA.md's yaml
 fences: `types.<type>.fields.<field>` counts present / filled / empty per
 field over the notes it is `expected` of, and `types.<type>.undeclared` lists
-fields the type does not declare. A type declared by more than one fence (the
-llm-wiki Source and its Paper variant, both `type: source`) has that many
-`variants`; each note is measured against the variant it fits — the one whose
+fields the type does not declare. A fence naming several types, or one type
+under a heading that does not name it (`## Universal Frontmatter`), is a base
+every note of the type carries; a fence under the type's own heading is a
+variant. A type declared by more than one such fence (the llm-wiki Source and
+its Paper variant, both `type: source`) has that many `variants`; each note is
+measured against the variant it fits — the one whose
 discriminator tag it carries (the Paper fence declares `tags: [paper]`), else
 the one whose fields it carries most of — so a Paper-only field is expected of
 the papers, not of every Source, and a paper missing every paper field is still

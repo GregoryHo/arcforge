@@ -14,6 +14,7 @@ import re
 from pathlib import Path
 
 KEY_RE = re.compile(r"^([A-Za-z0-9_-]+):(.*)$")
+HEADING_RE = re.compile(r"^#{1,6}\s+(.*\S)")
 # A fence delimiter may be indented by at most three spaces (CommonMark); four
 # is an indented code block whose backticks are literal text.
 FENCE_OPEN_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})\s*(\S*)")
@@ -135,17 +136,23 @@ def _walk_fences(text: str):
             yield "body", info, line
 
 
-def yaml_fences(text: str) -> list[str]:
-    """Bodies of the top-level ```yaml fences (see _walk_fences for nesting)."""
-    fences: list[str] = []
+def yaml_fences(text: str) -> list[tuple[str, str]]:
+    """(heading, body) per top-level ```yaml fence — the heading is the nearest one
+    above the fence, "" before any (see _walk_fences for nesting)."""
+    fences: list[tuple[str, str]] = []
+    heading = ""
     buf: list[str] = []
     for state, info, line in _walk_fences(text):
-        if state == "open":
+        if state == "text":
+            match = HEADING_RE.match(line)
+            if match:
+                heading = match.group(1)
+        elif state == "open":
             buf = []
         elif state == "body":
             buf.append(line)
         elif state == "close" and info in ("yaml", "yml"):
-            fences.append("\n".join(buf))
+            fences.append((heading, "\n".join(buf)))
     return fences
 
 

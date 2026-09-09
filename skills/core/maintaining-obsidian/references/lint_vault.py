@@ -12,10 +12,12 @@ the auditor reads before acting on:
   2. `type:` presence; per-type field fill counts and undeclared-field counts.
      Declared fields come from the top-level yaml fences in `<vault>/SCHEMA.md`
      (a fence nested inside another fence is an illustration). A fence whose
-     `type:` lists several names (`source | entity`) is a base every note of
-     those types carries; each fence naming one type is a variant of it (the
-     llm-wiki Source and its Paper variant), and a placeholder name (`<one of
-     the types declared below>`) declares nothing. A note is measured against
+     `type:` lists several names (`source | entity`), or whose section heading
+     does not name its one type (`## Universal Frontmatter` over `type: book`),
+     is a base every note of those types carries; a fence naming one type under
+     that type's own heading is a variant of it (the llm-wiki Source and its
+     Paper variant), and a placeholder name (`<one of the types declared
+     below>`) declares nothing. A note is measured against
      the variant whose fields it carries most of, so a field only one variant
      declares is `expected` of the notes fitting that variant, not of every
      note of the type. A variant fence that declares a `tags:` value names its
@@ -168,25 +170,29 @@ def select_scope(notes: list[dict], scope: str) -> list[dict]:
 def declared_fields(vault: Path) -> dict[str, list[dict]] | None:
     """Per type, one variant per fence SCHEMA.md declares; None without a SCHEMA.md.
 
-    A fence naming several types is a base shared by every variant of each; a
-    fence naming one type is a variant, with `fields` (its keys plus the base)
+    A fence naming several types, or naming one type under a heading that does
+    not mention it (`## Universal Frontmatter` over `type: book`), is a base
+    shared by every variant of each type it names; a fence naming one type under
+    that type's own heading is a variant, with `fields` (its keys plus the base)
     and `tags` (the tags its `tags:` value lists — the variant's discriminator).
-    A type with no fence of its own has its base as the single variant.
+    A type with no variant fence has its base as the single variant.
     """
     schema = vault / SCHEMA_FILE
     if not schema.is_file():
         return None
     base: dict[str, set[str]] = defaultdict(set)
     variants: dict[str, list[dict]] = defaultdict(list)
-    for fence in yaml_fences(read_text(schema)):
+    for heading, fence in yaml_fences(read_text(schema)):
         lines = [line for line in fence.split("\n") if line.strip() != "---"]
         fm = parse_frontmatter("\n".join(lines))
         type_value = fm.get("type")
         if not isinstance(type_value, str):
             continue
         names = [n for n in (part.strip() for part in type_value.split("|")) if TYPE_NAME_RE.match(n)]
+        heading_key = re.sub(r"[^a-z0-9]", "", heading.lower())
         for name in names:
-            if len(names) == 1:
+            own_section = re.sub(r"[^a-z0-9]", "", name.lower()) in heading_key
+            if len(names) == 1 and own_section:
                 variants[name].append({"fields": set(fm.keys()), "tags": set(note_tags(fm))})
             else:
                 base[name].update(fm.keys())
@@ -301,10 +307,11 @@ def link_facts(notes: list[dict], scoped: list[dict]) -> dict:
         by_stem[Path(note["rel"]).stem.lower()].append(note["rel"])
 
     def resolve(target: str) -> str | None:
+        # A link with a path resolves by that path only; a bare name by basename.
         name = target[:-3] if target.endswith(".md") else target
-        if "/" in name and f"{name}.md" in by_rel:
-            return f"{name}.md"
-        hits = by_stem.get(Path(name).name.lower())
+        if "/" in name:
+            return f"{name}.md" if f"{name}.md" in by_rel else None
+        hits = by_stem.get(name.lower())
         return hits[0] if hits else None
 
     outbound: dict[str, int] = {}
@@ -353,12 +360,16 @@ def _source_url_file(note: dict, files: dict[str, Path]) -> Path | None:
 
 
 def _linked_raw_source(note: dict, files: dict[str, Path], md_by_stem: dict) -> Path | None:
-    """The Raw Source note (`sha256`, no `type:`) the body wikilinks — when it links exactly one."""
+    """The Raw Source note (`sha256`, no `type:`) the body wikilinks — when it links exactly one.
+    A link with a path resolves by that path only; a bare name by basename."""
     hits: set[Path] = set()
     for match in WIKILINK_RE.finditer(strip_code(note["body"])):
         target = match.group(1).strip()
         name = target[:-3] if target.endswith(".md") else target
-        rels = [f"{name}.md"] if f"{name}.md" in files else md_by_stem.get(Path(name).name.lower(), [])
+        if "/" in name:
+            rels = [f"{name}.md"] if f"{name}.md" in files else []
+        else:
+            rels = md_by_stem.get(name.lower(), [])
         for rel in rels:
             fm_text, _ = split_frontmatter(read_text(files[rel]))
             if is_raw_source(parse_frontmatter(fm_text) if fm_text is not None else None):

@@ -481,6 +481,43 @@ def test_paper_missing_every_paper_field_still_fits_the_paper_variant(tmp_path):
     assert source["fields"]["source_author"]["expected"] == 2
 
 
+def test_single_type_universal_fence_is_a_base_not_a_variant(tmp_path):
+    # A vault with one type: the universal fence says `type: book` too, so by name
+    # count alone it would be a second variant and a Book missing `created` or
+    # `tags` would never be reported.
+    (tmp_path / "SCHEMA.md").write_text(
+        "# Schema\n\n## Universal Frontmatter\n\n```yaml\n---\ntype: book\ncreated: YYYY-MM-DD\ntags: []\n---\n```\n\n"
+        "## Book\n\n```yaml\n---\ntype: book\nauthor: \"\"\n---\n```\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "AGENTS.md").write_text("# Contract\n", encoding="utf-8")
+    (tmp_path / "dune.md").write_text("---\ntype: book\nauthor: Herbert\n---\nbody\n", encoding="utf-8")
+    book = _run(tmp_path)["types"]["book"]
+    assert book["variants"] == 1 and book["declared"] == ["author", "created", "tags", "type"]
+    assert book["fields"]["created"] == {"expected": 1, "present": 0, "filled": 0, "empty": 1, "empty_pct": 100.0, "exceeds": None}
+    assert book["fields"]["tags"]["empty"] == 1
+
+
+def test_links_with_a_path_resolve_by_that_path_only(vault):
+    raw = _news_shaped_pair(vault)
+    # The Article's link names the wrong day: the only bloomberg-fed.md lives
+    # under 2026-05-06, and it must not stand in for the missing capture.
+    article = vault / "Wiki" / "fed-article.md"
+    article.write_text(
+        article.read_text(encoding="utf-8").replace("[[Raw/2026-05-06/bloomberg-fed]]", "[[Raw/2026-05-07/bloomberg-fed]]"),
+        encoding="utf-8",
+    )
+    report = _run(vault)
+    assert {i["path"]: i["status"] for i in report["raw_sources"]}["Wiki/fed-article.md"] == "unresolved"
+    assert raw.exists()
+    # The same rule in the link graph: a path link to a note that is not there
+    # gives the same-named note elsewhere no backlink.
+    (vault / "Wiki" / "gamma-orphan.md").write_text(GAMMA + "\nSee [[Archive/alpha-note]].\n", encoding="utf-8")
+    links = _run(vault)["links"]["notes"]
+    assert links["Wiki/alpha-note.md"]["inbound"] == 1
+    assert links["Wiki/gamma-orphan.md"]["outbound"] == 1
+
+
 def test_minimal_preset_placeholders_declare_no_types_or_tags(tmp_path):
     # The minimal SCHEMA.md declares no types: its universal fence carries the
     # placeholder `<one of the types declared below>` and its `type: typename`
