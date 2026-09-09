@@ -356,7 +356,9 @@ def test_provenance_link_to_a_capture_is_not_a_wiki_relationship(vault):
     # A long attachment extension and a code span crossing a line break are
     # embeds and examples too.
     (vault / "Wiki" / "gamma-orphan.md").write_text(
-        GAMMA + "\n![[diagram.excalidraw]] and ``literal\n[[alpha-note]]`` here.\n", encoding="utf-8"
+        GAMMA + "\n![[diagram.excalidraw]] and ``literal\n[[alpha-note]]`` here.\n"
+        "\n> [!note]\n> ```md\n> [[alpha-note]] inside a callout fence\n> ```\n",
+        encoding="utf-8",
     )
     links = _run(vault)["links"]
     assert "Wiki/gamma-orphan.md" in links["orphans"]

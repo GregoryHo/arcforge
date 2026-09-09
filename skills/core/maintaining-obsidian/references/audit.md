@@ -137,11 +137,12 @@ its body wikilinks (the news preset's `## Source` line). Then:
 |---|---|
 | `fresh` | No log line. |
 | `drift` | Append `drift \| <filename> \| sha=<old>→<new>` to `log.md` and report it. Informational only. |
-| `unhashed` | Compute and write `sha256` + `ingested`. Offer `audit lint --backfill-sha256` for the rest. |
+| `unhashed` | Report it and propose the backfill; LINT writes nothing (only LINK modifies notes — obsidian B-5). The digest is written by re-ingest, or by `audit lint --backfill-sha256` when the user asks for it explicitly. |
 | `unresolved` | A typed note whose original is remote and whose body links no single Raw Source note, so nothing in the vault stands in for it — with a stored digest or without one (there is nothing to backfill from). Re-fetch when fetchable and compare the fetched body by hand; otherwise report it. Never a drift line. |
 
 Drift never auto-fixes the wiki layer — a changed source is a fact for the user
-to act on, not a licence to rewrite their note.
+to act on, not a licence to rewrite their note — and neither does an empty
+digest: the backfill is a proposal until the user runs it.
 
 ### EVOLVE — schema drift
 
