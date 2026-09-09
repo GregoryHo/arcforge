@@ -78,6 +78,21 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   scenario's *meaning* (task, fixture, assertions) bumps the version and
   empties the pool, because old rows answered a different question; cosmetic
   prose edits do not.
+- **B-10 A trial the runner cut off is an instrument failure, not a
+  measurement.** Every trial's `claude -p` session runs under a per-trial
+  ceiling: 900 s, unless `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS` moves it for one run —
+  unset or empty means the default, and any value that is not a positive
+  integer of milliseconds is refused on the first trial, before any session is
+  spawned. A trial the runner killed before the agent finished its turn is
+  recorded as `trial_killed_incomplete` and excluded from every scored pool —
+  a preflight containing one BLOCKs outright rather than rating the rest —
+  because its half transcript would otherwise grade as if the
+  agent had chosen to stop there; it neither moves the delta against the arm
+  nor counts as a scored trial under B-4's strict bar. A killed trial that had
+  already delivered its answer is a valid measurement and scores. The ceiling
+  is part of the measurement conditions, so a run that moved it MUST be
+  reported with the value it used, the way B-9 treats a `--since`-bounded
+  snapshot.
 
 ### Benchmarks
 - **B-9 Snapshots keep history and gate releases.** `eval report` writes
@@ -101,11 +116,19 @@ module invents a verdict. Delta-CI judging returns `IMPROVED`, `REGRESSED`,
 `PASS` or `REGRESSED` — never `INSUFFICIENT_DATA`, because an empty treatment arm
 fails the bar rather than deferring. That `PASS` is a distinct token from the
 preflight `PASS` in B-3, which is a discriminability outcome (`PASS` / `BLOCK`), not
-an A/B verdict.
+an A/B verdict. A result the runner killed before the agent finished carries
+`errorType: trial_killed_incomplete` and `infraError: true` —
+`scripts/lib/eval-trial-outcome.js` owns the two predicates (killed, output
+complete) — and `scorableResults` in `eval-stats.js` drops every `infraError` /
+`gradeError` row from every scored pool (`eval run`, A/B, benchmark), while
+preflight fails closed on the same flags (B-10). No result field records the
+ceiling a trial ran under.
 
 ## Decisions
 
 The measurement culture — two-arm evidence, the preflight ceiling gate,
 refuse-don't-guess verdicts — predates this log; rationale inline above.
 Scenario mechanics are taught by the `evaluating` skill and specified in
-`docs/guide/eval-system.md`.
+`docs/guide/eval-system.md`. D-017 pins the per-run override of the trial
+ceiling (B-10); the exclusion of killed-incomplete trials predates the log, and
+its rationale is inline at B-10.

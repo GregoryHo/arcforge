@@ -484,3 +484,33 @@ reverse one, append a superseding entry (see AGENTS.md).
 - Residual: A project adopting the method gets no mechanical check that its own
   log stays dense, its supersessions stay paired, or its spec headers agree with
   their rows. Booked as the `product-cli` wish below.
+
+### D-017 — The per-trial ceiling is overridable per run, and a run that moves it reports the value
+- Date: 2026-09-09
+- Version: unreleased (first version after 6.1.0)
+- Status: Accepted
+- Decision: The eval harness keeps 900 s as the per-trial ceiling and lets
+  `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS` move it for a single run — a positive integer
+  of milliseconds, refused otherwise on the first trial before any session
+  spawns — with the rule that a run which moved it is reported with the value it
+  used.
+- Why: `eval-diagramming-obsidian-unverified-save-claim`'s treatment arm runs a
+  full build-and-render pipeline; on a loaded machine 4 of 5 treatment trials
+  were killed at 900 s, and since a killed-incomplete trial never scores (eval
+  B-10) the arm had nothing to measure. The 900 s ceiling is the standing
+  instrument every other pool was measured under, so a per-run override gets
+  that scenario measured without changing the instrument for the rest, and
+  without editing the engine to do it. Moving the ceiling changes the conditions
+  of the measurement, which is why the value used travels with the result rather
+  than staying an invisible local setting — the same rule eval B-9 applies to a
+  `--since`-bounded snapshot.
+- Symptom: 4 of 5 treatment trials `trial_killed_incomplete` at the 900 s
+  ceiling; one scorable trial in the arm.
+- Residual: no result field records the ceiling a trial ran under, so a pool can
+  mix trials measured under different ceilings and nothing mechanical says so —
+  the reporting rule in B-10 is prose-only. The refusal of a bad value fires
+  from the first trial's spawn, after that trial's fixture `Setup` has already
+  run, not before the run begins.
+- Verification: `tests/scripts/eval.test.js` — `resolveTrialTimeoutMs` returns
+  900000 when the variable is unset or empty, `1800000` when set to it, and
+  throws naming the variable on `abc`, `0`, `-5`, `1.5` and `30m`.
