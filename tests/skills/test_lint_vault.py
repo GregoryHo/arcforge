@@ -332,6 +332,20 @@ def test_raw_captures_and_attachment_embeds_are_not_edges(vault):
     assert links["notes"]["Wiki/alpha-note-draft.md"]["outbound"] == 2
 
 
+def test_ambiguous_bare_links_resolve_by_folder_or_not_at_all(vault):
+    for folder in ("A", "B"):
+        (vault / folder).mkdir()
+        (vault / folder / "foo.md").write_text(f"---\ntype: entity\n---\n{folder} foo\n", encoding="utf-8")
+    (vault / "B" / "source.md").write_text("---\ntype: entity\n---\nSee [[foo]].\n", encoding="utf-8")
+    (vault / "Wiki" / "gamma-orphan.md").write_text(GAMMA + "\nAlso [[foo]].\n", encoding="utf-8")
+    links = _run(vault)["links"]
+    assert links["notes"]["B/foo.md"]["inbound"] == 1      # same folder as B/source.md
+    assert links["notes"]["A/foo.md"]["inbound"] == 0      # not handed the link by sort order
+    assert "A/foo.md" in links["orphans"]
+    assert links["notes"]["Wiki/gamma-orphan.md"]["outbound"] == 1   # ambiguous from Wiki/: unresolved, still a link
+    assert "Wiki/gamma-orphan.md" not in links["orphans"]
+
+
 def test_provenance_link_to_a_capture_is_not_a_wiki_relationship(vault):
     _news_shaped_pair(vault)
     # The Article's only link is its `## Source` line: no wiki relationship, so

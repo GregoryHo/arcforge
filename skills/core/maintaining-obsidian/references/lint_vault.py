@@ -25,7 +25,9 @@ the auditor reads before acting on:
      it lacks — that is how a paper missing every paper field is still measured
      as a paper rather than passing as a generic Source.
   3. Link graph from [[wikilinks]] over the wiki layer: inbound / outbound per
-     in-scope note, and the orphans (zero of each). A target with an explicit
+     in-scope note, and the orphans (zero of each). A bare `[[name]]` shared by
+     several notes resolves to the one in the linking note's folder, else stays
+     unresolved (it still counts as outbound). A target with an explicit
      extension other than `.md` is an attachment embed (`![[image.png]]`,
      `![[clip.mp4]]`), not a link, unless a note of that exact name exists.
      Raw Source captures are not in the graph: a `[[link]]` inside captured
@@ -316,13 +318,20 @@ def link_facts(notes: list[dict], scoped: list[dict], raw: list[dict]) -> dict:
     raw_rels = {note["rel"] for note in raw}
     raw_stems = {Path(note["rel"]).stem.lower() for note in raw}
 
-    def resolve(target: str) -> str | None:
-        # A link with a path resolves by that path only; a bare name by basename.
+    def resolve(target: str, source: str = "") -> str | None:
+        # A link with a path resolves by that path only. A bare name resolves by
+        # basename; when several notes share it, the one in the source note's
+        # own folder wins, and otherwise the link stays unresolved rather than
+        # being handed to whichever note sorts first (search-strategies.md:
+        # an ambiguous match is left unresolved).
         name = target[:-3] if target.endswith(".md") else target
         if "/" in name:
             return f"{name}.md" if f"{name}.md" in by_rel else None
-        hits = by_stem.get(name.lower())
-        return hits[0] if hits else None
+        hits = by_stem.get(name.lower(), [])
+        if len(hits) == 1:
+            return hits[0]
+        same_folder = [rel for rel in hits if Path(rel).parent == Path(source).parent]
+        return same_folder[0] if len(same_folder) == 1 else None
 
     def is_attachment(target: str) -> bool:
         ext = EXTENSION_RE.search(target)
@@ -342,7 +351,7 @@ def link_facts(notes: list[dict], scoped: list[dict], raw: list[dict]) -> dict:
             target = match.group(1).strip()
             if target and not is_attachment(target) and not is_raw_capture(target):
                 targets.add(target)
-        resolved = {resolve(raw) for raw in targets}
+        resolved = {resolve(target, note["rel"]) for target in targets}
         outbound[note["rel"]] = len(targets) - (1 if note["rel"] in resolved else 0)
         for rel in resolved - {None, note["rel"]}:
             inbound[rel] += 1
