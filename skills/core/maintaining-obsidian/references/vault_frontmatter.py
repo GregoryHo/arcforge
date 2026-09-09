@@ -14,8 +14,12 @@ import re
 from pathlib import Path
 
 KEY_RE = re.compile(r"^([A-Za-z0-9_-]+):(.*)$")
-FENCE_OPEN_RE = re.compile(r"^(`{3,}|~{3,})\s*(\S*)")
-INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
+# A fence delimiter may be indented by at most three spaces (CommonMark); four
+# is an indented code block whose backticks are literal text.
+FENCE_OPEN_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})\s*(\S*)")
+# A code span opens with a run of backticks and closes with a run of the same
+# length: `a`, ``a ` b``, ```a``` — never a run of another length.
+INLINE_CODE_RE = re.compile(r"(?<!`)(`+)(?!`)([^\n]+?)(?<!`)\1(?!`)")
 
 
 def read_text(path: Path) -> str:
@@ -111,20 +115,20 @@ def _walk_fences(text: str):
     `close` inside one. A fence closes only at a delimiter of its own character and
     at least its own length (CommonMark), so a ```yaml inside a ```` illustration
     fence is body, the illustration's closer does not open a new fence, and a
-    ``` fence closed by ```` ends where the longer delimiter is.
+    ``` fence closed by ```` ends where the longer delimiter is. A delimiter
+    indented four spaces or more is literal text, not a fence.
     """
     marker: str | None = None
     info = ""
     for line in text.split("\n"):
-        stripped = line.strip()
         if marker is None:
-            match = FENCE_OPEN_RE.match(stripped)
+            match = FENCE_OPEN_RE.match(line.rstrip())
             if match:
                 marker, info = match.group(1), match.group(2).lower()
                 yield "open", info, line
             else:
                 yield "text", "", line
-        elif re.fullmatch(rf"{re.escape(marker[0])}{{{len(marker)},}}", stripped):
+        elif re.fullmatch(rf" {{0,3}}{re.escape(marker[0])}{{{len(marker)},}}\s*", line):
             yield "close", info, line
             marker = None
         else:

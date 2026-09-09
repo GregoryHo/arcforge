@@ -25,8 +25,10 @@ as declared by the resolved vault's `SCHEMA.md`. Skip:
 - **Folders the vault's AGENTS.md declares out of scope.**
 
 Hand each skipped folder to the LINT script as `--skip <folder>`. On its own the
-script leaves out only dot-dirs, Excalidraw drawings, and the root contract
-files (AGENTS.md, SCHEMA.md, CLAUDE.md, README.md, index.md, log.md). A `.md` note
+script leaves out only dot-dirs, Excalidraw drawings, the root contract files
+(AGENTS.md, SCHEMA.md, CLAUDE.md, README.md, index.md, log.md), and the standard
+`_audits/` report folder — a vault that keeps its reports elsewhere names that
+folder with `--skip`, or every run's report would take a `recent:N` slot. A `.md` note
 that carries `sha256` but no `type:` is a Raw Source to the script: it is
 drift-checked whatever the scope, never counted as untyped, and never a subject
 of the schema, link, tag, or title checks — so `Raw/` needs no `--skip` and does
@@ -61,7 +63,7 @@ never against the user's working directory:
 ```bash
 cd "<base directory>/references"
 python3 lint_vault.py <vault> --json                              # default scope: recent:50
-python3 lint_vault.py <vault> --scope all --skip _audits --json
+python3 lint_vault.py <vault> --scope all --skip Templates --json
 python3 lint_vault.py <vault> --field-empty-pct 90 --undeclared-pct 80 --tag-min 10 --title-match 0.8 --json
 ```
 

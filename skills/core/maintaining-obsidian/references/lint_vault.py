@@ -48,8 +48,10 @@ drift-checked whatever the scope, so `Raw/` neither needs `--skip` nor eats
 into `recent:N`. A `[[wikilink]]` inside a fenced code block or inline code is
 an example, not a link. `--skip <folder>` drops a folder from the note set (plugin-
 managed folders, `_audits`, folders AGENTS.md declares out of scope). Dot-dirs,
-Excalidraw drawings (`excalidraw-plugin:` in frontmatter), and the root-level
-AGENTS.md / SCHEMA.md / CLAUDE.md / README.md / index.md / log.md are never notes.
+Excalidraw drawings (`excalidraw-plugin:` in frontmatter), the root-level
+AGENTS.md / SCHEMA.md / CLAUDE.md / README.md / index.md / log.md, and the
+standard `_audits/` report folder are never notes (a vault that keeps reports
+elsewhere passes that folder as `--skip`).
 
 Threshold flags only set the `exceeds` booleans in the JSON; the numbers live in
 each vault's SCHEMA.md `## Audit Thresholds`. Without a flag, `exceeds` is null.
@@ -80,6 +82,9 @@ from vault_frontmatter import (
 )
 
 NON_NOTE_ROOT_FILES = {"AGENTS.md", "SCHEMA.md", "CLAUDE.md", "README.md", "index.md", "log.md"}
+# The standard audit-report folder: every run writes a new report there, so
+# reports would otherwise take over the recent:N slice run by run.
+REPORT_DIR = "_audits"
 LOG_FILE = "log.md"
 SCHEMA_FILE = "SCHEMA.md"
 DUP_CANDIDATE_FLOOR = 0.6
@@ -109,7 +114,7 @@ def exceeds(value: float, threshold: float | None) -> bool | None:
 
 
 def _skipped(rel: str, skip: set[str]) -> bool:
-    return any(rel == folder or rel.startswith(folder + "/") for folder in skip)
+    return any(rel == folder or rel.startswith(folder + "/") for folder in skip | {REPORT_DIR})
 
 
 def collect(vault: Path, skip: set[str]) -> tuple[list[dict], dict[str, Path]]:

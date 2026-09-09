@@ -281,10 +281,23 @@ def test_raw_sources_are_drift_checked_but_never_scope_subjects(vault):
     assert not any("Raw/" in d["a"] or "Raw/" in d["b"] for d in _run(vault)["duplicate_titles"])
 
 
+def test_audit_reports_are_never_scope_subjects(vault):
+    reports = vault / "_audits"
+    reports.mkdir()
+    report = reports / "audit-2026-05-09-all.md"
+    report.write_text("---\ntype: audit-report\ncreated: 2026-05-09\n---\n# Audit\n", encoding="utf-8")
+    newest = max(p.stat().st_mtime for p in (vault / "Wiki").iterdir()) + 10
+    os.utime(report, (newest, newest))
+    result = _run(vault, "--scope", "recent:1")
+    assert result["notes"] == {"total": 3, "raw_sources": 0, "in_scope": 1}
+    assert "audit-report" not in result["types"]
+
+
 def test_wikilinks_inside_code_are_examples_not_links(vault):
     (vault / "Wiki" / "gamma-orphan.md").write_text(
-        # The fence opens with ``` and closes with ````, a longer delimiter CommonMark accepts.
-        GAMMA + "\nExample: `[[alpha-note]]` and\n\n```\n[[alpha-note-draft]]\n````\n",
+        # A double-backtick span, and a fence that opens with ``` and closes with
+        # ```` — a longer delimiter CommonMark accepts.
+        GAMMA + "\nExample: `[[alpha-note]]`, ``[[alpha-note]]`` and\n\n```\n[[alpha-note-draft]]\n````\n",
         encoding="utf-8",
     )
     links = _run(vault)["links"]
@@ -485,3 +498,7 @@ def test_minimal_preset_placeholders_declare_no_types_or_tags(tmp_path):
     report = _run(tmp_path)
     assert report["schema"]["declared_types"] == ["book"]
     assert report["types"]["typename"]["declared"] is None
+    # A fence indented four spaces is an indented code block, not a declaration.
+    with (tmp_path / "SCHEMA.md").open("a", encoding="utf-8") as schema:
+        schema.write("\nIndented example:\n\n    ```yaml\n    type: ghost\n    ```\n")
+    assert _run(tmp_path)["schema"]["declared_types"] == ["book"]
