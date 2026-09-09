@@ -86,6 +86,7 @@ from vault_frontmatter import (
     read_text,
     split_frontmatter,
     strip_code,
+    text_lines,
     yaml_fences,
 )
 
@@ -232,7 +233,7 @@ def declared_tags(vault: Path) -> list[str]:
         return []
     tags: list[str] = []
     inside = False
-    for line in read_text(schema).split("\n"):
+    for line in text_lines(read_text(schema)):  # a fenced example declares nothing
         if line.startswith("## "):
             inside = bool(TAXONOMY_HEADING_RE.match(line))
             continue
@@ -362,7 +363,8 @@ def link_facts(notes: list[dict], scoped: list[dict], raw: list[dict]) -> dict:
             ):
                 targets.add(target)
         resolved = {resolve(target, note["rel"]) for target in targets}
-        outbound[note["rel"]] = len(targets) - (1 if note["rel"] in resolved else 0)
+        # A link to the note itself, under any spelling, is not an outbound edge.
+        outbound[note["rel"]] = sum(1 for target in targets if resolve(target, note["rel"]) != note["rel"])
         for rel in resolved - {None, note["rel"]}:
             inbound[rel] += 1
 

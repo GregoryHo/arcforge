@@ -179,7 +179,11 @@ def yaml_fences(text: str) -> list[tuple[str, str]]:
     return fences
 
 
+def text_lines(text: str) -> list[str]:
+    """The lines outside every fence, inline code left in place."""
+    return [line for state, _, line, _ in _walk_fences(text) if state == "text"]
+
+
 def strip_code(text: str) -> str:
     """The text with fenced code blocks and inline code spans removed."""
-    kept = [line for state, _, line, _ in _walk_fences(text) if state == "text"]
-    return INLINE_CODE_RE.sub("", "\n".join(kept))
+    return INLINE_CODE_RE.sub("", "\n".join(text_lines(text)))

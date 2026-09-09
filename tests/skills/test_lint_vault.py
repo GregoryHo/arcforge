@@ -343,6 +343,30 @@ def test_raw_captures_and_attachment_embeds_are_not_edges(vault):
     assert links["notes"]["Wiki/alpha-note-draft.md"]["outbound"] == 2
 
 
+def test_self_links_under_any_spelling_are_not_edges(vault):
+    (vault / "Wiki" / "gamma-orphan.md").write_text(
+        GAMMA + "\nSelf: [[gamma-orphan]] and [[Wiki/gamma-orphan]] and [[gamma-orphan#Heading|me]].\n",
+        encoding="utf-8",
+    )
+    links = _run(vault)["links"]
+    assert links["notes"]["Wiki/gamma-orphan.md"] == {"inbound": 0, "outbound": 0}
+    assert "Wiki/gamma-orphan.md" in links["orphans"]
+
+
+def test_fenced_examples_under_the_taxonomy_declare_nothing(vault):
+    schema = vault / "SCHEMA.md"
+    schema.write_text(
+        schema.read_text(encoding="utf-8").replace(
+            "LINT checks:\n", "Example of a bad entry:\n\n```\n- `ghost` — not a real tag\n```\n\nLINT checks:\n"
+        ),
+        encoding="utf-8",
+    )
+    (vault / "Wiki" / "gamma-orphan.md").write_text(GAMMA.replace("tags: [entity, entity/tool, tdd]", "tags: [ghost]"), encoding="utf-8")
+    report = _run(vault, "--tag-min", "1")
+    assert report["schema"]["declared_tags"] == ["arcforge", "entity"]
+    assert report["tags"]["ghost"] == {"count": 1, "declared": False, "exceeds": True}
+
+
 def test_ambiguous_bare_links_resolve_by_folder_or_not_at_all(vault):
     for folder in ("A", "B"):
         (vault / folder).mkdir()
