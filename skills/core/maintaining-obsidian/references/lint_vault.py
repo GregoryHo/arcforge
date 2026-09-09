@@ -64,6 +64,16 @@ from collections import Counter, defaultdict
 from difflib import SequenceMatcher
 from pathlib import Path
 
+from vault_frontmatter import (
+    is_empty,
+    note_tags,
+    note_type,
+    parse_frontmatter,
+    read_text,
+    split_frontmatter,
+    yaml_fences,
+)
+
 NON_NOTE_ROOT_FILES = {"AGENTS.md", "SCHEMA.md", "CLAUDE.md", "README.md", "index.md", "log.md"}
 LOG_FILE = "log.md"
 SCHEMA_FILE = "SCHEMA.md"
@@ -73,123 +83,10 @@ DUP_CANDIDATE_FLOOR = 0.6
 NON_NOTE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".pdf", ".canvas", ".html", ".excalidraw"}
 FILE_TOKEN_RE = re.compile(r"\.(md|pdf|png|jpe?g|gif|svg|html|canvas)$", re.IGNORECASE)
 WIKILINK_RE = re.compile(r"\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]")
-KEY_RE = re.compile(r"^([A-Za-z0-9_-]+):(.*)$")
 TYPE_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 TAXONOMY_HEADING_RE = re.compile(r"^##\s+.*\btaxonomy\b", re.IGNORECASE)
 TAXONOMY_ITEM_RE = re.compile(r"^\s*[-*]\s+`#?([^`\s]+)`")
 LOG_ENTRY_RE = re.compile(r"^\s*(?:#+\s*|-\s*)?\[\d{4}-\d{2}-\d{2}\]")
-
-
-# ---------------------------------------------------------------------------
-# Frontmatter
-# ---------------------------------------------------------------------------
-
-
-def read_text(path: Path) -> str:
-    """Read as UTF-8 with line endings normalized to \\n."""
-    return path.read_bytes().decode("utf-8", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
-
-
-def split_frontmatter(text: str) -> tuple[str | None, str]:
-    """Return (frontmatter text, body). Frontmatter is None when the note has none."""
-    if not text.startswith("---\n"):
-        return None, text
-    end = text.find("\n---\n", 4)
-    if end == -1:
-        if text.endswith("\n---"):
-            return text[4:-4], ""
-        return None, text
-    return text[4:end], text[end + 5 :]
-
-
-def _scalar(raw: str):
-    """Parse one inline YAML value: quoted string, inline list, empty, or bare."""
-    value = raw.strip()
-    if value[:1] in ("'", '"'):
-        close = value.find(value[0], 1)
-        return value[1:close] if close != -1 else value[1:]
-    value = re.split(r"\s+#", value, maxsplit=1)[0].strip()
-    if value.startswith("[") and value.endswith("]"):
-        inner = value[1:-1].strip()
-        return [_scalar(item) for item in inner.split(",")] if inner else []
-    if value in ("", "null", "~"):
-        return ""
-    return value
-
-
-def parse_frontmatter(text: str) -> dict:
-    """Parse a frontmatter block. Block lists and nested mappings are read whole."""
-    data: dict = {}
-    lines = text.split("\n")
-    i = 0
-    while i < len(lines):
-        match = KEY_RE.match(lines[i])
-        i += 1
-        if not match:
-            continue
-        key, rest = match.group(1), match.group(2)
-        if rest.strip() and not rest.strip().startswith("#"):
-            data[key] = _scalar(rest)
-            continue
-        block: list[str] = []
-        while i < len(lines) and (
-            not lines[i].strip()
-            or lines[i][:1] in (" ", "\t")
-            or lines[i] == "-"
-            or lines[i].startswith("- ")
-        ):
-            if lines[i].strip():
-                block.append(lines[i].strip())
-            i += 1
-        if not block:
-            data[key] = ""
-        elif all(item == "-" or item.startswith("- ") for item in block):
-            data[key] = [_scalar(item[1:]) for item in block]
-        else:
-            data[key] = {
-                item.split(":", 1)[0].strip(): _scalar(item.split(":", 1)[1]) if ":" in item else ""
-                for item in block
-            }
-    return data
-
-
-def is_empty(value) -> bool:
-    return value == "" or value == [] or value == {}
-
-
-def note_tags(fm: dict | None) -> list[str]:
-    """The note's frontmatter tags as bare strings (inline, block, or comma/space-separated)."""
-    tags = (fm or {}).get("tags", [])
-    if isinstance(tags, str):
-        tags = [t for t in re.split(r"[,\s]+", tags) if t]
-    elif isinstance(tags, dict):
-        tags = list(tags)
-    return [tag.lstrip("#") for tag in tags if isinstance(tag, str) and tag]
-
-
-def note_type(fm: dict | None) -> str | None:
-    """The note's `type:` when it is a non-empty string; None for an untyped note."""
-    value = fm.get("type") if fm else None
-    return value if isinstance(value, str) and value else None
-
-
-def yaml_fences(text: str) -> list[str]:
-    """Bodies of the top-level ```yaml fences. A ```yaml line inside an open fence is content."""
-    fences: list[str] = []
-    info: str | None = None
-    buf: list[str] = []
-    for line in text.split("\n"):
-        stripped = line.strip()
-        if info is None:
-            if stripped.startswith("```"):
-                info, buf = stripped[3:].strip().lower(), []
-        elif stripped == "```":
-            if info in ("yaml", "yml"):
-                fences.append("\n".join(buf))
-            info = None
-        else:
-            buf.append(line)
-    return fences
 
 
 def exceeds(value: float, threshold: float | None) -> bool | None:
@@ -509,7 +406,9 @@ def log_facts(vault: Path, files: dict[str, Path]) -> dict:
             token = part.strip().strip("`")
             if not FILE_TOKEN_RE.search(token):
                 continue
-            if token in files or token.lstrip("./") in files or Path(token).name in basenames:
+            if token in files or token.lstrip("./") in files:
+                continue
+            if "/" not in token and token in basenames:
                 continue
             missing.append({"line": line_no, "file": token})
     return {"path": LOG_FILE, "entries": entries, "missing_files": missing}

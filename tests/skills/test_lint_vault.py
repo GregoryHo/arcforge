@@ -269,6 +269,16 @@ def test_log_entries_naming_missing_files(vault):
     assert log["missing_files"] == [{"line": 4, "file": "Wiki/deleted-note.md"}]
 
 
+def test_log_path_tokens_are_not_satisfied_by_a_basename_elsewhere(vault):
+    # `Wiki/deleted-note.md` stays missing when only `Archive/deleted-note.md`
+    # exists; a bare basename in the log still matches any file of that name.
+    (vault / "Archive").mkdir()
+    (vault / "Archive" / "deleted-note.md").write_text("---\ntype: entity\n---\nmoved\n", encoding="utf-8")
+    with (vault / "log.md").open("a", encoding="utf-8") as log:
+        log.write("## [2026-05-09] create | entity | deleted-note.md\n")
+    assert _run(vault)["log"]["missing_files"] == [{"line": 4, "file": "Wiki/deleted-note.md"}]
+
+
 def test_tag_counts_and_taxonomy_membership(vault):
     tags = _run(vault)["tags"]
     assert {tag: facts["count"] for tag, facts in tags.items()} == {
