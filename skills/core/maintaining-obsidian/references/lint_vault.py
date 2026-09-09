@@ -40,9 +40,13 @@ the auditor reads before acting on:
   7. Duplicate-title candidates (difflib ratio >= 0.6, or the --title-match
      value when lower) between in-scope notes and every other note.
 
-Scope: `recent:N` (default recent:50) takes the N most recently modified notes as
-subjects; the link graph, the file index, and duplicate comparison still cover
-the whole vault. `--skip <folder>` drops a folder from the note set (plugin-
+Scope: `recent:N` (default recent:50) takes the N most recently modified
+wiki-layer notes as subjects; the link graph, the file index, and duplicate
+comparison still cover the whole vault. Raw Source notes (`sha256`, no `type:`)
+are never subjects of the schema, link, tag, or title checks and are all
+drift-checked whatever the scope, so `Raw/` neither needs `--skip` nor eats
+into `recent:N`. A `[[wikilink]]` inside a fenced code block or inline code is
+an example, not a link. `--skip <folder>` drops a folder from the note set (plugin-
 managed folders, `_audits`, folders AGENTS.md declares out of scope). Dot-dirs,
 Excalidraw drawings (`excalidraw-plugin:` in frontmatter), and the root-level
 AGENTS.md / SCHEMA.md / CLAUDE.md / README.md / index.md / log.md are never notes.
@@ -71,6 +75,7 @@ from vault_frontmatter import (
     parse_frontmatter,
     read_text,
     split_frontmatter,
+    strip_code,
     yaml_fences,
 )
 
@@ -87,6 +92,11 @@ TYPE_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 TAXONOMY_HEADING_RE = re.compile(r"^##\s+.*\btaxonomy\b", re.IGNORECASE)
 TAXONOMY_ITEM_RE = re.compile(r"^\s*[-*]\s+`#?([^`\s]+)`")
 LOG_ENTRY_RE = re.compile(r"^\s*(?:#+\s*|-\s*)?\[\d{4}-\d{2}-\d{2}\]")
+
+
+def is_raw_source(fm: dict | None) -> bool:
+    """A Raw Source note to the script: carries `sha256` and no `type:`."""
+    return fm is not None and "sha256" in fm and note_type(fm) is None
 
 
 def exceeds(value: float, threshold: float | None) -> bool | None:
@@ -216,7 +226,7 @@ def type_facts(scoped: list[dict], declared, field_empty_pct, undeclared_pct) ->
         fm = note["fm"]
         type_value = note_type(fm)
         if type_value is None:
-            if fm is not None and "sha256" in fm:
+            if is_raw_source(fm):
                 # A Raw Source note: audit.md keeps it under the drift check
                 # (raw_source_facts) and out of schema compliance.
                 continue
@@ -296,7 +306,7 @@ def link_facts(notes: list[dict], scoped: list[dict]) -> dict:
     inbound: Counter = Counter()
     for note in notes:
         targets = set()
-        for match in WIKILINK_RE.finditer(note["text"]):
+        for match in WIKILINK_RE.finditer(strip_code(note["text"])):
             raw = match.group(1).strip()
             if raw and Path(raw).suffix.lower() not in NON_NOTE_EXTS:
                 targets.add(raw)
@@ -340,14 +350,13 @@ def _source_url_file(note: dict, files: dict[str, Path]) -> Path | None:
 def _linked_raw_source(note: dict, files: dict[str, Path], md_by_stem: dict) -> Path | None:
     """The Raw Source note (`sha256`, no `type:`) the body wikilinks — when it links exactly one."""
     hits: set[Path] = set()
-    for match in WIKILINK_RE.finditer(note["body"]):
+    for match in WIKILINK_RE.finditer(strip_code(note["body"])):
         target = match.group(1).strip()
         name = target[:-3] if target.endswith(".md") else target
         rels = [f"{name}.md"] if f"{name}.md" in files else md_by_stem.get(Path(name).name.lower(), [])
         for rel in rels:
             fm_text, _ = split_frontmatter(read_text(files[rel]))
-            fm = parse_frontmatter(fm_text) if fm_text is not None else None
-            if fm is not None and "sha256" in fm and note_type(fm) is None:
+            if is_raw_source(parse_frontmatter(fm_text) if fm_text is not None else None):
                 hits.add(files[rel])
     return hits.pop() if len(hits) == 1 else None
 
@@ -464,7 +473,9 @@ def duplicate_title_facts(notes: list[dict], scoped: list[dict], title_match) ->
 
 def lint_vault(vault: Path, scope: str, skip: set[str], thresholds: dict) -> dict:
     notes, files = collect(vault, skip)
-    scoped = select_scope(notes, scope)
+    raw = [note for note in notes if is_raw_source(note["fm"])]
+    wiki = [note for note in notes if not is_raw_source(note["fm"])]
+    scoped = select_scope(wiki, scope)
     declared = declared_fields(vault)
     taxonomy = declared_tags(vault)
     types, untyped = type_facts(
@@ -475,7 +486,7 @@ def lint_vault(vault: Path, scope: str, skip: set[str], thresholds: dict) -> dic
         "scope": scope,
         "skipped": sorted(skip),
         "thresholds": thresholds,
-        "notes": {"total": len(notes), "in_scope": len(scoped)},
+        "notes": {"total": len(wiki), "raw_sources": len(raw), "in_scope": len(scoped)},
         "schema": {
             "path": SCHEMA_FILE if declared is not None else None,
             "declared_types": sorted(declared) if declared else [],
@@ -484,10 +495,10 @@ def lint_vault(vault: Path, scope: str, skip: set[str], thresholds: dict) -> dic
         "untyped": untyped,
         "types": types,
         "links": link_facts(notes, scoped),
-        "raw_sources": raw_source_facts(scoped, vault, files),
+        "raw_sources": raw_source_facts(scoped + raw, vault, files),
         "log": log_facts(vault, files),
         "tags": tag_facts(scoped, taxonomy, thresholds["tag_min"]),
-        "duplicate_titles": duplicate_title_facts(notes, scoped, thresholds["title_match"]),
+        "duplicate_titles": duplicate_title_facts(wiki, scoped, thresholds["title_match"]),
     }
 
 
@@ -507,7 +518,7 @@ def print_summary(report: dict) -> None:
     schema = report["schema"]
     print(
         f"Vault: {report['vault']}  scope: {report['scope']} "
-        f"({notes['in_scope']} of {notes['total']} notes)"
+        f"({notes['in_scope']} of {notes['total']} wiki notes, {notes['raw_sources']} Raw Sources)"
     )
     print(f"Schema: {schema['path'] or 'none'}  types: {', '.join(schema['declared_types']) or '-'}")
     for name, facts in report["types"].items():

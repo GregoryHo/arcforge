@@ -42,7 +42,7 @@ Vault may extend this baseline (e.g., `langs: [en, zh]` for bilingual,
 
 Example skeleton (copy, customize, and add a new section per type):
 
-```
+````
 ## TypeName
 
 ```yaml
@@ -66,7 +66,7 @@ aliases: []
 - **Mermaid:** when to add a relationship diagram.
 - **Canvas:** when to use Obsidian Canvas.
 - **Excalidraw:** when to delegate to `/diagramming-obsidian`.
-```
+````
 
 When you've added at least one type, ingest mode can classify and create
 notes against this schema.>

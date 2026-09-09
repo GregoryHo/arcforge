@@ -1,10 +1,11 @@
-"""Frontmatter and YAML-fence parsing for lint_vault.py.
+"""Frontmatter, fence, and code-span parsing for lint_vault.py.
 
 Reads a note as UTF-8 with line endings normalized, splits its frontmatter from
 its body, and parses the frontmatter as a block: inline values, inline lists,
 block lists (indented or at column 0), and one-level nested mappings. Also
-extracts the top-level ```yaml fences of a SCHEMA.md. Stdlib only; imported by
-lint_vault.py in this directory.
+extracts the top-level ```yaml fences of a SCHEMA.md, and masks fenced code
+blocks and inline code so a literal `[[link]]` shown as an example is not a
+link. Stdlib only; imported by lint_vault.py in this directory.
 """
 
 from __future__ import annotations
@@ -13,6 +14,9 @@ import re
 from pathlib import Path
 
 KEY_RE = re.compile(r"^([A-Za-z0-9_-]+):(.*)$")
+FENCE_OPEN_RE = re.compile(r"^(`{3,}|~{3,})\s*(\S*)")
+CODE_FENCE_RE = re.compile(r"^[ \t]{0,3}(`{3,}|~{3,})[^\n]*\n.*?^[ \t]{0,3}\1[ \t]*$", re.MULTILINE | re.DOTALL)
+INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
 
 
 def read_text(path: Path) -> str:
@@ -104,19 +108,32 @@ def note_type(fm: dict | None) -> str | None:
 
 
 def yaml_fences(text: str) -> list[str]:
-    """Bodies of the top-level ```yaml fences. A ```yaml line inside an open fence is content."""
+    """Bodies of the top-level ```yaml fences.
+
+    A fence closes only at a delimiter of its own character and at least its own
+    length (CommonMark), so a ```yaml inside a ```` illustration fence is content
+    and the illustration's own closer does not open a fence that swallows the
+    rest of the file.
+    """
     fences: list[str] = []
-    info: str | None = None
+    marker: str | None = None
+    info = ""
     buf: list[str] = []
     for line in text.split("\n"):
         stripped = line.strip()
-        if info is None:
-            if stripped.startswith("```"):
-                info, buf = stripped[3:].strip().lower(), []
-        elif stripped == "```":
+        if marker is None:
+            match = FENCE_OPEN_RE.match(stripped)
+            if match:
+                marker, info, buf = match.group(1), match.group(2).lower(), []
+        elif re.fullmatch(rf"{re.escape(marker[0])}{{{len(marker)},}}", stripped):
             if info in ("yaml", "yml"):
                 fences.append("\n".join(buf))
-            info = None
+            marker = None
         else:
             buf.append(line)
     return fences
+
+
+def strip_code(text: str) -> str:
+    """The text with fenced code blocks and inline code spans removed."""
+    return INLINE_CODE_RE.sub("", CODE_FENCE_RE.sub("", text))

@@ -28,7 +28,10 @@ Hand each skipped folder to the LINT script as `--skip <folder>`. On its own the
 script leaves out only dot-dirs, Excalidraw drawings, and the root contract
 files (AGENTS.md, SCHEMA.md, CLAUDE.md, README.md, index.md, log.md). A `.md` note
 that carries `sha256` but no `type:` is a Raw Source to the script: it is
-drift-checked and never counted as untyped, so `Raw/` needs no `--skip`.
+drift-checked whatever the scope, never counted as untyped, and never a subject
+of the schema, link, tag, or title checks — so `Raw/` needs no `--skip` and does
+not eat into `recent:N`. A `[[wikilink]]` inside a code fence or inline code is
+an example to the script, not a link.
 
 ## LINK — resolve relationships
 

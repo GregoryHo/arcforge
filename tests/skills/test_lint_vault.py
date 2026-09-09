@@ -147,7 +147,7 @@ def _pair(report: dict, a: str, b: str) -> dict:
 
 def test_scans_only_notes_and_reads_declared_types(vault):
     report = _run(vault)
-    assert report["notes"] == {"total": 3, "in_scope": 3}
+    assert report["notes"] == {"total": 3, "raw_sources": 0, "in_scope": 3}
     assert report["schema"] == {
         "path": "SCHEMA.md",
         "declared_types": ["entity", "source"],
@@ -263,6 +263,34 @@ def test_typed_note_hashes_the_raw_source_its_body_links(vault):
     assert by_path["Wiki/fed-article.md"]["hashed_file"] == "Raw/2026-05-06/bloomberg-fed.md"
 
 
+def test_raw_sources_are_drift_checked_but_never_scope_subjects(vault):
+    raw = vault / "Raw"
+    raw.mkdir()
+    (raw / "alpha-capture.md").write_text(
+        "---\ntitle: Alpha\nsource_url: https://example.com/alpha\nsha256: " + "0" * 64 + "\n---\nraw text\n",
+        encoding="utf-8",
+    )
+    newest = max(p.stat().st_mtime for p in (vault / "Wiki").iterdir()) + 10
+    os.utime(raw / "alpha-capture.md", (newest, newest))
+    report = _run(vault, "--scope", "recent:1")
+    # The newest file is the capture, yet the one subject is a wiki note.
+    assert report["notes"] == {"total": 3, "raw_sources": 1, "in_scope": 1}
+    assert list(report["links"]["notes"]) != ["Raw/alpha-capture.md"]
+    assert {item["path"] for item in report["raw_sources"]} >= {"Raw/alpha-capture.md"}
+    # A capture titled like its note is not a duplicate-title candidate.
+    assert not any("Raw/" in d["a"] or "Raw/" in d["b"] for d in _run(vault)["duplicate_titles"])
+
+
+def test_wikilinks_inside_code_are_examples_not_links(vault):
+    (vault / "Wiki" / "gamma-orphan.md").write_text(
+        GAMMA + "\nExample: `[[alpha-note]]` and\n\n```\n[[alpha-note-draft]]\n```\n",
+        encoding="utf-8",
+    )
+    links = _run(vault)["links"]
+    assert "Wiki/gamma-orphan.md" in links["orphans"]
+    assert links["notes"]["Wiki/alpha-note.md"]["inbound"] == 1
+
+
 def test_log_entries_naming_missing_files(vault):
     log = _run(vault)["log"]
     assert log["entries"] == 3
@@ -333,14 +361,14 @@ def test_recent_scope_limits_subjects_but_not_the_graph(vault):
     )
     assert proc.returncode == 0, proc.stderr
     report = json.loads(proc.stdout)
-    assert report["notes"] == {"total": 3, "in_scope": 1}
+    assert report["notes"] == {"total": 3, "raw_sources": 0, "in_scope": 1}
     assert list(report["links"]["notes"]) == ["Wiki/alpha-note-draft.md"]
     assert report["links"]["notes"]["Wiki/alpha-note-draft.md"]["inbound"] == 1
 
 
 def test_skip_drops_a_folder_and_bad_scope_is_rejected(vault):
     report = _run(vault, "--skip", "Wiki")
-    assert report["notes"] == {"total": 0, "in_scope": 0}
+    assert report["notes"] == {"total": 0, "raw_sources": 0, "in_scope": 0}
     proc = subprocess.run(
         [sys.executable, str(SCRIPT), str(vault), "--scope", "latest"],
         capture_output=True,
@@ -448,4 +476,11 @@ def test_minimal_preset_placeholders_declare_no_types_or_tags(tmp_path):
     (tmp_path / "note.md").write_text("---\ntype: typename\ntags: [x]\n---\nbody\n", encoding="utf-8")
     report = _run(tmp_path)
     assert report["schema"] == {"path": "SCHEMA.md", "declared_types": [], "declared_tags": []}
+    assert report["types"]["typename"]["declared"] is None
+    # A real type added after the illustration is read: the illustration's closer
+    # does not open a fence that swallows the rest of the file.
+    with (tmp_path / "SCHEMA.md").open("a", encoding="utf-8") as schema:
+        schema.write("\n## Book\n\n```yaml\n---\ntype: book\nauthor: \"\"\n---\n```\n")
+    report = _run(tmp_path)
+    assert report["schema"]["declared_types"] == ["book"]
     assert report["types"]["typename"]["declared"] is None
