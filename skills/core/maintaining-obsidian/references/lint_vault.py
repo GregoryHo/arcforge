@@ -29,7 +29,8 @@ the auditor reads before acting on:
      extension other than `.md` is an attachment embed (`![[image.png]]`,
      `![[clip.mp4]]`), not a link, unless a note of that exact name exists.
      Raw Source captures are not in the graph: a `[[link]]` inside captured
-     text is the source's, not the vault's.
+     text is the source's, not the vault's, and a typed note's provenance link
+     to its capture (`[[Raw/...]]`) is not a wiki relationship.
   4. Raw Source sha256 drift per raw-sources.md: strip the frontmatter, normalize
      line endings to `\\n`, sha256 the UTF-8 bytes of what follows the closing
      fence line. A note carries a hash when its frontmatter has a `sha256` key.
@@ -97,7 +98,7 @@ DUP_CANDIDATE_FLOOR = 0.6
 # A link target with an explicit extension other than .md is an attachment
 # embed, not a note relationship — unless a note of that exact name exists
 # (`[[Node.js]]` is a note when Node.js.md is).
-EXTENSION_RE = re.compile(r"\.[A-Za-z0-9]{1,8}$")
+EXTENSION_RE = re.compile(r"\.[A-Za-z0-9]+$")
 FILE_TOKEN_RE = re.compile(r"\.(md|pdf|png|jpe?g|gif|svg|html|canvas)$", re.IGNORECASE)
 WIKILINK_RE = re.compile(r"\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]")
 TYPE_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -305,11 +306,15 @@ def type_facts(scoped: list[dict], declared, field_empty_pct, undeclared_pct) ->
     return types, untyped
 
 
-def link_facts(notes: list[dict], scoped: list[dict]) -> dict:
+def link_facts(notes: list[dict], scoped: list[dict], raw: list[dict]) -> dict:
+    """Link graph over the wiki-layer `notes`; a link to one of the `raw` captures is
+    provenance, not a relationship, and counts for neither side."""
     by_rel = {note["rel"] for note in notes}
     by_stem: dict[str, list[str]] = defaultdict(list)
     for note in notes:
         by_stem[Path(note["rel"]).stem.lower()].append(note["rel"])
+    raw_rels = {note["rel"] for note in raw}
+    raw_stems = {Path(note["rel"]).stem.lower() for note in raw}
 
     def resolve(target: str) -> str | None:
         # A link with a path resolves by that path only; a bare name by basename.
@@ -323,14 +328,20 @@ def link_facts(notes: list[dict], scoped: list[dict]) -> dict:
         ext = EXTENSION_RE.search(target)
         return bool(ext) and ext.group(0).lower() != ".md" and resolve(target) is None
 
+    def is_raw_capture(target: str) -> bool:
+        name = target[:-3] if target.endswith(".md") else target
+        if "/" in name:
+            return f"{name}.md" in raw_rels
+        return name.lower() in raw_stems and resolve(target) is None
+
     outbound: dict[str, int] = {}
     inbound: Counter = Counter()
     for note in notes:
         targets = set()
         for match in WIKILINK_RE.finditer(strip_code(note["text"])):
-            raw = match.group(1).strip()
-            if raw and not is_attachment(raw):
-                targets.add(raw)
+            target = match.group(1).strip()
+            if target and not is_attachment(target) and not is_raw_capture(target):
+                targets.add(target)
         resolved = {resolve(raw) for raw in targets}
         outbound[note["rel"]] = len(targets) - (1 if note["rel"] in resolved else 0)
         for rel in resolved - {None, note["rel"]}:
@@ -519,7 +530,7 @@ def lint_vault(vault: Path, scope: str, skip: set[str], thresholds: dict) -> dic
         },
         "untyped": untyped,
         "types": types,
-        "links": link_facts(wiki, scoped),
+        "links": link_facts(wiki, scoped, raw),
         "raw_sources": raw_source_facts(scoped + raw, vault, files),
         "log": log_facts(vault, files),
         "tags": tag_facts(scoped, taxonomy, thresholds["tag_min"]),

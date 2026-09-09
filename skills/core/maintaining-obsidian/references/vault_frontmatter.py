@@ -19,8 +19,9 @@ HEADING_RE = re.compile(r"^#{1,6}\s+(.*\S)")
 # is an indented code block whose backticks are literal text.
 FENCE_OPEN_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})\s*(\S*)")
 # A code span opens with a run of backticks and closes with a run of the same
-# length: `a`, ``a ` b``, ```a``` — never a run of another length.
-INLINE_CODE_RE = re.compile(r"(?<!`)(`+)(?!`)([^\n]+?)(?<!`)\1(?!`)")
+# length: `a`, ``a ` b``, ```a``` — never a run of another length. It may cross
+# a line break but not a blank line (a paragraph end).
+INLINE_CODE_RE = re.compile(r"(?<!`)(`+)(?!`)((?:(?!\n\n)[\s\S])+?)(?<!`)\1(?!`)")
 
 
 def read_text(path: Path) -> str:

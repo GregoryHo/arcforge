@@ -332,6 +332,23 @@ def test_raw_captures_and_attachment_embeds_are_not_edges(vault):
     assert links["notes"]["Wiki/alpha-note-draft.md"]["outbound"] == 2
 
 
+def test_provenance_link_to_a_capture_is_not_a_wiki_relationship(vault):
+    _news_shaped_pair(vault)
+    # The Article's only link is its `## Source` line: no wiki relationship, so
+    # it is an orphan, while its provenance still resolves for the drift check.
+    report = _run(vault)
+    assert "Wiki/fed-article.md" in report["links"]["orphans"]
+    assert {i["path"]: i["status"] for i in report["raw_sources"]}["Wiki/fed-article.md"] == "fresh"
+    # A long attachment extension and a code span crossing a line break are
+    # embeds and examples too.
+    (vault / "Wiki" / "gamma-orphan.md").write_text(
+        GAMMA + "\n![[diagram.excalidraw]] and ``literal\n[[alpha-note]]`` here.\n", encoding="utf-8"
+    )
+    links = _run(vault)["links"]
+    assert "Wiki/gamma-orphan.md" in links["orphans"]
+    assert links["notes"]["Wiki/alpha-note.md"]["inbound"] == 1
+
+
 def test_log_path_tokens_are_not_satisfied_by_a_basename_elsewhere(vault):
     # `Wiki/deleted-note.md` stays missing when only `Archive/deleted-note.md`
     # exists; a bare basename in the log still matches any file of that name.

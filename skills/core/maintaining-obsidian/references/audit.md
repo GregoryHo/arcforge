@@ -113,8 +113,9 @@ tags:                     # block, unindented
 
 - **Orphans** — `links.orphans`: zero inbound and zero outbound links, with the
   graph built over the whole wiki layer even when the scope is `recent:N`. Raw
-  Source captures are not in the graph, and a target with an extension other
-  than `.md` is an attachment embed, not a link.
+  Source captures are not in the graph — neither a `[[link]]` inside captured
+  text nor a typed note's provenance link to its capture counts — and a target
+  with an extension other than `.md` is an attachment embed, not a link.
 - **Untyped** — `untyped`: no `type:` field; `has_frontmatter` separates a note
   with no frontmatter from one whose frontmatter lacks the field. Report; never
   auto-fix.
