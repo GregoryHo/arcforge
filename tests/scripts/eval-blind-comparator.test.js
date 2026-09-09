@@ -19,22 +19,23 @@ const {
   buildBlindComparatorPrompt,
   BLIND_COMPARATOR_FORBIDDEN,
 } = require('../../scripts/lib/eval-graders');
+const { scoreBlindRubric } = require('../../scripts/lib/eval-grader-model');
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 /**
  * Make a minimal mock JSON response that the blind comparator would return.
+ * The harness derives the winner from the per-criterion scores, so the fixture
+ * shapes the scores to produce the requested outcome.
  * @param {'A'|'B'|'tie'} winner
  */
 function makeAgentResponse(winner = 'A') {
+  const scores = { A: [[0.8], [0.6]], B: [[0.6], [0.8]], tie: [[0.7], [0.7]] }[winner];
   return JSON.stringify({
-    winner,
     reasoning: 'Output A was more complete.',
-    score_a: 0.8,
-    score_b: 0.6,
     rubric: [{ criterion: 'Addresses the task', weight: 1.0 }],
-    scores_a: [0.8],
-    scores_b: [0.6],
+    scores_a: scores[0],
+    scores_b: scores[1],
   });
 }
 
@@ -283,7 +284,7 @@ describe('runBlindComparator — winner label mapping', () => {
     expect(result).toBeNull();
   });
 
-  it('returns tie when agent returns tie', () => {
+  it('returns tie when the weighted totals are within the tie margin', () => {
     mockUtils.execCommand.mockReturnValueOnce({
       stdout: makeAgentResponse('tie'),
       stderr: '',
@@ -295,12 +296,19 @@ describe('runBlindComparator — winner label mapping', () => {
     expect(result.winner_original_label).toBe('tie');
   });
 
-  it('returns null when agent returns an unrecognized winner value', () => {
-    // Regression (F4): malformed comparator output (lowercase 'b',
-    // 'baseline', whitespace-padded 'B ', etc.) used to be silently
-    // mapped as if winner === 'B', biasing results.
+  it('returns null when the scores do not align with the rubric', () => {
+    // A score array of the wrong length cannot be weighted; surface the failure
+    // rather than deriving a winner from partial data.
     mockUtils.execCommand.mockReturnValueOnce({
-      stdout: makeAgentResponse('b'), // lowercase, not a valid label
+      stdout: JSON.stringify({
+        reasoning: 'A wins.',
+        rubric: [
+          { criterion: 'Clarity', weight: 0.5 },
+          { criterion: 'Completeness', weight: 0.5 },
+        ],
+        scores_a: [0.9],
+        scores_b: [0.5, 0.5],
+      }),
       stderr: '',
       exitCode: 0,
     });
@@ -312,10 +320,7 @@ describe('runBlindComparator — winner label mapping', () => {
   it('includes reasoning and rubric in the result', () => {
     mockUtils.execCommand.mockReturnValueOnce({
       stdout: JSON.stringify({
-        winner: 'A',
         reasoning: 'Output A was clearer.',
-        score_a: 0.9,
-        score_b: 0.5,
         rubric: [{ criterion: 'Clarity', weight: 1.0 }],
         scores_a: [0.9],
         scores_b: [0.5],
@@ -331,16 +336,32 @@ describe('runBlindComparator — winner label mapping', () => {
     expect(result.rubric[0].criterion).toBe('Clarity');
   });
 
+  it('returns null when a score element is a string (F4 regression class)', () => {
+    // Regression (F4): malformed comparator output used to be silently mapped
+    // to a concrete baseline/treatment outcome. A string score is not a score;
+    // coercing it to a number would bias the supplementary preference signal.
+    mockUtils.execCommand.mockReturnValueOnce({
+      stdout: JSON.stringify({
+        reasoning: 'A wins.',
+        rubric: [{ criterion: 'Clarity', weight: 1.0 }],
+        scores_a: ['0.9'],
+        scores_b: [0.5],
+      }),
+      stderr: '',
+      exitCode: 0,
+    });
+
+    const result = runBlindComparator(TASK_PROMPT, BASELINE_OUTPUT, TREATMENT_OUTPUT, '/fake/root');
+    expect(result).toBeNull();
+  });
+
   it('exposes score_baseline and score_treatment in result', () => {
     mockUtils.execCommand.mockReturnValueOnce({
       stdout: JSON.stringify({
-        winner: 'A',
         reasoning: 'A wins.',
-        score_a: 0.8,
-        score_b: 0.4,
-        rubric: [],
-        scores_a: [],
-        scores_b: [],
+        rubric: [{ criterion: 'Task completion', weight: 1.0 }],
+        scores_a: [0.8],
+        scores_b: [0.4],
       }),
       stderr: '',
       exitCode: 0,
@@ -351,5 +372,91 @@ describe('runBlindComparator — winner label mapping', () => {
     // score_baseline and score_treatment must both be present
     expect(typeof result.score_baseline).toBe('number');
     expect(typeof result.score_treatment).toBe('number');
+  });
+});
+
+// ── harness-side arithmetic: the prompt no longer asks the agent to compute ────
+
+describe('scoreBlindRubric — harness-side arithmetic', () => {
+  it('weights scores by the rubric and normalizes weights that do not sum to 1', () => {
+    const result = scoreBlindRubric(
+      [
+        { criterion: 'x', weight: 2 },
+        { criterion: 'y', weight: 2 },
+      ],
+      [1.0, 0.5],
+      [0.5, 0.5],
+    );
+    expect(result).toEqual({ winner: 'A', scoreA: 0.75, scoreB: 0.5 });
+  });
+
+  it('declares a tie inside the margin', () => {
+    const result = scoreBlindRubric([{ criterion: 'x', weight: 1 }], [0.75], [0.7]);
+    expect(result.winner).toBe('tie');
+  });
+
+  it('treats a gap of exactly the margin as a tie regardless of float representation', () => {
+    // 0.8 - 0.7 > 0.1 in binary floating point while 0.7 - 0.6 is not; the
+    // comparison carries a tolerance so both land on the same side.
+    for (const [a, b] of [
+      [0.8, 0.7],
+      [0.7, 0.6],
+      [1.0, 0.9],
+      [0.35, 0.25],
+    ]) {
+      expect(scoreBlindRubric([{ criterion: 'x', weight: 1 }], [a], [b]).winner).toBe('tie');
+    }
+    expect(scoreBlindRubric([{ criterion: 'x', weight: 1 }], [0.81], [0.7]).winner).toBe('A');
+    expect(scoreBlindRubric([{ criterion: 'x', weight: 1 }], [0.7], [0.81]).winner).toBe('B');
+  });
+
+  it('decides the winner on the unrounded totals, not on their two-decimal display', () => {
+    // Weights need not land on hundredths: 0.416 / 0.292 / 0.292 give totals of
+    // 0.854 and 0.75, a gap of 0.104 past the margin, although the displayed
+    // totals round to 0.85 and 0.75.
+    const rubric = [
+      { criterion: 'x', weight: 0.416 },
+      { criterion: 'y', weight: 0.292 },
+      { criterion: 'z', weight: 0.292 },
+    ];
+    expect(scoreBlindRubric(rubric, [1, 0.75, 0.75], [0.75, 0.75, 0.75])).toEqual({
+      winner: 'A',
+      scoreA: 0.85,
+      scoreB: 0.75,
+    });
+    expect(scoreBlindRubric(rubric, [0.75, 0.75, 0.75], [1, 0.75, 0.75]).winner).toBe('B');
+  });
+
+  it('rejects a malformed rubric', () => {
+    expect(scoreBlindRubric([], [], [])).toBeNull();
+    expect(scoreBlindRubric([{ criterion: 'x', weight: 'heavy' }], [1], [1])).toBeNull();
+  });
+
+  const RUBRIC = [{ criterion: 'x', weight: 1 }];
+
+  it('returns null for a string score instead of coercing it', () => {
+    expect(scoreBlindRubric(RUBRIC, ['0.9'], [0.5])).toBeNull();
+    expect(scoreBlindRubric(RUBRIC, [0.5], ['0.9'])).toBeNull();
+  });
+
+  it('returns null for a null score instead of treating it as 0', () => {
+    expect(scoreBlindRubric(RUBRIC, [null], [0.5])).toBeNull();
+    expect(scoreBlindRubric(RUBRIC, [0.5], [null])).toBeNull();
+  });
+
+  it('returns null for a NaN score instead of declaring a tie', () => {
+    expect(scoreBlindRubric(RUBRIC, [Number.NaN], [0.5])).toBeNull();
+    expect(scoreBlindRubric(RUBRIC, [0.5], [Number.NaN])).toBeNull();
+  });
+
+  it('returns null for an out-of-range score instead of clamping it', () => {
+    expect(scoreBlindRubric(RUBRIC, [5], [0.5])).toBeNull();
+    expect(scoreBlindRubric(RUBRIC, [0.5], [1.01])).toBeNull();
+    expect(scoreBlindRubric(RUBRIC, [-0.1], [0.5])).toBeNull();
+    expect(scoreBlindRubric(RUBRIC, [0.5], [-1])).toBeNull();
+  });
+
+  it('accepts the inclusive bounds 0 and 1', () => {
+    expect(scoreBlindRubric(RUBRIC, [1], [0])).toEqual({ winner: 'A', scoreA: 1, scoreB: 0 });
   });
 });

@@ -9,7 +9,6 @@
 
 const path = require('node:path');
 const { execCommand } = require('./utils');
-const { DELTA_IMPROVED_THRESHOLD, DELTA_REGRESSED_THRESHOLD } = require('./eval-stats');
 const {
   loadAgentDef,
   captureTrialArtifacts,
@@ -73,7 +72,8 @@ function gradeWithModel(result, scenario, projectRoot) {
   for (let attempt = 1; attempt <= 2; attempt++) {
     const { stdout, exitCode } = execCommand(
       'claude',
-      ['-p', '--output-format', 'text', '--no-session-persistence'],
+      // The grader reads and never edits ("Your Tools" in eval-grader.md); enforce it.
+      ['-p', '--output-format', 'text', '--no-session-persistence', '--tools', 'Read,Grep,Glob'],
       {
         input: prompt,
         cwd: projectRoot,
@@ -146,13 +146,10 @@ function gradeWithModel(result, scenario, projectRoot) {
  * @returns {{ analysis: string, delta_explanation?: string, weak_assertions_patterns?: string[], variance_notes?: string[], improvements?: string[], regressions?: string[], limitations?: string[] }|null}
  */
 function compareWithModel(scenario, baseline, treatment, projectRoot, metrics) {
-  const rawDef = loadAgentDef(
+  const agentDef = loadAgentDef(
     path.join(projectRoot, 'scripts', 'lib', 'prompts', 'eval-analyzer.md'),
   );
-  if (!rawDef) return null;
-  const agentDef = rawDef
-    .replace(/\{IMPROVED_THRESHOLD\}/g, String(DELTA_IMPROVED_THRESHOLD))
-    .replace(/\{REGRESSED_THRESHOLD\}/g, String(DELTA_REGRESSED_THRESHOLD));
+  if (!agentDef) return null;
   const assertions = scenario.assertions.map((a, i) => `${i + 1}. ${a}`).join('\n');
   const fmtResults = (results) =>
     results
@@ -186,14 +183,15 @@ function compareWithModel(scenario, baseline, treatment, projectRoot, metrics) {
     '### Required Response Format (automated comparison)',
     'Respond with ONLY a JSON object:',
     '```json',
-    '{"analysis": "...", "improvements": ["..."], "regressions": ["..."], "limitations": ["..."], "recommendation": "SHIP"}',
+    '{"analysis": "...", "improvements": ["..."], "regressions": ["..."], "limitations": ["..."], "delta_explanation": "...", "weak_assertions_patterns": ["..."], "variance_notes": ["..."]}',
     '```',
     'Use the provided programmatic metrics as numeric truth. Do not invent missing per-assertion numbers.',
   ].join('\n');
 
   const { stdout, exitCode } = execCommand(
     'claude',
-    ['-p', '--output-format', 'text', '--no-session-persistence'],
+    // The analyzer reads and never edits ("Your Tools" in eval-analyzer.md); enforce it.
+    ['-p', '--output-format', 'text', '--no-session-persistence', '--tools', 'Read,Grep,Glob'],
     {
       input: prompt,
       cwd: projectRoot,
@@ -251,6 +249,54 @@ function buildBlindComparatorPrompt(taskPrompt, outputA, outputB, agentDef) {
     '',
     'Derive a rubric from the task prompt, score each output, and respond with the required JSON only.',
   ].join('\n');
+}
+
+/** Margin below which two weighted totals count as a tie. */
+const BLIND_TIE_MARGIN = 0.1;
+/** Tolerance for the tie comparison: far below score precision, above float noise. */
+const BLIND_TIE_EPSILON = 1e-9;
+
+/**
+ * Compute the blind comparator's weighted totals and winner. The agent supplies
+ * the judgment (rubric weights and per-criterion scores); the arithmetic and the
+ * tie threshold live here, where they are deterministic and testable, rather
+ * than in the prompt.
+ * @param {Array<{criterion: string, weight: number}>} rubric
+ * @param {number[]} scoresA - Per-criterion scores for Output A (rubric order)
+ * @param {number[]} scoresB - Per-criterion scores for Output B (rubric order)
+ * @returns {{ winner: 'A'|'B'|'tie', scoreA: number, scoreB: number }|null}
+ *   scoreA / scoreB are the weighted totals rounded to hundredths for display;
+ *   the winner is decided on the unrounded totals.
+ *   null when the rubric is empty or carries a non-finite / negative weight,
+ *   when either score array is missing or not rubric-length, or when any score
+ *   element is not a finite number within [0, 1] inclusive. Nothing is
+ *   coerced or clamped: a string '0.9', a null, a NaN, or a 5 is a malformed
+ *   response and never maps to a winner.
+ */
+function scoreBlindRubric(rubric, scoresA, scoresB) {
+  if (!Array.isArray(rubric) || rubric.length === 0) return null;
+  if (!Array.isArray(scoresA) || !Array.isArray(scoresB)) return null;
+  if (scoresA.length !== rubric.length || scoresB.length !== rubric.length) return null;
+  const weights = rubric.map((r) => (typeof r?.weight === 'number' ? r.weight : Number.NaN));
+  if (weights.some((w) => !Number.isFinite(w) || w < 0)) return null;
+  const totalWeight = weights.reduce((a, b) => a + b, 0);
+  if (totalWeight <= 0) return null;
+  const validScore = (s) => typeof s === 'number' && Number.isFinite(s) && s >= 0 && s <= 1;
+  if (!scoresA.every(validScore) || !scoresB.every(validScore)) return null;
+  const weighted = (scores) =>
+    scores.reduce((sum, s, i) => sum + s * (weights[i] / totalWeight), 0);
+  const totalA = weighted(scoresA);
+  const totalB = weighted(scoresB);
+  // Decide on the unrounded totals with a tolerance: subtracting two-decimal
+  // floats puts an exact-margin gap on either side of the threshold depending
+  // on the operands' binary representation (0.8 - 0.7 > 0.1, but 0.7 - 0.6 is
+  // not), while rounding the totals first would turn a real gap of 0.104 —
+  // weights need not land on hundredths — into a tie.
+  let winner = 'tie';
+  if (totalA - totalB > BLIND_TIE_MARGIN + BLIND_TIE_EPSILON) winner = 'A';
+  else if (totalB - totalA > BLIND_TIE_MARGIN + BLIND_TIE_EPSILON) winner = 'B';
+  const display = (total) => Math.round(total * 100) / 100;
+  return { winner, scoreA: display(totalA), scoreB: display(totalB) };
 }
 
 /**
@@ -317,31 +363,31 @@ function runBlindComparator(taskPrompt, baselineOutput, treatmentOutput, project
 
   if (exitCode !== 0) return null;
 
-  const parsed = extractJsonObject(stdout, ['winner']);
+  const parsed = extractJsonObject(stdout, ['rubric', 'scores_a', 'scores_b']);
   if (!parsed) return null;
 
-  const winner = parsed.winner; // expect 'A', 'B', or 'tie'
-  let winnerOriginalLabel;
-  if (winner === 'tie') {
-    winnerOriginalLabel = 'tie';
-  } else if (winner === 'A') {
-    winnerOriginalLabel = baselineIsA ? 'baseline' : 'treatment';
-  } else if (winner === 'B') {
-    winnerOriginalLabel = baselineIsA ? 'treatment' : 'baseline';
-  } else {
-    // Unknown / malformed winner value (e.g. lowercase 'b', 'baseline',
-    // whitespace-padded 'B '). Surface the failure rather than silently
-    // mapping it to a concrete baseline/treatment outcome — that would
-    // bias the supplementary preference signal.
+  // Malformed, out-of-range, or misaligned scores surface as a failure rather
+  // than being coerced and mapped to a concrete baseline/treatment outcome —
+  // that would bias the supplementary preference signal.
+  const scored = scoreBlindRubric(parsed.rubric, parsed.scores_a, parsed.scores_b);
+  if (!scored) {
+    process.stderr.write(
+      'Warning: blind comparator returned a malformed rubric or scores — dropping this pair.\n',
+    );
     return null;
   }
+
+  const { winner, scoreA, scoreB } = scored;
+  let winnerOriginalLabel = 'tie';
+  if (winner === 'A') winnerOriginalLabel = baselineIsA ? 'baseline' : 'treatment';
+  if (winner === 'B') winnerOriginalLabel = baselineIsA ? 'treatment' : 'baseline';
 
   return {
     winner_original_label: winnerOriginalLabel,
     reasoning: parsed.reasoning || '',
-    rubric: parsed.rubric || [],
-    score_baseline: baselineIsA ? (parsed.score_a ?? 0) : (parsed.score_b ?? 0),
-    score_treatment: baselineIsA ? (parsed.score_b ?? 0) : (parsed.score_a ?? 0),
+    rubric: parsed.rubric,
+    score_baseline: baselineIsA ? scoreA : scoreB,
+    score_treatment: baselineIsA ? scoreB : scoreA,
   };
 }
 
@@ -350,5 +396,7 @@ module.exports = {
   compareWithModel,
   buildBlindComparatorPrompt,
   runBlindComparator,
+  scoreBlindRubric,
   BLIND_COMPARATOR_FORBIDDEN,
+  BLIND_TIE_MARGIN,
 };

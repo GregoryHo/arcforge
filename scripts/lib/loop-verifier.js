@@ -81,10 +81,9 @@ function buildTaskCriteria(task) {
 /**
  * Assemble the verifier session prompt at runtime. NEVER edits the prompt file.
  * Layers: agent body → task identity + acceptance criteria → verify-command
- * evidence instruction → a forceful verdict-protocol override. The override
- * deliberately supersedes the agent body's own SHIP/NEEDS WORK/BLOCKED report
- * vocabulary so a real session emits a parseable `Final verdict:` line, not a
- * divergent verdict.
+ * evidence instruction → the verdict protocol. The protocol is restated here,
+ * next to the parser that consumes it, so the `Final verdict:` line stays
+ * required even if the agent body's report format changes.
  * @param {Object} args
  * @param {string} args.agentBody - Verifier agent body (frontmatter stripped)
  * @param {Object} args.task - Task being verified ({ id, text })
@@ -114,10 +113,9 @@ function assembleVerifierPrompt({ agentBody, task, criteria, verifyCommand, feed
       '',
     );
   }
-  parts.push('## Verdict Protocol (overrides any report format above)', '');
+  parts.push('## Verdict Protocol', '');
   parts.push(
-    'Disregard the SHIP / NEEDS WORK / BLOCKED wording in the report format above. ' +
-      'After your verification, your response MUST end with a single line that is ' +
+    'After your verification, your response MUST end with a single line that is ' +
       'EXACTLY one of:',
     '',
     'Final verdict: PASS',

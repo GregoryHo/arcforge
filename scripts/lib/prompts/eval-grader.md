@@ -32,10 +32,7 @@ For each assertion in the scenario:
 1. **Find evidence** — does the output contain evidence of this criterion?
 2. **Assess quality** — not just present/absent, but how well?
 3. **Write one short evidence note** — quote or point to the relevant output/artifact
-4. **Score** using the normalized 0.0-1.0 scale requested by the harness:
-   - **1.0** — fully met (clear evidence the criterion is satisfied)
-   - **0.5** — partially met (some evidence, but incomplete or flawed)
-   - **0** — not met (no evidence, or criterion clearly unsatisfied)
+4. **Score** on the normalized 0.0-1.0 scale, using the anchors `0` (not met), `0.25` (weak evidence), `0.5` (partially met), `0.75` (mostly met), `1.0` (fully met)
 
 ### Step 4: Compute Overall Grade
 
@@ -43,29 +40,7 @@ For each assertion in the scenario:
 - Treat them as convenience fields for downstream consumers
 - **The harness is the authority**: it recomputes overall score and pass/fail from the returned assertion scores
 
-## Report Format
-
-```markdown
-## Eval Grade
-
-### Eval: [scenario name]
-### Trial: [trial number]
-
-### Assertions
-
-| # | Assertion | Score | Evidence |
-|---|-----------|-------|----------|
-| 1 | [criterion] | 0.85 | [where in output] |
-| 2 | [criterion] | 0.70 | [where in output] |
-
-### Overall Score: [average]
-### Verdict: [PASS / PARTIAL / FAIL]
-
-### Notes
-[Any observations about the output quality, patterns, or issues]
-```
-
-## Critical Rules
+## Rules
 
 1. **Grade independently** — don't factor in what you know about the agent or baseline/treatment history
 2. **Single-trial only** — do not compare conditions, compute deltas, or judge whether treatment improved
@@ -73,9 +48,9 @@ For each assertion in the scenario:
 4. **No invented evidence** — if support is missing, score conservatively
 5. **Flag ambiguity** — if an assertion is unclear, note it rather than guessing
 
-## Automated Grading Mode
+## Response Format
 
-When used by `arcforge eval run` (automated batch grading), respond with ONLY a JSON object instead of the markdown report:
+Respond with ONLY a JSON object:
 
 ```json
 {
@@ -98,7 +73,7 @@ When used by `arcforge eval run` (automated batch grading), respond with ONLY a 
 }
 ```
 
-- `scores`: normalized 0.0-1.0 scores, preferably using anchors `0`, `0.25`, `0.5`, `0.75`, `1.0`
+- `scores`: one score per assertion, in rubric order, on the anchors above
 - `evidence`: short evidence note for each assertion in the same order
 - `blockRefs`: for each assertion, list the `[Block N]` numbers from the output that contain the evidence (empty array if no specific block)
 - `overall`: optional convenience field
@@ -112,4 +87,4 @@ When used by `arcforge eval run` (automated batch grading), respond with ONLY a 
   - `assertion_id`: 1-based index of the assertion in the rubric
   - `reason`: brief explanation of why the assertion is weak or unverifiable
 
-The automated pipeline parses this JSON. Do not include explanations or markdown wrapping in automated mode. The harness recomputes `overall` and `passed`, so the assertion scores are the authoritative output. `discovered_claims` and `weak_assertions` are stored for analysis but do NOT affect the computed score or pass/fail verdict.
+The harness parses this JSON. Do not include explanations or markdown wrapping. The harness recomputes `overall` and `passed`, so the assertion scores are the authoritative output. `discovered_claims` and `weak_assertions` are stored for analysis but do NOT affect the computed score or pass/fail verdict.
