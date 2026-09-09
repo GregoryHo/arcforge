@@ -68,6 +68,76 @@ p7-benchmark-evidence.md「協定修正案」）。
 | writing-skills | unmet-but-covered（P7 ceiling ×2，新支無 delta 史） | 存廢建議書 |
 | evaluating | unmet-but-covered（P5）；P7 preflight 67% 恢復鑑別力 | 存廢建議書（傾向保留） |
 
+## Prompt audit (2026-09-08) — non-regression on the three `SKILL.md` edits
+
+The prompt audit (`/claude-api prompt-audit`, target: the Claude 5 generation
+the evals are baselined on) changed three `SKILL.md` bodies: `executing` (B1, a
+cross-reference sentence), `finishing` (B2, a table cell's version pin), and
+`diagramming-obsidian` (A7, the "think first, draw second" scaffold replaced by
+"every concept has a verb"). Under `.claude/rules/skills.md` those are behavioral
+edits, so each gets harness evidence. The audit's other skill edits live in
+`references/` and presets, which a skill-scope trial never receives (the trial
+gets `SKILL.md` only), so they carry no eval delta by construction; an
+independent refuter per package and the `qa` agent are the evidence for those.
+
+**Run.** `node scripts/cli.js eval ab <scenario> --k 5` on `fix/prompt-audit-skills`
+(skill edits only — the grader prompts changed in the same audit sit on
+`fix/prompt-audit-eval`, so these rows were graded by the unchanged instrument),
+default model, isolated, no `--plugin-dir`, the same conditions as the standing
+P7 rows. Claude Code 2.1.263. Preflight records reused at their current hashes
+(executing `223fe220d5b4dc34` PASS 1/3, finishing `21a613c70fd71f8d` PASS 0/3,
+diagramming `091682c484dd86c7` PASS 0/3, all `-default`).
+
+**Threshold, pre-registered before the run** (`~/.claude/plans/audit-report-toasty-dahl.md`,
+Phase D). This is a **non-regression** claim: PASS requires both (1) the new
+delta's CI lower bound is **> 0** and (2) the new CI **overlaps** the standing
+CI for the row — executing **+0.40 [0.03, 0.77]**, finishing **+0.54 [0.46, 0.62]**,
+diagramming **+0.23 [0.09, 0.38]** (`evals/benchmarks/latest.json`, generated
+2026-09-07). A smaller delta whose interval satisfies both is a PASS and is read
+as one; FAIL on either half means the edited sentence is the suspect.
+
+| scenario | run id | baseline avg (pass) | treatment avg (pass) | delta | standing | verdict |
+|---|---|---|---|---|---|---|
+| `eval-finishing-verify-before-options` | `20260908-141154` | 0.43 (0/5) | 1.00 (5/5) | **+0.57 CI[0.57, 0.57]** | +0.54 [0.46, 0.62] | PASS both halves — IMPROVED |
+| `eval-executing-verify-decides-done` | `20260908-141154` + top-up `20260908-162050` | 0.80 (4/5) | 1.00 (5/5 scorable; one trial per run killed at the runner timeout) | **+0.20 CI[−0.36, 0.76]** | +0.40 [0.03, 0.77] | INCONCLUSIVE — half 1 not met, half 2 met; recorded, not rerun |
+| `eval-diagramming-obsidian-unverified-save-claim` | `20260908-141154` (instrument-capped: 4 of 5 treatment trials killed at 900 s), rerun `20260909-015919` with `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000` | 0.50 (0/5) | 0.90 (3/5) | **+0.40 CI[0.16, 0.64]** | +0.23 [0.09, 0.38] | PASS both halves — IMPROVED (on the rerun) |
+
+**Verdict.** finishing: PASS on both halves — the new interval sits inside the
+standing one, so B2 (the `git 2.52` cell) moved nothing. executing: **half 1 not met, half 2 met — recorded as INCONCLUSIVE, not rerun.**
+Treatment sat at the ceiling (5/5, avg 1.00) and the delta's interval overlaps the
+standing one, but its lower bound is −0.36 because this run's baseline scored 0.80
+with one 0 among four 1s (CV 0.56; the standing baseline was 0.60), and a k=5
+delta cannot separate a ceiling treatment from a 0.8 baseline. One trial per arm
+was killed at the runner timeout under a load average of 20 and does not score;
+a symmetric `--k 1` top-up (run `20260908-162050`) restored the treatment arm to
+five scorable rows, while the baseline top-up trial was itself killed. The
+pre-registration makes the edited sentence the suspect when a half fails; B1 is
+the one sentence of `executing/SKILL.md` that changed — a cross-reference to the
+`dispatching` skill ("model tier" → "acceptance", the tier text having left
+dispatching in v6) that this scenario never reaches. The maintainer's decision is
+to record the row as not established rather than buy a narrower interval with
+another twenty trials; the release's full benchmark regeneration re-measures it.
+diagramming: **PASS on both halves, on the rerun.** The first run was not
+evaluable under the standing instrument: four of the five treatment trials were
+killed at the runner's fixed 900 s ceiling (the standing row already ran at that
+ceiling — treatment avg 721 s, max 894 s — and the machine sat at a load average
+of 20). A killed, incomplete trial never scores, so instead of a top-up the
+instrument was changed: `fix/prompt-audit-eval` adds `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS`,
+and the rerun set it to 1,800 s from a detached worktree of this branch plus that
+one commit (grader prompts unchanged). All ten trials completed; three of the five
+treatment trials ran 841–1,171 s, past the old cap. Baseline 0.50 [0.28, 0.72],
+treatment 0.90 [0.73, 1], delta +0.40 CI[0.16, 0.64], overlapping the standing
+[0.09, 0.38]; pooled with the first run's five baseline rows and its one surviving
+treatment row, `eval compare` reads +0.38 CI[0.16, 0.61] — IMPROVED either way. The
+cost regression the harness flags (treatment about twice the baseline's duration
+and output tokens) is the skill running the pipeline the baseline skips, as in the
+standing row.
+
+`evals/benchmarks/latest.json` was **not** regenerated here: `eval report` pools
+every row in the window per scenario, so a regeneration now would average the
+2026-08-15 treatment rows with these; the release's benchmark-freshness gate
+forces a full regeneration anyway because `skills/` changed.
+
 ## v6.1.0 — Codex packaging: the router's per-host note (non-regression, instrument-capped)
 
 `skills/core/using/SKILL.md` gained a per-host invocation note during Codex
