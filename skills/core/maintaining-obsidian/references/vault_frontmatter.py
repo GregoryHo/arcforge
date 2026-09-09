@@ -15,7 +15,6 @@ from pathlib import Path
 
 KEY_RE = re.compile(r"^([A-Za-z0-9_-]+):(.*)$")
 FENCE_OPEN_RE = re.compile(r"^(`{3,}|~{3,})\s*(\S*)")
-CODE_FENCE_RE = re.compile(r"^[ \t]{0,3}(`{3,}|~{3,})[^\n]*\n.*?^[ \t]{0,3}\1[ \t]*$", re.MULTILINE | re.DOTALL)
 INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
 
 
@@ -107,33 +106,46 @@ def note_type(fm: dict | None) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
-def yaml_fences(text: str) -> list[str]:
-    """Bodies of the top-level ```yaml fences.
-
-    A fence closes only at a delimiter of its own character and at least its own
-    length (CommonMark), so a ```yaml inside a ```` illustration fence is content
-    and the illustration's own closer does not open a fence that swallows the
-    rest of the file.
+def _walk_fences(text: str):
+    """Yield (state, info, line) per line: `text` outside any fence; `open`, `body`,
+    `close` inside one. A fence closes only at a delimiter of its own character and
+    at least its own length (CommonMark), so a ```yaml inside a ```` illustration
+    fence is body, the illustration's closer does not open a new fence, and a
+    ``` fence closed by ```` ends where the longer delimiter is.
     """
-    fences: list[str] = []
     marker: str | None = None
     info = ""
-    buf: list[str] = []
     for line in text.split("\n"):
         stripped = line.strip()
         if marker is None:
             match = FENCE_OPEN_RE.match(stripped)
             if match:
-                marker, info, buf = match.group(1), match.group(2).lower(), []
+                marker, info = match.group(1), match.group(2).lower()
+                yield "open", info, line
+            else:
+                yield "text", "", line
         elif re.fullmatch(rf"{re.escape(marker[0])}{{{len(marker)},}}", stripped):
-            if info in ("yaml", "yml"):
-                fences.append("\n".join(buf))
+            yield "close", info, line
             marker = None
         else:
+            yield "body", info, line
+
+
+def yaml_fences(text: str) -> list[str]:
+    """Bodies of the top-level ```yaml fences (see _walk_fences for nesting)."""
+    fences: list[str] = []
+    buf: list[str] = []
+    for state, info, line in _walk_fences(text):
+        if state == "open":
+            buf = []
+        elif state == "body":
             buf.append(line)
+        elif state == "close" and info in ("yaml", "yml"):
+            fences.append("\n".join(buf))
     return fences
 
 
 def strip_code(text: str) -> str:
     """The text with fenced code blocks and inline code spans removed."""
-    return INLINE_CODE_RE.sub("", CODE_FENCE_RE.sub("", text))
+    kept = [line for state, _, line in _walk_fences(text) if state == "text"]
+    return INLINE_CODE_RE.sub("", "\n".join(kept))

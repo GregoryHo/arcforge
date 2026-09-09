@@ -283,7 +283,8 @@ def test_raw_sources_are_drift_checked_but_never_scope_subjects(vault):
 
 def test_wikilinks_inside_code_are_examples_not_links(vault):
     (vault / "Wiki" / "gamma-orphan.md").write_text(
-        GAMMA + "\nExample: `[[alpha-note]]` and\n\n```\n[[alpha-note-draft]]\n```\n",
+        # The fence opens with ``` and closes with ````, a longer delimiter CommonMark accepts.
+        GAMMA + "\nExample: `[[alpha-note]]` and\n\n```\n[[alpha-note-draft]]\n````\n",
         encoding="utf-8",
     )
     links = _run(vault)["links"]
