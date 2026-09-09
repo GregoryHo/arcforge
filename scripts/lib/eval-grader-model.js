@@ -253,6 +253,8 @@ function buildBlindComparatorPrompt(taskPrompt, outputA, outputB, agentDef) {
 
 /** Margin below which two weighted totals count as a tie. */
 const BLIND_TIE_MARGIN = 0.1;
+/** Tolerance for the tie comparison: far below score precision, above float noise. */
+const BLIND_TIE_EPSILON = 1e-9;
 
 /**
  * Compute the blind comparator's weighted totals and winner. The agent supplies
@@ -263,6 +265,8 @@ const BLIND_TIE_MARGIN = 0.1;
  * @param {number[]} scoresA - Per-criterion scores for Output A (rubric order)
  * @param {number[]} scoresB - Per-criterion scores for Output B (rubric order)
  * @returns {{ winner: 'A'|'B'|'tie', scoreA: number, scoreB: number }|null}
+ *   scoreA / scoreB are the weighted totals rounded to hundredths for display;
+ *   the winner is decided on the unrounded totals.
  *   null when the rubric is empty or carries a non-finite / negative weight,
  *   when either score array is missing or not rubric-length, or when any score
  *   element is not a finite number within [0, 1] inclusive. Nothing is
@@ -281,16 +285,18 @@ function scoreBlindRubric(rubric, scoresA, scoresB) {
   if (!scoresA.every(validScore) || !scoresB.every(validScore)) return null;
   const weighted = (scores) =>
     scores.reduce((sum, s, i) => sum + s * (weights[i] / totalWeight), 0);
-  // Compare in integer hundredths: subtracting two-decimal floats puts an
-  // exact-margin gap on either side of the threshold depending on the operands'
-  // binary representation (0.8 - 0.7 > 0.1, but 0.7 - 0.6 is not).
-  const hundredthsA = Math.round(weighted(scoresA) * 100);
-  const hundredthsB = Math.round(weighted(scoresB) * 100);
-  const marginHundredths = Math.round(BLIND_TIE_MARGIN * 100);
+  const totalA = weighted(scoresA);
+  const totalB = weighted(scoresB);
+  // Decide on the unrounded totals with a tolerance: subtracting two-decimal
+  // floats puts an exact-margin gap on either side of the threshold depending
+  // on the operands' binary representation (0.8 - 0.7 > 0.1, but 0.7 - 0.6 is
+  // not), while rounding the totals first would turn a real gap of 0.104 —
+  // weights need not land on hundredths — into a tie.
   let winner = 'tie';
-  if (hundredthsA - hundredthsB > marginHundredths) winner = 'A';
-  else if (hundredthsB - hundredthsA > marginHundredths) winner = 'B';
-  return { winner, scoreA: hundredthsA / 100, scoreB: hundredthsB / 100 };
+  if (totalA - totalB > BLIND_TIE_MARGIN + BLIND_TIE_EPSILON) winner = 'A';
+  else if (totalB - totalA > BLIND_TIE_MARGIN + BLIND_TIE_EPSILON) winner = 'B';
+  const display = (total) => Math.round(total * 100) / 100;
+  return { winner, scoreA: display(totalA), scoreB: display(totalB) };
 }
 
 /**

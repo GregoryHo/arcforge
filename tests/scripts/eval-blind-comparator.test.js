@@ -397,7 +397,7 @@ describe('scoreBlindRubric — harness-side arithmetic', () => {
 
   it('treats a gap of exactly the margin as a tie regardless of float representation', () => {
     // 0.8 - 0.7 > 0.1 in binary floating point while 0.7 - 0.6 is not; the
-    // comparison runs in integer hundredths so both land on the same side.
+    // comparison carries a tolerance so both land on the same side.
     for (const [a, b] of [
       [0.8, 0.7],
       [0.7, 0.6],
@@ -408,6 +408,23 @@ describe('scoreBlindRubric — harness-side arithmetic', () => {
     }
     expect(scoreBlindRubric([{ criterion: 'x', weight: 1 }], [0.81], [0.7]).winner).toBe('A');
     expect(scoreBlindRubric([{ criterion: 'x', weight: 1 }], [0.7], [0.81]).winner).toBe('B');
+  });
+
+  it('decides the winner on the unrounded totals, not on their two-decimal display', () => {
+    // Weights need not land on hundredths: 0.416 / 0.292 / 0.292 give totals of
+    // 0.854 and 0.75, a gap of 0.104 past the margin, although the displayed
+    // totals round to 0.85 and 0.75.
+    const rubric = [
+      { criterion: 'x', weight: 0.416 },
+      { criterion: 'y', weight: 0.292 },
+      { criterion: 'z', weight: 0.292 },
+    ];
+    expect(scoreBlindRubric(rubric, [1, 0.75, 0.75], [0.75, 0.75, 0.75])).toEqual({
+      winner: 'A',
+      scoreA: 0.85,
+      scoreB: 0.75,
+    });
+    expect(scoreBlindRubric(rubric, [0.75, 0.75, 0.75], [1, 0.75, 0.75]).winner).toBe('B');
   });
 
   it('rejects a malformed rubric', () => {
