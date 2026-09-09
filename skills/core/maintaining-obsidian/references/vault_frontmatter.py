@@ -115,6 +115,11 @@ def note_type(fm: dict | None) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
+def is_raw_source(fm: dict | None) -> bool:
+    """A Raw Source note to the script: carries `sha256` and no `type:`."""
+    return fm is not None and "sha256" in fm and note_type(fm) is None
+
+
 def _walk_fences(text: str):
     """Yield (state, info, line, quoted) per line: `text` outside any fence; `open`,
     `body`, `close` inside one; `quoted` when the fence sits in a blockquote or
