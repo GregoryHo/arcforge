@@ -55,8 +55,10 @@ def _scalar(raw: str):
         return value[1:close] if close != -1 else value[1:]
     value = re.split(r"\s+#", value, maxsplit=1)[0].strip()
     if value.startswith("[") and value.endswith("]"):
+        # Flow list: a quoted item keeps its commas (`["[[Smith, John]]", b]`).
         inner = value[1:-1].strip()
-        return [_scalar(item) for item in inner.split(",")] if inner else []
+        items = re.findall(r"\"[^\"]*\"|'[^']*'|[^,]+", inner)
+        return [_scalar(item) for item in items if item.strip()] if inner else []
     if value in ("", "null", "~"):
         return ""
     return value

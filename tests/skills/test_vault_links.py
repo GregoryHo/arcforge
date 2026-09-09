@@ -149,6 +149,15 @@ def test_links_in_yaml_comments_are_not_edges_but_links_in_values_are(vault):
     links = _run(vault)["links"]
     assert links["notes"]["Wiki/gamma-orphan.md"]["outbound"] == 1
     assert links["notes"]["Wiki/alpha-note.md"]["inbound"] == 2
+    # A quoted flow-list item keeps its comma.
+    (vault / "Wiki" / "Smith, John.md").write_text("---\ntype: entity\n---\nperson\n", encoding="utf-8")
+    (vault / "Wiki" / "gamma-orphan.md").write_text(
+        GAMMA.replace("extra_field: yes\n", "extra_field: yes\nrelated: [\"[[Smith, John]]\", \"[[alpha-note]]\"]\n"),
+        encoding="utf-8",
+    )
+    links = _run(vault)["links"]
+    assert links["notes"]["Wiki/Smith, John.md"]["inbound"] == 1
+    assert links["notes"]["Wiki/gamma-orphan.md"]["outbound"] == 2
     # A block scalar is a value too.
     (vault / "Wiki" / "gamma-orphan.md").write_text(
         GAMMA.replace("extra_field: yes\n", "extra_field: yes\nrelated: |\n  See [[alpha-note]]\n  and more\n"),

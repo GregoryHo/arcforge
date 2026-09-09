@@ -41,11 +41,12 @@ the auditor reads before acting on:
      body, and a typed note hashes the one Raw Source note its body wikilinks.
      A typed note with neither is `unresolved`, whether or not it stores a
      digest: its original is remote, and nothing in the vault stands in for it.
-  5. `log.md` entries naming files that do not exist anywhere in the vault. The
-     last field of an entry is its path whatever it contains (`create | source |
-     My Note.md`); any other field counts as a path only when it ends in an
-     extension and has no whitespace before its first `/`. `query` and `schema`
-     entries are free text, not checked.
+  5. `log.md` entries naming files that do not exist anywhere in the vault. An
+     entry's path field — the last one, or the second for `drift | <filename> |
+     sha=…` — is a path whatever it contains (`create | source | My Note.md`);
+     any other field counts as a path only when it ends in an extension and has
+     no whitespace before its first `/`. `query` and `schema` entries are free
+     text, not checked.
   6. Frontmatter tag counts, each marked `declared` when the tag or its top-level
      segment is a backticked list item under SCHEMA.md's `## Tag Taxonomy`;
      `--tag-min` sets `exceeds` for undeclared tags only.
@@ -114,6 +115,8 @@ LOG_ENTRY_RE = re.compile(r"^\s*(?:#+\s*|-\s*)?\[\d{4}-\d{2}-\d{2}\]\s*([A-Za-z-
 # Log entries whose fields are free text rather than a path (a question may end
 # in a filename without naming a file to check).
 FREE_TEXT_OPS = {"query", "schema"}
+# Operations whose path is not the last field: `drift | <filename> | sha=<old>→<new>`.
+PATH_FIELD = {"drift": 1}
 
 
 def is_path_token(token: str) -> bool:
@@ -341,17 +344,19 @@ def log_facts(vault: Path, files: dict[str, Path]) -> dict:
     missing = []
     for line_no, line in enumerate(read_text(log).split("\n"), 1):
         entry = LOG_ENTRY_RE.match(line)
+        op = (entry.group(1) or "").lower() if entry else ""
         if entry:
             entries += 1
-            if (entry.group(1) or "").lower() in FREE_TEXT_OPS:
+            if op in FREE_TEXT_OPS:
                 continue
         fields = [part.strip().strip("`") for part in line.split("|")]
+        path_index = PATH_FIELD.get(op, len(fields) - 1)
         for index, token in enumerate(fields):
-            # The last field of a path-valued entry is the path whatever it
-            # contains (`create | source | My Note.md`); any other field is a
-            # path only when it reads as one.
-            last_field = entry is not None and index == len(fields) - 1
-            if not (is_path_token(token) or (last_field and FILE_TOKEN_RE.match(token))):
+            # The entry's path field is a path whatever it contains (`create |
+            # source | My Note.md`, `drift | My Raw Note.md | sha=…`); any other
+            # field is a path only when it reads as one.
+            path_field = entry is not None and index == path_index
+            if not (is_path_token(token) or (path_field and FILE_TOKEN_RE.match(token))):
                 continue
             if token in files or token.lstrip("./") in files:
                 continue

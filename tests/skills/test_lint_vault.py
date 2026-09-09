@@ -114,13 +114,15 @@ def test_log_path_tokens_are_not_satisfied_by_a_basename_elsewhere(vault):
         log.write("## [2026-05-13] query | summarize Wiki/alpha-note.md and Wiki/gone.md\n")
         log.write("## [2026-05-14] schema | updated SCHEMA.md\n")
         log.write("## [2026-05-15] create | entity | My Root Note.md\n")
+        log.write("## [2026-05-16] drift | My Raw Note.md | sha=0000→1111\n")
     report = _run(vault)["log"]
-    assert report["entries"] == 10
+    assert report["entries"] == 11
     assert report["missing_files"] == [
         {"line": 4, "file": "Wiki/deleted-note.md"},
         {"line": 7, "file": "Raw/recording.mp3"},
         {"line": 9, "file": "Wiki/My Note.md"},
         {"line": 12, "file": "My Root Note.md"},
+        {"line": 13, "file": "My Raw Note.md"},
     ]
 
 
