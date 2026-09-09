@@ -41,7 +41,8 @@ the auditor reads before acting on:
      body, and a typed note hashes the one Raw Source note its body wikilinks.
      A typed note with neither is `unresolved`, whether or not it stores a
      digest: its original is remote, and nothing in the vault stands in for it.
-  5. `log.md` entries naming files that do not exist anywhere in the vault.
+  5. `log.md` entries naming files that do not exist anywhere in the vault
+     (a `query` entry's fields are a question, not a path, and are not checked).
   6. Frontmatter tag counts, each marked `declared` when the tag or its top-level
      segment is a backticked list item under SCHEMA.md's `## Tag Taxonomy`;
      `--tag-min` sets `exceeds` for undeclared tags only.
@@ -111,7 +112,10 @@ WIKILINK_RE = re.compile(r"\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]")
 TYPE_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 TAXONOMY_HEADING_RE = re.compile(r"^##\s+.*\btaxonomy\b", re.IGNORECASE)
 TAXONOMY_ITEM_RE = re.compile(r"^\s*[-*]\s+`#?([^`\s]+)`")
-LOG_ENTRY_RE = re.compile(r"^\s*(?:#+\s*|-\s*)?\[\d{4}-\d{2}-\d{2}\]")
+LOG_ENTRY_RE = re.compile(r"^\s*(?:#+\s*|-\s*)?\[\d{4}-\d{2}-\d{2}\]\s*([A-Za-z-]+)?")
+# Log entries whose fields are free text rather than a path (a question may end
+# in a filename without naming a file to check).
+FREE_TEXT_OPS = {"query"}
 
 
 def is_raw_source(fm: dict | None) -> bool:
@@ -327,6 +331,24 @@ def type_facts(scoped: list[dict], declared, field_empty_pct, undeclared_pct) ->
     return types, untyped
 
 
+def _frontmatter_values(value) -> list[str]:
+    """Every string inside a parsed frontmatter value (scalar, list, or mapping)."""
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        return [s for item in value for s in _frontmatter_values(item)]
+    if isinstance(value, dict):
+        return [s for item in value.values() for s in _frontmatter_values(item)]
+    return []
+
+
+def link_text(note: dict) -> str:
+    """What the graph scans: the body outside code, plus the parsed frontmatter
+    values — a `[[link]]` in a YAML comment is not a link."""
+    values = _frontmatter_values(note["fm"] or {})
+    return strip_code(note["body"]) + "\n" + "\n".join(values)
+
+
 def link_facts(notes: list[dict], scoped: list[dict], raw: list[dict]) -> dict:
     """Link graph over the wiki-layer `notes`; a link to one of the `raw` captures is
     provenance, not a relationship, and counts for neither side."""
@@ -368,7 +390,7 @@ def link_facts(notes: list[dict], scoped: list[dict], raw: list[dict]) -> dict:
     inbound: Counter = Counter()
     for note in notes:
         targets = set()
-        for match in WIKILINK_RE.finditer(strip_code(note["text"])):
+        for match in WIKILINK_RE.finditer(link_text(note)):
             target = match.group(1).strip()
             if (
                 target
@@ -488,8 +510,11 @@ def log_facts(vault: Path, files: dict[str, Path]) -> dict:
     entries = 0
     missing = []
     for line_no, line in enumerate(read_text(log).split("\n"), 1):
-        if LOG_ENTRY_RE.match(line):
+        entry = LOG_ENTRY_RE.match(line)
+        if entry:
             entries += 1
+            if (entry.group(1) or "").lower() in FREE_TEXT_OPS:
+                continue
         for part in line.split("|"):
             token = part.strip().strip("`")
             if not FILE_TOKEN_RE.match(token):

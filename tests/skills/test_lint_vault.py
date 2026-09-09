@@ -347,6 +347,23 @@ def test_raw_captures_and_attachment_embeds_are_not_edges(vault):
     assert links["notes"]["Wiki/alpha-note-draft.md"]["outbound"] == 2
 
 
+def test_links_in_yaml_comments_are_not_edges_but_links_in_values_are(vault):
+    (vault / "Wiki" / "gamma-orphan.md").write_text(
+        GAMMA.replace("extra_field: yes\n", "extra_field: yes\nrelated: []   # e.g. [[alpha-note]]\n"),
+        encoding="utf-8",
+    )
+    links = _run(vault)["links"]
+    assert "Wiki/gamma-orphan.md" in links["orphans"]
+    assert links["notes"]["Wiki/alpha-note.md"]["inbound"] == 1
+    (vault / "Wiki" / "gamma-orphan.md").write_text(
+        GAMMA.replace("extra_field: yes\n", "extra_field: yes\nrelated: \"[[alpha-note]]\"\n"),
+        encoding="utf-8",
+    )
+    links = _run(vault)["links"]
+    assert links["notes"]["Wiki/gamma-orphan.md"]["outbound"] == 1
+    assert links["notes"]["Wiki/alpha-note.md"]["inbound"] == 2
+
+
 def test_self_links_under_any_spelling_are_not_edges(vault):
     (vault / "Wiki" / "gamma-orphan.md").write_text(
         GAMMA + "\nSelf: [[gamma-orphan]] and [[Wiki/gamma-orphan]] and [[gamma-orphan#Heading|me]].\n",
@@ -431,7 +448,10 @@ def test_log_path_tokens_are_not_satisfied_by_a_basename_elsewhere(vault):
         log.write("## [2026-05-10] ingest | raw | Raw/recording.mp3\n")
         log.write("## [2026-05-11] schema | bump to v1.2\n")
         log.write("## [2026-05-12] create | entity | Wiki/My Note.md\n")
-    assert _run(vault)["log"]["missing_files"] == [
+        log.write("## [2026-05-13] query | summarize Wiki/alpha-note.md and Wiki/gone.md\n")
+    report = _run(vault)["log"]
+    assert report["entries"] == 8
+    assert report["missing_files"] == [
         {"line": 4, "file": "Wiki/deleted-note.md"},
         {"line": 7, "file": "Raw/recording.mp3"},
         {"line": 9, "file": "Wiki/My Note.md"},
