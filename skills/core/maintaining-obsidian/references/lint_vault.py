@@ -54,8 +54,9 @@ comparison still cover the whole wiki layer. Raw Source notes (`sha256`, no
 `type:`) are never subjects of the schema, link, tag, or title checks, never
 sources or targets in the link graph, and are all drift-checked whatever the
 scope, so `Raw/` neither needs `--skip` nor eats into `recent:N`. A `[[wikilink]]` inside a fenced code block or inline code is
-an example, not a link. `--skip <folder>` drops a folder from the note set (plugin-
-managed folders, `_audits`, folders AGENTS.md declares out of scope). Dot-dirs,
+an example, not a link. `--skip <folder>` drops a folder from the wiki note set (plugin-
+managed folders, folders AGENTS.md declares out of scope); a Raw Source note in
+a skipped folder keeps its identity. Dot-dirs,
 Excalidraw drawings (`excalidraw-plugin:` in frontmatter), the root-level
 AGENTS.md / SCHEMA.md / CLAUDE.md / README.md / index.md / log.md, and the
 standard `_audits/` report folder are never notes (a vault that keeps reports
@@ -143,7 +144,7 @@ def collect(vault: Path, skip: set[str]) -> tuple[list[dict], dict[str, Path]]:
             continue
         rel_posix = rel.as_posix()
         files[rel_posix] = path
-        if path.suffix != ".md" or _skipped(rel_posix, skip):
+        if path.suffix != ".md":
             continue
         if len(rel.parts) == 1 and path.name in NON_NOTE_ROOT_FILES:
             continue
@@ -162,6 +163,9 @@ def collect(vault: Path, skip: set[str]) -> tuple[list[dict], dict[str, Path]]:
                 "body": body,
                 "title": title if isinstance(title, str) and title else path.stem,
                 "mtime": path.stat().st_mtime,
+                # A skipped folder leaves the wiki note set; a Raw Source note in
+                # it keeps its identity (drift-checked, a provenance target).
+                "skipped": _skipped(rel_posix, skip),
             }
         )
     return notes, files
@@ -202,9 +206,8 @@ def declared_fields(vault: Path) -> dict[str, list[dict]] | None:
         if not isinstance(type_value, str):
             continue
         names = [n for n in (part.strip() for part in type_value.split("|")) if TYPE_NAME_RE.match(n)]
-        heading_key = re.sub(r"[^a-z0-9]", "", heading.lower())
         for name in names:
-            own_section = re.sub(r"[^a-z0-9]", "", name.lower()) in heading_key
+            own_section = _heading_names(heading, name)
             if len(names) == 1 and own_section:
                 variants[name].append({"fields": set(fm.keys()), "tags": set(note_tags(fm))})
             else:
@@ -214,6 +217,17 @@ def declared_fields(vault: Path) -> dict[str, list[dict]] | None:
         or [{"fields": base[name], "tags": set()}]
         for name in sorted(set(base) | set(variants))
     }
+
+
+def _heading_names(heading: str, type_name: str) -> bool:
+    """Whether the heading path names the type as whole words — `Source — Paper
+    Variant / Frontmatter` names `source`, `Daily Aggregate` names
+    `daily-aggregate`, `Catalog defaults` does not name `log`."""
+    tokens = re.findall(r"[a-z0-9]+", heading.lower())
+    key = re.sub(r"[^a-z0-9]", "", type_name.lower())
+    return any(
+        key == "".join(tokens[i:j]) for i in range(len(tokens)) for j in range(i + 1, len(tokens) + 1)
+    )
 
 
 def _fit(fm: dict, variants: list[dict]) -> int:
@@ -539,7 +553,7 @@ def duplicate_title_facts(notes: list[dict], scoped: list[dict], title_match) ->
 def lint_vault(vault: Path, scope: str, skip: set[str], thresholds: dict) -> dict:
     notes, files = collect(vault, skip)
     raw = [note for note in notes if is_raw_source(note["fm"])]
-    wiki = [note for note in notes if not is_raw_source(note["fm"])]
+    wiki = [note for note in notes if not is_raw_source(note["fm"]) and not note["skipped"]]
     scoped = select_scope(wiki, scope)
     declared = declared_fields(vault)
     taxonomy = declared_tags(vault)

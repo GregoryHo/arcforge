@@ -264,9 +264,13 @@ def test_typed_note_hashes_the_raw_source_its_body_links(vault):
     )
     legacy = {item["path"]: item for item in _run(vault)["raw_sources"]}["Wiki/fed-article-legacy.md"]
     assert legacy["status"] == "unhashed" and legacy["recomputed"] == RAW_DIGEST
-    # --skip Raw takes the capture out of the note set, not out of the drift check.
-    by_path = {item["path"]: item for item in _run(vault, "--skip", "Raw")["raw_sources"]}
+    # --skip Raw takes the capture out of the note set, not out of the drift
+    # check, and its link is still provenance rather than a wiki edge.
+    skipped = _run(vault, "--skip", "Raw")
+    by_path = {item["path"]: item for item in skipped["raw_sources"]}
     assert by_path["Wiki/fed-article.md"]["status"] == "fresh"
+    assert by_path["Raw/2026-05-06/bloomberg-fed.md"]["status"] == "fresh"
+    assert "Wiki/fed-article.md" in skipped["links"]["orphans"]
     # The publisher edits the article: the re-captured body drifts from the pair.
     raw.write_text(raw.read_text(encoding="utf-8") + "\nCorrection appended.\n", encoding="utf-8")
     by_path = {item["path"]: item for item in _run(vault)["raw_sources"]}
@@ -638,6 +642,22 @@ def test_bare_provenance_link_colliding_with_a_wiki_name_is_unresolved(vault):
     by_path = {i["path"]: i for i in _run(vault)["raw_sources"]}
     assert by_path["Wiki/typed.md"]["status"] == "unresolved"
     assert by_path["Wiki/typed.md"]["hashed_file"] is None
+
+
+def test_a_heading_naming_the_type_as_a_substring_is_still_a_base(tmp_path):
+    # `## Catalog defaults` contains "log" but does not name the type `log`.
+    (tmp_path / "SCHEMA.md").write_text(
+        "# Schema\n\n## Catalog defaults\n\n```yaml\n---\ntype: log\ncreated: YYYY-MM-DD\n---\n```\n\n"
+        "## Log\n\n```yaml\n---\ntype: log\nlevel: \"\"\n---\n```\n\n"
+        "## Daily Aggregate\n\n```yaml\n---\ntype: daily-aggregate\nday: \"\"\n---\n```\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "AGENTS.md").write_text("# Contract\n", encoding="utf-8")
+    (tmp_path / "entry.md").write_text("---\ntype: log\nlevel: info\n---\nbody\n", encoding="utf-8")
+    (tmp_path / "day.md").write_text("---\ntype: daily-aggregate\nday: 2026-05-06\n---\nbody\n", encoding="utf-8")
+    types = _run(tmp_path)["types"]
+    assert types["log"]["variants"] == 1 and types["log"]["fields"]["created"]["empty"] == 1
+    assert types["daily-aggregate"]["variants"] == 1
 
 
 def test_links_with_a_path_resolve_by_that_path_only(vault):
