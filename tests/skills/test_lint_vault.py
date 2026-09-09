@@ -340,6 +340,17 @@ def test_ambiguous_bare_links_resolve_by_folder_or_not_at_all(vault):
     (vault / "Wiki" / "gamma-orphan.md").write_text(GAMMA + "\nAlso [[foo]].\n", encoding="utf-8")
     links = _run(vault)["links"]
     assert links["notes"]["B/foo.md"]["inbound"] == 1      # same folder as B/source.md
+    # The same-folder rule also decides the attachment and provenance prefilters:
+    # a dotted name shared by two folders, and a bare name a capture also has.
+    for folder in ("A", "B"):
+        (vault / folder / "Node.js.md").write_text("---\ntype: entity\n---\nnode\n", encoding="utf-8")
+    (vault / "Raw").mkdir()
+    (vault / "Raw" / "foo.md").write_text("---\nsource_url: https://x/foo\nsha256: " + "0" * 64 + "\n---\ncapture\n", encoding="utf-8")
+    (vault / "B" / "source.md").write_text("---\ntype: entity\n---\nSee [[foo]] and [[Node.js]].\n", encoding="utf-8")
+    links = _run(vault)["links"]
+    assert links["notes"]["B/Node.js.md"]["inbound"] == 1
+    assert links["notes"]["B/foo.md"]["inbound"] == 1
+    assert links["notes"]["B/source.md"]["outbound"] == 2
     assert links["notes"]["A/foo.md"]["inbound"] == 0      # not handed the link by sort order
     assert "A/foo.md" in links["orphans"]
     assert links["notes"]["Wiki/gamma-orphan.md"]["outbound"] == 1   # ambiguous from Wiki/: unresolved, still a link
@@ -372,7 +383,12 @@ def test_log_path_tokens_are_not_satisfied_by_a_basename_elsewhere(vault):
     (vault / "Archive" / "deleted-note.md").write_text("---\ntype: entity\n---\nmoved\n", encoding="utf-8")
     with (vault / "log.md").open("a", encoding="utf-8") as log:
         log.write("## [2026-05-09] create | entity | deleted-note.md\n")
-    assert _run(vault)["log"]["missing_files"] == [{"line": 4, "file": "Wiki/deleted-note.md"}]
+        log.write("## [2026-05-10] ingest | raw | Raw/recording.mp3\n")
+        log.write("## [2026-05-11] schema | bump to v1.2\n")
+    assert _run(vault)["log"]["missing_files"] == [
+        {"line": 4, "file": "Wiki/deleted-note.md"},
+        {"line": 7, "file": "Raw/recording.mp3"},
+    ]
 
 
 def test_tag_counts_and_taxonomy_membership(vault):

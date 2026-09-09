@@ -101,7 +101,9 @@ DUP_CANDIDATE_FLOOR = 0.6
 # embed, not a note relationship — unless a note of that exact name exists
 # (`[[Node.js]]` is a note when Node.js.md is).
 EXTENSION_RE = re.compile(r"\.[A-Za-z0-9]+$")
-FILE_TOKEN_RE = re.compile(r"\.(md|pdf|png|jpe?g|gif|svg|html|canvas)$", re.IGNORECASE)
+# A log token names a file when it has no whitespace and ends in an extension
+# that starts with a letter (`Raw/recording.mp3`, `note.md`; not `v1.2`).
+FILE_TOKEN_RE = re.compile(r"^\S+\.[A-Za-z][A-Za-z0-9]{0,9}$")
 WIKILINK_RE = re.compile(r"\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]")
 TYPE_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 TAXONOMY_HEADING_RE = re.compile(r"^##\s+.*\btaxonomy\b", re.IGNORECASE)
@@ -333,15 +335,15 @@ def link_facts(notes: list[dict], scoped: list[dict], raw: list[dict]) -> dict:
         same_folder = [rel for rel in hits if Path(rel).parent == Path(source).parent]
         return same_folder[0] if len(same_folder) == 1 else None
 
-    def is_attachment(target: str) -> bool:
+    def is_attachment(target: str, source: str) -> bool:
         ext = EXTENSION_RE.search(target)
-        return bool(ext) and ext.group(0).lower() != ".md" and resolve(target) is None
+        return bool(ext) and ext.group(0).lower() != ".md" and resolve(target, source) is None
 
-    def is_raw_capture(target: str) -> bool:
+    def is_raw_capture(target: str, source: str) -> bool:
         name = target[:-3] if target.endswith(".md") else target
         if "/" in name:
             return f"{name}.md" in raw_rels
-        return name.lower() in raw_stems and resolve(target) is None
+        return name.lower() in raw_stems and resolve(target, source) is None
 
     outbound: dict[str, int] = {}
     inbound: Counter = Counter()
@@ -349,7 +351,11 @@ def link_facts(notes: list[dict], scoped: list[dict], raw: list[dict]) -> dict:
         targets = set()
         for match in WIKILINK_RE.finditer(strip_code(note["text"])):
             target = match.group(1).strip()
-            if target and not is_attachment(target) and not is_raw_capture(target):
+            if (
+                target
+                and not is_attachment(target, note["rel"])
+                and not is_raw_capture(target, note["rel"])
+            ):
                 targets.add(target)
         resolved = {resolve(target, note["rel"]) for target in targets}
         outbound[note["rel"]] = len(targets) - (1 if note["rel"] in resolved else 0)
@@ -458,7 +464,7 @@ def log_facts(vault: Path, files: dict[str, Path]) -> dict:
             entries += 1
         for part in line.split("|"):
             token = part.strip().strip("`")
-            if not FILE_TOKEN_RE.search(token):
+            if not FILE_TOKEN_RE.match(token):
                 continue
             if token in files or token.lstrip("./") in files:
                 continue
