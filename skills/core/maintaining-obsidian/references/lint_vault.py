@@ -10,18 +10,25 @@ the auditor reads before acting on:
   1. Frontmatter per note, parsed as a block. A YAML block list (`tags:` then
      indented `- ` items) reads as filled, never as empty.
   2. `type:` presence; per-type field fill counts and undeclared-field counts.
-     Declared fields come from the yaml fences in `<vault>/SCHEMA.md`; a fence
-     whose `type:` lists several names (`source | entity`) declares for each.
+     Declared fields come from the top-level yaml fences in `<vault>/SCHEMA.md`
+     (a fence nested inside another fence is an illustration). A fence whose
+     `type:` lists several names (`source | entity`) declares for each; a
+     placeholder name (`<one of the types declared below>`) declares nothing.
   3. Link graph from [[wikilinks]] over the whole vault: inbound / outbound per
      in-scope note, and the orphans (zero of each). Embeds of non-note files
      (`![[image.png]]`) are not links.
   4. Raw Source sha256 drift per raw-sources.md: strip the frontmatter, normalize
      line endings to `\\n`, sha256 the UTF-8 bytes of what follows the closing
-     fence line. A note carries a Raw Source hash when its frontmatter has a
-     `sha256` key; when its `source_url` resolves to a file inside the vault,
-     that file's body is the one hashed.
+     fence line. A note carries a hash when its frontmatter has a `sha256` key.
+     The file hashed is the `source_url` target when that is a file inside the
+     vault; otherwise a Raw Source note (`sha256`, no `type:`) hashes its own
+     body, and a typed note hashes the one Raw Source note its body wikilinks.
+     A typed note with neither is `unresolved`: its original is remote, and
+     nothing in the vault stands in for it.
   5. `log.md` entries naming files that do not exist anywhere in the vault.
-  6. Frontmatter tag counts.
+  6. Frontmatter tag counts, each marked `declared` when the tag or its top-level
+     segment is a backticked list item under SCHEMA.md's `## Tag Taxonomy`;
+     `--tag-min` sets `exceeds` for undeclared tags only.
   7. Duplicate-title candidates (difflib ratio >= 0.6, or the --title-match
      value when lower) between in-scope notes and every other note.
 
@@ -58,8 +65,10 @@ DUP_CANDIDATE_FLOOR = 0.6
 NON_NOTE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".pdf", ".canvas", ".html", ".excalidraw"}
 FILE_TOKEN_RE = re.compile(r"\.(md|pdf|png|jpe?g|gif|svg|html|canvas)$", re.IGNORECASE)
 WIKILINK_RE = re.compile(r"\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]")
-FENCE_RE = re.compile(r"```ya?ml\n(.*?)\n```", re.DOTALL)
 KEY_RE = re.compile(r"^([A-Za-z0-9_-]+):(.*)$")
+TYPE_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+TAXONOMY_HEADING_RE = re.compile(r"^##\s+.*\btaxonomy\b", re.IGNORECASE)
+TAXONOMY_ITEM_RE = re.compile(r"^\s*[-*]\s+`#?([^`\s]+)`")
 LOG_ENTRY_RE = re.compile(r"^\s*(?:#+\s*|-\s*)?\[\d{4}-\d{2}-\d{2}\]")
 
 
@@ -140,6 +149,31 @@ def is_empty(value) -> bool:
     return value == "" or value == [] or value == {}
 
 
+def note_type(fm: dict | None) -> str | None:
+    """The note's `type:` when it is a non-empty string; None for an untyped note."""
+    value = fm.get("type") if fm else None
+    return value if isinstance(value, str) and value else None
+
+
+def yaml_fences(text: str) -> list[str]:
+    """Bodies of the top-level ```yaml fences. A ```yaml line inside an open fence is content."""
+    fences: list[str] = []
+    info: str | None = None
+    buf: list[str] = []
+    for line in text.split("\n"):
+        stripped = line.strip()
+        if info is None:
+            if stripped.startswith("```"):
+                info, buf = stripped[3:].strip().lower(), []
+        elif stripped == "```":
+            if info in ("yaml", "yml"):
+                fences.append("\n".join(buf))
+            info = None
+        else:
+            buf.append(line)
+    return fences
+
+
 def exceeds(value: float, threshold: float | None) -> bool | None:
     return None if threshold is None else value >= threshold
 
@@ -207,16 +241,33 @@ def declared_fields(vault: Path) -> dict[str, set[str]] | None:
     if not schema.is_file():
         return None
     declared: dict[str, set[str]] = defaultdict(set)
-    for fence in FENCE_RE.findall(read_text(schema)):
+    for fence in yaml_fences(read_text(schema)):
         lines = [line for line in fence.split("\n") if line.strip() != "---"]
         fm = parse_frontmatter("\n".join(lines))
         type_value = fm.get("type")
-        if not isinstance(type_value, str) or not type_value:
+        if not isinstance(type_value, str):
             continue
-        for name in type_value.split("|"):
-            if name.strip():
-                declared[name.strip()].update(fm.keys())
+        for name in (part.strip() for part in type_value.split("|")):
+            if TYPE_NAME_RE.match(name):
+                declared[name].update(fm.keys())
     return dict(declared)
+
+
+def declared_tags(vault: Path) -> list[str]:
+    """Top-level tags listed under SCHEMA.md's taxonomy heading, as `- `tag` — ...` items."""
+    schema = vault / SCHEMA_FILE
+    if not schema.is_file():
+        return []
+    tags: list[str] = []
+    inside = False
+    for line in read_text(schema).split("\n"):
+        if line.startswith("## "):
+            inside = bool(TAXONOMY_HEADING_RE.match(line))
+            continue
+        match = TAXONOMY_ITEM_RE.match(line) if inside else None
+        if match and match.group(1) not in tags:
+            tags.append(match.group(1))
+    return tags
 
 
 def type_facts(scoped: list[dict], declared, field_empty_pct, undeclared_pct) -> tuple[dict, list]:
@@ -224,8 +275,8 @@ def type_facts(scoped: list[dict], declared, field_empty_pct, undeclared_pct) ->
     untyped = []
     for note in scoped:
         fm = note["fm"]
-        type_value = fm.get("type") if fm else None
-        if not isinstance(type_value, str) or not type_value:
+        type_value = note_type(fm)
+        if type_value is None:
             if fm is not None and "sha256" in fm:
                 # A Raw Source note: audit.md keeps it under the drift check
                 # (raw_source_facts) and out of schema compliance.
@@ -312,26 +363,67 @@ def sha256_body(body: str) -> str:
     return hashlib.sha256(body.encode("utf-8")).hexdigest()
 
 
+def sha256_file(path: Path) -> str:
+    """A note's body digest per raw-sources.md; a non-note file's raw bytes."""
+    if path.suffix == ".md":
+        return sha256_body(split_frontmatter(read_text(path))[1])
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _source_url_file(note: dict, files: dict[str, Path]) -> Path | None:
+    """The vault file `source_url` names, when it names one (not a URL, not the note itself)."""
+    source_url = note["fm"].get("source_url")
+    if not isinstance(source_url, str) or not source_url or "://" in source_url:
+        return None
+    candidate = files.get(source_url.lstrip("/")) or files.get(
+        (Path(note["rel"]).parent / source_url).as_posix()
+    )
+    return candidate if candidate is not None and candidate != note["path"] else None
+
+
+def _linked_raw_source(note: dict, files: dict[str, Path], md_by_stem: dict) -> Path | None:
+    """The Raw Source note (`sha256`, no `type:`) the body wikilinks — when it links exactly one."""
+    hits: set[Path] = set()
+    for match in WIKILINK_RE.finditer(note["body"]):
+        target = match.group(1).strip()
+        name = target[:-3] if target.endswith(".md") else target
+        rels = [f"{name}.md"] if f"{name}.md" in files else md_by_stem.get(Path(name).name.lower(), [])
+        for rel in rels:
+            fm_text, _ = split_frontmatter(read_text(files[rel]))
+            fm = parse_frontmatter(fm_text) if fm_text is not None else None
+            if fm is not None and "sha256" in fm and note_type(fm) is None:
+                hits.add(files[rel])
+    return hits.pop() if len(hits) == 1 else None
+
+
 def raw_source_facts(scoped: list[dict], vault: Path, files: dict[str, Path]) -> list[dict]:
+    md_by_stem: dict[str, list[str]] = defaultdict(list)
+    for rel in files:
+        if rel.endswith(".md"):
+            md_by_stem[Path(rel).stem.lower()].append(rel)
     out = []
     for note in scoped:
         fm = note["fm"]
         if fm is None or "sha256" not in fm:
             continue
         stored = fm["sha256"] if isinstance(fm["sha256"], str) else ""
-        hashed_file, recomputed = note["rel"], sha256_body(note["body"])
-        source_url = fm.get("source_url")
-        if isinstance(source_url, str) and source_url and "://" not in source_url:
-            candidate = files.get(source_url.lstrip("/")) or files.get(
-                (Path(note["rel"]).parent / source_url).as_posix()
-            )
-            if candidate is not None and candidate != note["path"]:
-                hashed_file = candidate.relative_to(vault).as_posix()
-                if candidate.suffix == ".md":
-                    recomputed = sha256_body(split_frontmatter(read_text(candidate))[1])
-                else:
-                    recomputed = hashlib.sha256(candidate.read_bytes()).hexdigest()
-        status = "unhashed" if not stored else ("fresh" if stored == recomputed else "drift")
+        # The provenance pair: a typed note's digest is of the Raw Source it was
+        # ingested from, never of its own synthesized body.
+        target = _source_url_file(note, files)
+        if target is None and note_type(fm) is not None:
+            target = _linked_raw_source(note, files, md_by_stem)
+        if target is not None:
+            hashed_file, recomputed = target.relative_to(vault).as_posix(), sha256_file(target)
+        elif note_type(fm) is None:
+            hashed_file, recomputed = note["rel"], sha256_body(note["body"])
+        else:
+            hashed_file, recomputed = None, None
+        if not stored:
+            status = "unhashed"
+        elif recomputed is None:
+            status = "unresolved"
+        else:
+            status = "fresh" if stored == recomputed else "drift"
         out.append(
             {
                 "path": note["rel"],
@@ -364,7 +456,8 @@ def log_facts(vault: Path, files: dict[str, Path]) -> dict:
     return {"path": LOG_FILE, "entries": entries, "missing_files": missing}
 
 
-def tag_facts(scoped: list[dict], tag_min) -> dict:
+def tag_facts(scoped: list[dict], declared: list[str], tag_min) -> dict:
+    """Tag counts; `exceeds` only for a tag outside the taxonomy (top-level segment undeclared)."""
     counts: Counter = Counter()
     for note in scoped:
         tags = (note["fm"] or {}).get("tags", [])
@@ -375,7 +468,15 @@ def tag_facts(scoped: list[dict], tag_min) -> dict:
         for tag in tags:
             if isinstance(tag, str) and tag:
                 counts[tag.lstrip("#")] += 1
-    return {tag: {"count": n, "exceeds": exceeds(n, tag_min)} for tag, n in sorted(counts.items())}
+    out = {}
+    for tag, n in sorted(counts.items()):
+        is_declared = tag in declared or tag.split("/", 1)[0] in declared
+        out[tag] = {
+            "count": n,
+            "declared": is_declared,
+            "exceeds": None if tag_min is None else (not is_declared and n >= tag_min),
+        }
+    return out
 
 
 def normalize_title(title: str) -> str:
@@ -414,6 +515,7 @@ def lint_vault(vault: Path, scope: str, skip: set[str], thresholds: dict) -> dic
     notes, files = collect(vault, skip)
     scoped = select_scope(notes, scope)
     declared = declared_fields(vault)
+    taxonomy = declared_tags(vault)
     types, untyped = type_facts(
         scoped, declared, thresholds["field_empty_pct"], thresholds["undeclared_pct"]
     )
@@ -426,13 +528,14 @@ def lint_vault(vault: Path, scope: str, skip: set[str], thresholds: dict) -> dic
         "schema": {
             "path": SCHEMA_FILE if declared is not None else None,
             "declared_types": sorted(declared) if declared else [],
+            "declared_tags": taxonomy,
         },
         "untyped": untyped,
         "types": types,
         "links": link_facts(notes, scoped),
         "raw_sources": raw_source_facts(scoped, vault, files),
         "log": log_facts(vault, files),
-        "tags": tag_facts(scoped, thresholds["tag_min"]),
+        "tags": tag_facts(scoped, taxonomy, thresholds["tag_min"]),
         "duplicate_titles": duplicate_title_facts(notes, scoped, thresholds["title_match"]),
     }
 
@@ -469,7 +572,8 @@ def print_summary(report: dict) -> None:
     by_status = Counter(item["status"] for item in report["raw_sources"])
     print(
         f"Raw Sources: {len(report['raw_sources'])} (fresh {by_status['fresh']}, "
-        f"drift {by_status['drift']}, unhashed {by_status['unhashed']})"
+        f"drift {by_status['drift']}, unhashed {by_status['unhashed']}, "
+        f"unresolved {by_status['unresolved']})"
     )
     for item in report["raw_sources"]:
         if item["status"] != "fresh":
@@ -478,7 +582,8 @@ def print_summary(report: dict) -> None:
     print(f"Log: {log['entries']} entries, {len(log['missing_files'])} naming missing files")
     for item in log["missing_files"]:
         print(f"  line {item['line']}: {item['file']}")
-    print(f"Tags: {len(report['tags'])} distinct")
+    outside = sum(1 for facts in report["tags"].values() if not facts["declared"])
+    print(f"Tags: {len(report['tags'])} distinct, {outside} outside the taxonomy")
     print(f"Duplicate-title candidates: {len(report['duplicate_titles'])}")
     for item in report["duplicate_titles"]:
         print(f"  {item['ratio']:.3f}  {item['a']}  ~  {item['b']}")

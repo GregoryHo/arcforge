@@ -108,16 +108,19 @@ tags:                     # block, unindented
 ### Source Drift (sha256)
 
 `raw_sources[]` lists every in-scope note with a `sha256` key: the stored
-digest, the digest recomputed per `raw-sources.md` (from the `source_url`
-target when that is a file inside the vault, otherwise from the note's own
-body), and a `status`. For remote URLs, re-fetch first when fetchable and
-compare the fetched body by hand. Then:
+digest, the digest recomputed per `raw-sources.md`, the `hashed_file` it was
+recomputed from, and a `status`. The file hashed is the `source_url` target
+when that is a file inside the vault; otherwise a Raw Source note (`sha256`,
+no `type:`) hashes its own body, and a typed note — the provenance pair, whose
+`source_url` is usually the remote original — hashes the one Raw Source note
+its body wikilinks (the news preset's `## Source` line). Then:
 
 | `status` | Action |
 |---|---|
 | `fresh` | No log line. |
 | `drift` | Append `drift \| <filename> \| sha=<old>→<new>` to `log.md` and report it. Informational only. |
 | `unhashed` | Compute and write `sha256` + `ingested`. Offer `audit lint --backfill-sha256` for the rest. |
+| `unresolved` | A typed note whose original is remote and whose body links no single Raw Source note, so nothing in the vault stands in for it. Re-fetch when fetchable and compare the fetched body by hand; otherwise report it. Never a drift line. |
 
 Drift never auto-fixes the wiki layer — a changed source is a fact for the user
 to act on, not a licence to rewrite their note.
@@ -132,7 +135,7 @@ the cut-off is the vault's, passed as the flag named in the table.
 |---|---|---|---|
 | Field usage | `types.<type>.fields.<field>.empty_pct`; `types.<type>.undeclared.<field>.present_pct` | `--field-empty-pct`, `--undeclared-pct` | "`source_author` empty in 9 of 10 Source notes" |
 | Type fit | Section structure that does not match the declared type — read the notes; not in the JSON | — | "12 Entity notes carry `## Steps` — a tutorial type?" |
-| Tag drift | `tags.<tag>.count` against the taxonomy SCHEMA.md declares | `--tag-min` | "`#distributed-systems` used 15× — formalize?" |
+| Tag drift | `tags.<tag>.count` with `declared` read from the backticked list items under SCHEMA.md's `## Tag Taxonomy` (a sub-tag counts through its top-level segment); `exceeds` is set for undeclared tags only | `--tag-min` | "`#distributed-systems` used 15× — formalize?" |
 
 ### Vault-declared LINT
 
