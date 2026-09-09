@@ -101,9 +101,10 @@ DUP_CANDIDATE_FLOOR = 0.6
 # embed, not a note relationship — unless a note of that exact name exists
 # (`[[Node.js]]` is a note when Node.js.md is).
 EXTENSION_RE = re.compile(r"\.[A-Za-z0-9]+$")
-# A log token names a file when it has no whitespace and ends in an extension
-# that starts with a letter (`Raw/recording.mp3`, `note.md`; not `v1.2`).
-FILE_TOKEN_RE = re.compile(r"^\S+\.[A-Za-z][A-Za-z0-9]{0,9}$")
+# A log token (one pipe-delimited field) names a file when it ends in an
+# extension that starts with a letter (`Raw/recording.mp3`, `Wiki/My Note.md`;
+# not `bump to v1.2`).
+FILE_TOKEN_RE = re.compile(r"^\S.*\.[A-Za-z][A-Za-z0-9]{0,9}$")
 WIKILINK_RE = re.compile(r"\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]")
 TYPE_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 TAXONOMY_HEADING_RE = re.compile(r"^##\s+.*\btaxonomy\b", re.IGNORECASE)

@@ -79,7 +79,8 @@ def parse_frontmatter(text: str) -> dict:
             or lines[i] == "-"
             or lines[i].startswith("- ")
         ):
-            if lines[i].strip():
+            # A comment-only line is neither a list item nor a mapping entry.
+            if lines[i].strip() and not lines[i].strip().startswith("#"):
                 block.append(lines[i].strip())
             i += 1
         if not block:
@@ -139,7 +140,13 @@ def _walk_fences(text: str):
             else:
                 yield "text", "", line, False
             continue
-        inner = line[len(prefix):] if line.startswith(prefix) else line
+        # Inside a quoted fence each line carries its own `>` run; strip that
+        # line's prefix, not the opener's (`> ```yaml` may close as `>```` `).
+        if prefix:
+            quoted = QUOTE_PREFIX_RE.match(line)
+            inner = line[quoted.end():] if quoted else line
+        else:
+            inner = line
         if re.fullmatch(rf" {{0,3}}{re.escape(marker[0])}{{{len(marker)},}}\s*", inner):
             yield "close", info, line, bool(prefix)
             marker = None

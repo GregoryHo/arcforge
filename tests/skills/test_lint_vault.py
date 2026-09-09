@@ -161,6 +161,17 @@ def test_block_list_frontmatter_reads_as_filled(vault):
     assert tags == {"expected": 2, "present": 2, "filled": 2, "empty": 0, "empty_pct": 0.0, "exceeds": None}
 
 
+def test_comment_lines_inside_a_block_are_not_items(vault):
+    (vault / "Wiki" / "delta-note.md").write_text(
+        "---\ntype: source\ntags:\n  # grouping\n  - project\nsource_author:\n  # none yet\n---\nbody\n",
+        encoding="utf-8",
+    )
+    report = _run(vault)
+    assert report["tags"]["project"]["count"] == 1
+    assert not any(t.startswith("#") or t.startswith("- ") for t in report["tags"])
+    assert report["types"]["source"]["fields"]["source_author"]["filled"] == 0
+
+
 def test_unindented_block_list_reads_as_filled(vault):
     # Valid YAML: sequence items at column 0 under the key (PyYAML reads a list).
     (vault / "Wiki" / "delta-note.md").write_text(
@@ -371,11 +382,14 @@ def test_provenance_link_to_a_capture_is_not_a_wiki_relationship(vault):
     # embeds and examples too.
     (vault / "Wiki" / "gamma-orphan.md").write_text(
         GAMMA + "\n![[diagram.excalidraw]] and ``literal\n[[alpha-note]]`` here.\n"
-        "\n> [!note]\n> ```md\n> [[alpha-note]] inside a callout fence\n> ```\n",
+        "\n> [!note]\n> ```md\n> [[alpha-note]] inside a callout fence\n>```\n\nAfter the callout: [[Node.js]].\n",
         encoding="utf-8",
     )
+    # The callout fence closes on `>``` ` (no space), and text after it is text again.
+    (vault / "Wiki" / "Node.js.md").write_text("---\ntype: entity\n---\nnode\n", encoding="utf-8")
     links = _run(vault)["links"]
-    assert "Wiki/gamma-orphan.md" in links["orphans"]
+    assert "Wiki/gamma-orphan.md" not in links["orphans"]
+    assert links["notes"]["Wiki/gamma-orphan.md"]["outbound"] == 1
     assert links["notes"]["Wiki/alpha-note.md"]["inbound"] == 1
 
 
@@ -388,9 +402,11 @@ def test_log_path_tokens_are_not_satisfied_by_a_basename_elsewhere(vault):
         log.write("## [2026-05-09] create | entity | deleted-note.md\n")
         log.write("## [2026-05-10] ingest | raw | Raw/recording.mp3\n")
         log.write("## [2026-05-11] schema | bump to v1.2\n")
+        log.write("## [2026-05-12] create | entity | Wiki/My Note.md\n")
     assert _run(vault)["log"]["missing_files"] == [
         {"line": 4, "file": "Wiki/deleted-note.md"},
         {"line": 7, "file": "Raw/recording.mp3"},
+        {"line": 9, "file": "Wiki/My Note.md"},
     ]
 
 
