@@ -12,9 +12,12 @@
  *
  * Validates hooks/claude-code.json:
  *   - every event key is a known Claude Code hook event;
- *   - every matcher-group has a stable string `id`, a valid-regex `matcher`,
- *     and a non-empty `hooks` array;
- *   - `id`s are unique across the whole file;
+ *   - every matcher-group carries ONLY the two keys Claude Code's schema knows
+ *     (`matcher`, `hooks`) — anything else is silently dropped by the host and
+ *     warned about at every session start, so it is a finding here;
+ *   - every matcher-group has a valid-regex `matcher` and a non-empty `hooks`
+ *     array;
+ *   - no command is registered twice across the whole file;
  *   - every command hook uses `type: "command"` and references
  *     `${CLAUDE_PLUGIN_ROOT}`;
  *   - the sync-guard rule: PreToolUse and PostToolUse each expose EXACTLY ONE
@@ -76,6 +79,12 @@ const ALLOWED_EVENTS = new Set([
   'TaskCompleted',
 ]);
 
+// The only keys Claude Code's matcher-group schema recognises. Anything else is
+// stripped on load and reported as "unknown keys ... ignored" in every session,
+// so the registry must not carry annotations here — hook names and descriptions
+// live in hooks/README.md.
+const ALLOWED_GROUP_KEYS = new Set(['matcher', 'hooks']);
+
 // Events whose sync entry blocks the tool call — they must collapse to exactly
 // one synchronous dispatcher entry (the async observers are the only exception).
 const SINGLE_SYNC_EVENTS = ['PreToolUse', 'PostToolUse'];
@@ -94,7 +103,7 @@ function validateHooksJson(config) {
     return ['hooks/claude-code.json must have a top-level "hooks" object'];
   }
 
-  const seenIds = new Set();
+  const seenCommands = new Set();
 
   for (const [event, groups] of Object.entries(config.hooks)) {
     if (!ALLOWED_EVENTS.has(event)) {
@@ -108,12 +117,11 @@ function validateHooksJson(config) {
     for (const [i, group] of groups.entries()) {
       const where = `${event}[${i}]`;
 
-      if (typeof group?.id !== 'string' || !group.id.trim()) {
-        errors.push(`${where}: missing stable string "id"`);
-      } else if (seenIds.has(group.id)) {
-        errors.push(`${where}: duplicate id "${group.id}"`);
-      } else {
-        seenIds.add(group.id);
+      const unknownKeys = Object.keys(group ?? {}).filter((k) => !ALLOWED_GROUP_KEYS.has(k));
+      if (unknownKeys.length > 0) {
+        errors.push(
+          `${where}: unknown matcher-group keys ${unknownKeys.map((k) => `"${k}"`).join(', ')} — Claude Code ignores them and warns at session start`,
+        );
       }
 
       if (typeof group?.matcher !== 'string') {
@@ -137,6 +145,10 @@ function validateHooksJson(config) {
         // biome-ignore lint/suspicious/noTemplateCurlyInString: matching the literal ${CLAUDE_PLUGIN_ROOT} placeholder text
         if (typeof hook?.command !== 'string' || !hook.command.includes('${CLAUDE_PLUGIN_ROOT}')) {
           errors.push(`${where}.hooks[${j}]: command must reference \${CLAUDE_PLUGIN_ROOT}`);
+        } else if (seenCommands.has(hook.command)) {
+          errors.push(`${where}.hooks[${j}]: duplicate command "${hook.command}"`);
+        } else {
+          seenCommands.add(hook.command);
         }
       }
     }
