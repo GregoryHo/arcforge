@@ -2,8 +2,6 @@
   "hooks": {
     "SessionStart": [
       {
-        "id": "inject-context",
-        "description": "Inject resume context (session summary, activated instincts).",
         "matcher": "startup|resume|clear|compact",
         "hooks": [
           {
@@ -13,8 +11,6 @@
         ]
       },
       {
-        "id": "session-start",
-        "description": "Create the session file and lazily start the observer daemon (async).",
         "matcher": "startup|resume|clear",
         "hooks": [
           {
@@ -27,8 +23,6 @@
     ],
     "UserPromptSubmit": [
       {
-        "id": "user-message-counter",
-        "description": "Increment the diary user-message counter (stdin-passthrough).",
         "matcher": ".*",
         "hooks": [
           {
@@ -40,8 +34,6 @@
     ],
     "PreToolUse": [
       {
-        "id": "secrets-guard",
-        "description": "Warn-only scan for hardcoded credentials in Edit/Write content and git commit commands.",
         "matcher": ".*",
         "hooks": [
           {
@@ -51,8 +43,6 @@
         ]
       },
       {
-        "id": "observe-pre",
-        "description": "Append the pre-tool observation (async — daemon I/O stays off the blocking path).",
         "matcher": ".*",
         "hooks": [
           {
@@ -65,8 +55,6 @@
     ],
     "PostToolUse": [
       {
-        "id": "compact-suggester",
-        "description": "Increment the shared diary tool-count on every event and suggest /compact at the threshold.",
         "matcher": ".*",
         "hooks": [
           {
@@ -76,8 +64,6 @@
         ]
       },
       {
-        "id": "observe-post",
-        "description": "Append the post-tool observation (async).",
         "matcher": ".*",
         "hooks": [
           {
@@ -90,8 +76,6 @@
     ],
     "Stop": [
       {
-        "id": "session-end",
-        "description": "Finalize the session and run the threshold-gated diary capture.",
         "matcher": ".*",
         "hooks": [
           {
@@ -103,8 +87,6 @@
     ],
     "PreCompact": [
       {
-        "id": "pre-compact",
-        "description": "Reset the suggester state and run diary-capture before compaction.",
         "matcher": ".*",
         "hooks": [
           {
