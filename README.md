@@ -194,7 +194,7 @@ npm run test:skills           # pytest — skill structure validation
 npm run test:observer-daemon  # Bash — observer daemon behavior
 ```
 
-Plus six static checks, all of which run in CI:
+Plus six static checks and lint, all of which run in CI:
 
 ```bash
 npm run check:versions        # version strings in sync
