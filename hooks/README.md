@@ -6,7 +6,7 @@ Hooks for extending Claude Code behavior in arcforge.
 
 ```
 hooks/
-├── claude-code.json        # Hook registry (9 entries, each with a stable `id`)
+├── claude-code.json        # Hook registry (9 matcher-groups)
 ├── README.md
 ├── secrets-guard/          # Warn-only scan for hardcoded credentials
 │   └── main.js
@@ -31,9 +31,15 @@ hooks/
 
 ## Active Hooks
 
-`claude-code.json` registers **9 entries**, each with a stable `id`. Every hook
-is its own registration; the observers are async entries so their daemon I/O
-never joins the blocking path.
+`claude-code.json` registers **9 matcher-groups**. Every hook is its own
+registration; the observers are async entries so their daemon I/O never joins
+the blocking path.
+
+A matcher-group carries only the two keys Claude Code's schema knows —
+`matcher` and `hooks`. Annotations such as a name or a description are *not*
+allowed there: the host drops unknown keys and warns about every one of them at
+session start. The names below are this README's handles for the entries, not
+fields in the JSON, and `check:hooks` fails if an annotation creeps back in.
 
 The registry is named for its host rather than by convention. Claude Code loads
 it because `.claude-plugin/plugin.json` declares
@@ -42,8 +48,8 @@ left empty on purpose, because that is the path Codex auto-discovers plugin
 hooks at and these hooks speak Claude Code's protocol. `npm run check:hooks`
 fails if either the declaration or the emptiness goes away.
 
-| Event | id | Kind | What runs |
-|-------|----|------|-----------|
+| Event | Registration | Kind | What runs |
+|-------|--------------|------|-----------|
 | SessionStart | `inject-context` | sync | Loads previous session context / activated instincts |
 | SessionStart | `session-start` | async | Initializes the session file, lazily starts the observer daemon |
 | UserPromptSubmit | `user-message-counter` | sync | Counts user messages (stdin passthrough) |
@@ -76,7 +82,8 @@ its self-gated context.
 ### Registry schema check
 
 `node scripts/check-hooks-schema.js` (npm: `check:hooks`) statically validates
-`hooks/claude-code.json` — known event names, valid matchers, stable unique ids,
+`hooks/claude-code.json` — known event names, valid matchers, no matcher-group
+key outside `matcher`/`hooks`, no command registered twice,
 `${CLAUDE_PLUGIN_ROOT}` command form, and the one-sync-entry-per-blocking-event
 rule. It also checks the registration path itself: that `.claude-plugin/plugin.json`
 declares the registry, that `.codex-plugin/plugin.json` declares no hooks, and

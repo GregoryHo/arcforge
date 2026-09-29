@@ -3,8 +3,9 @@
  *
  * Proves the shipped hooks/claude-code.json passes the schema linter, and that
  * the linter actually catches the failure classes it exists to guard (unknown
- * event, duplicate id, missing ${CLAUDE_PLUGIN_ROOT}, and an async guard
- * sneaking onto the blocking path).
+ * event, a matcher-group key Claude Code's schema does not know, a duplicate
+ * command, missing ${CLAUDE_PLUGIN_ROOT}, and an async guard sneaking onto the
+ * blocking path).
  *
  * Also proves the registration-path half, which is the leak guard: the Claude
  * Code manifest declares exactly `./hooks/claude-code.json` (the only thing that
@@ -33,8 +34,8 @@ const {
 // biome-ignore lint/suspicious/noTemplateCurlyInString: fixture uses the literal ${CLAUDE_PLUGIN_ROOT} placeholder
 const CMD = '${CLAUDE_PLUGIN_ROOT}/x';
 
-function group(id, extra = {}) {
-  return { id, matcher: '.*', hooks: [{ type: 'command', command: CMD, ...extra }] };
+function group(command = CMD, extra = {}) {
+  return { matcher: '.*', hooks: [{ type: 'command', command, ...extra }] };
 }
 
 describe('check-hooks-schema', () => {
@@ -46,21 +47,29 @@ describe('check-hooks-schema', () => {
   });
 
   it('rejects an unknown event name', () => {
-    const errors = validateHooksJson({ hooks: { NotARealEvent: [group('x')] } });
+    const errors = validateHooksJson({ hooks: { NotARealEvent: [group()] } });
     assert.ok(errors.some((e) => e.includes('unknown hook event')));
   });
 
-  it('rejects duplicate ids', () => {
+  it("rejects a matcher-group key Claude Code's schema does not know", () => {
     const errors = validateHooksJson({
-      hooks: { PreToolUse: [group('dup')], PostToolUse: [group('dup')] },
+      hooks: { Stop: [{ ...group(), id: 'session-end', description: 'annotated' }] },
     });
-    assert.ok(errors.some((e) => e.includes('duplicate id')));
+    assert.ok(errors.some((e) => e.includes('unknown matcher-group keys')));
+    assert.ok(errors.some((e) => e.includes('"id"') && e.includes('"description"')));
+  });
+
+  it('rejects the same command registered twice', () => {
+    const errors = validateHooksJson({
+      hooks: { PreToolUse: [group()], PostToolUse: [group()] },
+    });
+    assert.ok(errors.some((e) => e.includes('duplicate command')));
   });
 
   it('rejects a command that omits the plugin-root placeholder', () => {
     const errors = validateHooksJson({
       hooks: {
-        Stop: [{ id: 'x', matcher: '.*', hooks: [{ type: 'command', command: 'node end.js' }] }],
+        Stop: [{ matcher: '.*', hooks: [{ type: 'command', command: 'node end.js' }] }],
       },
     });
     assert.ok(errors.some((e) => e.includes('CLAUDE_PLUGIN_ROOT')));
@@ -69,8 +78,8 @@ describe('check-hooks-schema', () => {
   it('rejects a blocking event with no single synchronous dispatcher entry', () => {
     const errors = validateHooksJson({
       hooks: {
-        PreToolUse: [group('only-async', { async: true })],
-        PostToolUse: [group('ok')],
+        PreToolUse: [group(`${CMD}/pre`, { async: true })],
+        PostToolUse: [group(`${CMD}/post`)],
       },
     });
     assert.ok(errors.some((e) => e.includes('PreToolUse') && e.includes('synchronous')));

@@ -102,6 +102,11 @@ Register hooks in `hooks/claude-code.json` — the path
 thing that loads the registry. It is deliberately NOT `hooks/hooks.json`: that
 is the path Codex auto-discovers plugin hooks at, and `npm run check:hooks`
 fails if a file reappears there.
+- A matcher-group carries **only** `matcher` and `hooks`. Claude Code's schema
+  knows no other key: an `id`, a `description` or any other annotation is
+  dropped on load and warned about ("unknown keys ... ignored") at every
+  session start. Names and descriptions for the entries live in
+  `hooks/README.md`; `npm run check:hooks` fails if one returns to the JSON
 - Use `"async": true` for non-blocking hooks (e.g., logging, tracking)
 - Use `${CLAUDE_PLUGIN_ROOT}` (with braces) for all path references
 - Handler types: `command` (shell), `prompt` (LLM evaluation), `agent` (multi-turn subagent)
