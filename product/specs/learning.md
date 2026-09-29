@@ -1,6 +1,6 @@
 # learning — spec
 
-> Status: shipped v6.1.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.1.0 · extended by 6.2.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -186,3 +186,24 @@ data contracts live in `docs/decisions/learning-curator-schema/`.
   (B-5, B-9).
 - **D-012** — the `learn` candidate commands are a front end onto the canonical
   queue; the project-scoped queue is gone (B-5, B-9).
+- **D-018** — 6.1.1 carries the learning repairs that undo a choice the user
+  already made: repeated decay, the daemon after an opt-out, the dashboard's
+  refused activation, and `learn enable` erasing config (B-1, B-3, B-4).
+- **D-022** — decay is idempotent and never archives an activated instinct
+  (B-4, B-6).
+- **D-023** — *proposed*: the curator is a second outbound path — tool-less,
+  under the opt-in, and named in B-9 (B-1, B-9).
+- **D-020** — 6.2.0 carries the new instinct commands and every change that
+  moves learning state on disk.
+- **D-035** — *proposed*: a candidate name Layer 7 cannot use is rejected at
+  ingestion (B-5).
+- **D-036** — *proposed*: `approved` may be dismissed and `materialized` may be
+  materialized again (B-3, B-5).
+- **D-037** — *proposed*: the keyspace stays the project directory's basename,
+  collision recorded as a Residual (B-5, B-9).
+- **D-038** — *proposed*: manually saved instincts are not activatable, and the
+  product says so (B-3, B-4).
+- **D-040** — `learn instinct restore` brings back a decay-archived instinct,
+  audited (B-4, B-5).
+- **D-041** — *proposed*: rejections rotate to an archive, never deleted (B-5).
+- **D-042** — *proposed*: reflection counts only enriched diaries (B-8).

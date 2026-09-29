@@ -9,7 +9,10 @@ decision *and* every reversal. How to maintain this file: [`product/AGENTS.md`](
 | Version | Tag | Milestone | Status | What & why | Spec |
 |---|---|---|---|---|---|
 | 6.0.0 | `v6.0.0` | v6 toolkit | **shipped** | Ground-up rebuild: 15 self-contained skills behind a prose router, a 5-group CLI reached as bare `arcforge`, 6 hooks, and the retained learning / eval / obsidian systems — Claude Code single-harness, zero runtime deps. | [skill-system](specs/skill-system.md) · [cli](specs/cli.md) · [hooks](specs/hooks.md) · [learning](specs/learning.md) · [eval](specs/eval.md) · [obsidian](specs/obsidian.md) · [worktrees-loop](specs/worktrees-loop.md) |
-| 6.1.0 | `v6.1.0` | learning trust · spec-driven method · Codex packaging | **shipped ← we are here** | Diary enrichment and user-message capture move behind the learning opt-in and the enricher loses blanket permissions; the CLI's candidate commands become a front end onto the canonical queue; the lightweight spec-driven method arcforge runs itself on ships as the `speccing` skill; arcforge installs on Codex as a skills-only plugin over the same tree. | [skill-system](specs/skill-system.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) · [codex-harness](specs/codex-harness.md) · [sdd](specs/sdd.md) |
+| 6.1.0 | `v6.1.0` | learning trust · spec-driven method · Codex packaging | **shipped** | Diary enrichment and user-message capture move behind the learning opt-in and the enricher loses blanket permissions; the CLI's candidate commands become a front end onto the canonical queue; the lightweight spec-driven method arcforge runs itself on ships as the `speccing` skill; arcforge installs on Codex as a skills-only plugin over the same tree. | [skill-system](specs/skill-system.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) · [codex-harness](specs/codex-harness.md) · [sdd](specs/sdd.md) |
+| 6.1.1 | — | eval instrument · learning trust repairs · truthful safety claims | **building ← we are here** | The three fixes merged after `v6.1.0` — the prompt audit's engine and skill findings (#181, #182) and the hook registry's non-schema keys (#188) — plus the repairs the release benchmark depends on: trials isolated from the operator's output style and user hooks (#170), a provider refusal scored as an error trial rather than behavior, grader prompts that no longer resolve empty outside the arcforge repo, and error trials excluded from every verdict. Learning stops undoing what the user accepted: decay no longer re-applies at every SessionStart and archives instincts, the curator daemon — a second outbound path the spec never named — no longer starts after an opt-out, the dashboard's Activate and Deactivate pass their own gate, and `learn enable` stops erasing config. The secrets-guard claim is corrected to what it scans, and every edit under `skills/` lands here, so the benchmark is measured once, on a repaired instrument. | [eval](specs/eval.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) · [skill-system](specs/skill-system.md) · [obsidian](specs/obsidian.md) · [sdd](specs/sdd.md) · [worktrees-loop](specs/worktrees-loop.md) |
+| 6.1.2 | — | docs-are-the-contract sweep | **next** | Where the docs promise what the engine does not do: CLI messages and contract drift, hooks promises the engine never kept, loop state bugs, contributor tooling and repo hygiene. It touches no eval-backed path — nothing under `skills/`, `evals/scenarios/` or `evals/fixtures/` — so it ships without a benchmark regeneration. | [cli](specs/cli.md) · [hooks](specs/hooks.md) · [learning](specs/learning.md) · [worktrees-loop](specs/worktrees-loop.md) · [obsidian](specs/obsidian.md) · [codex-harness](specs/codex-harness.md) |
+| 6.2.0 | — | learning lifecycle · eval corpus repairs | **next** | Exits for candidates stuck at `approved` or `materialized`, `learn instinct deactivate` and `learn instinct restore`, a policy for candidate names, and worktree paths derived from the repo root; plus the scenario rubric fixes, measured in their own, smaller round. A minor because it adds CLI commands. | [learning](specs/learning.md) · [cli](specs/cli.md) · [worktrees-loop](specs/worktrees-loop.md) · [codex-harness](specs/codex-harness.md) · [eval](specs/eval.md) · [sdd](specs/sdd.md) |
 
 > Un-scheduled ideas live in the [Backlog](BACKLOG.md); a wish graduates into a
 > version (row + spec + Decision Log entry) when picked.
@@ -487,7 +490,7 @@ reverse one, append a superseding entry (see AGENTS.md).
 
 ### D-017 — The per-trial ceiling is overridable per run, and a run that moves it reports the value
 - Date: 2026-09-09
-- Version: unreleased (first version after 6.1.0)
+- Version: 6.1.1
 - Status: Accepted
 - Decision: The eval harness keeps 900 s as the per-trial ceiling and lets
   `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS` move it for a single run — a positive integer
@@ -514,3 +517,540 @@ reverse one, append a superseding entry (see AGENTS.md).
 - Verification: `tests/scripts/eval.test.js` — `resolveTrialTimeoutMs` returns
   900000 when the variable is unset or empty, `1800000` when set to it, and
   throws naming the variable on `abc`, `0`, `-5`, `1.5` and `30m`.
+
+### D-018 — 6.1.1 repairs the instrument and learning's trust promises before anything is measured
+- Date: 2026-09-30
+- Version: 6.1.1
+- Status: Accepted
+- Decision: 6.1.1 ships as a patch carrying the three changes merged after the
+  `v6.1.0` tag — the prompt audit's engine-prompt findings (#181), its skill and
+  contributor findings (#182), and the hook registry's non-schema keys (#188) —
+  together with the eval-instrument repairs the release benchmark depends on,
+  the learning repairs that stop undoing what a user accepted, the corrected
+  secrets-guard claim, and every edit under `skills/` known when the version
+  was planned; the roadmap opens the row as `building` now rather than at
+  release time.
+- Why: Plugin code is cached by version, so a fix merged without a bump never
+  reaches an installed copy. All three merged changes sat on `main` under
+  `6.1.0` with no row to govern them, and `specs/eval.md` already carried
+  D-017's behavior under a header that read `shipped v6.0.0`. The release is
+  gated on a regenerated benchmark — #182 edited files under `skills/`, and
+  `evals/benchmarks/latest.json` predates the `v6.1.0` tag — and the instrument
+  that produces that benchmark is itself broken: trials inherit the operator's
+  output style and user hooks (#170), a provider refusal is scored as a real
+  trial, the model grader's prompt resolves to an empty string outside the
+  arcforge repo and it grades anyway, and `eval run`, `list`, `report` and the
+  dashboard count error trials in their verdicts. Measuring first would spend
+  the quota on numbers nobody could trust, so the repairs ship first and
+  6.1.1's measurement runs on the repaired instrument — which is also why every
+  `skills/` edit known at planning lands here. Skill text that a later decision
+  changes (D-024, D-038) is measured in 6.2.0's round (D-020). The learning
+  repairs ride the same patch because
+  each one undoes a choice the user already made: an activated instinct
+  archived by decay that re-applies at every SessionStart, an opt-out the
+  curator daemon does not honour, activation the dashboard offers and its own
+  gate refuses, a hand-set config key erased by `learn enable`. Leaving them
+  for a minor would leave that in place. Patch rather than minor because every
+  change repairs something already shipped: no skill, CLI command, or hook is
+  added, and D-017's `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS` is a per-run setting on
+  the eval harness, not new surface for someone using arcforge on a project.
+- Cost accepted: `maintaining-obsidian` gains `references/lint_vault.py` inside
+  this patch. It runs scans the skill's audit already described in prose, which
+  is why it rides a patch, but it is a new file a user's session can execute.
+- Residual: the row stays `building` until the scenarios D-021 names are
+  re-measured on the repaired instrument; the patch does not tag before that
+  run exists.
+
+### D-019 — 6.1.2 is its own patch because it touches no eval-backed path
+- Date: 2026-09-30
+- Version: 6.1.2
+- Status: Accepted
+- Decision: The doc-versus-engine repairs — CLI messages and contract drift,
+  hooks promises the engine never kept, loop state bugs, learning's smaller
+  engine fixes, the website's install section, contributor tooling and repo
+  hygiene — ship as 6.1.2, a patch that changes nothing under
+  `skills/`, `evals/scenarios/` or `evals/fixtures/`.
+- Why: `scripts/check-benchmark-freshness.js` demands a regenerated benchmark
+  only when a change lands under one of those three prefixes. Keeping them out
+  lets drift a user can read today be repaired without spending eval quota.
+  Folding the work into 6.1.1 would lengthen the one release that already
+  waits on a measurement; folding it into 6.2.0 would hold documentation fixes
+  behind new CLI surface.
+- Cost accepted: a 6.1.2 item whose honest repair needs a skill edit cannot
+  ship in 6.1.2 — it takes a doc-side or engine-side fix there, or moves to
+  6.2.0.
+- Verification: at the 6.1.2 release, a `git diff --stat` from `v6.1.1` over
+  those three paths is empty, and the freshness check exits 0 without a new
+  snapshot.
+
+### D-020 — 6.2.0 isolates new CLI surface and anything that moves learning state on disk
+- Date: 2026-09-30
+- Version: 6.2.0
+- Status: Accepted
+- Decision: New CLI commands (`learn instinct deactivate` and
+  `learn instinct restore`), new exits in the Layer-5 Action × Status matrix,
+  every change that moves or rewrites learning state already on disk, the
+  dashboard's view of curator rejections, worktree paths derived from the repo
+  root, and the scenario rubric fixes ship as
+  6.2.0, a minor, measured in its own round of about 50 to 70 live sessions —
+  the exact list is confirmed when the row is promoted to `building`.
+- Why: Keeping new surface and state moves out of 6.1.1 and 6.1.2 leaves both
+  patches reviewable as repairs and free of migrations. Each rubric fix bumps a
+  scenario's `## Version` and empties its pool, so it needs that scenario re-run
+  — which the roughly 80 sessions budgeted for 6.1.1 cannot hold. Batching the
+  rubric fixes with whatever skill text the #179 decision (D-024) changes spends
+  the second round once. A minor because commands are added.
+- Residual: if the keyspace decision (D-037) chooses to migrate existing
+  learning data rather than keep the basename key, this version becomes a major
+  and is renumbered before it is built.
+
+### D-021 — 6.1.1's benchmark reruns only the scenarios whose subject changed
+- Date: 2026-09-30
+- Version: 6.1.1
+- Status: Accepted
+- Decision: The 6.1.1 benchmark re-runs, on the repaired instrument, only the
+  scenarios whose subject changed after the last snapshot or that the
+  instrument repairs exist to read — router skill selection, the diagramming
+  unverified-save claim (under a 1800 s ceiling, reported per D-017), executing
+  verify-decides-done, finishing verify-before-options, and the two
+  maintaining-obsidian scenarios (vault-only answer, audit runs the lint
+  script) — about 80 live sessions together with the #179 routing run and a
+  reserve for error trials.
+- Why: #182 edited the `SKILL.md` of diagramming-obsidian, executing,
+  finishing and maintaining-obsidian and added the lint-script scenario, and
+  the router run doubles as the acceptance test for the #170 isolation fix.
+  tdd and dispatching are not re-run: #182 touched only their `references/`,
+  and the A/B loads a single skill file (`scripts/cli/eval-command.js`), so
+  those files never reach a trial. A full rerun would spend several times the
+  quota on pools whose subject did not move.
+- Residual: every pool not re-run — brainstorming and tdd among them — was
+  measured before the instrument repairs, under the leaking isolation and the
+  refusal-as-trial scoring. The coverage ledger says so pool by pool, and no
+  pool is described as re-measured that was not.
+- Residual: the freshness gate compares timestamps, so a change under
+  `skills/`, `evals/scenarios/` or `evals/fixtures/` that lands after the
+  measurement commit still passes it. Before tagging, a `git diff --stat` from
+  the measurement commit over those paths has to be empty — checked by hand.
+
+### D-022 — Decay is idempotent, and it never archives an activated instinct
+- Date: 2026-09-30
+- Version: 6.1.1
+- Status: Accepted
+- Decision: Confidence decay charges each elapsed period once — running the
+  cycle any number of times over the same interval gives the result of running
+  it once — it never archives an activated instinct, and every archive it does
+  perform writes an audit record.
+- Why: learning B-4 says the product MUST NOT silently undo what the user
+  accepted, and that retiring an instinct is its own explicit deactivation.
+  Decay broke that with no opt-out involved at all: an automatic step removed
+  an instinct the user had activated, reported only a count of what it archived
+  and not which instinct, and left the queue claiming it was still `activated`.
+  An activated instinct leaves the injected set only through the user's
+  deactivation.
+- Symptom: `runDecayCycle` (`scripts/lib/confidence.js`) computes the full
+  weeks from `last_confirmed` to now at every SessionStart and writes back only
+  `confidence`, never the timestamp, so the same weeks are charged again each
+  session. An instinct at 0.50 confidence, confirmed four weeks earlier, moved
+  to `archived/` on the fifth call; it stopped being injected, its queue status
+  still read `activated`, and no audit line recorded the move. Verified at the
+  function level only; it reaches project-scope instincts.
+- Residual: instincts already over-decayed and archived are not restored by
+  6.1.1. `learn instinct restore` (D-040) arrives in 6.2.0; until then the
+  CHANGELOG names the manual move back.
+
+### D-023 — The curator is a second outbound path: tool-less, under the opt-in, and named in the spec
+- Date: 2026-09-30
+- Version: 6.1.1
+- Status: Proposed
+- Decision: Proposed: the curator's model run gets no tools, the observer
+  daemon starts and analyzes only where learning is enabled, and learning B-9
+  names the curator as a second outbound path beside diary enrichment. Until
+  accepted, it gates the curator and daemon changes and the rewrite of B-9.
+- Why: B-9, D-009 and the learning-dashboard guide all promise that diary
+  enrichment is the one outbound path. The observer daemon also sends
+  observation batches to a model, with no tool restriction, while the proposal
+  ingestor records that run's manifest as `tool_access: false`; and the daemon
+  starts at every SessionStart whether or not learning is on. A privacy claim
+  a user decides on is false in the direction that matters. Correcting the prose
+  alone would make the record honest and leave an unrestricted outbound run
+  that also ignores an opt-out, which B-1 does not allow.
+- Symptom: `scripts/lib/learning-curator/observer-daemon.sh` sends the curator
+  batch by invoking `claude --model haiku … --print` with no `--tools` or
+  `--allowedTools` restriction; `checkDaemon`
+  (`hooks/session-tracker/start.js`) checks only `ARCFORGE_OBSERVE_NO_SPAWN`,
+  and the daemon analyzes once ten or more observations wait. Observation
+  itself is gated, so the opt-out breach reaches a user who opted in, then out,
+  and left unanalyzed observations behind — inferred from the code, not run.
+- Residual: D-009's recorded Why calls enrichment the product's single
+  outbound path. That text is immutable and is now incomplete; the correction
+  lives here and in B-9, and D-009's decision itself stands.
+
+### D-024 — `speccing` under plugin routing (#179): re-measure before deciding
+- Date: 2026-09-30
+- Version: 6.1.1
+- Status: Proposed
+- Decision: Proposed: re-measure whether `speccing` fires under real plugin
+  routing on the repaired instrument; if the rate stays low, document it as
+  user-invoked in practice rather than editing its description. Until
+  accepted, it gates any edit to the `speccing` description and the final
+  README and skills-reference wording about how it fires; disclosing the
+  current measurement is not gated.
+- Why: D-015's +0.67 was measured with the skill body injected
+  (`--skill-file`). With the plugin loaded and the description left to route
+  (`--plugin-dir`), `eval-speccing-spec-before-code` scored 0/10 across two
+  k=5 runs in the release benchmark, the second after the earlier description
+  was restored. Both runs were taken under the #170 isolation leak, so they
+  cannot yet tell a routing defect from a contaminated instrument. Editing the
+  description on them would tune the skill against noise; documenting the
+  skill as user-invoked on them would retreat from D-015 on the same noise. A
+  clean re-measurement settles which.
+- Symptom: the README and the skills-reference guide describe a skill that
+  fires on its own; only the CHANGELOG discloses the 0/10. The failing case is
+  a user asking to leave product docs for later; `/speccing` typed by hand
+  still works.
+- Residual: if the re-measurement confirms the low rate and the documentation
+  route is taken, D-015's premise no longer holds in practice. That reversal is
+  recorded then, as its own entry superseding D-015, not folded into this one.
+
+### D-025 — `claude plugin eval` measures routing and stays out of the release gate
+- Date: 2026-09-30
+- Version: 6.1.1
+- Status: Proposed
+- Decision: Proposed: use `claude plugin eval` only to measure whether a named
+  skill fires under real plugin routing — first for #179 (D-024) — from an
+  eval directory outside `evals/`, with `--no-publish`, an explicit `--model`
+  and a `--max-cost-usd` on every run; it never produces the release snapshot
+  and never enters the release gate. Until accepted, it gates the #179 routing
+  run and the two-session isolation check that precedes it.
+- Why: The existing harness cannot measure routing cleanly:
+  `eval ab --plugin-dir` still injects the skill body in skill scope, so its
+  arms are not "plugin loaded" against "plugin absent", and its trials leak the
+  operator's settings (#170). `claude plugin eval` can assert that a specific
+  skill was used and starts each run from a fresh home and config directory.
+  It has no confidence intervals and writes no snapshot the freshness gate
+  reads, so it cannot replace the benchmark. `--no-publish` is required
+  because the default uploads the report to claude.ai.
+- Residual: the feature sits under `experimental` with no public documentation
+  page, and its isolation is inferred from the run layout, not yet observed —
+  which is what the two-session check is for. If it does not isolate, #179 is
+  measured on the repaired `arcforge eval` instead.
+
+### D-026 — answering-feedback: the ledger records REGRESSED, and the cost flag is informational
+- Date: 2026-09-30
+- Version: 6.1.1
+- Status: Proposed
+- Decision: Proposed: the coverage ledger records the REGRESSED of the
+  `code-review-answering-feedback` scenario as measured, and for an
+  injection-type treatment the cost-regression flag is informational — it is
+  reported, never counted toward the verdict. Until accepted, it gates the
+  ledger correction and the rewrite of the 6.0.0 benchmark evidence note.
+- Why: Under the non-regression policy (eval B-4) the verdict reads only
+  whether every treatment trial passes; a treatment pass rate of 0.8 means one
+  trial failed, and the cost flag never enters the verdict. The ledger and the
+  6.0.0 benchmark evidence nonetheless book it as passing on score and driven
+  by cost — a real REGRESSED entered as a pass. An injected skill adds tokens
+  to every trial by construction, so a cost flag on it describes the
+  treatment, not whether the treatment works.
+- Symptom: `evals/benchmarks/latest.json` carries the REGRESSED;
+  `evals/skill-eval-coverage.md` and the 6.0.0 benchmark evidence attribute it
+  to cost.
+
+### D-027 — Floor assertions keep the weight the engine gives them today
+- Date: 2026-09-30
+- Version: 6.1.1
+- Status: Proposed
+- Decision: Proposed: keep the engine's current computation of floor
+  assertions in the pass bar and write that computation down in eval B-5 and
+  the eval guide, settled before any 6.1.1 result is read. Until accepted, it
+  gates reading the 6.1.1 results against the pass bar.
+- Why: The question has no ruling on file, and it can decide a release
+  verdict: `writing-skills` t1 passes on a floor score of 0.83. Settling it
+  before the results are read keeps the ruling from being chosen to fit them;
+  keeping the current computation keeps the pools not re-run (D-021)
+  comparable with the ones that are.
+
+### D-028 — obsidian's `index.md` rebuild is a write step of LINK mode
+- Date: 2026-09-30
+- Version: 6.1.1
+- Status: Proposed
+- Decision: Proposed: the full `index.md` rebuild is a write step of the
+  audit's LINK mode, its procedure defined in the skill's
+  `references/audit.md`. Until accepted, it gates that procedure and every
+  reference that promises the rebuild.
+- Why: Seven places — the ingest mode (twice), the bootstrap workflow, and
+  the llm-wiki (twice), news and project-tracker presets — say the audit's
+  LINT rebuilds `index.md`, while
+  `audit.md` defines no procedure, `lint_vault.py` excludes the index, and
+  obsidian B-5 says only link resolution modifies notes. After a batch ingest
+  the index falls behind, and query reads it first. Placing the rebuild in
+  LINK keeps B-5 true as written and gives the promise one home instead of
+  seven; placing it in LINT would change B-5.
+
+### D-029 — secrets-guard's docs say it scans the commit command, not the commit
+- Date: 2026-09-30
+- Version: 6.1.1
+- Status: Proposed
+- Decision: Proposed: hooks B-4, the README and the hooks guide say that on
+  `git commit` the guard scans the command string, not the content being
+  committed; scanning staged content becomes the `secrets-guard-staged-scan`
+  wish. Until accepted, it gates the B-4 rewrite and the README and guide
+  wording.
+- Why: B-4, the README and the guide all say commit content is scanned; the
+  Bash branch runs `scanForSecrets` over the command string and reads no staged
+  file, so a user believes a check stands before every commit when none does.
+  Either side can move. Fixing the docs costs three doc edits in this patch
+  and removes a false safety claim now. Building the scan is new behavior: it
+  reads the index on every `git commit` a session runs, on the synchronous path
+  hooks B-7 keeps small, for a result that stays warn-only (B-3), and it needs
+  its own cost measured before it ships — so it waits as a wish.
+- Symptom: a credential staged in a file and committed through the session
+  draws no warning; only one typed into the commit command itself does. Edits
+  and writes are scanned as B-4 says. `hooks/README.md` already words it the
+  way the code behaves.
+
+### D-030 — The Claude review workflow runs on opened and ready-for-review PRs only
+- Date: 2026-09-30
+- Version: 6.1.1
+- Status: Proposed
+- Decision: Proposed: the Claude code-review workflow runs only when a pull
+  request is opened or marked ready for review, under a paths filter, instead
+  of on every push. Until accepted, it gates the workflow edit, which lands
+  before 6.1.1's work-package PRs open.
+- Why: Every push runs a full review, drawing on the same usage the eval
+  measurements need; one branch ran it 26 times in a single day, and 6.1.1
+  opens six or more PRs. No user of arcforge is affected either way.
+- Cost accepted: a push after the PR is ready gets no automated review of its
+  own.
+
+### D-031 — hooks B-8 stops promising where the last session left off
+- Date: 2026-09-30
+- Version: 6.1.2
+- Status: Proposed
+- Decision: Proposed: remove "where the last session left off" from hooks B-8,
+  the hooks guide, `hooks/README.md` and the README, so SessionStart promises
+  what `inject-context` injects; building the carry-over becomes the
+  `session-continuity-injection` wish. Until accepted, it gates the B-8 rewrite
+  and the three doc edits.
+- Why: `inject-context` injects activated instincts, pending reviews, the
+  stale-draft warning, aliases and promotions — nothing from the previous
+  session's record, which the session-tracker README itself says no hook reads
+  back. Docs are the contract, so one side has to move. Removing the promise is
+  a doc change that fits 6.1.2; building it adds content to every session's
+  start, which is a product choice of its own.
+- Cost accepted: the product stops advertising a continuity feature a user may
+  have read about — one it never delivered.
+
+### D-032 — Without a verify floor, a loop task is done on exit 0, and the loop says so
+- Date: 2026-09-30
+- Version: 6.1.2
+- Status: Proposed
+- Decision: Proposed: worktrees-loop B-6 states that a task with no `verify:`
+  line, run without a run-level verify command, is done when its session exits
+  0, and the loop warns at start when any task will run without a floor. Until
+  accepted, it gates the B-6 rewrite and the start-up warning.
+- Why: B-6 says the loop never accepts the model's self-report, but with no
+  floor a clean exit is exactly that. The looping skill already says so, and a
+  test pins the behavior. Refusing floor-less tasks would break task lists
+  that work today; stating the rule and warning at start makes the
+  self-report visible at the one moment a user can still add a floor.
+- Symptom: `scripts/loop.js` marks a floor-less task done on exit 0 while B-6
+  promises it cannot happen.
+
+### D-033 — `check:product` widens by one decision: a clause convention, the C3 gaps, spec sections
+- Date: 2026-09-30
+- Version: 6.1.2
+- Refines: D-006
+- Status: Proposed
+- Decision: Proposed: fix one convention for numbering a decision's clauses;
+  then have C3 read the closed status vocabulary on every entry, reject a
+  trailing `·`, and hold a clause number to one claimant; and add an eighth
+  rule asserting that every spec carries the template's five section headings.
+  Until accepted, it gates the `check:product` changes and the matching
+  `product/AGENTS.md` text.
+- Why: D-006's recorded text enumerates seven rules and names each C3 widening
+  as needing its own decision. A clause-identity check has nothing to compare
+  until clauses have one numbering convention, so the convention comes first.
+  The section rule closes a fail-open: drop or indent a spec's `## Decisions`
+  and C5 checks nothing in that spec, silently. None of the gaps has harmed an
+  entry yet (#161, #163); closing them in a version that touches no eval-backed
+  path costs no quota.
+- Residual: the liveness of a `Refines:` or `Extends:` target stays untested,
+  as D-006 chose deliberately. The CommonMark edge cases recorded in
+  `docs/plans/check-product-deferred.md` stay open; how much CommonMark grammar
+  the linter owns is a separate decision.
+
+### D-034 — obsidian B-4's provenance pair is conditional on the vault adopting raw sources
+- Date: 2026-09-30
+- Version: 6.1.2
+- Status: Proposed
+- Decision: Proposed: obsidian B-4 follows the skill — the two-write ingest
+  (the immutable original, then the typed note with `source_url` and
+  `sha256`) applies in a vault whose contract declares `raw_source: adopted`,
+  not in every vault. Until accepted, it gates the B-4 rewrite and the
+  data-model line naming the provenance pair.
+- Why: B-4 states the two writes unconditionally; the skill performs them only
+  when the vault's contract adopts raw sources, and the project-tracker preset
+  declares it not adopted. Under B-1 the vault's contract decides domain
+  behavior, so the skill is the side that is right and the spec is the side
+  that overclaims.
+
+### D-035 — A candidate name Layer 7 cannot use is rejected at ingestion
+- Date: 2026-09-30
+- Version: 6.2.0
+- Refines: D-012
+- Status: Proposed
+- Decision: Proposed: Layer 5 rejects at ingestion a candidate whose `name`
+  the draft writer could not use as a filename or that the redactor would
+  alter; names are not normalized at materialization. Until accepted, it gates
+  the schema and ingestor changes.
+- Why: D-012 left reject-versus-normalize open. Layer 5 checks a name's
+  presence, type and length only, Layer 7 refuses a hostile one permanently
+  with `path_policy_rejected`, and `approved` has no exit, so `approve` then
+  `materialize` strands the candidate. Separately, `sanitizeRecord` leaves
+  `name` untouched while `secret_scan` is marked passed unconditionally, so a
+  key-shaped name reaches the queue, the draft filename, the draft body and
+  the activated instinct the runtime loads (#175). Rejecting at the door closes
+  both with one rule and keeps every stored name one the product can show;
+  normalizing would keep two names for one candidate, the stored and the
+  rendered.
+- Residual: either fix moves `candidate_record_hash` (#175). Candidates
+  already queued under such a name are not rewritten by this rule; they leave
+  `approved` through the exit D-036 proposes.
+
+### D-036 — Layer 5 gains two exits: dismiss from approved, materialize again from materialized
+- Date: 2026-09-30
+- Version: 6.2.0
+- Extends: D-012
+- Status: Proposed
+- Decision: Proposed: the Layer-5 Action × Status matrix lets an `approved`
+  candidate be dismissed and a `materialized` candidate be materialized again,
+  so neither state is a dead end. Until accepted, it gates the matrix change,
+  the frozen Layer-5 contract's matrix, and the dashboard and CLI actions that
+  expose the two exits.
+- Why: From `approved` the matrix allows only `materialize`, `promote` and
+  `evolve`, so an approved candidate that materialize refuses — a non-instinct
+  type or a hostile name — has no legal move (#160); D-012 recorded that dead
+  end as deliberate while the curator has no renderer. A `materialized`
+  candidate whose draft was edited or deleted allows only `activate`, which
+  refuses on the hash mismatch, so one hand edit strands it (#165), and the
+  guide's only remedy is restoring the file. Dismissing lets a reviewer retire
+  a verdict that cannot proceed; materializing again rewrites the draft from
+  the stored record, so the reviewed content and the file agree again.
+
+### D-037 — The learning keyspace stays the project directory's basename
+- Date: 2026-09-30
+- Version: 6.2.0
+- Status: Proposed
+- Decision: Proposed: observations, instincts and candidates stay keyed on the
+  sanitized basename of the project directory, and the collision between two
+  same-named projects is recorded as a Residual and stated in the learning
+  guide. Until accepted, it gates any keyspace change and that guide text.
+- Why: Separating the two projects is a keyspace redesign, not a filter:
+  `scope.project_id` cannot stand in, because it is taken from whichever
+  observation wrote first, or a name hash, so filtering on it would hide
+  candidates. Changing the key means migrating every existing user's learning
+  data, which would make 6.2.0 a major (D-020), for a collision a user meets
+  only with two project directories of the same name.
+- Residual: two such projects share one observation store, one instincts tree
+  and one candidate set, and `learn --project` cannot tell them apart (D-012).
+
+### D-038 — Manually saved instincts are not activatable, and the product says so
+- Date: 2026-09-30
+- Version: 6.2.0
+- Status: Proposed
+- Decision: Proposed: an instinct saved by hand or from reflection is not
+  activatable and is never injected; the learning guide and the save command's
+  output say so. Until accepted, it gates the guide text, the command output,
+  and the learning skill's "remember this" wording.
+- Why: Injection takes only ids in the activation set, and activation is
+  reached only through the candidate lifecycle and its three gates (learning
+  B-3). A saved instinct creates no candidate, so a path to injection would
+  either bypass those gates or add a second activation route beside them. What
+  is broken today is the silence, not the exclusion: "remember this" reads as
+  if the instinct will take effect, and nothing says it will not.
+- Cost accepted: a rule the user states outright does not reach a future
+  session through this path.
+
+### D-039 — The Codex boundary stays where D-013 drew it this cycle
+- Date: 2026-09-30
+- Version: 6.2.0
+- Status: Proposed
+- Decision: Proposed: 6.2.0 leaves the Codex boundary unchanged — the seven
+  CLI-backed skills keep reporting `command not found`, the hooks get no
+  Codex-native implementation, cross-skill handoffs keep the slash notation,
+  and the `claude`-spawning subsystems (learning's enricher and curator, eval,
+  loop) get no runner seam — each stated
+  as a Residual in codex-harness, its wish left in the backlog. Until
+  accepted, it gates those Residual edits.
+- Why: Each open item needs a maintainer decision about a boundary this cycle
+  does not reopen. A skill-relative engine path breaks D1/D9; the
+  SessionStart-hook route re-opens the hook-discovery guard D-013 closed; a
+  Codex hook adapter is blocked on ownership and trust, not protocol;
+  host-neutral handoffs reopen the frozen skill-schema §4.1/§5; and a
+  harness-neutral runner is a prerequisite nobody has scheduled. None is cheap
+  enough to ride a minor whose subject is learning's lifecycle.
+
+### D-040 — `learn instinct restore` brings back a decay-archived instinct, audited
+- Date: 2026-09-30
+- Version: 6.2.0
+- Status: Accepted
+- Decision: A new command, `learn instinct restore`, moves an instinct that
+  decay archived back out of the archive and records the restore in the audit
+  log.
+- Why: 6.1.1 stops decay from re-charging and from archiving activated
+  instincts (D-022), but instincts it already archived stay archived, and the
+  only remedy until then is a manual file move the CHANGELOG describes.
+  Hand-editing state is out of contract (learning B-5), so the way back has to
+  be a command, and since it changes what may be injected it is audited like
+  every other change of that kind.
+- Cost accepted: new CLI surface — one of the two commands that make 6.2.0 a
+  minor (D-020).
+
+### D-041 — Rejections rotate to an archive and are never deleted
+- Date: 2026-09-30
+- Version: 6.2.0
+- Status: Proposed
+- Decision: Proposed: `rejections.jsonl` rotates to an archive file once it
+  passes the Layer-5 contract's retention limits (30 days, 5,000 records,
+  10 MB); no rejection record is deleted. Until accepted, it gates the
+  retention code in the queue writer.
+- Why: The Layer-5 contract sets those limits and nothing implements them, so
+  the file only grows. Deleting would satisfy the limits and erase the only
+  record of what the curator declined and why — the record the
+  dashboard-rejections work in the same version shows the user. Rotation bounds
+  the live file and keeps the history.
+- Residual: the archive itself is unbounded, and `queue.jsonl` rotation stays
+  deferred.
+
+### D-042 — Reflection counts only enriched diaries
+- Date: 2026-09-30
+- Version: 6.2.0
+- Status: Proposed
+- Decision: Proposed: learning B-8's three-diary threshold counts only
+  diaries whose sections were enriched; an unenriched draft stub does not count
+  toward readiness. Until accepted, it gates the B-8 definition and the
+  readiness count.
+- Why: Under the opt-in, an unenriched stub is counted toward the three
+  diaries, which produces a false "ready" nudge and a reflection with nothing
+  to mine (#169). B-8 exists so reflection does not overclaim, and a stub is
+  not evidence a pattern can be drawn from. Filtering the count directly would
+  break its other readers, so B-8 defines what counts first and the code
+  follows the definition.
+
+### D-043 — Graders never execute trial output
+- Date: 2026-09-30
+- Version: 6.2.0
+- Status: Proposed
+- Decision: Proposed: an eval grader never runs code a trial produced; the A5
+  floor of `eval-speccing-spec-before-code` (#156) becomes a static check over
+  the trial's files instead of a `node -e` probe of the exported function.
+  Until accepted, it gates the #156 repair.
+- Why: The repair the backlog recorded — a grader-owned probe of
+  `formatFor('csv', run)` — would have the grader execute code the agent under
+  test just wrote, on the operator's machine with the operator's permissions,
+  and trial isolation today is advice rather than a sandbox. A static check is
+  weaker evidence that the CSV branch works, but it cannot be turned against
+  the machine that grades it.
+- Cost accepted: the A5 floor can still pass on code that reads right and does
+  not run. The floor ships with the scenario's other three rubric repairs
+  (#157, #162, #168) in one `## Version` bump and a k=10 rerun of both arms.

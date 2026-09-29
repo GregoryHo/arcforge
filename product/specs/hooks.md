@@ -1,6 +1,6 @@
 # hooks — spec
 
-> Status: shipped v6.1.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.1.0 · extended by 6.1.2 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -167,3 +167,7 @@ implements fail-open is pinned in `.claude/rules/coding-standards.md`.
   under the opt-in (B-6).
 - **D-009** — the enrichment run that B-6 gates is also unprivileged
   ([learning](learning.md) B-9).
+- **D-029** — *proposed*: B-4 says the guard scans the commit command, not the
+  committed content; a staged-content scan waits as a wish (B-4).
+- **D-031** — *proposed*: B-8 stops promising where the last session left off
+  (B-8).
