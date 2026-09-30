@@ -811,11 +811,10 @@ reverse one, append a superseding entry (see AGENTS.md).
 ### D-030 — The Claude review workflow runs on opened and ready-for-review PRs only
 - Date: 2026-09-30
 - Version: 6.1.1
-- Status: Proposed
-- Decision: Proposed: the Claude code-review workflow runs only when a pull
-  request is opened or marked ready for review, under a paths filter, instead
-  of on every push. Until accepted, it gates the workflow edit, which lands
-  before 6.1.1's work-package PRs open.
+- Status: Accepted
+- Decision: The Claude code-review workflow runs only when a pull request is
+  opened or marked ready for review, under a paths filter, instead of on every
+  push. The workflow edit lands before 6.1.1's work-package PRs open.
 - Why: Every push runs a full review, drawing on the same usage the eval
   measurements need; one branch ran it 26 times in a single day, and 6.1.1
   opens six or more PRs. No user of arcforge is affected either way.
