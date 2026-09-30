@@ -759,15 +759,29 @@ function findLatestActivation(arcforgeRoot, candidateId) {
  * @returns {Set<string>} candidate ids whose latest action === 'activate'
  */
 function listActivatedCandidateIds(arcforgeRoot) {
+  return readActivationState(arcforgeRoot).activated;
+}
+
+/**
+ * The same fold, plus what could not be read: an unreadable directory or a
+ * record that is not JSON. Injection treats those as "not activated" (fail
+ * closed for influence); a destructive caller — decay's archive — must treat
+ * them as unknown instead (B-10).
+ *
+ * @returns {{ activated: Set<string>, unreadable: string[] }}
+ */
+function readActivationState(arcforgeRoot) {
   const activated = new Set();
+  const unreadable = [];
   const activationsDir = getActivationsDir(arcforgeRoot);
-  if (!fs.existsSync(activationsDir)) return activated;
+  if (!fs.existsSync(activationsDir)) return { activated, unreadable };
 
   let entries;
   try {
     entries = fs.readdirSync(activationsDir).sort();
-  } catch {
-    return activated;
+  } catch (err) {
+    unreadable.push(`activations directory: ${err.message}`);
+    return { activated, unreadable };
   }
 
   // candidate_id -> { action, created_at }
@@ -783,15 +797,15 @@ function listActivatedCandidateIds(arcforgeRoot) {
       if (!prev || record.created_at >= prev.created_at) {
         latestByCandidate.set(id, { action: record.action, created_at: record.created_at });
       }
-    } catch {
-      // Corrupted record — skip
+    } catch (err) {
+      unreadable.push(`${entry}: ${err.message}`);
     }
   }
 
   for (const [id, latest] of latestByCandidate) {
     if (latest.action === 'activate') activated.add(id);
   }
-  return activated;
+  return { activated, unreadable };
 }
 
 // ---------------------------------------------------------------------------
@@ -877,5 +891,6 @@ module.exports = {
   initialConfidenceFor,
   findLatestActivation,
   listActivatedCandidateIds,
+  readActivationState,
   findUsableMaterialization,
 };

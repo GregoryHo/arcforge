@@ -147,7 +147,9 @@ start in that week. An instinct that decays far enough is moved to the
 `archived` folder beside it, the file is stamped `archive_reason: decay` so you
 can tell it from one you contradicted away, and the move is written to the
 review audit log under the instinct's name. An instinct you activated is never
-archived by decay — it leaves the injected set only when you deactivate it.
+archived by decay — it leaves the injected set only when you deactivate it — and
+when the record of which instincts are activated cannot be read, decay archives
+nothing and the session start message says so.
 
 ## Review: from candidate to active
 

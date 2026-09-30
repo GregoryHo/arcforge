@@ -14,7 +14,7 @@ const path = require('node:path');
 
 const { getArcforgeHome } = require('./utils');
 const { writeAuditEntry } = require('./learning-audit-log');
-const { listActivatedCandidateIds } = require('./learning-curator/activate');
+const { readActivationState } = require('./learning-curator/activate');
 
 // ─────────────────────────────────────────────
 // Constants
@@ -284,14 +284,24 @@ function archiveByDecay(ctx, file, content, frontmatter, updates) {
  * An archive whose audit entry cannot be written is not performed: the file
  * stays in place unchanged and is listed in `archiveFailed` with the reason.
  *
+ * When the activation state cannot be read (an unreadable directory, a record
+ * that is not JSON), no file is archived — it may be activated — and each one
+ * that would have been is listed in `archiveSkipped`; decay still lowers it.
+ *
  * `archivedTo` lists, in `archived` order, where each archive landed: an
  * existing archive of the same name is never overwritten, so the new one
  * takes a dated suffix.
  *
- * @returns {{ decayed: string[], archived: string[], archivedTo: string[], archiveFailed: {file: string, error: string}[] }}
+ * @returns {{ decayed: string[], archived: string[], archivedTo: string[], archiveFailed: {file: string, error: string}[], archiveSkipped: {file: string, reason: string}[] }}
  */
 function runDecayCycle(dirPath, options = {}) {
-  const result = { decayed: [], archived: [], archivedTo: [], archiveFailed: [] };
+  const result = {
+    decayed: [],
+    archived: [],
+    archivedTo: [],
+    archiveFailed: [],
+    archiveSkipped: [],
+  };
 
   if (!fs.existsSync(dirPath)) return result;
 
@@ -302,7 +312,7 @@ function runDecayCycle(dirPath, options = {}) {
     archiveSubdir: options.archiveSubdir || 'archived',
   };
   const files = fs.readdirSync(dirPath).filter((f) => f.endsWith('.md'));
-  let activated = null;
+  let activation = null;
 
   for (const file of files) {
     const filePath = path.join(dirPath, file);
@@ -329,9 +339,20 @@ function runDecayCycle(dirPath, options = {}) {
     };
 
     if (shouldArchive(newConfidence)) {
-      if (activated === null) activated = listActivatedCandidateIds(ctx.arcforgeRoot);
+      if (activation === null) activation = readActivationState(ctx.arcforgeRoot);
       const id = frontmatter.id || path.basename(file, '.md');
-      if (!activated.has(id) && !activated.has(path.basename(file, '.md'))) {
+      const known = activation.unreadable.length === 0;
+      if (!known) {
+        // Unknown is not inactive: without readable activation state this
+        // may be an activated instinct, so it decays in place, unarchived.
+        result.archiveSkipped.push({
+          file,
+          reason: `activation state unreadable (${activation.unreadable.join('; ')})`,
+        });
+      } else if (
+        !activation.activated.has(id) &&
+        !activation.activated.has(path.basename(file, '.md'))
+      ) {
         const outcome = archiveByDecay(ctx, file, content, frontmatter, updates);
         if (outcome.error) {
           result.archiveFailed.push({ file, error: outcome.error });

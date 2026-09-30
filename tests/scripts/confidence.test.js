@@ -538,6 +538,25 @@ Do the thing.
       expect(fs.existsSync(path.join(dir, 'archived', 'dying.md'))).toBe(false);
     });
 
+    it('skips archiving, but still decays, when activation state cannot be read', () => {
+      const dir = path.join(root, 'instincts', 'proj');
+      writeInstinct(dir, 'maybe_active', '0.12', '2025-01-01');
+      const activations = path.join(home, 'learning', 'activations');
+      fs.mkdirSync(activations, { recursive: true });
+      fs.writeFileSync(path.join(activations, '0001-broken.json'), '{ not json');
+
+      const result = runDecayCycle(dir, { now: NOW });
+
+      expect(result.archived).toEqual([]);
+      expect(result.archiveSkipped).toHaveLength(1);
+      expect(result.archiveSkipped[0].file).toBe('maybe_active.md');
+      expect(result.archiveSkipped[0].reason).toMatch(/activation state/);
+      expect(fs.existsSync(path.join(dir, 'maybe_active.md'))).toBe(true);
+      expect(fs.existsSync(path.join(dir, 'archived'))).toBe(false);
+      expect(readFm(path.join(dir, 'maybe_active.md')).confidence).toBe(MIN_CONFIDENCE);
+      expect(auditLines()).toHaveLength(0);
+    });
+
     it('never overwrites an existing archive of the same name', () => {
       const dir = path.join(root, 'instincts', 'proj');
       writeInstinct(dir, 'dying', '0.12', '2025-01-01');

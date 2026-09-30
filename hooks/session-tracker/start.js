@@ -123,7 +123,13 @@ function runDecayCycles(project) {
     const instResult = runDecayCycle(getInstinctsDir(project));
 
     const failed = instResult.archiveFailed || [];
-    if (instResult.decayed.length > 0 || instResult.archived.length > 0 || failed.length > 0) {
+    const skipped = instResult.archiveSkipped || [];
+    if (
+      instResult.decayed.length > 0 ||
+      instResult.archived.length > 0 ||
+      failed.length > 0 ||
+      skipped.length > 0
+    ) {
       const archivedNames =
         instResult.archived.length > 0 ? ` (${instResult.archived.join(', ')})` : '';
       // An archive whose audit entry could not be written was not performed.
@@ -131,14 +137,19 @@ function runDecayCycles(project) {
         failed.length > 0
           ? `; ${failed.length} not archived, audit log unwritable (${failed.map((f) => f.file).join(', ')})`
           : '';
+      // Unknown activation state is not treated as inactive: nothing archived.
+      const unknown =
+        skipped.length > 0
+          ? `; ${skipped.length} not archived, activation state unreadable (${skipped.map((f) => f.file).join(', ')})`
+          : '';
       output({
-        systemMessage: `Decay cycle: ${instResult.decayed.length} decayed, ${instResult.archived.length} archived${archivedNames}${heldBack}`,
+        systemMessage: `Decay cycle: ${instResult.decayed.length} decayed, ${instResult.archived.length} archived${archivedNames}${heldBack}${unknown}`,
       });
     }
 
     return { instResult };
   } catch {
-    return { instResult: { decayed: [], archived: [], archiveFailed: [] } };
+    return { instResult: { decayed: [], archived: [], archiveFailed: [], archiveSkipped: [] } };
   }
 }
 
