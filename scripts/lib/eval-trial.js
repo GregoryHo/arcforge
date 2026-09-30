@@ -20,6 +20,7 @@ const {
 } = require('./eval-trial-env');
 const { parseStreamJsonOutput, parseActionsFromTranscript } = require('./eval-transcript');
 const { isTrialKilled, isOutputComplete, isProviderRefusal } = require('./eval-trial-outcome');
+const { watchForWrites } = require('./eval-trial-guard');
 
 // Mirror of eval.js constants to avoid circular imports
 const RESULTS_DIR = path.join('evals', 'results');
@@ -139,8 +140,10 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     '--no-session-persistence',
     '--disable-slash-commands',
   ];
-  if (isolated && !pluginDir) {
-    claudeArgs.push('--strict-mcp-config');
+  if (isolated && !pluginDir) claudeArgs.push('--strict-mcp-config');
+  // Advisory only — the trial is not a sandbox; watchForWrites() below catches
+  // the trials that ignore it. A plugin-dir trial gets it too (eval-10).
+  if (isolated || pluginDir) {
     claudeArgs.push(
       '--append-system-prompt',
       `You are running in an isolated eval trial. Your working directory is ${trialDir}, and every file you need is already in it — do not read, search, or access files outside this directory.`,
@@ -172,6 +175,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     console.error(`[eval-debug] cmd: claude ${claudeArgs.join(' ')}`);
     console.error(`[eval-debug] prompt: ${prompt.slice(0, 100)}...`);
   }
+  const writesSince = watchForWrites([projectRoot, pluginDir]);
   const t0 = Date.now();
   const result = execCommand('claude', claudeArgs, {
     input: prompt,
@@ -194,6 +198,12 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     env: { ...process.env, ARCFORGE_HOME: path.join(trialDir, '.arcforge') },
   });
   const wallDuration = Date.now() - t0;
+  const repoWrites = writesSince();
+  for (const root of repoWrites.incomplete) {
+    process.stderr.write(
+      `Warning: ${root} is too large to snapshot; writes the trial made there were not checked.\n`,
+    );
+  }
   if (process.env.EVAL_DEBUG) {
     console.error(`[eval-debug] exitCode: ${result.exitCode}`);
     console.error(`[eval-debug] stdout length: ${(result.stdout || '').length}`);
@@ -239,6 +249,21 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     ...(model ? { model } : {}),
     ...(runId ? { runId } : {}),
   };
+  // A trial that changed the repository it ran from measured a different
+  // environment than its arm describes, and may have changed what the next
+  // trial sees. It is an instrument failure whatever it scored (eval-10).
+  if (repoWrites.changed.length > 0) {
+    const shown = repoWrites.changed.slice(0, 5).join(', ');
+    const more = repoWrites.changed.length > 5 ? ` and ${repoWrites.changed.length - 5} more` : '';
+    return {
+      ...base,
+      output: parsedOutput || '',
+      error: `Trial wrote outside its directory: ${shown}${more}`,
+      errorType: 'trial_wrote_repo',
+      infraError: true,
+    };
+  }
+
   // A trial the runner killed before the agent finished its turn is an
   // instrument failure, not behaviour: its half transcript otherwise grades as
   // if the agent had chosen to stop there (P4 defect A — four of five two-axis

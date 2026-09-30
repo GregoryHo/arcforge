@@ -110,6 +110,17 @@ under test with its hooks, and skips your user-level settings file entirely.
 Credentials stored in your keychain still work. Anything that only lives in your
 user settings, such as an `apiKeyHelper`, is not available to such a trial.
 
+Isolation is not a sandbox. The agent runs with your filesystem permissions.
+Isolated and `--plugin-dir` trials are told to stay inside their directory, but
+nothing enforces it. So the runner checks afterwards: it snapshots the project
+(and the plugin directory, when that lives elsewhere) before each trial and
+compares after. It skips `.git`, `node_modules`, `.eval-trials/`,
+`evals/results/` and nested repositories. A trial that added, changed or removed
+anything there is recorded as an infra error (`trial_wrote_repo`) naming the
+paths, and never scores. Check those paths with `git status`. An edit you make
+to the same project while a trial runs looks identical, so a long run is best
+left alone.
+
 `--skill-file` injects a skill body into the treatment prompt — that measures a
 **skill**. `--plugin-dir` loads a real plugin instead — that measures a
 **workflow**, the whole environment. They answer different questions; using
