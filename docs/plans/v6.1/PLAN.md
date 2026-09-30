@@ -26,6 +26,7 @@
 - **不代跑 eval**：任何 live trial 都由使用者啟動。計畫只列要跑哪些、幾個 session。
 - **對外動作先確認**：push、開 PR、打 tag、建立或關閉 issue 之前都先問。
 - **每個 commit 前**：`npm run lint:fix`、`npm test`（5 個 runner）、6 個 static check。
+- **spec 先行**：各工作包先寫 B-item。要實作的行為先進 spec，再寫測試；spec 已經承諾的行為不用重寫。
 - **測試先行**：每個引擎修正先寫會失敗的測試，再修，文件改動放同一個 commit。
 - **`Proposed` 決策**：每一版開工時，一次把該版的 `Proposed` 決策列給使用者確認；定案前不寫對應的程式。
 
@@ -53,8 +54,8 @@
 
 | 事項 | 處置 | 做什麼 |
 |---|---|---|
-| hooks-7 | 量測 | 使用者在 repo 外的空資料夾從 marketplace 安裝 6.1.0，開一個 session 確認 hook 有觸發。失敗的話，這件事變成 6.1.1 的第一個修正 |
-| release-7 | 決策 | 改寫本機 commit `4d80a06d`：三個版本的列、D-018 的範圍、spec header、BACKLOG |
+| hooks-7 | 量測 | 使用者在 repo 外的空資料夾從 marketplace 安裝 6.1.0，開一個 session 確認 hook 有觸發。失敗的話，6.1.1 先修這個 |
+| release-7 | 決策 | 三個版本的列、D-018 的範圍、spec header、BACKLOG 都已寫入（roadmap 的 PR） |
 | release-3 | 修設定 | `.github/workflows/claude-code-review.yml` 只在 PR 開啟與 ready 時跑，加路徑限制。6.1.1 會開 6 個以上的 PR，不先收窄的話每次 push 都會跑完整 review |
 
 ### WP-A eval 儀器（量測前必須合併）
@@ -257,9 +258,11 @@ spec-before-code 新版 A/B（k=10，20 個）、supersede 的 preflight 加 A/B
 
 ## 核可後的執行順序
 
-1. 把 recap 清單與事項編號對照存進 `docs/plans/v6.1/`，讓編號不依賴暫存目錄。`docs/plans` 不在 `check:docs` 的掃描範圍內，清單裡引用的舊指令名不會觸發檢查。
-2. 派 `pm`（opus）修改 `product/`：三個版本的列（6.1.1 為 `building`，其餘為 `next`）、上表的決策、spec header、BACKLOG。`pm` 沒有 Bash，所以由主 session 執行 `npm run check:product` 與 `git commit --amend` 改寫 `4d80a06d`（尚未 push，改寫是安全的）。之後每次派 `pm` 都是同樣的分工。
-3. 問使用者：要不要 push 並開 PR；要不要建立上面列的 issue。
+第 1 到 3 步已完成，結果在 PR #190、#191、#203 與 issue #192 到 #202。
+
+1. （已完成）recap 清單與事項編號對照存進 `docs/plans/v6.1/`。`docs/plans` 不在 `check:docs` 的掃描範圍內，清單裡引用的舊指令名不會觸發檢查。
+2. （已完成）`pm`（opus）修改 `product/`：三個版本的列、決策、spec header、BACKLOG。`pm` 沒有 Bash，`npm run check:product` 與 git 操作由主 session 執行；之後每次派 `pm` 都是同樣的分工。
+3. （已完成）收窄 CI review workflow、開 roadmap 的 PR、為 medium 以上且沒有歸屬的 11 項建立 issue。
 4. 使用者做 WP0 的 marketplace 安裝查核。
 5. 列出 6.1.1 的 `Proposed` 決策請使用者確認。
 6. WP-A、WP-B、WP-C 各開一個分支，各派一個 opus worker 在獨立 worktree 實作，`qa`（opus）逐一審查。

@@ -111,6 +111,13 @@ was recorded about them.
   higher than one inferred from reflection, because an inference about the
   user is weaker evidence than their own words. Users can `confirm` or
   `contradict` any instinct; enough contradiction archives it.
+- **B-10 Decay charges each period once, and never retires an activated
+  instinct.** Confidence decays with the time since an instinct was last
+  confirmed. Running the decay cycle any number of times over the same
+  interval MUST give the result of running it once. Decay MUST NOT archive an
+  activated instinct — it leaves the injected set only through the user's
+  deactivation (B-4) — and every archive decay does perform MUST write an
+  audit record naming the instinct (D-022).
 - **B-7 One session, one record.** When a diary draft exists, it *is* the
   entry — finalizing renames the draft rather than merging, and writing a
   second diary alongside a draft would orphan one of them. The `/learning`

@@ -82,17 +82,20 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   measurement.** Every trial's `claude -p` session runs under a per-trial
   ceiling: 900 s, unless `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS` moves it for one run —
   unset or empty means the default, and any value that is not a positive
-  integer of milliseconds is refused on the first trial, before any session is
-  spawned. A trial the runner killed before the agent finished its turn is
+  integer of milliseconds is refused before the run begins, ahead of any
+  fixture `Setup` and any session (D-018). A trial the runner killed before the agent finished its turn is
   recorded as `trial_killed_incomplete` and excluded from every scored pool —
   a preflight containing one BLOCKs outright rather than rating the rest —
   because its half transcript would otherwise grade as if the
   agent had chosen to stop there; it neither moves the delta against the arm
   nor counts as a scored trial under B-4's strict bar. A killed trial that had
-  already delivered its answer is a valid measurement and scores. The ceiling
-  is part of the measurement conditions, so a run that moved it MUST be
-  reported with the value it used, the way B-9 treats a `--since`-bounded
-  snapshot.
+  already delivered its answer is a valid measurement and scores. A provider
+  refusal — a session-limit or quota message returned in place of the agent's
+  turn — is an instrument failure of the same kind: its row carries
+  `infraError` and leaves every scored pool (D-018). The ceiling is part of
+  the measurement conditions, so a run that moved it MUST be reported with the
+  value it used, the way B-9 treats a `--since`-bounded snapshot, and every
+  result row records the ceiling its trial ran under (D-018).
 
 ### Benchmarks
 - **B-9 Snapshots keep history and gate releases.** `eval report` writes
