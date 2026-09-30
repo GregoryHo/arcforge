@@ -608,6 +608,22 @@ describe('assembleBatch — since applies to diary, reflect and recall files too
     ).toBe(true);
   });
 
+  test('an edit after the stamp does not pull a diary created before it into the batch', () => {
+    const now = Date.now();
+    const day = new Date(now).toISOString().slice(0, 10);
+    const filePath = path.join(tmpDir, '.arcforge', 'diaries', project, day, 'diary-edited.md');
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, '# S\n\nedited-old-marker', 'utf8');
+    // Created before the stamp; touched after it.
+    const since = new Date(now + 5000).toISOString();
+    const later = new Date(now + 60000);
+    fs.utimesSync(filePath, later, later);
+
+    const { prompt } = batchFor(since);
+
+    expect(prompt).not.toContain('edited-old-marker');
+  });
+
   test('without since, selection is unchanged', () => {
     const { prompt, byType } = batchFor(undefined);
     expect(byType).toMatchObject({ diary: 3, reflect: 2, recall: 2 });

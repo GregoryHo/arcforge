@@ -65,14 +65,25 @@ function walkFilesByMtime(dir, namePattern) {
  * A diary lives at `diaries/<project>/<YYYY-MM-DD>/diary-<session>[-draft].md`,
  * so its own date is the directory it is filed under. A day cannot order a
  * diary against an opt-in made that same day, so the file's write time must
- * also be at or after the stamp: a diary counts only when both are.
+ * also be at or after the stamp: a diary counts only when both are. The write
+ * time is the EARLIER of creation and last modification — the same floor the
+ * stale-draft check uses — so editing or touching a diary written before the
+ * opt-in cannot pull it into a batch.
  */
 function diaryRecordedSince(file, sinceMs) {
   const day = path.basename(path.dirname(file.path));
   if (!DATE_DIR_RE.test(day)) return false;
   const dayStart = Date.parse(`${day}T00:00:00.000Z`);
   if (Number.isNaN(dayStart) || dayStart + DAY_MS <= sinceMs) return false;
-  return file.mtime >= sinceMs;
+  let stat;
+  try {
+    stat = fs.statSync(file.path);
+  } catch {
+    return false;
+  }
+  // birthtime is 0 on filesystems that don't record it; fall back to mtime.
+  const writtenAt = stat.birthtimeMs > 0 ? Math.min(stat.mtimeMs, stat.birthtimeMs) : stat.mtimeMs;
+  return writtenAt >= sinceMs;
 }
 
 /** Reflect and recall records carry `created_at` in their frontmatter. */
