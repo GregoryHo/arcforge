@@ -104,6 +104,37 @@ describe('eval command', () => {
     });
   });
 
+  describe('eval preflight', () => {
+    it('records a refused trial without grading it, so no grader session spawns', async () => {
+      writeScenario(tempDir, 'preflight-refusal');
+      evalLib.runTrial.mockImplementation((_s, t) => ({
+        eval: 'preflight-refusal',
+        trial: t,
+        k: 3,
+        passed: false,
+        score: 0,
+        grader: 'model',
+        timestamp: '2026-09-30T00:00:00.000Z',
+        infraError: true,
+        errorType: 'provider_refusal',
+      }));
+      jest.spyOn(process, 'exit').mockImplementation((code) => {
+        throw new Error(`process.exit(${code})`);
+      });
+
+      await expect(
+        runEvalCommand(args(['preflight', 'preflight-refusal']), {
+          projectRoot: tempDir,
+          asJson: false,
+        }),
+      ).rejects.toThrow('process.exit(1)');
+
+      expect(evalLib.runTrial).toHaveBeenCalledTimes(3);
+      expect(evalLib.gradeTrialResult).not.toHaveBeenCalled();
+      expect(logs).toContain('Verdict: BLOCK');
+    });
+  });
+
   describe('eval ab, skill scope (B-1, #197)', () => {
     const SKILL_BODY = 'SKILL BODY THAT MUST NOT REACH A PLUGIN-ROUTED TREATMENT';
 

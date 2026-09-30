@@ -214,6 +214,9 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
       });
     const stubGrade = (result, _t) => {
       try {
+        // An infra error has no agent turn to grade — and grading a refusal
+        // would spawn a grader session while the account is limited.
+        if (result.infraError) return result;
         return eval_.gradeTrialResult(result, scenario, projectRoot, result.actions);
       } finally {
         eval_.cleanupTrialDir(result.trialDir);
