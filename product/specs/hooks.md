@@ -50,8 +50,9 @@ down, never block the user, and never observe them uninvited.
   `secrets-guard` — is deliberately warn-only. The product position: a false
   positive should cost the user a sentence to read, not a blocked edit.
 - **B-4 The credential warning cannot itself leak.** `secrets-guard` scans
-  edits, writes, and `git commit` content for credential shapes and, on a hit,
-  names the *category* of finding — it MUST NOT echo the matched string.
+  edits, writes, and the text of a `git commit` command — not the content the
+  commit stages, which no hook reads (D-029) — for credential shapes and, on a
+  hit, names the *category* of finding — it MUST NOT echo the matched string.
   Test-, example-, and fixture-shaped lines are exempt so routine false
   positives stay quiet.
 - **B-5 Hook input is untrusted.** Tool names, paths, and prompts arriving in
