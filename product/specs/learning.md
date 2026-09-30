@@ -35,7 +35,9 @@ was recorded about them.
   enrichment and the curator's analysis (B-9) — run only under the opt-in**,
   so with learning off a draft keeps its unfilled sections permanently, no
   observation left behind by an earlier opt-in is analyzed, and that stub is the contract rather than a
-  failure to report. Nothing invites the user into the loop from that state
+  failure to report. Turning learning back on does not reach back: only
+  observations recorded after the effective opt-in are analyzed, and those left
+  on disk from before an opt-out stay unanalyzed (D-023). Nothing invites the user into the loop from that state
   either: the reflection nudge waits for the same opt-in, because a permanent
   offer to analyze diaries is itself a way of not taking "off" for an answer.
   Enabling is an explicit, scoped act (`--project` or
@@ -193,6 +195,15 @@ and the operation record are the three formats pinned by
 `scripts/lib/learning-schemas.js`. There is no second candidate vocabulary:
 `scripts/lib/learning.js` retains only the opt-in config and its `VALID_SCOPES`,
 so the statuses above are the ones both the dashboard and the CLI speak (D-012).
+
+The observer daemon finds a project's root through one record per project,
+`~/.arcforge/learning/project-roots/<project>.json`, shaped
+`{ project, project_root }`. Its single owner is `scripts/lib/learning.js`:
+SessionStart and the observation hook both write it through that owner, the
+daemon's enablement check reads it, and a malformed record is rejected rather
+than guessed at. `<project>` is the same sanitized directory basename as the
+rest of the keyspace, so the record shares the collision D-037 records: two
+same-named projects share one record.
 
 The invariants: state is only ever advanced through the engine (B-5), scope decides
 location (B-9), and one session yields one diary (B-7).
