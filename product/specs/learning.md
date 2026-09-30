@@ -127,8 +127,10 @@ was recorded about them.
   contradiction — and records the restore in the audit log, naming the
   instinct, the file it returned to, and the archive reason when the file
   carries one; files archived before that stamp existed carry none and are
-  restorable all the same. Hand-editing state stays out of contract (B-5), so
-  this is the only supported route back; like every change to what may be
+  restorable all the same. When an active instinct of the same name already
+  exists, restore MUST refuse and name both files rather than overwrite either.
+  Hand-editing state stays out of contract (B-5), so this is the only
+  supported route back; like every change to what may be
   injected, it is audited (D-040).
 - **B-7 One session, one record.** When a diary draft exists, it *is* the
   entry — finalizing renames the draft rather than merging, and writing a

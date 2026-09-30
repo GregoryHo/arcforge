@@ -82,7 +82,7 @@
 
 | 事項 | 處置 | 做什麼 | 測試 |
 |---|---|---|---|
-| learning-1 | 修引擎 | 衰減改成可重複執行而結果不變；已啟用的 instinct 不自動封存；每次封存寫 audit | `tests/scripts/`：呼叫 5 次等於呼叫 1 次 |
+| learning-1 | 修引擎 | 衰減改成可重複執行而結果不變；已啟用的 instinct 不自動封存；每次封存寫 audit，並在封存檔標記原因（B-10） | `tests/scripts/`：呼叫 5 次等於呼叫 1 次；已啟用的不會被移進 `archived/`；封存檔帶有原因欄位 |
 | learning-2 | 修引擎加修文件 | curator 加上不給工具的限制；spec B-9 與 guide 寫明 curator 是第二條對外路徑 | `tests/observer-daemon/`：argv 含工具限制 |
 | learning-3 | 修引擎 | `checkDaemon` 先檢查 opt-in；未啟用的 project 不分析 | `hooks/__tests__/`：learning 關閉時不啟動 daemon |
 | learning-4 | 修引擎 | #173：dashboard 確認後送出 `safety_ack` | dashboard ack 測試 |

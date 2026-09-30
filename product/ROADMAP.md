@@ -990,9 +990,12 @@ reverse one, append a superseding entry (see AGENTS.md).
 - Date: 2026-09-30
 - Version: 6.2.0
 - Status: Accepted
-- Decision: A new command, `learn instinct restore`, moves an instinct that
-  decay archived back out of the archive and records the restore in the audit
-  log.
+- Decision: A new command, `learn instinct restore`, moves an archived
+  instinct back out of the archive — whatever archived it, decay or an earlier
+  contradiction, since the user's explicit command outranks both — refuses
+  rather than overwrites when an active instinct of the same name exists, and
+  records the restore in the audit log with the archive reason when the file
+  carries one.
 - Why: 6.1.1 stops decay from re-charging and from archiving activated
   instincts (D-022), but instincts it already archived stay archived, and the
   only remedy until then is a manual file move the CHANGELOG describes.
