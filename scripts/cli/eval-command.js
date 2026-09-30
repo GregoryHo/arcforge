@@ -166,6 +166,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
         const versioned = scenario.version ? { ...graded, version: scenario.version } : graded;
         eval_.appendResult(versioned, projectRoot);
         console.log(formatStatus(graded));
+        eval_.stopIfTrialWroteRepo(versioned, `trial ${t}`);
       }
     } finally {
       if (rl) rl.close();

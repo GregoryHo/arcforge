@@ -144,10 +144,17 @@ nothing enforces it. So the runner checks afterwards: it snapshots the project
 and the plugin directory before each trial and compares after. That includes
 the baseline of a plugin-dir comparison and its preflight, which load no plugin
 but could still edit it before the treatment loads it. The plugin directory is
-walked on its own even when it sits inside the project as a separate checkout. A trial that added, changed or removed anything the check
-covers is recorded as an infra error (`trial_wrote_repo`) naming the paths, and
-never scores. Check those paths with `git status`. An edit you make to the same
-project while a trial runs looks identical, so a long run is best left alone.
+walked on its own even when it sits inside the project as a separate checkout.
+
+A trial that added, changed or removed anything the check covers is recorded as
+an infra error (`trial_wrote_repo`) naming the paths, and never scores. The
+run then stops before the next trial starts, because every later trial would
+run against the changed files. That applies to `eval run`, `eval ab` and
+`eval preflight`. The command prints which trial wrote where and exits
+non-zero. Rows already recorded stay on disk. The runner does not undo the
+change: inspect the paths with `git status`, reset the repository (and the
+plugin directory) yourself, then rerun. An edit you make to the same project
+while a trial runs looks identical, so a long run is best left alone.
 
 The check has blind spots. Any folder named `.git`, `node_modules` or
 `.eval-trials` is skipped at any depth. So are the project's own

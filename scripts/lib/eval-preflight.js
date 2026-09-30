@@ -14,6 +14,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { listScenarios, parseScenario } = require('./eval');
+const { stopIfTrialWroteRepo } = require('./eval-trial');
 
 /** Directory where preflight JSON files are stored */
 const PREFLIGHT_DIR = path.join('evals', 'preflight');
@@ -152,6 +153,7 @@ function runPreflight(name, projectRoot, opts = {}) {
   const results = [];
   for (let t = 1; t <= PREFLIGHT_K; t++) {
     const raw = runTrial(t, PREFLIGHT_K);
+    stopIfTrialWroteRepo(raw, `preflight trial ${t}`);
     const graded = gradeResult(raw, t);
     results.push(graded);
   }

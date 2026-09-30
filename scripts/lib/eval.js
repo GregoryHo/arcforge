@@ -37,6 +37,7 @@ const {
   runTrial,
   saveTranscript,
   buildTrialPrompt,
+  stopIfTrialWroteRepo,
 } = require('./eval-trial');
 
 /**
@@ -158,18 +159,20 @@ function runAbTrials(baseScenario, treatScenario, gradeScenario, k, bOpts, tOpts
   const baseline = [];
   const treatment = [];
 
+  // A trial that wrote outside its directory ends the run (stopIfTrialWroteRepo).
+  const runArm = (arm, scenario, t, opts) => {
+    const row = executeAndGradeTrial(scenario, gradeScenario, t, k, opts);
+    arm.push(row);
+    stopIfTrialWroteRepo(row, `${opts.label} trial ${t}`);
+  };
   if (interleave) {
     for (let t = 1; t <= k; t++) {
-      baseline.push(executeAndGradeTrial(baseScenario, gradeScenario, t, k, bOpts));
-      treatment.push(executeAndGradeTrial(treatScenario, gradeScenario, t, k, tOpts));
+      runArm(baseline, baseScenario, t, bOpts);
+      runArm(treatment, treatScenario, t, tOpts);
     }
   } else {
-    for (let t = 1; t <= k; t++) {
-      baseline.push(executeAndGradeTrial(baseScenario, gradeScenario, t, k, bOpts));
-    }
-    for (let t = 1; t <= k; t++) {
-      treatment.push(executeAndGradeTrial(treatScenario, gradeScenario, t, k, tOpts));
-    }
+    for (let t = 1; t <= k; t++) runArm(baseline, baseScenario, t, bOpts);
+    for (let t = 1; t <= k; t++) runArm(treatment, treatScenario, t, tOpts);
   }
 
   return { baseline, treatment, delta: stats.computeDelta(baseline, treatment) };
@@ -461,6 +464,7 @@ module.exports = {
   parseActionsFromTranscript,
   resolveMaxTurns,
   runTrial,
+  stopIfTrialWroteRepo,
   buildTrialPrompt,
   resolveTrialTimeoutMs,
   DEFAULT_TRIAL_TIMEOUT_MS,

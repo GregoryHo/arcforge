@@ -345,21 +345,81 @@ describe('the baseline of a plugin-dir comparison watches the plugin it does not
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
+  // The write is recorded on the baseline row, and the run stops there, so the
+  // treatment never loads the edited plugin.
+  const baselineRow = () =>
+    require('../../scripts/lib/eval').loadResults('isolation-baseline', tempDir)[0];
+  const trialCalls = () =>
+    mockUtils.execCommand.mock.calls.filter((c) => c[0] === 'claude' && c[1].includes('-p'));
+
   it('records a baseline write into the plugin as trial_wrote_repo (skill scope)', () => {
-    const { baseline } = runSkillEval(SCENARIO, 1, { projectRoot: tempDir, pluginDir: plugin });
-    expect(baseline[0].errorType).toBe('trial_wrote_repo');
-    expect(baseline[0].error).toContain(path.join('vendor', 'plugin', 'SKILL.md'));
-    const baselineArgs = mockUtils.execCommand.mock.calls.find(
-      (c) => c[0] === 'claude' && c[1].includes('-p'),
-    )[1];
-    expect(baselineArgs).not.toContain('--plugin-dir');
+    expect(() =>
+      runSkillEval(SCENARIO, 1, { projectRoot: tempDir, pluginDir: plugin, runId: 'r1' }),
+    ).toThrow(/baseline trial 1 wrote outside its directory/);
+    expect(baselineRow().errorType).toBe('trial_wrote_repo');
+    expect(baselineRow().error).toContain(path.join('vendor', 'plugin', 'SKILL.md'));
+    expect(trialCalls()).toHaveLength(1);
+    expect(trialCalls()[0][1]).not.toContain('--plugin-dir');
   });
 
   it('records a baseline write into the plugin as trial_wrote_repo (workflow scope)', () => {
-    const { baseline } = runWorkflowEval({ ...SCENARIO, scope: 'workflow', pluginDir: plugin }, 1, {
-      projectRoot: tempDir,
+    expect(() =>
+      runWorkflowEval({ ...SCENARIO, scope: 'workflow', pluginDir: plugin }, 1, {
+        projectRoot: tempDir,
+        runId: 'r1',
+      }),
+    ).toThrow(/baseline trial 1 wrote outside its directory/);
+    expect(baselineRow().errorType).toBe('trial_wrote_repo');
+    expect(trialCalls()).toHaveLength(1);
+  });
+});
+
+describe('a detected repository write stops the run', () => {
+  const { runSkillEval, loadResults } = require('../../scripts/lib/eval');
+  const { runPreflight } = require('../../scripts/lib/eval-preflight');
+  let tempDir;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-stop-'));
+    mockUtils.execCommand.mockReset();
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('aborts an A/B after the trial that wrote, before the next trial starts', () => {
+    stubExec(() => {
+      fs.writeFileSync(path.join(tempDir, 'stray.txt'), 'x');
+      return { stdout: DONE_STREAM, stderr: '', exitCode: 0 };
     });
-    expect(baseline[0].errorType).toBe('trial_wrote_repo');
+    expect(() =>
+      runSkillEval(SCENARIO, 2, { projectRoot: tempDir, skillInstruction: 'BODY', runId: 'r1' }),
+    ).toThrow(/baseline trial 1 wrote outside its directory: .*stray\.txt.*reset/s);
+    const trials = mockUtils.execCommand.mock.calls.filter(
+      (c) => c[0] === 'claude' && c[1].includes('-p'),
+    );
+    expect(trials).toHaveLength(1);
+    // The offending row is on disk, still an infra error.
+    const [row] = loadResults('isolation-baseline', tempDir);
+    expect(row.errorType).toBe('trial_wrote_repo');
+    expect(row.infraError).toBe(true);
+  });
+
+  it('aborts a preflight after the trial that wrote', () => {
+    const scenariosDir = path.join(tempDir, 'evals', 'scenarios');
+    fs.mkdirSync(scenariosDir, { recursive: true });
+    fs.writeFileSync(path.join(scenariosDir, 'pf.md'), '# Eval: pf\n\n## Scope\nskill\n');
+    const runTrialStub = jest.fn(() => ({
+      trial: 1,
+      infraError: true,
+      errorType: 'trial_wrote_repo',
+      error: 'Trial wrote outside its directory: /repo/x',
+    }));
+    expect(() =>
+      runPreflight('pf', tempDir, { runTrial: runTrialStub, gradeResult: (r) => r }),
+    ).toThrow(/preflight trial 1 wrote outside its directory/);
+    expect(runTrialStub).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -325,6 +325,24 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
 }
 
 /**
+ * Stop the run after a trial that wrote outside its directory. Every later
+ * trial (the treatment in particular) would run against the modified repository
+ * or plugin and still score, so a detected write ends the run rather than one
+ * row. Rows already recorded, the offending one included, stay on disk; the
+ * repository is not restored here: that is the operator's call.
+ * @param {Object} row - The TrialResult the trial produced
+ * @param {string} where - Which trial, for the message (e.g. 'baseline trial 2')
+ * @throws {Error} when the row is trial_wrote_repo
+ */
+function stopIfTrialWroteRepo(row, where) {
+  if (row?.errorType !== 'trial_wrote_repo') return;
+  const paths = String(row.error || '').replace(/^Trial wrote outside its directory:\s*/, '');
+  throw new Error(
+    `${where} wrote outside its directory: ${paths}. The run is stopped so no later trial runs against the modified files; rows already recorded are kept. Inspect and reset the repository (git status) before rerunning.`,
+  );
+}
+
+/**
  * Build the `claude -p` argv for one trial.
  *
  * Everything but `--plugin-dir` is a function of options a comparison passes to
@@ -422,6 +440,7 @@ module.exports = {
   DEFAULT_TRIAL_TIMEOUT_MS,
   resolveTrialTimeoutMs,
   runTrial,
+  stopIfTrialWroteRepo,
   buildClaudeArgs,
   saveTranscript,
   buildTrialPrompt,

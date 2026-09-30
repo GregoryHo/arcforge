@@ -104,6 +104,35 @@ describe('eval command', () => {
     });
   });
 
+  describe('eval run stops on a repository write', () => {
+    it('aborts after the trial that wrote, keeping its row', async () => {
+      writeScenario(tempDir, 'run-stop');
+      evalLib.runTrial.mockImplementation((_s, t) => ({
+        eval: 'run-stop',
+        trial: t,
+        k: 3,
+        passed: false,
+        score: 0,
+        grader: 'code',
+        timestamp: '2026-09-30T00:00:00.000Z',
+        runId: '20260930-000000',
+        infraError: true,
+        errorType: 'trial_wrote_repo',
+        error: 'Trial wrote outside its directory: /repo/src/x.js',
+      }));
+
+      await expect(
+        runEvalCommand(args(['run', 'run-stop'], { k: '3' }), {
+          projectRoot: tempDir,
+          asJson: false,
+        }),
+      ).rejects.toThrow(/trial 1 wrote outside its directory: \/repo\/src\/x\.js/);
+      expect(evalLib.runTrial).toHaveBeenCalledTimes(1);
+      const [row] = evalLib.loadResults('run-stop', tempDir);
+      expect(row.errorType).toBe('trial_wrote_repo');
+    });
+  });
+
   describe('eval preflight', () => {
     it('records a refused trial without grading it, so no grader session spawns', async () => {
       writeScenario(tempDir, 'preflight-refusal');
