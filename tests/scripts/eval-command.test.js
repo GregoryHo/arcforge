@@ -103,4 +103,70 @@ describe('eval command', () => {
       expect(stored.find((r) => r.trial === 6).infraError).toBe(true);
     });
   });
+
+  describe('eval ab, skill scope (B-1, #197)', () => {
+    const SKILL_BODY = 'SKILL BODY THAT MUST NOT REACH A PLUGIN-ROUTED TREATMENT';
+
+    function writeSkillScenario(name, { target = true } = {}) {
+      fs.mkdirSync(path.join(tempDir, 'skills', 'demo'), { recursive: true });
+      fs.writeFileSync(path.join(tempDir, 'skills', 'demo', 'SKILL.md'), SKILL_BODY);
+      const extra = `\n## Preflight\nskip\n${target ? '\n## Target\nskills/demo/SKILL.md\n' : ''}`;
+      const dir = path.join(tempDir, evalLib.SCENARIOS_DIR);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, `${name}.md`),
+        SCENARIO(name, extra).replace('## Scope\nagent', '## Scope\nskill'),
+      );
+    }
+
+    beforeEach(() => {
+      evalLib.runSkillEval.mockReturnValue({ baseline: [], treatment: [], delta: 0 });
+      jest.spyOn(process, 'exit').mockImplementation((code) => {
+        throw new Error(`process.exit(${code})`);
+      });
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    it('loads the plugin without injecting the ## Target body', async () => {
+      writeSkillScenario('ab-plugin');
+      await runEvalCommand(args(['ab', 'ab-plugin'], { 'plugin-dir': tempDir }), {
+        projectRoot: tempDir,
+        asJson: false,
+      });
+      const [, , opts] = evalLib.runSkillEval.mock.calls[0];
+      expect(opts.pluginDir).toBe(tempDir);
+      expect(opts.skillInstruction).toBeUndefined();
+    });
+
+    it('runs a plugin-routed comparison for a scenario with no ## Target', async () => {
+      writeSkillScenario('ab-plugin-no-target', { target: false });
+      await runEvalCommand(args(['ab', 'ab-plugin-no-target'], { 'plugin-dir': tempDir }), {
+        projectRoot: tempDir,
+        asJson: false,
+      });
+      expect(evalLib.runSkillEval).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses --skill-file together with --plugin-dir', async () => {
+      writeSkillScenario('ab-both');
+      await expect(
+        runEvalCommand(
+          args(['ab', 'ab-both'], {
+            'plugin-dir': tempDir,
+            'skill-file': 'skills/demo/SKILL.md',
+          }),
+          { projectRoot: tempDir, asJson: false },
+        ),
+      ).rejects.toThrow('process.exit(1)');
+      expect(evalLib.runSkillEval).not.toHaveBeenCalled();
+    });
+
+    it('still injects the body when only --skill-file (or ## Target) is given', async () => {
+      writeSkillScenario('ab-skill');
+      await runEvalCommand(args(['ab', 'ab-skill']), { projectRoot: tempDir, asJson: false });
+      const [, , opts] = evalLib.runSkillEval.mock.calls[0];
+      expect(opts.skillInstruction).toBe(SKILL_BODY);
+      expect(opts.pluginDir).toBeUndefined();
+    });
+  });
 });

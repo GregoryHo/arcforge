@@ -152,6 +152,46 @@ describe('a trial that writes outside its directory is an instrument failure (ev
   });
 });
 
+describe('runSkillEval with a plugin dir measures routing, not an injected body (B-1)', () => {
+  const { runSkillEval } = require('../../scripts/lib/eval');
+  let tempDir;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-skill-plugin-'));
+    mockUtils.execCommand.mockReset();
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('refuses a skill body and a plugin dir together', () => {
+    expect(() =>
+      runSkillEval(SCENARIO, 1, {
+        projectRoot: tempDir,
+        skillInstruction: 'x',
+        pluginDir: tempDir,
+      }),
+    ).toThrow(/exclusive/);
+  });
+
+  it('runs the plugin-dir treatment under plugin-dir settings, so its hooks load', () => {
+    const settingsByArm = {};
+    stubExec((opts) => {
+      const arm = opts.input.includes('## Task') && opts.cwd;
+      settingsByArm[arm] = JSON.parse(
+        fs.readFileSync(path.join(opts.cwd, '.claude', 'settings.json'), 'utf8'),
+      );
+      return { stdout: DONE_STREAM, stderr: '', exitCode: 0 };
+    });
+    runSkillEval(SCENARIO, 1, { projectRoot: tempDir, pluginDir: tempDir });
+    const [baseline, treatment] = Object.values(settingsByArm);
+    expect(baseline.disableAllHooks).toBe(true);
+    expect(treatment).not.toHaveProperty('disableAllHooks');
+    expect(treatment.outputStyle).toBe('default');
+  });
+});
+
 describe('eval-trial-guard snapshots', () => {
   let root;
 

@@ -344,23 +344,39 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
         maxTurns,
       });
     } else {
-      const skillFile = args.options['skill-file'] || scenario.target;
-      if (!skillFile) {
+      // B-1: --skill-file injects a body and measures a skill; --plugin-dir loads
+      // the plugin, which routes to the skill by its description, and measures
+      // that. Never both: with --plugin-dir no body is injected.
+      if (pluginDir && args.options['skill-file']) {
         console.error(
-          'Error: eval ab for skill scope requires --skill-file <path> or ## Target in scenario',
+          'Error: eval ab takes --skill-file or --plugin-dir, not both — one injects the skill body, the other loads the plugin',
         );
         process.exit(1);
       }
-      const resolvedSkillFile = path.resolve(projectRoot, skillFile);
-      if (!fs.existsSync(resolvedSkillFile)) {
-        console.error(`Error: skill file not found: ${skillFile}`);
-        process.exit(1);
+      let skillInstruction;
+      if (!pluginDir) {
+        const skillFile = args.options['skill-file'] || scenario.target;
+        if (!skillFile) {
+          console.error(
+            'Error: eval ab for skill scope requires --skill-file <path>, --plugin-dir <path>, or ## Target in scenario',
+          );
+          process.exit(1);
+        }
+        const resolvedSkillFile = path.resolve(projectRoot, skillFile);
+        if (!fs.existsSync(resolvedSkillFile)) {
+          console.error(`Error: skill file not found: ${skillFile}`);
+          process.exit(1);
+        }
+        skillInstruction = fs.readFileSync(resolvedSkillFile, 'utf8');
       }
-      const skillInstruction = fs.readFileSync(resolvedSkillFile, 'utf8');
       console.log(
         `A/B eval (skill): ${scenario.name} (k=${k})${interleave ? ' [interleaved]' : ''}`,
       );
-      console.log(`Skill: ${skillFile}\n`);
+      console.log(
+        pluginDir
+          ? `Baseline: isolated (no plugin) | Treatment: plugin ${pluginDir} (no skill body injected)\n`
+          : `Skill: ${args.options['skill-file'] || scenario.target}\n`,
+      );
       result = eval_.runSkillEval(scenario, k, {
         projectRoot,
         skillInstruction,

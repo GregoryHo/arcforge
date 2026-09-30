@@ -83,7 +83,8 @@ Runs both arms and stores every trial. Useful flags:
 | `--model` | Which model to run trials on |
 | `--interleave` | Alternate the arms instead of running each in a block, so drift over the run hits both equally |
 | `--max-turns` | Turn budget per trial, overriding the scenario |
-| `--plugin-dir` | Load a plugin directory into the treatment arm |
+| `--skill-file` | Skill-scope only: inject this skill body into the treatment prompt. Falls back to the scenario's `## Target` |
+| `--plugin-dir` | Load this plugin into the treatment arm instead. Never combined with `--skill-file` |
 
 Each trial's `claude -p` session is capped at 900 s; a trial killed at the cap is
 an infra error and never scores. Set `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=<milliseconds>`
@@ -126,6 +127,12 @@ left alone.
 **workflow**, the whole environment. They answer different questions; using
 `--skill-file` when you meant to test the environment quietly turns a workflow
 eval into a skill eval.
+
+The two never mix. On a skill-scope scenario, `--plugin-dir` gives you a
+baseline with no plugin and a treatment with the plugin loaded, where the agent
+reaches the skill through its description as a user's session would. No skill
+body is injected, and `## Target` is not needed. Passing `--skill-file` and
+`--plugin-dir` together is refused.
 
 To run one condition on its own, without a comparison:
 
