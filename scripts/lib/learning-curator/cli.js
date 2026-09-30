@@ -76,17 +76,25 @@ function cmdAssembleBatch(argv) {
     process.exit(1);
   }
 
+  // Both flags gate what reaches the model (learning B-1), so a flag given
+  // without a usable value is refused rather than dropped — dropping --since
+  // would build a batch with no opt-in filter at all.
   let minObservations;
-  if (args['min-observations'] !== undefined) {
-    minObservations = Number(args['min-observations']);
-    if (!Number.isInteger(minObservations) || minObservations < 0) {
+  const rawMin = args['min-observations'];
+  if (rawMin !== undefined) {
+    if (typeof rawMin !== 'string' || !/^\d+$/.test(rawMin)) {
       console.error(
-        `Error: --min-observations must be a non-negative integer (got "${args['min-observations']}")`,
+        `Error: --min-observations must be a non-negative integer (got ${JSON.stringify(rawMin)})`,
       );
       process.exit(1);
     }
+    minObservations = Number(rawMin);
   }
-  const since = typeof args.since === 'string' ? args.since : undefined;
+  const since = args.since;
+  if (since !== undefined && (typeof since !== 'string' || Number.isNaN(Date.parse(since)))) {
+    console.error(`Error: --since must be an ISO timestamp (got ${JSON.stringify(since)})`);
+    process.exit(1);
+  }
 
   let result;
   try {

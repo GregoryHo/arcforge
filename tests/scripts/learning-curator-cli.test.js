@@ -307,3 +307,53 @@ describe('CLI learning-enabled', () => {
     expect(result.stderr).toMatch(/project/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// learning B-1: assemble-batch refuses a malformed --since / --min-observations
+// rather than building a batch with no opt-in filter (fail closed)
+// ---------------------------------------------------------------------------
+
+describe('CLI assemble-batch argument validation', () => {
+  const { spawnSync } = require('node:child_process');
+
+  function assemble(extra) {
+    seedObservations('val-proj', 12);
+    const env = { ...process.env, HOME: tmpDir };
+    delete env.ARCFORGE_HOME;
+    return spawnSync('node', [CLI_PATH, 'assemble-batch', '--project', 'val-proj', ...extra], {
+      env,
+      encoding: 'utf8',
+    });
+  }
+
+  function batchesWritten() {
+    const dir = path.join(tmpDir, '.arcforge', 'learning', 'curator-batches');
+    return fs.existsSync(dir) ? fs.readdirSync(dir) : [];
+  }
+
+  const refusals = {
+    '--since with no value': [['--since'], /--since/],
+    '--since followed by another flag': [['--since', '--min-observations', '10'], /--since/],
+    '--since that is not a date': [['--since', 'yesterday'], /--since/],
+    '--min-observations with no value': [
+      ['--since', '2026-01-01T00:00:00Z', '--min-observations'],
+      /--min-observations/,
+    ],
+    '--min-observations that is not digits': [['--min-observations', '1e1'], /--min-observations/],
+    '--min-observations that is negative': [['--min-observations', '-1'], /--min-observations/],
+  };
+  for (const [label, [extra, message]] of Object.entries(refusals)) {
+    test(`exits 1 on ${label}, writing nothing`, () => {
+      const result = assemble(extra);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toMatch(message);
+      expect(batchesWritten()).toEqual([]);
+    });
+  }
+
+  test('a well-formed --since and --min-observations still assemble', () => {
+    const result = assemble(['--since', '2026-01-01T00:00:00Z', '--min-observations', '10']);
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout).batch_id).toMatch(/^batch_/);
+  });
+});
