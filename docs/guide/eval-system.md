@@ -65,10 +65,10 @@ scenario's `## Plugin Dir` counts on its own. With a plugin dir and no other lim
 budget is 10 turns.
 
 Preflight results are cached per scenario **and per model**, keyed on the
-scenario's content, and per turn budget, plugin dir and `--effort`. Edit the
-scenario, switch models, or change the budget, plugin dir or effort, and you need
-a fresh one: baseline
-competence is not transferable between conditions, and a PASS earned under one
+scenario's content, and per turn budget, plugin dir, `--effort` and per-trial
+ceiling (`ARCFORGE_EVAL_TRIAL_TIMEOUT_MS`). Edit the scenario, switch models, or
+change the budget, plugin dir, effort or ceiling, and you need a fresh one:
+baseline competence is not transferable between conditions, and a PASS earned under one
 does not unblock A/B runs under another. When `ab` finds no record for its own
 conditions, it stops. It names the conditions it needed and any it found
 instead, and gives the exact `preflight` command to run.

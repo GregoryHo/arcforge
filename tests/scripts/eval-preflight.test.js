@@ -570,3 +570,45 @@ describe('preflight is keyed on the effort the baseline ran at', () => {
     expect(gate({ effort: 'high' })).toContain('--effort high');
   });
 });
+
+describe('preflight is keyed on the per-trial ceiling the baseline ran under', () => {
+  let tempDir;
+
+  beforeEach(() => {
+    tempDir = makeTempDir();
+    writeScenario(tempDir, 'test-scenario', SCENARIO_CONTENT);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const preflightUnder = (conditions) =>
+    runPreflight('test-scenario', tempDir, {
+      runTrial: () => ({ passed: false, score: 0 }),
+      gradeResult: (r) => r,
+      conditions,
+    });
+  const gate = (conditions) => checkPreflightGate('test-scenario', tempDir, { conditions });
+
+  test('a PASS under one ceiling unlocks an A/B under that ceiling (hit)', () => {
+    expect(preflightUnder({ trialTimeoutMs: 300000 }).trial_timeout_ms).toBe(300000);
+    expect(gate({ trialTimeoutMs: 300000 })).toBeNull();
+  });
+
+  test('a PASS under a short ceiling does not unlock a longer one (miss)', () => {
+    preflightUnder({ trialTimeoutMs: 300000 });
+    const error = gate({ trialTimeoutMs: 1800000 });
+    expect(error).toMatch(/ceiling 1800000 ms/);
+    expect(error).toMatch(/recorded under: .*ceiling 300000 ms/);
+    expect(error).toContain(
+      'Run: ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000 arcforge eval preflight test-scenario',
+    );
+  });
+
+  test('the default ceiling adds no suffix, so existing records keep matching', () => {
+    preflightUnder({});
+    expect(gate({ trialTimeoutMs: 900000 })).toBeNull();
+    expect(gate({})).toBeNull();
+  });
+});

@@ -294,7 +294,12 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
       gradeResult: stubGrade,
       model,
       effort,
-      conditions: { maxTurns: baselineArm.maxTurns, pluginDir: abPluginDir, effort },
+      conditions: {
+        maxTurns: baselineArm.maxTurns,
+        pluginDir: abPluginDir,
+        effort,
+        trialTimeoutMs: eval_.resolveTrialTimeoutMs(),
+      },
     });
 
     console.log(`Verdict: ${outcome.verdict}`);
@@ -394,7 +399,12 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
       });
       const gateError = checkPreflightGate(scenario.name, projectRoot, {
         model,
-        conditions: { maxTurns: abMaxTurns, pluginDir: abPluginDir, effort },
+        conditions: {
+          maxTurns: abMaxTurns,
+          pluginDir: abPluginDir,
+          effort,
+          trialTimeoutMs: eval_.resolveTrialTimeoutMs(),
+        },
       });
       if (gateError) {
         console.error(`Error: ${gateError}`);

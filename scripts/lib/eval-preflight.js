@@ -14,7 +14,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { listScenarios, parseScenario } = require('./eval');
-const { stopIfTrialWroteRepo } = require('./eval-trial');
+const { stopIfTrialWroteRepo, DEFAULT_TRIAL_TIMEOUT_MS } = require('./eval-trial');
 
 /** Directory where preflight JSON files are stored */
 const PREFLIGHT_DIR = path.join('evals', 'preflight');
@@ -72,16 +72,19 @@ function preflightFilename(hash, model, conditions = {}) {
  * @param {{ maxTurns?: number, pluginDir?: string, effort?: string }} conditions
  * @returns {string} '' or e.g. '-t10-pd', '-ehigh', '-t10-pd-ehigh'
  */
-function conditionsSuffix({ maxTurns, pluginDir, effort } = {}) {
+function conditionsSuffix({ maxTurns, pluginDir, effort, trialTimeoutMs } = {}) {
   const budget =
     maxTurns == null && !pluginDir ? '' : `-t${maxTurns ?? 'none'}${pluginDir ? '-pd' : ''}`;
   const effortKey = effort ? `-e${String(effort).replace(/[^A-Za-z0-9._]/g, '_')}` : '';
-  return `${budget}${effortKey}`;
+  // The ceiling only when it was moved, so records at the default keep matching.
+  const ceiling =
+    trialTimeoutMs && trialTimeoutMs !== DEFAULT_TRIAL_TIMEOUT_MS ? `-c${trialTimeoutMs}` : '';
+  return `${budget}${effortKey}${ceiling}`;
 }
 
 /** Human-readable conditions, as the gate names them. */
-function describeConditions({ maxTurns, pluginDir, effort } = {}) {
-  return `max turns ${maxTurns ?? 'none'}, plugin dir ${pluginDir ? 'yes' : 'no'}, effort ${effort || 'default'}`;
+function describeConditions({ maxTurns, pluginDir, effort, trialTimeoutMs } = {}) {
+  return `max turns ${maxTurns ?? 'none'}, plugin dir ${pluginDir ? 'yes' : 'no'}, effort ${effort || 'default'}, ceiling ${trialTimeoutMs || DEFAULT_TRIAL_TIMEOUT_MS} ms`;
 }
 
 /**
@@ -148,6 +151,7 @@ function runPreflight(name, projectRoot, opts = {}) {
     max_turns: conditions.maxTurns ?? null,
     plugin_dir: Boolean(conditions.pluginDir),
     effort: conditions.effort || null,
+    trial_timeout_ms: conditions.trialTimeoutMs || DEFAULT_TRIAL_TIMEOUT_MS,
   };
 
   const results = [];
@@ -299,13 +303,18 @@ function missingPreflightMessage(name, projectRoot, { hash, model, conditions })
     conditions.pluginDir ? `--plugin-dir ${conditions.pluginDir}` : '',
     conditions.effort ? `--effort ${conditions.effort}` : '',
   ].filter(Boolean);
+  // The ceiling is set by environment, not a flag, so the command carries it.
+  const ceilingEnv =
+    conditions.trialTimeoutMs && conditions.trialTimeoutMs !== DEFAULT_TRIAL_TIMEOUT_MS
+      ? `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=${conditions.trialTimeoutMs} `
+      : '';
   const prefix = preflightFilename(hash, model).replace(/\.json$/, '');
   const dir = path.join(projectRoot, PREFLIGHT_DIR);
   const recorded = (fs.existsSync(dir) ? fs.readdirSync(dir) : [])
     .filter(
       (f) =>
         f === `${prefix}.json` ||
-        ((f.startsWith(`${prefix}-t`) || f.startsWith(`${prefix}-e`)) && f.endsWith('.json')),
+        (['-t', '-e', '-c'].some((s) => f.startsWith(`${prefix}${s}`)) && f.endsWith('.json')),
     )
     .map((f) => {
       try {
@@ -314,6 +323,7 @@ function missingPreflightMessage(name, projectRoot, { hash, model, conditions })
           maxTurns: r.max_turns ?? undefined,
           pluginDir: r.plugin_dir,
           effort: r.effort,
+          trialTimeoutMs: r.trial_timeout_ms,
         });
       } catch {
         return null; // unreadable record: it cannot say what it ran under
@@ -327,8 +337,8 @@ function missingPreflightMessage(name, projectRoot, { hash, model, conditions })
   return (
     `No preflight record found for scenario "${name}" (hash: ${hash}, model: ${modelLabel}, ${describeConditions(conditions)}).\n` +
     mismatch +
-    `Run: arcforge eval preflight ${[name, ...flags].join(' ')}\n` +
-    `Preflight is per-(scenario, model, effort, turn budget, plugin dir) — baseline pass rate depends ` +
+    `Run: ${ceilingEnv}arcforge eval preflight ${[name, ...flags].join(' ')}\n` +
+    `Preflight is per-(scenario, model, effort, turn budget, plugin dir, ceiling) — baseline pass rate depends ` +
     `on each, so a PASS under one does not unblock A/B runs under another.`
   );
 }
