@@ -1,12 +1,17 @@
 """Verify a saved .excalidraw.md file.
 
-Two checks:
-  1. Format markers — catches silent corruption from manual-fallback path
-  2. Canvas renders — catches JSON corruption from either save path
+What is checked depends on the save path, which the drawing block reveals:
 
-For manual-fallback (uncompressed ```json``` block), also compares the
-re-rendered PNG byte size against /tmp/diagram.png if present — a large
-delta signals JSON structural damage.
+  ea.create() path (```compressed-json``` block): format markers only. The
+    compressed payload is not decoded, parsed, or rendered, so a payload the
+    plugin corrupted still passes. Exit 0 here means the file has the plugin's
+    format markers, not that the canvas renders.
+
+  Manual-fallback path (uncompressed ```json``` block):
+    1. Format markers: catches the silent corruption hand-writing causes.
+    2. The JSON parses and the canvas re-renders.
+    3. The re-rendered PNG's byte size is compared against /tmp/diagram.png
+       when present. A large delta signals JSON structural damage.
 
 Exits 0 on success, 1 on any failure with a clear message.
 """
@@ -84,8 +89,8 @@ def main() -> None:
 
     json_text, is_compressed = extract_json_block(content)
     if is_compressed:
-        print('OK: format markers present, compressed-json block '
-              '(ea.create path — trusting plugin)')
+        print('OK: format markers present; compressed-json block not decoded or '
+              'rendered (ea.create path: markers only)')
         return
 
     json.loads(json_text)
