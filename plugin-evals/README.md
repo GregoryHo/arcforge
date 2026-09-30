@@ -79,7 +79,7 @@ add `--trust-plugin`.
 ## Reading the results
 
 **isolation-check** passes only when the graders pass in both runs **and**
-the manual gate below holds. The graders check what each run reports:
+the manual gate below holds. The graders check what each run reports and did:
 
 - `output-style-default` — `OUTPUT_STYLE: default`
 - `user-claude-md-none` — `USER_CLAUDE_MD: none`
@@ -90,6 +90,11 @@ the manual gate below holds. The graders check what each run reports:
   home under `/Users/`**; on any other platform, adapt their patterns to the
   operator's real home before running. A static grader cannot read the caller's
   environment, so they only rule out the common leak.
+- `printenv-home-called` and `printenv-config-dir-called` — the trace holds the
+  `printenv HOME` and `printenv CLAUDE_CONFIG_DIR` Bash calls (`tool_used` on
+  Bash), so a run that skips them and makes up plausible paths fails. They
+  prove the calls happened, not that the reply copied their output; the manual
+  gate checks that.
 
 Two extras back the graders up without replacing them: `no-user-claude-md` and
 `no-user-claude-md-in-trace` assert that the sentence opening this repo
@@ -114,7 +119,10 @@ session or only has a side effect:
 
 **After the runs:**
 
-1. **Paths differ.** The `HOME:` printed by run 1 and by run 2 must differ from
+1. **Paths are real and differ.** In each run, the `HOME:` and
+   `CLAUDE_CONFIG_DIR:` lines must match the output of that run's own
+   `printenv` Bash calls in its `trace.jsonl`. A reply that disagrees with its
+   trace fails. Then the `HOME:` printed by run 1 and by run 2 must differ from
    each other and from your real `printenv HOME`. The same goes for
    `CLAUDE_CONFIG_DIR:` against your real config directory (`~/.claude` when
    unset). **The two runs printing the same path fails the check**: it means
@@ -142,7 +150,27 @@ Write/Edit. isolation-check grants only Bash, so that gate cannot fire. This
 is why the case ships no marker grader, and why check 3 carries the hook
 evidence.
 
-**speccing-trigger** has one grader, `skill-fired`: a `Skill` call whose input
-names `speccing`, with or without the `arcforge:` namespace. The case score
-over 10 runs is the trigger rate. The task itself is not graded here; the
-ledger edits are what the harness scenario scores.
+**speccing-trigger** has one grader, `skill-fired`: a `Skill` call whose `skill`
+field is `speccing`, with or without the `arcforge:` namespace. The pattern is
+anchored to the `skill` field, so `speccing` appearing only in `args` does not
+count. A second alternative accepts an input serialized as the bare skill name,
+because the runner's serialization of a Skill input is not documented. It was
+tested against these inputs:
+
+| Input | Counts |
+|---|---|
+| `{"skill":"arcforge:speccing"}` | yes |
+| `{"skill":"speccing"}` | yes |
+| `{"skill":"arcforge:speccing","args":"csv-export"}` | yes |
+| `{"skill": "arcforge:speccing"}` | yes |
+| `arcforge:speccing` | yes |
+| `speccing` | yes |
+| `{"skill":"arcforge:using"}` | no |
+| `{"skill":"other:speccing"}` | no |
+| `{"skill":"speccing-extra"}` | no |
+| `{"skill":"prespeccing"}` | no |
+| `{"skill":"arcforge:using","args":"speccing"}` | no |
+| `{"skill":"arcforge:using","args":"arcforge:speccing"}` | no |
+
+The case score over 10 runs is the trigger rate. The task itself is not graded
+here; the ledger edits are what the harness scenario scores.
