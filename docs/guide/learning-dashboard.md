@@ -312,8 +312,10 @@ That stops new observations and analysis for the scope. The background analysis
 checks the opt-in before each run and only ever sends what was recorded since
 learning was last turned on — observations by their own timestamp, and the
 diaries, reflections and recalls that go with them by theirs (a diary by the
-date it is filed under and when it was written, a reflection or recall by when
-it was created). So nothing recorded before you turned learning off is sent for
+date it is filed under and when it was first written — though on a filesystem
+that records no creation time only the last modification is known, so there an
+edit made after you turned learning back on can still let that day's earlier
+diary through; a reflection or recall by when it was created). So nothing recorded before you turned learning off is sent for
 analysis — not now, and not if you turn learning back on later; it stays on
 disk, and only what is recorded after the new opt-in is analyzed. With learning
 off everywhere, the background process is not even started. Instincts you already

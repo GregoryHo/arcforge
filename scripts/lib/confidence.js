@@ -200,18 +200,38 @@ function decayAnchor(frontmatter) {
 }
 
 /**
+ * Where this archive goes without touching one already there: `<file>` when
+ * free, else `<name>.<archived_at>.md`, then `<name>.<archived_at>.<n>.md` — so
+ * an earlier archive of the same name (a contradiction archive, say) survives.
+ */
+function freeArchiveName(archiveDir, file, day) {
+  if (!fs.existsSync(path.join(archiveDir, file))) return file;
+  const base = path.basename(file, '.md');
+  let candidate = `${base}.${day}.md`;
+  for (let n = 2; fs.existsSync(path.join(archiveDir, candidate)); n++) {
+    candidate = `${base}.${day}.${n}.md`;
+  }
+  return candidate;
+}
+
+/**
  * Archive one decayed instinct, audit first. The archive copy is written, the
  * audit entry appended, and only then is the source removed — so an audit that
  * cannot be written rolls the copy back and leaves the instinct where it was,
- * rather than committing the move with no record of it (B-10).
+ * rather than committing the move with no record of it (B-10). It never
+ * overwrites an existing archive, so the rollback only ever removes the copy
+ * this cycle wrote.
  *
- * @returns {null|string} null on success, else the audit failure's message
+ * @returns {{ archivedTo: string }|{ error: string }} the archive path relative
+ *   to the instincts directory, or the audit failure's message
  */
 function archiveByDecay(ctx, file, content, frontmatter, updates) {
   const archiveDir = path.join(ctx.dirPath, ctx.archiveSubdir);
   fs.mkdirSync(archiveDir, { recursive: true });
-  const archivePath = path.join(archiveDir, file);
   const archivedAt = ctx.now.toISOString();
+  const archiveName = freeArchiveName(archiveDir, file, archivedAt.split('T')[0]);
+  const archivePath = path.join(archiveDir, archiveName);
+  const archivedTo = path.join(ctx.archiveSubdir, archiveName);
   fs.writeFileSync(
     archivePath,
     updateConfidenceFrontmatter(content, {
@@ -230,7 +250,7 @@ function archiveByDecay(ctx, file, content, frontmatter, updates) {
         action: 'decay_archive',
         instinct_id: frontmatter.id || path.basename(file, '.md'),
         instinct_dir: path.basename(ctx.dirPath),
-        archived_to: path.join(ctx.archiveSubdir, file),
+        archived_to: archivedTo,
         actor: { actor_type: 'decay_cycle' },
         reason: DECAY_ARCHIVE_REASON,
         confidence_before: frontmatter.confidence,
@@ -240,10 +260,10 @@ function archiveByDecay(ctx, file, content, frontmatter, updates) {
     );
   } catch (err) {
     fs.unlinkSync(archivePath);
-    return `audit entry could not be written: ${err.message}`;
+    return { error: `audit entry could not be written: ${err.message}` };
   }
   fs.unlinkSync(path.join(ctx.dirPath, file));
-  return null;
+  return { archivedTo };
 }
 
 /**
@@ -264,10 +284,14 @@ function archiveByDecay(ctx, file, content, frontmatter, updates) {
  * An archive whose audit entry cannot be written is not performed: the file
  * stays in place unchanged and is listed in `archiveFailed` with the reason.
  *
- * @returns {{ decayed: string[], archived: string[], archiveFailed: {file: string, error: string}[] }}
+ * `archivedTo` lists, in `archived` order, where each archive landed: an
+ * existing archive of the same name is never overwritten, so the new one
+ * takes a dated suffix.
+ *
+ * @returns {{ decayed: string[], archived: string[], archivedTo: string[], archiveFailed: {file: string, error: string}[] }}
  */
 function runDecayCycle(dirPath, options = {}) {
-  const result = { decayed: [], archived: [], archiveFailed: [] };
+  const result = { decayed: [], archived: [], archivedTo: [], archiveFailed: [] };
 
   if (!fs.existsSync(dirPath)) return result;
 
@@ -308,9 +332,13 @@ function runDecayCycle(dirPath, options = {}) {
       if (activated === null) activated = listActivatedCandidateIds(ctx.arcforgeRoot);
       const id = frontmatter.id || path.basename(file, '.md');
       if (!activated.has(id) && !activated.has(path.basename(file, '.md'))) {
-        const error = archiveByDecay(ctx, file, content, frontmatter, updates);
-        if (error === null) result.archived.push(file);
-        else result.archiveFailed.push({ file, error });
+        const outcome = archiveByDecay(ctx, file, content, frontmatter, updates);
+        if (outcome.error) {
+          result.archiveFailed.push({ file, error: outcome.error });
+        } else {
+          result.archived.push(file);
+          result.archivedTo.push(outcome.archivedTo);
+        }
         continue;
       }
     }

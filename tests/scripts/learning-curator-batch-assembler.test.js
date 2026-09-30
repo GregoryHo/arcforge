@@ -608,21 +608,42 @@ describe('assembleBatch — since applies to diary, reflect and recall files too
     ).toBe(true);
   });
 
-  test('an edit after the stamp does not pull a diary created before it into the batch', () => {
-    const now = Date.now();
-    const day = new Date(now).toISOString().slice(0, 10);
-    const filePath = path.join(tmpDir, '.arcforge', 'diaries', project, day, 'diary-edited.md');
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, '# S\n\nedited-old-marker', 'utf8');
-    // Created before the stamp; touched after it.
-    const since = new Date(now + 5000).toISOString();
-    const later = new Date(now + 60000);
-    fs.utimesSync(filePath, later, later);
+  // Creation time is what keeps an edited diary out; a filesystem that records
+  // none (birthtime 0) leaves only the mtime fallback, which this case cannot
+  // exercise, so it is skipped there rather than failed.
+  const birthtimeRecorded = (() => {
+    const probeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'arcforge-birthtime-probe-'));
+    try {
+      const probe = path.join(probeDir, 'probe');
+      fs.writeFileSync(probe, '');
+      return fs.statSync(probe).birthtimeMs > 0;
+    } finally {
+      fs.rmSync(probeDir, { recursive: true, force: true });
+    }
+  })();
+  if (!birthtimeRecorded) {
+    console.warn(
+      'Skipping the edited-diary case: this filesystem records no creation time (birthtimeMs is 0), so only the mtime fallback applies.',
+    );
+  }
+  (birthtimeRecorded ? test : test.skip)(
+    'an edit after the stamp does not pull a diary created before it into the batch',
+    () => {
+      const now = Date.now();
+      const day = new Date(now).toISOString().slice(0, 10);
+      const filePath = path.join(tmpDir, '.arcforge', 'diaries', project, day, 'diary-edited.md');
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.writeFileSync(filePath, '# S\n\nedited-old-marker', 'utf8');
+      // Created before the stamp; touched after it.
+      const since = new Date(now + 5000).toISOString();
+      const later = new Date(now + 60000);
+      fs.utimesSync(filePath, later, later);
 
-    const { prompt } = batchFor(since);
+      const { prompt } = batchFor(since);
 
-    expect(prompt).not.toContain('edited-old-marker');
-  });
+      expect(prompt).not.toContain('edited-old-marker');
+    },
+  );
 
   test('without since, selection is unchanged', () => {
     const { prompt, byType } = batchFor(undefined);

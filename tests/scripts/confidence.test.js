@@ -538,6 +538,40 @@ Do the thing.
       expect(fs.existsSync(path.join(dir, 'archived', 'dying.md'))).toBe(false);
     });
 
+    it('never overwrites an existing archive of the same name', () => {
+      const dir = path.join(root, 'instincts', 'proj');
+      writeInstinct(dir, 'dying', '0.12', '2025-01-01');
+      const olderPath = path.join(dir, 'archived', 'dying.md');
+      fs.mkdirSync(path.dirname(olderPath), { recursive: true });
+      fs.writeFileSync(olderPath, 'an earlier contradiction archive\n');
+
+      const result = runDecayCycle(dir, { now: NOW });
+
+      expect(fs.readFileSync(olderPath, 'utf-8')).toBe('an earlier contradiction archive\n');
+      expect(result.archived).toEqual(['dying.md']);
+      expect(result.archivedTo).toEqual([path.join('archived', 'dying.2026-03-01.md')]);
+      const written = readFm(path.join(dir, 'archived', 'dying.2026-03-01.md'));
+      expect(written.archive_reason).toBe('decay');
+      expect(auditLines()[0].archived_to).toBe(path.join('archived', 'dying.2026-03-01.md'));
+    });
+
+    it('rolls back only its own copy when the audit fails beside an existing archive', () => {
+      const dir = path.join(root, 'instincts', 'proj');
+      writeInstinct(dir, 'dying', '0.12', '2025-01-01');
+      const olderPath = path.join(dir, 'archived', 'dying.md');
+      fs.mkdirSync(path.dirname(olderPath), { recursive: true });
+      fs.writeFileSync(olderPath, 'an earlier contradiction archive\n');
+      fs.mkdirSync(path.join(home, 'learning'), { recursive: true });
+      fs.writeFileSync(path.join(home, 'learning', 'dashboard'), 'not a directory');
+
+      const result = runDecayCycle(dir, { now: NOW });
+
+      expect(result.archiveFailed).toHaveLength(1);
+      expect(fs.readFileSync(olderPath, 'utf-8')).toBe('an earlier contradiction archive\n');
+      expect(fs.readdirSync(path.join(dir, 'archived'))).toEqual(['dying.md']);
+      expect(fs.existsSync(path.join(dir, 'dying.md'))).toBe(true);
+    });
+
     it('stamps the archived file with the decay reason and audits the instinct by name', () => {
       const dir = path.join(root, 'instincts', 'proj');
       writeInstinct(dir, 'dying', '0.12', '2025-01-01');
