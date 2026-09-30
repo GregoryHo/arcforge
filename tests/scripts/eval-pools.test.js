@@ -55,6 +55,57 @@ describe('conditionOf', () => {
   });
 });
 
+describe('error-only pools are instrument failures, never the measurement', () => {
+  const { pairArms } = require('../../scripts/lib/eval-pools');
+  const refusal = (overrides) =>
+    row({
+      passed: false,
+      score: 0,
+      infraError: true,
+      errorType: 'provider_refusal',
+      model: 'opus',
+      timestamp: '2026-09-30T12:00:00.000Z',
+      ...overrides,
+    });
+
+  it('keeps the previous scorable pool current when the newest pool is all errors', () => {
+    const scored = [1, 2].map((t) => row({ trial: t }));
+    const failed = [1, 2, 3].map((t) => refusal({ trial: t }));
+    const { current, others } = splitPools([...scored, ...failed]);
+    expect(current).toEqual(scored);
+    expect(others).toEqual([
+      {
+        conditions: expect.objectContaining({ model: 'opus' }),
+        rows: 3,
+        instrumentFailure: true,
+      },
+    ]);
+  });
+
+  it('has no current pool when nothing was ever scored', () => {
+    const { current, conditions, others } = splitPools([refusal()]);
+    expect(current).toEqual([]);
+    expect(conditions).toBeNull();
+    expect(others[0].instrumentFailure).toBe(true);
+  });
+
+  it('keeps a valid A/B pair when a rerun under new conditions only errored', () => {
+    const baseline = [row({ score: 0, passed: false }), refusal({ trial: 2 })];
+    const treatment = [row({ score: 1 }), refusal({ trial: 2 })];
+    const paired = pairArms(baseline, treatment);
+    expect(paired.error).toBeUndefined();
+    expect(paired.baseline).toHaveLength(1);
+    expect(paired.treatment).toHaveLength(1);
+    expect(paired.unpaired.every((p) => p.instrumentFailure)).toBe(true);
+  });
+
+  it('labels an error-only pool as an instrument failure when printed', () => {
+    const { otherPoolLines } = require('../../scripts/lib/eval-pools');
+    const [line] = otherPoolLines([{ conditions: {}, rows: 3, instrumentFailure: true }]);
+    expect(line).toMatch(/^Instrument failure, not a measurement: 3 row\(s\)/);
+  });
+});
+
 describe('splitPools', () => {
   it('never combines an isolated pool with a toolkit (--no-isolate) pool', () => {
     const isolated = [1, 2].map((t) => row({ trial: t, isolation: 'isolated' }));

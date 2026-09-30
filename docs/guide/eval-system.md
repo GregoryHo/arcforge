@@ -377,6 +377,12 @@ conditions, as a "Not combined" line in the terminal, `other_pools` in the
 benchmark, and `otherPools` in the dashboard. Rows written before these
 fields existed form a pool of their own, shown as "unrecorded".
 
+Only a pool with at least one scored trial can be the measurement. A pool where
+every trial is an infra or grade error, such as quota refusals after switching
+models, is an instrument failure. It is never judged or paired. The previous
+scored pool stays current, and the failed pool is listed separately as
+"Instrument failure, not a measurement" (`instrumentFailure: true` in the JSON).
+
 An A/B comparison (`compare`, the benchmark's `compared` entry, the dashboard's
 A/B view) pairs its arms rather than taking each arm's newest pool on its own.
 It uses the newest pair of pools, one per arm, that ran under the same model,

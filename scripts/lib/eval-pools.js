@@ -14,6 +14,15 @@
  * Pure functions, no I/O. Zero external dependencies — Node.js standard library only.
  */
 
+const { scorableResults } = require('./eval-stats');
+
+/**
+ * A pool with no scorable row (every trial an infra or grade error: quota
+ * refusals after a model switch, say) is an instrument failure. It is listed,
+ * flagged `instrumentFailure`, and never chosen as the measurement.
+ */
+const hasScore = (rows) => scorableResults(rows).length > 0;
+
 /** The row fields that make up a pool's run conditions. */
 const CONDITION_FIELDS = [
   'model',
@@ -56,11 +65,17 @@ function splitPools(rows) {
   }
   const latest = (pool) => pool.reduce((max, r) => (r.timestamp > max ? r.timestamp : max), '');
   const ordered = [...pools.values()].sort((a, b) => latest(b).localeCompare(latest(a)));
-  const [current = [], ...rest] = ordered;
+  const current = ordered.find(hasScore) || [];
   return {
     current,
     conditions: current.length > 0 ? conditionOf(current[0]) : null,
-    others: rest.map((pool) => ({ conditions: conditionOf(pool[0]), rows: pool.length })),
+    others: ordered
+      .filter((pool) => pool !== current)
+      .map((pool) => ({
+        conditions: conditionOf(pool[0]),
+        rows: pool.length,
+        ...(hasScore(pool) ? {} : { instrumentFailure: true }),
+      })),
   };
 }
 
@@ -123,8 +138,8 @@ function pairArms(baselineRows, treatmentRows) {
   const bPools = poolsOf(baselineRows);
   const tPools = poolsOf(treatmentRows);
   let best = null;
-  for (const b of bPools) {
-    for (const t of tPools) {
+  for (const b of bPools.filter((p) => hasScore(p.rows))) {
+    for (const t of tPools.filter((p) => hasScore(p.rows))) {
       if (b.pair !== t.pair || !isolationPairs(b.isolation, t.isolation)) continue;
       const since = b.latest < t.latest ? b.latest : t.latest;
       if (!best || since > best.since) best = { b, t, since };
@@ -134,7 +149,12 @@ function pairArms(baselineRows, treatmentRows) {
     pools
       .filter((p) => p !== best?.b && p !== best?.t)
       .sort((x, y) => y.latest.localeCompare(x.latest))
-      .map((p) => ({ arm, conditions: conditionOf(p.rows[0]), rows: p.rows.length }));
+      .map((p) => ({
+        arm,
+        conditions: conditionOf(p.rows[0]),
+        rows: p.rows.length,
+        ...(hasScore(p.rows) ? {} : { instrumentFailure: true }),
+      }));
   const unpaired = [...list('baseline', bPools), ...list('treatment', tPools)];
   if (!best) {
     return {
@@ -184,10 +204,10 @@ function describeCondition(conditions) {
  * @returns {string[]}
  */
 function otherPoolLines(others, label) {
-  return others.map(
-    (p) =>
-      `Not combined${label ? ` (${label})` : ''}: ${p.rows} row(s) under ${describeCondition(p.conditions)}`,
-  );
+  return others.map((p) => {
+    const what = p.instrumentFailure ? 'Instrument failure, not a measurement' : 'Not combined';
+    return `${what}${label ? ` (${label})` : ''}: ${p.rows} row(s) under ${describeCondition(p.conditions)}`;
+  });
 }
 
 module.exports = {
