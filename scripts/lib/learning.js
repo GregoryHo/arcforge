@@ -109,13 +109,23 @@ function getProjectRootRecordPath(project, { homeDir } = {}) {
 /**
  * Put a project's root on record under the name its observations are filed
  * under (the `getProjectName()` key), so `isLearningEnabledForProject` can find
- * the project-scope opt-in. SessionStart records it while learning is on there.
+ * the project-scope opt-in. SessionStart and every observation keep it current
+ * while learning is on there, so it is cheap and idempotent: a record that
+ * already says the same is not rewritten. A record that fails its shape is
+ * replaced — the writer is the one party that knows the right answer.
  *
  * @returns {{ project: string, project_root: string }}
  */
 function recordProjectRoot({ projectRoot = process.cwd(), homeDir } = {}) {
   const resolved = path.resolve(projectRoot);
   const record = { project: sanitizeProjectName(path.basename(resolved)), project_root: resolved };
+  let existing = null;
+  try {
+    existing = readProjectRootRecord(record.project, { homeDir });
+  } catch {
+    // An unusable record is exactly what this write repairs, so it is not an error here.
+  }
+  if (existing && existing.project_root === resolved) return record;
   writeJsonFile(getProjectRootRecordPath(record.project, { homeDir }), record);
   return record;
 }

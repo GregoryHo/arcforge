@@ -63,7 +63,11 @@ const {
   getObserverSignalFile,
   getObserverPidFile,
 } = require('../../scripts/lib/session-utils');
-const { getProjectId, isLearningEnabledAnyScope } = require('../../scripts/lib/learning');
+const {
+  getProjectId,
+  isLearningEnabledAnyScope,
+  recordProjectRoot,
+} = require('../../scripts/lib/learning');
 const {
   sanitizeObservationPayload,
   EVIDENCE_STATUS,
@@ -430,6 +434,14 @@ function main() {
     if (!shouldObserve()) {
       process.exit(0);
       return;
+    }
+    // Keep the project-root record current so the daemon's consent check finds
+    // an opt-in made mid-session (learning B-1). Idempotent; never rewrites an
+    // identical record. Best-effort like the rest of the hook.
+    try {
+      recordProjectRoot({ projectRoot: process.env.CLAUDE_PROJECT_DIR || process.cwd() });
+    } catch {
+      // A failed write only delays analysis until SessionStart records the root.
     }
     setSessionIdFromInput(input);
     const sessionId = getSessionId();
