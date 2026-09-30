@@ -185,7 +185,10 @@ The buttons offered on a candidate are only the ones legal from its current
 state, so you cannot activate something that was never materialized. Activating
 and deactivating carry an extra gate on top of that: both are refused unless the
 request carries an explicit acknowledgement that you understand it changes
-behavior.
+behavior, and the dashboard asks you for it. Before either is sent, it shows you
+that the step changes how future sessions behave — for **Activate**, together
+with the exact file activation writes — and sends the acknowledgement only once
+you confirm what it showed. Decline, and nothing is sent.
 
 Every action is written to an audit log, accepted or rejected, with the reason.
 Do not route around the dashboard by editing state files by hand — that is the
@@ -197,10 +200,10 @@ The CLI works the **same queue** the dashboard does. It is the scriptable way
 into the same review loop, not a second one: it reads through the same event
 log, offers only the transitions the same legality matrix allows, and writes to
 the same audit log. On the CLI, the acknowledgement that gates activation is the
-typed command itself: `learn activate <id>` prints the behavior-change warning
-and the target path to stderr, and carries its own acknowledgement. So a
-scripted `learn activate --json` activates with no further prompt; the command
-you typed was the gate.
+typed command itself: `learn activate <id>` prints the same behavior-change
+warning the dashboard shows, and the target path, to stderr, and carries its
+own acknowledgement. So a scripted `learn activate --json` activates with no
+further prompt; the command you typed was the gate.
 
 ```bash
 arcforge learn inbox --project

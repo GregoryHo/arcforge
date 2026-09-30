@@ -38,6 +38,7 @@ const { materialize, defaultRenderPolicy } = require('./learning-curator/materia
 const {
   activate: activateLayer8,
   deactivate: deactivateLayer8,
+  buildActiveInstinctPath,
   defaultActivationPolicy,
   findLatestActivation,
   findUsableMaterialization,
@@ -219,8 +220,27 @@ function sanitizeDashboardDetail(candidateId) {
   if (record.lifecycle?.activation !== undefined) {
     detail.activation = sanitizeProvenanceBlock(record.lifecycle.activation);
   }
+  const activeTarget = activeTargetPathFor(record, card.available_actions);
+  if (activeTarget !== undefined) detail.active_target_path = activeTarget;
 
   return detail;
+}
+
+/**
+ * The file activation writes, or deactivation retires, for an instinct
+ * candidate whose next legal move is one of them — what the page names before
+ * it sends the `safety_ack` for it (#173). Layer 8's own derivation from the
+ * root the action handler hands it, so the path shown is the path written. It
+ * keys on `scope.project`, the slug the card already carries, never on
+ * `scope.project_id`.
+ */
+function activeTargetPathFor(record, availableActions) {
+  if (record.artifact_type !== 'instinct') return undefined;
+  const changesBehavior =
+    availableActions.includes(LIFECYCLE_ACTION.ACTIVATE) ||
+    availableActions.includes(LIFECYCLE_ACTION.DEACTIVATE);
+  if (!changesBehavior) return undefined;
+  return buildActiveInstinctPath(getArcforgeRoot(), record);
 }
 
 /**
