@@ -12,10 +12,19 @@ is contributor-only and is not in `package.json` `files`, so it ships to nobody.
 
 | Case | Measures | Runs |
 |---|---|---|
-| `isolation-check/` | D-025's inference that each run starts from a fresh `HOME` and `CLAUDE_CONFIG_DIR`, so the operator's output style, user hooks and user `CLAUDE.md` do not reach the trial | 1 |
+| `isolation-check/` | D-025's inference that each run starts from a fresh `HOME` and `CLAUDE_CONFIG_DIR`, so the operator's output style, user hooks and user `CLAUDE.md` do not reach the trial | 2 |
 | `speccing-trigger/` | #179 / D-024: how often `speccing` fires on its own when a user asks for a feature in a repo that keeps product state under `product/` | 10 |
 
-Expected sessions: **10 + 1**.
+Expected sessions: **10 + 2**.
+
+The `speccing-trigger` prompt is **verbatim** from
+`evals/scenarios/eval-speccing-spec-before-code.md`: its `## Context` and
+`## Scenario`, assembled as the arcforge harness sends them (`## Context`, then
+`## Task`). That includes "Don't spend time on the product docs — I'll sort
+those out after the release" — that request to leave the product docs for later
+is the trap #179 describes, and the case must reproduce the one that scored
+0/10. If the scenario's wording changes, copy it here again, or the two
+measurements stop being comparable.
 
 ## How to run
 

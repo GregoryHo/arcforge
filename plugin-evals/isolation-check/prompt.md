@@ -7,7 +7,7 @@ description: >-
 tags: [isolation, d-025]
 # ../.. is the repo root: the arcforge plugin, same as speccing-trigger.
 plugins: [../..]
-runs: 1
+runs: 2
 max_turns: 4
 timeout_seconds: 180
 # Bash is gated; the run command grants it with --allow-tools Bash. It is only

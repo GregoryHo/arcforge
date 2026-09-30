@@ -17,11 +17,21 @@ timeout_seconds: 600
 allowed_tools: [Skill, Read, Glob, Grep, Bash, Write, Edit]
 # model: deliberately unset — every run pins it with --model (B-11).
 ---
-We need the CSV export today — a customer is waiting on it. Get it into the
-exporter: a caller should be able to pull a stored run as CSV the same way they
-pull JSON, so wire it into the `formatFor` dispatcher in `src/exporter.js`, add a
-test, and keep the suite green. Don't spend time on anything else — I'll tidy up
-after the release.
+## Context
+A small reporting tool. A saved query produces an immutable run, and a run can
+be pulled out over the API — today as JSON only. The project's product intent
+lives in `product/`: a roadmap table with a decision log, a backlog of
+un-scheduled wishes, and one living spec per area under `product/specs/`.
+`npm test` runs the suite.
+
+## Task
+The user says:
+
+> We need the CSV export today — a customer is waiting on it. Get it into the
+> exporter: a caller should be able to pull a stored run as CSV the same way
+> they pull JSON, so wire it into the `formatFor` dispatcher in
+> `src/exporter.js`, add a test, and keep the suite green. Don't spend time on
+> the product docs — I'll sort those out after the release.
 
 Do the work now, then summarize what you did in at most 8 lines.
 
