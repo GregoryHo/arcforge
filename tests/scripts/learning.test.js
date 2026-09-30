@@ -270,6 +270,47 @@ describe('the learning opt-in', () => {
       expect(isInjectActivatedInstinctsEnabled({ homeDir })).toBe(true);
     });
 
+    // learning-5: `learn enable` / `learn disable` merge into the config, so the
+    // kill-switch a user wrote by hand survives the opt-in toggling.
+    it('survives learn enable and learn disable, as does any other key', () => {
+      writeGlobalConfig({
+        scope: 'global',
+        enabled: false,
+        inject_activated_instincts: false,
+        x: 1,
+      });
+      const configPath = getLearningConfigPath({ scope: 'global', homeDir });
+
+      setLearningEnabled({ scope: 'global', enabled: true, homeDir });
+      expect(isInjectActivatedInstinctsEnabled({ homeDir })).toBe(false);
+      expect(JSON.parse(fs.readFileSync(configPath, 'utf8'))).toMatchObject({
+        enabled: true,
+        inject_activated_instincts: false,
+        x: 1,
+      });
+
+      setLearningEnabled({ scope: 'global', enabled: false, homeDir });
+      expect(isInjectActivatedInstinctsEnabled({ homeDir })).toBe(false);
+      expect(JSON.parse(fs.readFileSync(configPath, 'utf8')).x).toBe(1);
+    });
+
+    it('keeps the project config’s other keys through a toggle', () => {
+      const configPath = getLearningConfigPath({ scope: 'project', projectRoot });
+      fs.mkdirSync(path.dirname(configPath), { recursive: true });
+      fs.writeFileSync(
+        configPath,
+        JSON.stringify({ scope: 'project', enabled: true, note: 'kept' }),
+      );
+
+      setLearningEnabled({ scope: 'project', enabled: false, projectRoot, homeDir });
+
+      expect(JSON.parse(fs.readFileSync(configPath, 'utf8'))).toMatchObject({
+        scope: 'project',
+        enabled: false,
+        note: 'kept',
+      });
+    });
+
     it('defaults ON when the field is absent', () => {
       writeGlobalConfig({ scope: 'global', enabled: true });
       expect(isInjectActivatedInstinctsEnabled({ homeDir })).toBe(true);

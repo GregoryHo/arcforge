@@ -251,7 +251,12 @@ function setLearningEnabled({
   // which is exactly why the fallback has to be captured here instead of
   // re-derived on the next read.
   const preserved = previous.enabled === next ? preservedStamp(previous, configPath) : null;
-  const config = { scope, enabled: next, updated_at: preserved ?? now };
+  // Merge, never replace: the file carries keys the opt-in does not own — the
+  // `inject_activated_instincts` kill-switch among them — and a toggle that
+  // dropped them would silently turn a user's own setting back off.
+  const raw = readJsonFile(configPath, null);
+  const existing = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const config = { ...existing, scope, enabled: next, updated_at: preserved ?? now };
   writeJsonFile(configPath, config);
   return config;
 }
