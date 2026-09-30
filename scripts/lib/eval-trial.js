@@ -134,8 +134,9 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     return buildInfraError(error.message || String(error), 'setup_failed', { trialDir });
   }
 
-  // Isolation mode: full isolation uses writeIsolationSettings,
-  // pluginDir uses semi-isolation (no claudeMdExcludes)
+  // Isolation mode: full isolation uses writeIsolationSettings; a pluginDir
+  // trial gets the same settings (CLAUDE.md excludes included) but leaves hooks
+  // on, so the plugin under test keeps its own hooks.
   if (pluginDir) {
     const semiSettings = isolationSettings || buildIsolationSettings({ forPluginDir: true });
     writeIsolationSettings(trialDir, semiSettings);

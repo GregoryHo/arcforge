@@ -92,8 +92,9 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   than a promise: the agent runs with the operator's filesystem permissions.
   What the runner adds is detection after the fact, within the blind spots the
   guide lists: a trial that wrote inside the repository it ran from is
-  recorded as an instrument failure (`trial_wrote_repo`) and leaves every
-  scored pool.
+  recorded as an instrument failure (`trial_wrote_repo`), as is one whose
+  repository was too large to check (`repo_check_skipped`), and neither
+  enters a scored pool.
 - **B-8 Results pool by scenario version.** Every result records the version
   it ran under and every read filters to the current one — editing a
   scenario's *meaning* (task, fixture, assertions) bumps the version and
