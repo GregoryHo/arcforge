@@ -163,6 +163,7 @@ function rawRowsForScenario(scenario, projectRoot, options = {}) {
         trialTimeoutMs: result.trialTimeoutMs ?? null,
         maxTurns: result.maxTurns ?? null,
         pluginDir: result.pluginDir ?? null,
+        isolation: result.isolation ?? null,
         passed: result.passed,
         score: result.score,
         duration_ms: durationMs,

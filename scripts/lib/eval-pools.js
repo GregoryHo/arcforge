@@ -15,7 +15,14 @@
  */
 
 /** The row fields that make up a pool's run conditions. */
-const CONDITION_FIELDS = ['model', 'effort', 'trialTimeoutMs', 'maxTurns', 'pluginDir'];
+const CONDITION_FIELDS = [
+  'model',
+  'effort',
+  'trialTimeoutMs',
+  'maxTurns',
+  'pluginDir',
+  'isolation',
+];
 
 /**
  * The run conditions a row recorded; null for a field the row predates.
@@ -58,10 +65,21 @@ function splitPools(rows) {
 }
 
 /**
- * The conditions both arms of a comparison must share. pluginDir is left out:
- * loading the plugin is the treatment itself, so it may differ between arms.
+ * The conditions both arms of a comparison must share. pluginDir and isolation
+ * are matched separately (isolationPairs): loading the plugin, or the toolkit,
+ * into the treatment is the treatment itself.
  */
-const PAIR_FIELDS = CONDITION_FIELDS.filter((field) => field !== 'pluginDir');
+const PAIR_FIELDS = CONDITION_FIELDS.filter((f) => f !== 'pluginDir' && f !== 'isolation');
+
+/**
+ * Whether two arms' isolation modes may be compared. Equal modes always may.
+ * The one intended difference is the treatment: an isolated baseline against a
+ * treatment that loads a plugin dir or the full toolkit.
+ */
+function isolationPairs(baselineMode, treatmentMode) {
+  if (baselineMode === treatmentMode) return true;
+  return baselineMode === 'isolated' && ['plugin-dir', 'toolkit'].includes(treatmentMode);
+}
 
 /** Identity of a row's conditions as far as arm pairing is concerned. */
 function pairKey(row) {
@@ -73,7 +91,15 @@ function poolsOf(rows) {
   const pools = new Map();
   for (const row of rows) {
     const key = conditionKey(row);
-    if (!pools.has(key)) pools.set(key, { key, pair: pairKey(row), rows: [], latest: '' });
+    if (!pools.has(key)) {
+      pools.set(key, {
+        key,
+        pair: pairKey(row),
+        isolation: row.isolation ?? null,
+        rows: [],
+        latest: '',
+      });
+    }
     const pool = pools.get(key);
     pool.rows.push(row);
     if (row.timestamp > pool.latest) pool.latest = row.timestamp;
@@ -99,7 +125,7 @@ function pairArms(baselineRows, treatmentRows) {
   let best = null;
   for (const b of bPools) {
     for (const t of tPools) {
-      if (b.pair !== t.pair) continue;
+      if (b.pair !== t.pair || !isolationPairs(b.isolation, t.isolation)) continue;
       const since = b.latest < t.latest ? b.latest : t.latest;
       if (!best || since > best.since) best = { b, t, since };
     }
@@ -147,6 +173,7 @@ function describeCondition(conditions) {
     `ceiling ${show(conditions.trialTimeoutMs)} ms`,
     `max turns ${conditions.maxTurns === null && conditions.pluginDir !== null ? 'none' : show(conditions.maxTurns)}`,
     `plugin dir ${plugin}`,
+    `isolation ${show(conditions.isolation)}`,
   ].join(', ');
 }
 
@@ -169,6 +196,7 @@ module.exports = {
   conditionKey,
   splitPools,
   pairKey,
+  isolationPairs,
   pairArms,
   describeCondition,
   otherPoolLines,

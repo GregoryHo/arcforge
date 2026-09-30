@@ -92,6 +92,7 @@ describe('trial isolation keeps the operator user config out (B-7, #170)', () =>
   it('records user-settings for a trial that reads the user settings file', () => {
     const row = runTrial(SCENARIO, 1, 1, { projectRoot: tempDir, isolated: false });
     expect([row.model, row.effort]).toEqual(['user-settings', 'user-settings']);
+    expect(row.isolation).toBe('toolkit');
     const pinned = runTrial(SCENARIO, 1, 1, {
       projectRoot: tempDir,
       isolated: false,
@@ -324,6 +325,7 @@ describe('both arms of a comparison run the same claude argv but for the injecti
       [10, false],
       [10, true],
     ]);
+    expect(rows.map((r) => r.isolation)).toEqual(['isolated', 'plugin-dir']);
   });
 
   it('refuses a full-toolkit workflow A/B that does not pin both model and effort', () => {

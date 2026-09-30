@@ -83,6 +83,7 @@ const { splitPools } = require('./eval-pools');
  * @property {string} [effort] - Effort flag the trial ran with ('default' when none was passed)
  * @property {number|null} [maxTurns] - Turn budget the trial ran under (null: none)
  * @property {boolean} [pluginDir] - Whether a plugin dir was loaded into the trial
+ * @property {string} [isolation] - 'isolated' | 'plugin-dir' | 'toolkit' (--no-isolate)
  * @property {number[]} [assertionScores] - Per-assertion scores (0.0-1.0)
  * @property {string[]} [evidence] - Per-assertion evidence notes from grader
  * @property {number[][]} [blockRefs] - Per-assertion transcript block references (1-indexed)

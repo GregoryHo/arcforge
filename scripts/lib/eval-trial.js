@@ -132,6 +132,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
       effort: effort || unset,
       maxTurns: resolvedMaxTurns ?? null,
       pluginDir: Boolean(pluginDir),
+      isolation: pluginDir ? 'plugin-dir' : isolated ? 'isolated' : 'toolkit',
     };
   }
 

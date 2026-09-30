@@ -30,6 +30,7 @@ const row = (overrides = {}) => ({
   trialTimeoutMs: 900000,
   maxTurns: null,
   pluginDir: false,
+  isolation: 'isolated',
   ...overrides,
 });
 
@@ -41,6 +42,7 @@ describe('conditionOf', () => {
       'trialTimeoutMs',
       'maxTurns',
       'pluginDir',
+      'isolation',
     ]);
     expect(conditionOf({ model: 'opus' })).toEqual({
       model: 'opus',
@@ -48,11 +50,25 @@ describe('conditionOf', () => {
       trialTimeoutMs: null,
       maxTurns: null,
       pluginDir: null,
+      isolation: null,
     });
   });
 });
 
 describe('splitPools', () => {
+  it('never combines an isolated pool with a toolkit (--no-isolate) pool', () => {
+    const isolated = [1, 2].map((t) => row({ trial: t, isolation: 'isolated' }));
+    const toolkit = [1, 2, 3].map((t) =>
+      row({ trial: t, isolation: 'toolkit', timestamp: '2026-09-30T11:00:00.000Z' }),
+    );
+    const { current, others } = splitPools([...isolated, ...toolkit]);
+    expect(current).toHaveLength(3);
+    expect(current.every((r) => r.isolation === 'toolkit')).toBe(true);
+    expect(others).toEqual([
+      { conditions: expect.objectContaining({ isolation: 'isolated' }), rows: 2 },
+    ]);
+  });
+
   it('keeps one condition as a single pool', () => {
     const rows = [row({ trial: 1 }), row({ trial: 2 })];
     const { current, others } = splitPools(rows);
@@ -220,6 +236,19 @@ describe('pairArms', () => {
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('pairs an isolated baseline with a plugin-dir or toolkit treatment: that is the treatment', () => {
+    const baseline = [row({ isolation: 'isolated' })];
+    expect(
+      pairArms(baseline, [row({ isolation: 'plugin-dir', pluginDir: true })]).error,
+    ).toBeUndefined();
+    expect(pairArms(baseline, [row({ isolation: 'toolkit' })]).error).toBeUndefined();
+  });
+
+  it('never pairs arms whose isolation differs any other way', () => {
+    const paired = pairArms([row({ isolation: 'toolkit' })], [row({ isolation: 'isolated' })]);
+    expect(paired.error).toMatch(/no run conditions in common/);
   });
 
   it('refuses when the arms share no condition pair, listing every pool', () => {

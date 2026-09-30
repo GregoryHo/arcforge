@@ -368,7 +368,8 @@ when only its prose did.
 
 A pool is narrower than a version. Every row also records the conditions it ran
 under: `model`, `effort`, the per-trial ceiling (`trialTimeoutMs`), the turn
-budget (`maxTurns`) and whether a plugin was loaded (`pluginDir`). Rows under
+budget (`maxTurns`), whether a plugin was loaded (`pluginDir`), and the isolation
+mode (`isolation`: `isolated`, `plugin-dir`, or `toolkit` for `--no-isolate`). Rows under
 different conditions answered different questions, so no reader combines them.
 `eval run`, `list`, `compare`, `report` and the dashboard judge the newest
 condition's pool. Each other pool is listed beside it with its row count and
@@ -379,8 +380,9 @@ fields existed form a pool of their own, shown as "unrecorded".
 An A/B comparison (`compare`, the benchmark's `compared` entry, the dashboard's
 A/B view) pairs its arms rather than taking each arm's newest pool on its own.
 It uses the newest pair of pools, one per arm, that ran under the same model,
-effort, ceiling and turn budget; only the plugin dir may differ, since loading
-it is the treatment. When the newest runs of the two arms don't match, the
+effort, ceiling, turn budget and isolation mode. The one allowed difference is
+the treatment itself: an isolated baseline against a treatment that loads a
+plugin dir or the full toolkit. When the newest runs of the two arms don't match, the
 older matching pair is judged and the rest are listed as "Not combined". When
 the arms share no conditions at all, the comparison is refused and every pool
 is listed; rerun `eval ab` so both arms run under the same conditions.
@@ -398,7 +400,7 @@ a date-stamped copy, so history is kept rather than overwritten.
 
 A per-trial export goes to `evals/benchmarks/raw/` the same way. Each raw row
 carries its run conditions (`model`, `effort`, `trialTimeoutMs`, `maxTurns`,
-`pluginDir`). Its baseline-relative fields (`baseline_score_avg`,
+`pluginDir`, `isolation`). Its baseline-relative fields (`baseline_score_avg`,
 `score_delta_vs_baseline_avg` and the rest) are computed against the baseline
 pool that ran under the same model, effort, ceiling and turn budget. A row with
 no such baseline gets `null` there.
