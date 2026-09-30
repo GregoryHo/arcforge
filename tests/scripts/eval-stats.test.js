@@ -576,6 +576,24 @@ describe('meanOrNull', () => {
 
 // ── fr-gr-002: computeMetricDeltas ───────────────────────────
 
+describe('computeMetricDeltas ignores error rows', () => {
+  test('a provider refusal (zero tokens, a few ms) never moves the cost deltas', () => {
+    const scored = (trial) =>
+      makeResult({ trial, passed: true, score: 1, duration_ms: 1000, output_tokens: 100 });
+    const refusal = makeResult({
+      trial: 3,
+      infraError: true,
+      errorType: 'provider_refusal',
+      duration_ms: 50,
+      output_tokens: 0,
+    });
+    const deltas = computeMetricDeltas([scored(1), scored(2)], [scored(1), scored(2), refusal]);
+    expect(deltas.durationDelta).toBe(0);
+    expect(deltas.outputTokensDelta).toBe(0);
+    expect(deltas.treatmentMeans.output_tokens).toBe(100);
+  });
+});
+
 describe('computeMetricDeltas', () => {
   function makeResults(vals) {
     return vals.map((v, i) => ({

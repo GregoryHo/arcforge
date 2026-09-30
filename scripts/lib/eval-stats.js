@@ -458,7 +458,11 @@ function meanOrNull(values) {
  *   outputTokensRegression: boolean,
  * }}
  */
-function computeMetricDeltas(baseline, treatment) {
+function computeMetricDeltas(rawBaseline, rawTreatment) {
+  // Cost is measured on scored trials only: an error row (a refusal, a killed
+  // trial) records a few milliseconds and no tokens, not the agent's cost (B-10).
+  const baseline = scorableResults(rawBaseline);
+  const treatment = scorableResults(rawTreatment);
   const pick = (results, key) => results.map((r) => r[key] ?? null);
 
   const bDuration = meanOrNull(pick(baseline, 'duration_ms'));
