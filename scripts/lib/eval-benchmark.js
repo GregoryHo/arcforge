@@ -425,10 +425,12 @@ function compareResults(scenario, baseline, treatment, projectRoot) {
       verdict: result.verdict,
       ...(baselineWarning ? { baselineWarning } : {}),
     };
+    // The analyzer reads the same scored pool the metrics came from: an infra
+    // or grade error (a provider refusal, a killed trial) is not behavior (B-10).
     const modelAnalysis = graders.compareWithModel(
       scenario,
-      baseline,
-      treatment,
+      stats.scorableResults(baseline),
+      stats.scorableResults(treatment),
       projectRoot,
       metrics,
     );

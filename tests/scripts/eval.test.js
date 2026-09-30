@@ -1389,6 +1389,32 @@ Do something.
   // ── getVerdict ────────────────────────────────────────────────
 
   describe('compareResults verdict policy', () => {
+    it('should hand the analyzer scored trials only, never a provider refusal', () => {
+      const gradersModule = require('../../scripts/lib/eval-graders');
+      const spy = jest.spyOn(gradersModule, 'compareWithModel').mockReturnValue(null);
+      try {
+        const scored = (trial) => makeResult({ trial, score: 1, passed: true });
+        const refusal = makeResult({
+          trial: 3,
+          infraError: true,
+          errorType: 'provider_refusal',
+          error: "Provider refused the trial in place of the agent's turn: session limit",
+        });
+        compareResults(
+          { grader: 'model', assertions: ['A1'] },
+          [scored(1), scored(2)],
+          [scored(1), scored(2), refusal],
+          tempDir,
+        );
+        const [, baseline, treatment] = spy.mock.calls[0];
+        expect(baseline.map((r) => r.trial)).toEqual([1, 2]);
+        expect(treatment.map((r) => r.trial)).toEqual([1, 2]);
+        expect(treatment.some((r) => r.infraError)).toBe(false);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
     it('should preserve default A/B delta CI verdict behavior', () => {
       const baseline = [
         makeResult({ score: 1, passed: true }),
