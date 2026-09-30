@@ -17,6 +17,7 @@ on:
       - ".claude-plugin/**"
       - ".codex-plugin/**"
       - ".agents/**"
+      - "package.json"
 
 jobs:
   claude-review:
