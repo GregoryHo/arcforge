@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 import sys
 from pathlib import Path
 
@@ -129,7 +130,7 @@ def render(
             if "Executable doesn't exist" in str(e) or "browserType.launch" in str(e):
                 print("ERROR: Chromium not installed for Playwright.", file=sys.stderr)
                 references = Path(__file__).resolve().parent
-                print(f'Run: cd "{references}" && uv run playwright install chromium', file=sys.stderr)
+                print(f"Run: cd {shlex.quote(str(references))} && uv run playwright install chromium", file=sys.stderr)
                 sys.exit(1)
             raise
 

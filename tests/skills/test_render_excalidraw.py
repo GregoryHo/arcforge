@@ -8,7 +8,8 @@ directory holding the script's `pyproject.toml`.
 
 import json
 import os
-import re
+import shlex
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -35,7 +36,7 @@ def sync_playwright():
 '''
 
 
-def _run_without_chromium(tmp_path: Path) -> str:
+def _run_without_chromium(tmp_path: Path, script: Path = SCRIPT) -> str:
     stub = tmp_path / "stub"
     (stub / "playwright").mkdir(parents=True)
     (stub / "playwright" / "__init__.py").write_text("", encoding="utf-8")
@@ -46,7 +47,7 @@ def _run_without_chromium(tmp_path: Path) -> str:
         encoding="utf-8",
     )
     proc = subprocess.run(
-        [sys.executable, str(SCRIPT), str(diagram)],
+        [sys.executable, str(script), str(diagram)],
         capture_output=True,
         text=True,
         check=False,
@@ -58,9 +59,12 @@ def _run_without_chromium(tmp_path: Path) -> str:
 
 
 def _cd_target(stderr: str) -> Path:
-    match = re.search(r'Run: cd "([^"]+)" &&', stderr)
-    assert match, f'no runnable `cd "<dir>" &&` hint in:\n{stderr}'
-    return Path(match.group(1))
+    # Parse the hint the way a shell would when the user pastes it.
+    line = next((l for l in stderr.splitlines() if l.startswith("Run: cd ")), None)
+    assert line, f"no `Run: cd <dir> && ...` hint in:\n{stderr}"
+    words = shlex.split(line[len("Run: "):])
+    assert words[0] == "cd" and words[2] == "&&", words
+    return Path(words[1])
 
 
 def test_missing_chromium_hint_names_the_scripts_own_directory(tmp_path):
@@ -71,3 +75,14 @@ def test_missing_chromium_hint_names_the_scripts_own_directory(tmp_path):
     assert target.resolve() == REFERENCES.resolve()
     assert "playwright install chromium" in stderr
 
+
+
+def test_missing_chromium_hint_quotes_a_directory_with_a_space_and_a_quote(tmp_path):
+    # Pasted into a shell, the hint must reach this exact directory: no word
+    # split at the space, no string ended by the quote, no `$()` expansion.
+    odd = tmp_path / 'ref "q" $(echo x) dir'
+    odd.mkdir()
+    for name in ("render_excalidraw.py", "render_template.html"):
+        shutil.copy(REFERENCES / name, odd / name)
+    stderr = _run_without_chromium(tmp_path, odd / "render_excalidraw.py")
+    assert _cd_target(stderr) == odd.resolve()
