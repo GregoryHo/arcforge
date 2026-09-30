@@ -246,7 +246,7 @@ function statusBadge(status) {
   return h('span', { className:'badge '+(cls[status]||'badge-no-runs') }, status);
 }
 function verdictBadge(v) {
-  const cls = { IMPROVED:'badge-improved',INCONCLUSIVE:'badge-inconclusive',REGRESSED:'badge-regressed',INSUFFICIENT_DATA:'badge-insufficient' };
+  const cls = { IMPROVED:'badge-improved',PASS:'badge-ship',INCONCLUSIVE:'badge-inconclusive',REGRESSED:'badge-regressed',INSUFFICIENT_DATA:'badge-insufficient' };
   return h('span', { className:'badge '+(cls[v]||'badge-no-runs') }, v||'');
 }
 function scoreBar(score) {

@@ -330,7 +330,9 @@ function handleApiCompare(res, projectRoot, scenarioName, query) {
   const tStats = treatment.length > 0 ? stats.statsFromResults(treatment) : null;
   const delta = stats.computeDelta(baseline, treatment);
   const deltaCi = stats.ciForDelta(baseline, treatment);
-  const verdict = stats.verdictFromDeltaCI(baseline, treatment);
+  // Same judge as eval compare: a scenario's verdict policy decides (B-4).
+  const verdictPolicy = scenario?.verdictPolicy;
+  const verdict = stats.verdictFromAbPolicy(baseline, treatment, verdictPolicy);
   const metricDeltas = stats.computeMetricDeltas(baseline, treatment);
 
   sendJson(res, {
@@ -340,6 +342,7 @@ function handleApiCompare(res, projectRoot, scenarioName, query) {
     delta: stats.round2(delta),
     deltaCi,
     verdict,
+    ...(verdictPolicy ? { verdictPolicy } : {}),
     metricDeltas,
   });
 }

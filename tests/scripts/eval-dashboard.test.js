@@ -261,6 +261,37 @@ describe('dashboard', () => {
       expect(data.baseline.stats.avg).toBe(0.25);
       expect(data.treatment.stats.avg).toBe(1.0);
     });
+
+    it('should judge a non-regression scenario by its policy, as eval compare does', () => {
+      writeScenario(
+        tempDir,
+        'nr-eval.md',
+        '# Eval: nr-eval\n\n## Scope\nskill\n\n## Scenario\nDo it.\n\n## Grader\ncode\n\n## Verdict Policy\nnon-regression\n',
+      );
+      const row = (condition, trial) => ({
+        eval: `nr-eval-${condition}`,
+        trial,
+        k: 2,
+        passed: true,
+        score: 1.0,
+        grader: 'code',
+        timestamp: `2026-03-20T10:00:0${trial}Z`,
+      });
+      writeResult(tempDir, 'nr-eval', '20260320-100000', 'baseline', [
+        row('baseline', 1),
+        row('baseline', 2),
+      ]);
+      writeResult(tempDir, 'nr-eval', '20260320-100000', 'treatment', [
+        row('treatment', 1),
+        row('treatment', 2),
+      ]);
+
+      const data = callRouter(createRouter(tempDir, ''), '/api/compare/nr-eval').json();
+
+      // Delta-CI judging would say INSUFFICIENT_DATA at k=2; the strict bar says PASS.
+      expect(data.verdict).toBe('PASS');
+      expect(data.verdictPolicy).toBe('non-regression');
+    });
   });
 
   // ── /api/transcript ────────────────────────────────────────────

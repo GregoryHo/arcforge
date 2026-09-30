@@ -140,14 +140,18 @@ arcforge eval compare eval-tdd-test-first-gate
 | `REGRESSED` | It sits entirely below zero |
 | `INCONCLUSIVE` | It straddles zero — this is a real answer, not a failure to get one |
 | `INSUFFICIENT_DATA` | Fewer than 5 trials in an arm; no defensible verdict exists yet |
+| `PASS` | `non-regression` policy only (below): every scored treatment trial passed |
 
 `INCONCLUSIVE` at k=5 usually means the effect is smaller than the noise. Raising
 k narrows the interval; it does not manufacture an effect that is not there.
 
 A scenario declaring `## Verdict Policy non-regression` is judged differently:
 there is no delta to interpret, and it passes only when **every** treatment trial
-that produced a score passes and at least one did. That is the right policy for
-"this must keep working", the wrong one for "this should help".
+that produced a score passes and at least one did — `PASS`, otherwise
+`REGRESSED`, never `INSUFFICIENT_DATA`. `eval ab`, `eval compare` and the
+dashboard's A/B view all apply it. That is the right policy for "this must keep
+working", the wrong one for "this should help". This `PASS` is an A/B verdict,
+not the preflight `PASS` from step 2.
 
 ## Scenario format
 
