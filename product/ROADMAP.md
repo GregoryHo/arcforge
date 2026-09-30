@@ -687,7 +687,7 @@ reverse one, append a superseding entry (see AGENTS.md).
 ### D-024 — `speccing` under plugin routing (#179): re-measure before deciding
 - Date: 2026-09-30
 - Version: 6.1.1
-- Status: Proposed
+- Status: Accepted
 - Decision: Proposed: re-measure whether `speccing` fires under real plugin
   routing on the repaired instrument; if the rate stays low, document it as
   user-invoked in practice rather than editing its description. Until
@@ -714,7 +714,7 @@ reverse one, append a superseding entry (see AGENTS.md).
 ### D-025 — `claude plugin eval` measures routing and stays out of the release gate
 - Date: 2026-09-30
 - Version: 6.1.1
-- Status: Proposed
+- Status: Accepted
 - Decision: Proposed: use `claude plugin eval` only to measure whether a named
   skill fires under real plugin routing — first for #179 (D-024) — from an
   eval directory outside `evals/`, with `--no-publish`, an explicit `--model`
@@ -737,7 +737,7 @@ reverse one, append a superseding entry (see AGENTS.md).
 ### D-026 — answering-feedback: the ledger records REGRESSED, and the cost flag is informational
 - Date: 2026-09-30
 - Version: 6.1.1
-- Status: Proposed
+- Status: Accepted
 - Decision: Proposed: the coverage ledger records the REGRESSED of the
   `code-review-answering-feedback` scenario as measured, and for an
   injection-type treatment the cost-regression flag is informational — it is
@@ -757,7 +757,7 @@ reverse one, append a superseding entry (see AGENTS.md).
 ### D-027 — Floor assertions keep the weight the engine gives them today
 - Date: 2026-09-30
 - Version: 6.1.1
-- Status: Proposed
+- Status: Accepted
 - Decision: Proposed: keep the engine's current computation of floor
   assertions in the pass bar and write that computation down in eval B-5 and
   the eval guide, settled before any 6.1.1 result is read. Until accepted, it
@@ -771,7 +771,7 @@ reverse one, append a superseding entry (see AGENTS.md).
 ### D-028 — obsidian's `index.md` rebuild is a write step of LINK mode
 - Date: 2026-09-30
 - Version: 6.1.1
-- Status: Proposed
+- Status: Accepted
 - Decision: Proposed: the full `index.md` rebuild is a write step of the
   audit's LINK mode, its procedure defined in the skill's
   `references/audit.md`. Until accepted, it gates that procedure and every

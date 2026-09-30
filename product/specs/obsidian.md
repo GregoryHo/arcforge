@@ -53,7 +53,10 @@ work carries provenance a reader can check.
   hash. Contradictions with existing notes are surfaced to the user, never
   silently overwritten.
 - **B-5 Audit reports; it barely writes.** Of the three audit passes only link
-  resolution modifies notes — lint and growth report and propose. A lint
+  resolution modifies notes — lint and growth report and propose. The full
+  `index.md` rebuild is a write step of that link pass (LINK mode), its
+  procedure defined in the skill's audit reference; LINT never writes, the
+  index included (D-028). A lint
   finding is a hypothesis to verify against the file, not a fact; entity notes
   are never fabricated without source backing; thresholds come from the
   vault's schema, and where it declares none the observation is reported
@@ -95,7 +98,6 @@ The vault-contract model (mechanism/domain split, contract-wins) and the
 verified-save bar predate this log; rationale inline above. Registry mechanics
 live behind the CLI per [cli](cli.md) B-8.
 
-- **D-028** — *proposed*: the `index.md` rebuild is a write step of LINK mode
-  (B-5).
+- **D-028** — the `index.md` rebuild is a write step of LINK mode (B-5).
 - **D-034** — *proposed*: the provenance pair applies where the vault adopts raw
   sources (B-4).

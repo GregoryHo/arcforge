@@ -35,6 +35,15 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
 - **B-2 The workflow is gated, and the gates are real.** `lint` (structural) →
   `preflight` (discriminability) → `ab` (trials) → `compare` (verdict).
   `eval ab` refuses to run without a passing preflight on record.
+- **B-11 Routing is a trigger rate, measured outside the harness.** Whether a
+  named skill fires under real plugin routing is measured with the plugin
+  loaded through `claude plugin eval` and a `tool_used: Skill` grader matched
+  to that skill (D-025). The reading is a trigger rate, not a verdict: it MUST
+  NOT enter the release gate or the benchmark snapshot (B-9). Its cases live
+  outside `evals/`, the harness's own directory, and every run keeps its report
+  local (`--no-publish`), pins its model (`--model`) and sets a spending cap
+  (`--max-cost-usd`), so each reading names the model it measured and no run
+  can overrun its budget.
 
 ### Discriminability
 - **B-3 Preflight kills ceiling scenarios before they cost anything.**
@@ -54,13 +63,24 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   guessing. A `non-regression` verdict policy replaces the delta with a strict
   bar: the verdict is `PASS` when the treatment arm has at least one scored
   trial and every one of them passes, `REGRESSED` otherwise — an arm with
-  nothing scored fails the bar rather than deferring.
+  nothing scored fails the bar rather than deferring. Under that policy the
+  cost-regression flag (a treatment mean of duration or tokens above twice the
+  baseline's) on an injection-type treatment is reported, never counted toward
+  the verdict: an injected skill adds tokens to every trial by construction.
+  The coverage ledger records a `REGRESSED` as measured, never re-booked as a
+  pass driven by cost (D-026).
 - **B-5 A trial is pass or fail, never partial credit.** Behavioral assertions
   (graded deterministically from the log of what the agent actually did) are
   the preferred evidence — they cost nothing, never drift, and cannot be
   argued with; model-graded text assertions exist for claims about what was
   *said*. A mixed scenario passes at score ≥ 0.8; `code` and `model` graders
-  require every assertion to land.
+  require every assertion to land. Floor assertions count toward that bar as
+  the engine computes it today (D-027). The engine has no floor type: a floor
+  is a scenario author's label for a check both arms are expected to pass.
+  Listed as an assertion, it is one equal share of the score like any other,
+  so in a mixed scenario floors can carry a trial over 0.8; a `code` grader's
+  floor printed outside its `A<N>:` labels adds nothing to the score but fails
+  the trial through the grader's exit code.
 
 ### Trial integrity
 - **B-6 The agent never sees the grading.** Only a scenario's `Context` and
@@ -141,12 +161,12 @@ its rationale is inline at B-10.
 - **D-021** — 6.1.1's benchmark reruns only the scenarios whose subject changed;
   the pools not re-run are recorded as measured on the pre-repair instrument
   (B-9).
-- **D-025** — *proposed*: `claude plugin eval` measures routing only and stays
-  out of the release gate (B-1, B-9).
-- **D-026** — *proposed*: the ledger records answering-feedback's REGRESSED, and
-  the cost flag is informational for an injected treatment (B-4).
-- **D-027** — *proposed*: floor assertions keep the weight the engine gives them
-  today, written down before 6.1.1's results are read (B-5).
+- **D-025** — `claude plugin eval` measures routing only and stays out of the
+  release gate (B-9, B-11).
+- **D-026** — the ledger records answering-feedback's REGRESSED, and the cost
+  flag is informational for an injected treatment (B-4).
+- **D-027** — floor assertions keep the weight the engine gives them today,
+  written down before 6.1.1's results are read (B-5).
 - **D-020** — 6.2.0 carries the scenario rubric fixes with their own
   measurement round (B-8).
 - **D-043** — *proposed*: graders never execute trial output (B-6, B-7).

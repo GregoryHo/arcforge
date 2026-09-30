@@ -24,7 +24,7 @@ p7-benchmark-evidence.md「協定修正案」）。
 | scenario | 池來源 | treatment pass | 本窗 delta |
 |---|---|---|---|
 | brainstorming-alternatives-before-build | ab | 40%（avg 0.85） | **+0.35 CI[0.11, 0.59] IMPROVED** |
-| code-review-answering-feedback | ab | 80% | +0.05（non-reg 分數面過；成本旗標見帳） |
+| code-review-answering-feedback | ab | 80% | +0.05 CI[−0.14, 0.24]；non-regression 判定 **REGRESSED**（treatment 4/5 過門檻，1 個 trial 沒過；成本旗標僅供參考，不入判定。D-026 更正，原先記為分數面過） |
 | code-review-range-fidelity | ab | 100% | +0.27 CI[−0.08, 0.61]（non-reg PASS） |
 | code-review-two-axis | ab | 100% | **+0.40 IMPROVED** |
 | compacting-persist-before-compact | run | 100%（avg 0.96） | non-reg SHIP |
@@ -54,7 +54,7 @@ p7-benchmark-evidence.md「協定修正案」）。
 | speccing | spec-before-code **+0.67 CI[0.67, 0.67] IMPROVED**；supersede-not-overwrite unmet-but-covered（baseline ceiling） | 6.1.0 ab k=10 |
 | tdd | +0.63 CI[0.41, 0.86] | P7 ab |
 | finishing | +0.54 CI[0.46, 0.62] | P7 ab（P4 +0.58 同量級） |
-| code-review | two-axis +0.40；range-fidelity +0.27 non-reg PASS；answering-feedback +0.05 分數面過 | P7 ab ×3 |
+| code-review | two-axis +0.40；range-fidelity +0.27 non-reg PASS；answering-feedback +0.05 但 non-reg **REGRESSED**（4/5，D-026） | P7 ab ×3 |
 | executing | +0.40 CI[0.03, 0.77] | P7 ab k=10 |
 | using（router） | +0.36 CI[0.25, 0.47]；另 e2e 矩陣 16/16（P6） | P7 ab（v6.1.0 有較新的 non-regression 覆蓋，見下節） |
 | brainstorming | +0.35 CI[0.11, 0.59] | P7 ab（P6 +0.50 同向） |
