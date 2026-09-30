@@ -434,7 +434,6 @@ describe('eval command', () => {
         expect(opts.isolated).toBe(true);
         expect(opts.pluginDir).toBeUndefined();
         expect(opts.maxTurns).toBe(10);
-        expect(opts.skipPermissions).toBe(true);
       }
     });
 
@@ -463,7 +462,8 @@ describe('eval command', () => {
       writeScenario(tempDir, 'pf-plain');
       const [opts] = await preflightOpts('pf-plain');
       expect(opts.maxTurns).toBeUndefined();
-      expect(opts.skipPermissions).toBe(false);
+      // Contained, so it runs without permission prompts all the same (B-7).
+      expect(opts.isolated).toBe(true);
     });
   });
 

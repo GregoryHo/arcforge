@@ -116,7 +116,6 @@ function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts
     runId,
     pluginDir,
     maxTurns,
-    skipPermissions,
     watchRoots,
   } = opts;
   const result = runTrial(trialScenario, trialNumber, k, {
@@ -129,7 +128,6 @@ function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts
     runId,
     pluginDir,
     maxTurns,
-    skipPermissions,
     watchRoots,
   });
   // Every row carries the scenario version — infraError rows too, or a
@@ -185,19 +183,18 @@ function runAbTrials(baseScenario, treatScenario, gradeScenario, k, bOpts, tOpts
 /**
  * Options both arms of a comparison must share so their claude argv differ only
  * by the injection: one turn budget (resolved as if the plugin were loaded, so
- * the baseline does not run unbounded beside a 10-turn treatment) and one
- * permission mode. Both arms also watch the plugin root for writes: a baseline
+ * the baseline does not run unbounded beside a 10-turn treatment). The
+ * permission mode follows from containment (buildClaudeArgs). Both arms also watch the plugin root for writes: a baseline
  * that edits the plugin would otherwise go unseen, and the treatment would then
  * load the edited plugin. Watching loads nothing.
  * @param {EvalScenario} scenario
  * @param {{ maxTurns?: number, pluginDir?: string }} opts
- * @returns {{ maxTurns?: number, skipPermissions: boolean, watchRoots: string[] }}
+ * @returns {{ maxTurns?: number, watchRoots: string[] }}
  */
 function sharedArmOptions(scenario, { maxTurns, pluginDir }) {
   const resolved = resolveMaxTurns({ maxTurns, scenarioMaxTurns: scenario.maxTurns, pluginDir });
   return {
     ...(resolved != null ? { maxTurns: resolved } : {}),
-    skipPermissions: Boolean(pluginDir),
     watchRoots: pluginDir ? [pluginDir] : [],
   };
 }

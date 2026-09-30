@@ -105,6 +105,15 @@ describe('trial isolation keeps the operator user config out (B-7, #170)', () =>
   it('leaves a --no-isolate trial reading the surrounding config', () => {
     runTrial(SCENARIO, 1, 1, { projectRoot: tempDir, isolated: false });
     expect(trialArgs()).not.toContain('--setting-sources');
+    // Its permission mode is whatever the operator's own settings say.
+    expect(trialArgs()).not.toContain('--dangerously-skip-permissions');
+  });
+
+  it('runs an isolated trial with no plugin dir without permission prompts', () => {
+    // The user settings file is not read, so no permission mode comes from it;
+    // without the flag a -p session is denied every Bash, Write and Edit.
+    runTrial(SCENARIO, 1, 1, { projectRoot: tempDir });
+    expect(trialArgs()).toContain('--dangerously-skip-permissions');
   });
 });
 
@@ -280,7 +289,7 @@ describe('both arms of a comparison run the same claude argv but for the injecti
     expect(argvs).toHaveLength(2);
     expectOnlyInjectionDiffers(argvs);
     expect(argvs[0]).toContain('--setting-sources');
-    expect(argvs[0]).toContain('--dangerously-skip-permissions');
+    for (const argv of argvs) expect(argv).toContain('--dangerously-skip-permissions');
     expect(argvs[0][argvs[0].indexOf('--max-turns') + 1]).toBe('10');
   });
 
@@ -308,6 +317,7 @@ describe('both arms of a comparison run the same claude argv but for the injecti
   it('skill scope with an injected body: argv identical, the body is in the prompt', () => {
     runSkillEval(SCENARIO, 1, { projectRoot: tempDir, skillInstruction: 'BODY' });
     expect(argvs[0]).toEqual(argvs[1]);
+    for (const argv of argvs) expect(argv).toContain('--dangerously-skip-permissions');
   });
 
   it('records the model and effort every row ran with, default when none was passed', () => {

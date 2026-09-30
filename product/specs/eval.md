@@ -99,7 +99,9 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   and permissions reach neither arm. A plugin-dir trial is contained the same
   way, `CLAUDE.md` excludes included, but keeps the plugin under test with its
   own hooks; the user settings file is dropped there too, which costs a
-  credential that lives only in that file. Both arms of a comparison run the
+  credential that lives only in that file. A contained trial runs without
+  permission prompts, since it is unattended and the operator's permission mode
+  does not reach it. Both arms of a comparison run the
   same `claude` flags apart from the injection itself, and their settings
   files differ only in that the baseline, which loads no plugin, switches every
   hook off; every row records the `model` and `effort` it ran with. The

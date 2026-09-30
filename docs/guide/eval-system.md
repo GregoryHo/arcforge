@@ -56,10 +56,10 @@ three trials, and measures how often it passes with no change applied at all.
 A BLOCK is a verdict about your *scenario*, not your change. Make the task
 harder, or find the failure mode you were actually worried about.
 
-Preflight runs its baseline the way the A/B will run it: with the same turn
-budget and permission mode. Give `preflight` the `--max-turns`,
+Preflight runs its baseline the way the A/B will run it: contained, with the
+same turn budget. Give `preflight` the `--max-turns`,
 `--plugin-dir` and `--effort` you will give `ab`. There `--plugin-dir` only sets the
-budget and permission mode; nothing is loaded into the baseline. Like `ab`,
+budget; nothing is loaded into the baseline. Like `ab`,
 `preflight` takes `--plugin-dir` for a `workflow` scenario only. A `workflow`
 scenario's `## Plugin Dir` counts on its own. With a plugin dir and no other limit, the
 budget is 10 turns.
@@ -126,10 +126,20 @@ through. A `--plugin-dir` trial is contained the same way, `CLAUDE.md` excludes
 included, except that it loads the plugin under test and leaves hooks on so the
 plugin's own hooks run.
 
+Both kinds of contained trial, isolated and `--plugin-dir`, run with permission
+prompts skipped (`--dangerously-skip-permissions`) inside their trial
+directory. A trial runs unattended, so nobody is there to answer a prompt.
+Since your settings file is not read, no permission mode of yours applies
+either, and without the flag the agent would be denied every command, write
+and edit. What contains the trial instead is the write check described below
+and arcforge's redirected state. This holds for `eval run`, `eval preflight` and
+both arms of `eval ab`. A `--no-isolate` trial with no plugin dir is not
+contained: it reads your settings file and runs under your own permission mode.
+
 In a comparison, both arms run `claude` with the same flags apart from the
 injection itself. They share the settings sources, the turn budget, the
-permission mode (neither arm stops for permission prompts when a plugin is
-loaded) and `--model` / `--effort`. Their settings files differ only in that
+permission mode (neither arm stops for permission prompts) and `--model` /
+`--effort`. Their settings files differ only in that
 the baseline switches every hook off: it loads no plugin, so that costs it
 nothing. Every result row records the `model` and `effort` it ran with, the flag
 value when one was given. Otherwise it says `default` for a contained trial,
