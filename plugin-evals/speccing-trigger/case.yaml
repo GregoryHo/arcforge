@@ -1,0 +1,8 @@
+# Merged with prompt.md: this file supplies the schema version and the
+# scaffold; prompt.md supplies the name, plugins, runs, limits and the prompt.
+schema_version: "1.1"
+context:
+  # Runs only when the eval is started with --scaffold. Resolved from this case
+  # directory; the runner executes it with bash, in the run's empty working
+  # directory, before the agent starts.
+  scaffold_script: scaffold.sh
