@@ -172,7 +172,7 @@
 
 ## eval 額度預算
 
-### 6.1.1：約 80 個 session
+### 6.1.1：約 95 個 session
 
 | 執行 | 方式 | session |
 |---|---|---|
@@ -182,6 +182,7 @@
 | finishing-verify-before-options | `arcforge eval ab`，k=5 | 10 |
 | maintaining-obsidian-vault-only-answer | `arcforge eval ab`，k=5 | 10 |
 | maintaining-obsidian-audit-runs-lint-script | `arcforge eval ab`，k=5 | 10 |
+| maintaining-obsidian-link-rebuilds-index（新 scenario，D-028） | 先跑 k=3 的 preflight，再 `arcforge eval ab`，k=5 | 13 |
 | #179 觸發率 | `claude plugin eval`，只跑載入 plugin 的那一臂，10 次 | 10 |
 | `claude plugin eval` 隔離查核 | 1 個 case，2 次 | 2 |
 | 備用 | 補被判為 `infraError` 的 trial | 10 |
