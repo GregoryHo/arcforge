@@ -50,13 +50,15 @@ const TOOL_LESS_ARGV = [
   '{"mcpServers":{}}',
 ];
 
-// ingestProposal refuses to run without the curator argv (B-9, D-023), so every
-// case that is not about that argv ingests as the daemon does: tool-less.
+// ingestProposal and recordRunFailure refuse to run without the curator argv
+// (B-9, D-023), so every case that is not about that argv records as the
+// daemon does: tool-less.
 function getIngestor() {
   const ingestor = require('../../scripts/lib/learning-curator/proposal-ingestor');
   return {
     ...ingestor,
     ingestProposal: (opts) => ingestor.ingestProposal({ curatorArgv: TOOL_LESS_ARGV, ...opts }),
+    recordRunFailure: (opts) => ingestor.recordRunFailure({ curatorArgv: TOOL_LESS_ARGV, ...opts }),
   };
 }
 
@@ -804,6 +806,37 @@ describe('recordRunFailure — writes failure manifest', () => {
     expect(manifest.response_hash).toBeNull();
     expect(manifest.raw_prompt_saved).toBe(false);
     expect(manifest.raw_response_saved).toBe(false);
+    expect(manifest.invocation).toEqual({
+      tool_access: false,
+      transport_status: 'transport_error',
+    });
+  });
+
+  test('a failed run records the tool access its argv gave it, and its transport status', () => {
+    const { recordRunFailure } = getRawIngestor();
+    const withTools = TOOL_LESS_ARGV.filter(
+      (a, i) => a !== '--tools' && TOOL_LESS_ARGV[i - 1] !== '--tools',
+    );
+    const result = recordRunFailure({
+      batchId: 'batch_y',
+      parseStatus: 'timeout',
+      homeDir: tmpDir,
+      curatorArgv: withTools,
+    });
+    const runsDir = path.join(tmpDir, '.arcforge', 'learning', 'curator-runs');
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(runsDir, `${result.run_id}.manifest.json`), 'utf8'),
+    );
+    expect(manifest.invocation).toEqual({ tool_access: true, transport_status: 'timeout' });
+  });
+
+  test('a failure without the curator argv is refused and writes nothing', () => {
+    const { recordRunFailure } = getRawIngestor();
+    expect(() =>
+      recordRunFailure({ batchId: 'batch_z', parseStatus: 'timeout', homeDir: tmpDir }),
+    ).toThrow(/curator argv is required/);
+    const runsDir = path.join(tmpDir, '.arcforge', 'learning', 'curator-runs');
+    expect(fs.existsSync(runsDir) ? fs.readdirSync(runsDir) : []).toEqual([]);
   });
 
   test('persisted manifest has correct fields for both spec parse_status values', () => {

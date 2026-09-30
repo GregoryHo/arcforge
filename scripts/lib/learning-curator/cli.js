@@ -150,7 +150,9 @@ function cmdIngestProposal(argv) {
 }
 
 function cmdRecordRunFailure(argv) {
-  const args = parseArgs(argv);
+  const separator = argv.indexOf('--');
+  const curatorArgv = separator === -1 ? undefined : argv.slice(separator + 1);
+  const args = parseArgs(separator === -1 ? argv : argv.slice(0, separator));
   const batchId = args['batch-id'];
   const parseStatus = args['parse-status'];
   const detail = args.detail || null;
@@ -172,7 +174,12 @@ function cmdRecordRunFailure(argv) {
 
   let result;
   try {
-    result = recordRunFailure({ batchId, parseStatus, detail: detail || undefined });
+    result = recordRunFailure({
+      batchId,
+      parseStatus,
+      detail: detail || undefined,
+      curatorArgv,
+    });
   } catch (err) {
     console.error(`Error: record-run-failure failed: ${err.message}`);
     process.exit(1);
@@ -225,7 +232,7 @@ function cmdHelp() {
       "    The argv after -- (required) is the curator run's; it decides the manifest's tool_access.",
       '    Prints JSON: { run_id, parse_status, accepted, rejected }',
       '',
-      '  record-run-failure --batch-id <batch_id> --parse-status <transport_error|timeout> [--detail <msg>]',
+      '  record-run-failure --batch-id <batch_id> --parse-status <transport_error|timeout> [--detail <msg>] -- <claude argv...>',
       '    Layer 4: write a CuratorRunManifest for a daemon transport failure.',
       '    Prints JSON: { run_id, parse_status, accepted, rejected }',
       '',

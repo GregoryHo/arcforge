@@ -585,15 +585,24 @@ function ingestProposal({
  * @param {string} options.parseStatus — 'transport_error' | 'timeout'
  * @param {string} [options.detail]    — free-text reason
  * @param {string} [options.homeDir]   — override home directory (tests)
+ * @param {string[]} options.curatorArgv — the argv the failed `claude` run used;
+ *   required, as in ingestProposal, so the manifest records its tool access
  * @returns {{ run_id, parse_status, accepted, rejected }}
  */
-function recordRunFailure({ batchId, parseStatus, detail, homeDir: homeOverride } = {}) {
+function recordRunFailure({
+  batchId,
+  parseStatus,
+  detail,
+  homeDir: homeOverride,
+  curatorArgv,
+} = {}) {
   if (typeof batchId !== 'string' || !batchId.trim()) {
     throw new Error('recordRunFailure: batchId must be a non-empty string');
   }
   if (typeof parseStatus !== 'string' || !parseStatus.trim()) {
     throw new Error('recordRunFailure: parseStatus must be a non-empty string');
   }
+  const toolAccess = toolAccessFromArgv(curatorArgv);
 
   const homeDir = homeOverride;
   const now = new Date();
@@ -609,6 +618,10 @@ function recordRunFailure({ batchId, parseStatus, detail, homeDir: homeOverride 
     run_id: runId,
     created_at: createdAt,
     source_batch_id: batchId,
+    invocation: {
+      tool_access: toolAccess,
+      transport_status: parseStatus,
+    },
     parse_status: parseStatus,
     detail: detail || null,
     accepted_count: 0,

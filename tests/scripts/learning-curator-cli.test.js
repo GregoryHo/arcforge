@@ -159,6 +159,10 @@ describe('CLI record-run-failure', () => {
       'transport_error',
       '--detail',
       'claude exit 1',
+      '--',
+      '--tools',
+      '',
+      '--strict-mcp-config',
     ]);
     const parsed = JSON.parse(output);
     expect(parsed.run_id).toMatch(/^curator_run_/);
@@ -172,6 +176,7 @@ describe('CLI record-run-failure', () => {
     expect(fs.existsSync(manifestPath)).toBe(true);
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     expect(manifest.parse_status).toBe('transport_error');
+    expect(manifest.invocation.tool_access).toBe(false);
   });
 
   test('timeout parse-status persists correctly', () => {
@@ -183,6 +188,10 @@ describe('CLI record-run-failure', () => {
       'timeout',
       '--detail',
       'watchdog killed claude',
+      '--',
+      '--tools',
+      '',
+      '--strict-mcp-config',
     ]);
     const parsed = JSON.parse(output);
     expect(parsed.parse_status).toBe('timeout');

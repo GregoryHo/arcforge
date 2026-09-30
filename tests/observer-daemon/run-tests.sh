@@ -311,6 +311,22 @@ else
   ERRORS+=('PR-F-T1: failure manifest with parse_status=transport_error was written')
 fi
 
+# B-9: a failed run's manifest records the tool access of the argv it ran with.
+manifest_tool_access() {
+  node -e '
+    const m = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+    process.stdout.write(String(m.invocation && m.invocation.tool_access));
+  ' "$1" 2>/dev/null || true
+}
+assert_eq \
+  'B9-T2: timeout failure manifest records tool_access false' \
+  'false' \
+  "$([ -n "$C4_TIMEOUT_STATUS" ] && manifest_tool_access "$C4_TIMEOUT_STATUS")"
+assert_eq \
+  'B9-T2: transport_error failure manifest records tool_access false' \
+  'false' \
+  "$([ -n "$PRF_TRANSPORT_MANIFEST" ] && manifest_tool_access "$PRF_TRANSPORT_MANIFEST")"
+
 # ─────────────────────────────────────────────
 # E2-G1: daemon no longer writes to per-project instincts subdir
 # Strategy: the production analysis code must not contain mkdir + write

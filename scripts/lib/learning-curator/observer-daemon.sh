@@ -321,6 +321,7 @@ analyze_project() {
             --batch-id "$batch_id" \
             --parse-status "timeout" \
             --detail "claude CLI exceeded watchdog timeout (${OBSERVER_DAEMON_WATCHDOG_SECS}s)" \
+            -- "${claude_args[@]}" \
             > /dev/null 2>&1 || true
           last_was_timeout=true
         else
@@ -341,6 +342,7 @@ analyze_project() {
         --batch-id "$batch_id" \
         --parse-status "transport_error" \
         --detail "claude CLI not found in PATH" \
+        -- "${claude_args[@]}" \
         > /dev/null 2>&1 || true
       return
     fi
@@ -357,6 +359,7 @@ analyze_project() {
         --batch-id "$batch_id" \
         --parse-status "transport_error" \
         --detail "claude CLI exited non-zero after ${max_retries} retries" \
+        -- "${claude_args[@]}" \
         > /dev/null 2>&1 || true
     fi
     return
