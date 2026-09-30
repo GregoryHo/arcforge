@@ -258,7 +258,9 @@ function verdictFromRate(rate) {
  * @param {number} [target] - CI lower bound target (default: SHIP_CI_TARGET)
  * @returns {'SHIP' | 'NEEDS WORK' | 'BLOCKED'} Verdict
  */
-function verdictFromCI(results, target) {
+function verdictFromCI(rawResults, target) {
+  // Error trials never move a verdict (B-10): judge the scored pool only.
+  const results = scorableResults(rawResults);
   if (results.length < 2) return 'BLOCKED';
   const t = target ?? SHIP_CI_TARGET;
   const interval = ci95(results);
@@ -276,7 +278,9 @@ function verdictFromCI(results, target) {
  * @param {boolean} [options.useCi=false] - Use CI-based SHIP threshold
  * @returns {'SHIP' | 'NEEDS WORK' | 'BLOCKED'} Verdict
  */
-function getVerdict(results, options = {}) {
+function getVerdict(rawResults, options = {}) {
+  // Error trials never move a verdict (B-10): judge the scored pool only.
+  const results = scorableResults(rawResults);
   if (results.length === 0) return 'BLOCKED';
   if (options.useCi && results.length >= 5) return verdictFromCI(results);
   return verdictFromRate(passRate(results));
@@ -454,7 +458,11 @@ function meanOrNull(values) {
  *   outputTokensRegression: boolean,
  * }}
  */
-function computeMetricDeltas(baseline, treatment) {
+function computeMetricDeltas(rawBaseline, rawTreatment) {
+  // Cost is measured on scored trials only: an error row (a refusal, a killed
+  // trial) records a few milliseconds and no tokens, not the agent's cost (B-10).
+  const baseline = scorableResults(rawBaseline);
+  const treatment = scorableResults(rawTreatment);
   const pick = (results, key) => results.map((r) => r[key] ?? null);
 
   const bDuration = meanOrNull(pick(baseline, 'duration_ms'));

@@ -51,8 +51,10 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   already passes ≥80% of the time — at a ceiling, a good change and a useless
   one produce the same numbers, so any delta measured there is noise. A BLOCK
   is a verdict about the scenario, not the change. Results are cached per
-  scenario content **and per model**: baseline competence is not transferable,
-  and a PASS under one model never unblocks runs under another. Non-regression
+  scenario content, model, effort, ceiling, turn budget and plugin-dir setting: baseline
+  competence is not transferable, and an A/B run whose baseline conditions
+  differ from the cached preflight is refused until preflight is rerun under
+  them. Non-regression
   scenarios (`must not get worse`) opt out with an explicit `skip`.
 
 ### Verdicts
@@ -89,15 +91,37 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   the answer.
 - **B-7 Trials cannot contaminate the user.** Every trial runs in a clean
   fixture directory with toolkit state redirected away from the user's real
-  learning state — unconditionally. On top of that, isolation is the default:
-  the trial session is stripped of plugins and MCP servers, and opting out
+  learning state — unconditionally. Nor does the user's configuration reach
+  the trial. On top of that, isolation is the default: plugins and MCP servers are
+  stripped, `CLAUDE.md` files and rules are excluded, the output style is
+  pinned to the default, hooks are disabled, and the user settings file is
+  not read, so the operator's hooks, output style, model, effort level, env
+  and permissions reach neither arm. A plugin-dir trial is contained the same
+  way, `CLAUDE.md` excludes included, but keeps the plugin under test with its
+  own hooks; the user settings file is dropped there too, which costs a
+  credential that lives only in that file. Both arms of a comparison run the
+  same `claude` flags apart from the injection itself, and their settings
+  files differ only in that the baseline, which loads no plugin, switches every
+  hook off; every row records the `model` and `effort` it ran with. The
+  exception is a `workflow` A/B with no plugin dir, whose treatment runs on the
+  user's full configuration by definition: it refuses to start unless `--model`
+  and `--effort` are both given, which is all that keeps the arms on one model
+  and one effort. Opting out
   (`--no-isolate`) readmits the surrounding toolkit into the trial — never the
-  user's real state.
+  user's real state. Isolation is not a sandbox, and that is a limit rather
+  than a promise: the agent runs with the operator's filesystem permissions.
+  What the runner adds is detection after the fact, within the blind spots the
+  guide lists: a trial that wrote inside the repository it ran from is
+  recorded as an instrument failure (`trial_wrote_repo`), as is one whose
+  repository was too large to check (`repo_check_skipped`), and neither
+  enters a scored pool.
 - **B-8 Results pool by scenario version.** Every result records the version
   it ran under and every read filters to the current one — editing a
   scenario's *meaning* (task, fixture, assertions) bumps the version and
   empties the pool, because old rows answered a different question; cosmetic
-  prose edits do not.
+  prose edits do not. A pool is the scenario version plus the run conditions
+  (model, effort, ceiling, turn budget, plugin dir, isolation), and readers never combine
+  conditions (D-021).
 - **B-10 A trial the runner cut off is an instrument failure, not a
   measurement.** Every trial's `claude -p` session runs under a per-trial
   ceiling: 900 s, unless `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS` moves it for one run —
@@ -115,7 +139,10 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   `infraError` and leaves every scored pool (D-018). The ceiling is part of
   the measurement conditions, so a run that moved it MUST be reported with the
   value it used, the way B-9 treats a `--since`-bounded snapshot, and every
-  result row records the ceiling its trial ran under (D-018).
+  result row records the ceiling its trial ran under (D-018). Residual: a
+  refusal that arrives after the agent has already acted — tool calls made,
+  output tokens spent — is not distinguished from a completed turn and scores
+  as one.
 
 ### Benchmarks
 - **B-9 Snapshots keep history and gate releases.** `eval report` writes
@@ -141,11 +168,12 @@ fails the bar rather than deferring. That `PASS` is a distinct token from the
 preflight `PASS` in B-3, which is a discriminability outcome (`PASS` / `BLOCK`), not
 an A/B verdict. A result the runner killed before the agent finished carries
 `errorType: trial_killed_incomplete` and `infraError: true` —
-`scripts/lib/eval-trial-outcome.js` owns the two predicates (killed, output
-complete) — and `scorableResults` in `eval-stats.js` drops every `infraError` /
+`scripts/lib/eval-trial-outcome.js` owns the three predicates (killed, output
+complete, provider refusal) — and `scorableResults` in `eval-stats.js` drops every `infraError` /
 `gradeError` row from every scored pool (`eval run`, A/B, benchmark), while
-preflight fails closed on the same flags (B-10). No result field records the
-ceiling a trial ran under.
+preflight fails closed on the same flags (B-10). Every result row records
+`trialTimeoutMs`, the ceiling its trial ran under, so a pool that mixes ceilings
+can be seen from its rows.
 
 ## Decisions
 

@@ -9,7 +9,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { execCommand, ensureDir, getTimestamp, CLAUDE_MAX_BUFFER } = require('./utils');
+const { ensureDir } = require('./utils');
 const stats = require('./eval-stats');
 const graders = require('./eval-graders');
 const {
@@ -31,30 +31,15 @@ const {
   buildIsolationSettings,
 } = require('./eval-trial-env');
 const { parseStreamJsonOutput, parseActionsFromTranscript } = require('./eval-transcript');
-const { isTrialKilled, isOutputComplete } = require('./eval-trial-outcome');
-
-// Per-trial ceiling for the spawned `claude -p` session. 900s is the standing
-// instrument (see the lineage note at the execCommand call); a treatment whose
-// pipeline builds or renders can run past it on a loaded machine, so one run can
-// move the ceiling without editing the engine. A killed trial never scores.
-const DEFAULT_TRIAL_TIMEOUT_MS = 900000;
-
-/**
- * Resolve the per-trial timeout: ARCFORGE_EVAL_TRIAL_TIMEOUT_MS when set, else the default.
- * @param {NodeJS.ProcessEnv} [env] - Environment to read (injectable for tests)
- * @returns {number} Timeout in milliseconds
- */
-function resolveTrialTimeoutMs(env = process.env) {
-  const raw = env.ARCFORGE_EVAL_TRIAL_TIMEOUT_MS;
-  if (raw === undefined || raw === '') return DEFAULT_TRIAL_TIMEOUT_MS;
-  const ms = Number(raw);
-  if (!Number.isInteger(ms) || ms <= 0) {
-    throw new Error(
-      `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS must be a positive integer of milliseconds, got ${JSON.stringify(raw)}`,
-    );
-  }
-  return ms;
-}
+const {
+  DEFAULT_TRIAL_TIMEOUT_MS,
+  resolveTrialTimeoutMs,
+  runTrial,
+  saveTranscript,
+  buildTrialPrompt,
+  stopIfTrialWroteRepo,
+} = require('./eval-trial');
+const { splitPools } = require('./eval-pools');
 
 /**
  * Eval scenario parsed from a markdown file
@@ -86,12 +71,19 @@ function resolveTrialTimeoutMs(env = process.env) {
  * @property {number|null} api_duration_ms - Duration the CLI reported in its stream-json result event (null if the trial produced no result event)
  * @property {number|null} input_tokens - Input tokens used by the trial agent (null if unavailable)
  * @property {number|null} output_tokens - Output tokens used by the trial agent (null if unavailable)
+ * @property {number} [trialTimeoutMs] - Per-trial ceiling (ms) the trial ran under; absent on rows written before 6.1.1
  * @property {string} [transcript] - Path to transcript file
  * @property {string} [trialDir] - Isolated temp directory used for this trial
  * @property {string} [error] - Error message if failed
  * @property {string} [errorType] - Machine-readable error category (e.g., 'model_grader_failed')
  * @property {boolean} [gradeError] - True if the grader failed to produce a score
  * @property {boolean} [infraError] - True if the trial runner failed to capture output
+ * @property {string} [repoCheck] - 'skipped' when the tree was too large for the repository-write check
+ * @property {string} [model] - Model flag the trial ran with ('default' when none was passed)
+ * @property {string} [effort] - Effort flag the trial ran with ('default' when none was passed)
+ * @property {number|null} [maxTurns] - Turn budget the trial ran under (null: none)
+ * @property {boolean} [pluginDir] - Whether a plugin dir was loaded into the trial
+ * @property {string} [isolation] - 'isolated' | 'plugin-dir' | 'toolkit' (--no-isolate)
  * @property {number[]} [assertionScores] - Per-assertion scores (0.0-1.0)
  * @property {string[]} [evidence] - Per-assertion evidence notes from grader
  * @property {number[][]} [blockRefs] - Per-assertion transcript block references (1-indexed)
@@ -101,245 +93,6 @@ function resolveTrialTimeoutMs(env = process.env) {
 const EVALS_DIR = 'evals';
 const RESULTS_DIR = path.join(EVALS_DIR, 'results');
 const BENCHMARKS_DIR = path.join(EVALS_DIR, 'benchmarks');
-
-/**
- * Run a single eval trial by spawning a Claude session.
- * Runs in a temp directory for workspace safety. When isolated (default),
- * plugins are disabled and MCP servers stripped. When not isolated,
- * the agent has access to the full toolkit (plugins, MCP, skills, hooks).
- * @param {EvalScenario} scenario - The eval scenario
- * @param {number} trialNumber - Trial number (1-indexed)
- * @param {number} totalTrials - Total number of trials (k)
- * @param {Object} options - Run options
- * @param {string} [options.projectRoot] - Project root (for transcript storage + code grading)
- * @param {string} [options.isolationSettings] - Cached isolation settings JSON
- * @param {boolean} [options.isolated=true] - Whether to disable plugins and MCP
- * @param {string} [options.pluginDir] - Plugin directory for semi-isolated mode
- * @param {number} [options.maxTurns] - Max turns for Claude CLI
- * @returns {TrialResult} Trial result
- */
-function runTrial(scenario, trialNumber, totalTrials, options = {}) {
-  const {
-    projectRoot = process.cwd(),
-    label,
-    isolationSettings,
-    isolated = true,
-    model,
-    effort,
-    runId,
-    pluginDir: rawPluginDir,
-    maxTurns: rawMaxTurns,
-  } = options;
-  const timestamp = getTimestamp();
-
-  const buildInfraError = (error, errorType, extra = {}) => {
-    const evalName = label ? `${scenario.name}-${label}` : scenario.name;
-    return {
-      eval: evalName,
-      trial: trialNumber,
-      k: totalTrials,
-      passed: false,
-      grader: scenario.grader,
-      score: 0,
-      timestamp,
-      duration_ms: null,
-      api_duration_ms: null,
-      input_tokens: null,
-      output_tokens: null,
-      error,
-      errorType,
-      infraError: true,
-      ...(model ? { model } : {}),
-      ...(runId ? { runId } : {}),
-      ...extra,
-    };
-  };
-
-  // Merge CLI overrides with scenario defaults (only when not fully isolated)
-  const pluginDir = rawPluginDir || (!isolated ? scenario.pluginDir : undefined) || undefined;
-
-  // Validate pluginDir exists before running trial
-  if (pluginDir && !fs.existsSync(path.resolve(pluginDir))) {
-    return buildInfraError(`Plugin dir does not exist: ${pluginDir}`, 'plugin_dir_missing');
-  }
-
-  // Always run in trial dir for workspace safety
-  const trialDir = createTrialDir(scenario.name, trialNumber, projectRoot);
-  try {
-    if (scenario.setup) runSetup(scenario.setup, trialDir, projectRoot);
-  } catch (error) {
-    return buildInfraError(error.message || String(error), 'setup_failed', { trialDir });
-  }
-
-  // Isolation mode: full isolation uses writeIsolationSettings,
-  // pluginDir uses semi-isolation (no claudeMdExcludes)
-  if (pluginDir) {
-    const semiSettings = isolationSettings || buildIsolationSettings({ excludeClaudeMd: false });
-    writeIsolationSettings(trialDir, semiSettings);
-  } else if (isolated) {
-    writeIsolationSettings(trialDir, isolationSettings);
-  }
-
-  const prompt = buildTrialPrompt(scenario);
-
-  const claudeArgs = [
-    '-p',
-    '--output-format',
-    'stream-json',
-    '--verbose',
-    '--no-session-persistence',
-    '--disable-slash-commands',
-  ];
-  if (isolated && !pluginDir) {
-    claudeArgs.push('--strict-mcp-config');
-    claudeArgs.push(
-      '--append-system-prompt',
-      `You are running in an isolated eval trial. Your working directory is ${trialDir}, and every file you need is already in it — do not read, search, or access files outside this directory.`,
-    );
-  }
-  if (pluginDir) {
-    claudeArgs.push('--plugin-dir', path.resolve(pluginDir));
-    // Eval trials run unattended in ephemeral dirs — no human to approve permission prompts
-    claudeArgs.push('--dangerously-skip-permissions');
-  }
-
-  // Resolve max-turns: CLI > scenario > pluginDir default (10)
-  const resolvedMaxTurns = resolveMaxTurns({
-    maxTurns: rawMaxTurns,
-    scenarioMaxTurns: scenario.maxTurns,
-    pluginDir,
-  });
-  if (resolvedMaxTurns != null) claudeArgs.push('--max-turns', String(resolvedMaxTurns));
-
-  if (model) claudeArgs.push('--model', model);
-  if (effort) claudeArgs.push('--effort', effort);
-
-  // Debug: log command for troubleshooting
-  if (process.env.EVAL_DEBUG) {
-    console.error(`[eval-debug] cwd: ${trialDir}`);
-    console.error(`[eval-debug] cmd: claude ${claudeArgs.join(' ')}`);
-    console.error(`[eval-debug] prompt: ${prompt.slice(0, 100)}...`);
-  }
-  const t0 = Date.now();
-  const result = execCommand('claude', claudeArgs, {
-    input: prompt,
-    cwd: trialDir,
-    // 900s: same instrument-fix lineage as the 300s→600s raise below. P6's
-    // brainstorming scenario (a design conversation, baseline avg 472s) had
-    // 2/5 baseline trials ETIMEDOUT at the 600s ceiling and their partial
-    // transcripts scored as real behavior — the exact defect class P4 recorded
-    // (killed AND incomplete must not score). Raising the ceiling is an
-    // instrument fix, not a rubric change (scenario hashes unaffected).
-    // P4 history: 300s clipped four of five two-axis treatment trials.
-    // ARCFORGE_EVAL_TRIAL_TIMEOUT_MS moves the ceiling for one run.
-    timeout: resolveTrialTimeoutMs(),
-    maxBuffer: CLAUDE_MAX_BUFFER,
-    // Redirect ONLY the arcforge data home (not HOME) to the trial's isolated
-    // fixture. getArcforgeHome() honors ARCFORGE_HOME before falling back to
-    // ~/.arcforge, so the trial's SessionStart hook reads the Setup-written
-    // fixture under TRIAL_DIR/.arcforge instead of the real ~/.arcforge. Real
-    // HOME is preserved so the claude trial still resolves ~/.claude auth.
-    env: { ...process.env, ARCFORGE_HOME: path.join(trialDir, '.arcforge') },
-  });
-  const wallDuration = Date.now() - t0;
-  if (process.env.EVAL_DEBUG) {
-    console.error(`[eval-debug] exitCode: ${result.exitCode}`);
-    console.error(`[eval-debug] stdout length: ${(result.stdout || '').length}`);
-    console.error(`[eval-debug] stderr: ${(result.stderr || '').slice(0, 300)}`);
-  }
-
-  const evalName = label ? `${scenario.name}-${label}` : scenario.name;
-  // With stream-json, stdout may contain valid tool-use data even on non-zero exit
-  // (e.g., max-turns reached). Try stdout first, fall back to stderr.
-  const rawOutput = result.stdout || result.stderr || '';
-  const { textResult, richTranscript, usage } = parseStreamJsonOutput(rawOutput);
-  // duration_ms is the trial's wall-clock cost, measured around the subprocess.
-  // The CLI's own `duration_ms` (result event) covers only the API turn — it
-  // excludes process start, hook and MCP init, and teardown, so preferring it
-  // under-reports a trial by seconds (measured: 1,882 ms reported vs 6,994 ms
-  // wall on a one-turn trial) and, because a killed trial emits no result event
-  // at all, it silently mixes two different clocks across a pool. Both clocks
-  // are kept: duration_ms for cost/ceiling analysis, api_duration_ms for the
-  // model-side time the CLI attributes to the turn.
-  const duration_ms = wallDuration;
-  const api_duration_ms = usage.duration_ms;
-  const parsedOutput = richTranscript || textResult;
-  const transcriptOutput = parsedOutput || rawOutput;
-  const transcript = saveTranscript(evalName, trialNumber, transcriptOutput, projectRoot, runId);
-  const actions = parseActionsFromTranscript(richTranscript);
-
-  const base = {
-    eval: evalName,
-    trial: trialNumber,
-    k: totalTrials,
-    passed: false, // Will be set by grader
-    grader: scenario.grader,
-    score: 0,
-    timestamp,
-    duration_ms,
-    api_duration_ms,
-    input_tokens: usage.input_tokens,
-    output_tokens: usage.output_tokens,
-    transcript,
-    trialDir,
-    ...(actions.length > 0 ? { actions } : {}),
-    ...(model ? { model } : {}),
-    ...(runId ? { runId } : {}),
-  };
-  // A trial the runner killed before the agent finished its turn is an
-  // instrument failure, not behaviour: its half transcript otherwise grades as
-  // if the agent had chosen to stop there (P4 defect A — four of five two-axis
-  // treatment trials clipped at the 300s ceiling scored 0.2 with no error flag,
-  // so scorableResults() kept them and the delta moved against the treatment).
-  // Killed AND incomplete, both: a killed trial that had already delivered its
-  // answer is a valid measurement (the same P4 pool has one, scored 1.0).
-  if (isTrialKilled(result) && !isOutputComplete({ textResult, actions })) {
-    return {
-      ...base,
-      output: parsedOutput || '',
-      error: 'Trial killed before the agent finished its turn (runner timeout)',
-      errorType: 'trial_killed_incomplete',
-      infraError: true,
-    };
-  }
-
-  if (result.exitCode !== 0 && !parsedOutput) {
-    // Only treat as error if no usable output was captured
-    return { ...base, error: result.stderr };
-  }
-
-  if (parsedOutput) {
-    return { ...base, output: parsedOutput };
-  }
-
-  return {
-    ...base,
-    output: '',
-    error: 'No assistant output captured from stream-json output',
-    errorType: 'trial_output_missing',
-    infraError: true,
-  };
-}
-
-/**
- * Save full trial output to a transcript file
- * @param {string} evalName - Eval name (may include label suffix)
- * @param {number} trialNumber - Trial number
- * @param {string} output - Full output text
- * @param {string} projectRoot - Project root directory
- * @returns {string} Path to transcript file
- */
-function saveTranscript(evalName, trialNumber, output, projectRoot, runId) {
-  const { scenarioName, condition } = parseEvalName(evalName);
-  const prefix = runId || compactDate();
-  const transcriptsPath = path.join(projectRoot, RESULTS_DIR, scenarioName, prefix, 'transcripts');
-  ensureDir(transcriptsPath);
-  const fileName =
-    condition === 'results' ? `trial-${trialNumber}.txt` : `${condition}-trial-${trialNumber}.txt`;
-  const filePath = path.join(transcriptsPath, fileName);
-  fs.writeFileSync(filePath, output);
-  return filePath;
-}
 
 /**
  * Execute a single trial: run → grade → append → callback → cleanup.
@@ -363,6 +116,8 @@ function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts
     runId,
     pluginDir,
     maxTurns,
+    skipPermissions,
+    watchRoots,
   } = opts;
   const result = runTrial(trialScenario, trialNumber, k, {
     projectRoot,
@@ -374,24 +129,19 @@ function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts
     runId,
     pluginDir,
     maxTurns,
+    skipPermissions,
+    watchRoots,
   });
-  if (result.infraError) {
-    try {
-      appendResult(result, projectRoot);
-      if (onTrialComplete) onTrialComplete(label, trialNumber, result);
-      return result;
-    } finally {
-      cleanupTrialDir(result.trialDir);
-    }
-  }
+  // Every row carries the scenario version — infraError rows too, or a
+  // version-scoped read drops them and error_trials undercounts (B-8).
+  const stamp = (row) => (gradeScenario.version ? { ...row, version: gradeScenario.version } : row);
   try {
-    const graded = graders.gradeTrialResult(result, gradeScenario, projectRoot, result.actions);
-    const versioned = gradeScenario.version
-      ? { ...graded, version: gradeScenario.version }
-      : graded;
-    appendResult(versioned, projectRoot);
-    if (onTrialComplete) onTrialComplete(label, trialNumber, versioned);
-    return versioned;
+    const recorded = result.infraError
+      ? stamp(result)
+      : stamp(graders.gradeTrialResult(result, gradeScenario, projectRoot, result.actions));
+    appendResult(recorded, projectRoot);
+    if (onTrialComplete) onTrialComplete(label, trialNumber, recorded);
+    return recorded;
   } finally {
     cleanupTrialDir(result.trialDir);
   }
@@ -413,26 +163,50 @@ function runAbTrials(baseScenario, treatScenario, gradeScenario, k, bOpts, tOpts
   const baseline = [];
   const treatment = [];
 
+  // A trial that wrote outside its directory ends the run (stopIfTrialWroteRepo).
+  const runArm = (arm, scenario, t, opts) => {
+    const row = executeAndGradeTrial(scenario, gradeScenario, t, k, opts);
+    arm.push(row);
+    stopIfTrialWroteRepo(row, `${opts.label} trial ${t}`);
+  };
   if (interleave) {
     for (let t = 1; t <= k; t++) {
-      baseline.push(executeAndGradeTrial(baseScenario, gradeScenario, t, k, bOpts));
-      treatment.push(executeAndGradeTrial(treatScenario, gradeScenario, t, k, tOpts));
+      runArm(baseline, baseScenario, t, bOpts);
+      runArm(treatment, treatScenario, t, tOpts);
     }
   } else {
-    for (let t = 1; t <= k; t++) {
-      baseline.push(executeAndGradeTrial(baseScenario, gradeScenario, t, k, bOpts));
-    }
-    for (let t = 1; t <= k; t++) {
-      treatment.push(executeAndGradeTrial(treatScenario, gradeScenario, t, k, tOpts));
-    }
+    for (let t = 1; t <= k; t++) runArm(baseline, baseScenario, t, bOpts);
+    for (let t = 1; t <= k; t++) runArm(treatment, treatScenario, t, tOpts);
   }
 
   return { baseline, treatment, delta: stats.computeDelta(baseline, treatment) };
 }
 
 /**
+ * Options both arms of a comparison must share so their claude argv differ only
+ * by the injection: one turn budget (resolved as if the plugin were loaded, so
+ * the baseline does not run unbounded beside a 10-turn treatment) and one
+ * permission mode. Both arms also watch the plugin root for writes: a baseline
+ * that edits the plugin would otherwise go unseen, and the treatment would then
+ * load the edited plugin. Watching loads nothing.
+ * @param {EvalScenario} scenario
+ * @param {{ maxTurns?: number, pluginDir?: string }} opts
+ * @returns {{ maxTurns?: number, skipPermissions: boolean, watchRoots: string[] }}
+ */
+function sharedArmOptions(scenario, { maxTurns, pluginDir }) {
+  const resolved = resolveMaxTurns({ maxTurns, scenarioMaxTurns: scenario.maxTurns, pluginDir });
+  return {
+    ...(resolved != null ? { maxTurns: resolved } : {}),
+    skipPermissions: Boolean(pluginDir),
+    watchRoots: pluginDir ? [pluginDir] : [],
+  };
+}
+
+/**
  * Run a skill eval as A/B comparison: baseline (without skill) vs treatment (with skill).
- * Both conditions run in isolated environments; the treatment prepends skill instruction.
+ * Both arms run isolated; the treatment prepends the skill body. There is no
+ * plugin dir in skill scope: a plugin-routed comparison is a workflow (B-1), and
+ * a single skill's trigger rate is `claude plugin eval`'s question (B-11).
  * @param {EvalScenario} scenario - Scenario with scope='skill'
  * @param {number} k - Number of trials per condition
  * @param {Object} options - Run options
@@ -453,6 +227,13 @@ function runSkillEval(scenario, k, options = {}) {
     pluginDir,
     maxTurns,
   } = options;
+  if (pluginDir) {
+    // #197: no run injects a skill body while also loading the plugin.
+    throw new Error(
+      'runSkillEval: skill scope takes no plugin dir; a plugin-routed comparison is workflow scope (B-1)',
+    );
+  }
+  resolveTrialTimeoutMs(); // refuse a bad ceiling before any trial spawns (B-10)
   const isolationSettings = buildIsolationSettings();
 
   const treatmentScenario = {
@@ -460,6 +241,7 @@ function runSkillEval(scenario, k, options = {}) {
     context: skillInstruction ? `${skillInstruction}\n\n${scenario.context}` : scenario.context,
   };
 
+  const shared = sharedArmOptions(scenario, { maxTurns });
   const bOpts = {
     projectRoot,
     label: 'baseline',
@@ -468,6 +250,7 @@ function runSkillEval(scenario, k, options = {}) {
     model,
     effort,
     runId,
+    ...shared,
   };
   const tOpts = {
     projectRoot,
@@ -477,8 +260,7 @@ function runSkillEval(scenario, k, options = {}) {
     model,
     effort,
     runId,
-    ...(pluginDir ? { pluginDir, isolated: false } : {}),
-    ...(maxTurns != null ? { maxTurns } : {}),
+    ...shared,
   };
   return runAbTrials(scenario, treatmentScenario, scenario, k, bOpts, tOpts, interleave);
 }
@@ -506,13 +288,23 @@ function runWorkflowEval(scenario, k, options = {}) {
     pluginDir,
     maxTurns,
   } = options;
-  const isolationSettings = buildIsolationSettings();
+  resolveTrialTimeoutMs(); // refuse a bad ceiling before any trial spawns (B-10)
   const resolvedPluginDir = pluginDir || scenario.pluginDir;
+  if (!resolvedPluginDir && (!model || !effort)) {
+    // A full-toolkit treatment reads the user settings file, which may set a
+    // model and effort level the isolated baseline never sees. Explicit flags
+    // outrank settings in both arms, so they are the only way to keep parity.
+    throw new Error(
+      `workflow A/B without a plugin dir runs the treatment on your full user config: pass both --model and --effort so both arms run the same model at the same effort (missing: ${[!model && '--model', !effort && '--effort'].filter(Boolean).join(', ')})`,
+    );
+  }
+  const isolationSettings = buildIsolationSettings();
   // Cache semi-isolation settings once (avoids spawning `claude plugin list` per trial)
   const semiSettings = resolvedPluginDir
-    ? buildIsolationSettings({ excludeClaudeMd: false })
+    ? buildIsolationSettings({ forPluginDir: true })
     : undefined;
 
+  const shared = sharedArmOptions(scenario, { maxTurns, pluginDir: resolvedPluginDir });
   const bOpts = {
     projectRoot,
     label: 'baseline',
@@ -522,6 +314,7 @@ function runWorkflowEval(scenario, k, options = {}) {
     model,
     effort,
     runId,
+    ...shared,
   };
 
   const tOpts = {
@@ -533,29 +326,9 @@ function runWorkflowEval(scenario, k, options = {}) {
     effort,
     runId,
     ...(resolvedPluginDir ? { pluginDir: resolvedPluginDir, isolationSettings: semiSettings } : {}),
-    ...(maxTurns != null ? { maxTurns } : {}),
+    ...shared,
   };
   return runAbTrials(scenario, scenario, scenario, k, bOpts, tOpts, interleave);
-}
-
-/**
- * Build a prompt for a trial run
- * @param {EvalScenario} scenario - The eval scenario
- * @returns {string} Prompt text
- */
-function buildTrialPrompt(scenario) {
-  const parts = [];
-
-  if (scenario.context) {
-    parts.push(`## Context\n${scenario.context}`);
-  }
-
-  parts.push(`## Task\n${scenario.scenario}`);
-
-  // Assertions are NOT included in the prompt — they are grading criteria
-  // for the grader (Step 4), not requirements for the agent (Step 3).
-
-  return parts.join('\n\n');
 }
 
 /**
@@ -663,6 +436,20 @@ function loadResults(evalName, projectRoot, options = {}) {
 }
 
 /**
+ * Load results and split them into pools by run conditions (B-8): `current` is
+ * the newest condition's pool, the one a verdict is computed over; `others`
+ * lists the rest with their conditions and row counts. Readers never combine
+ * pools.
+ * @param {string} evalName - Eval name (may carry a -baseline/-treatment suffix)
+ * @param {string} projectRoot - Project root directory
+ * @param {Object} [options] - Same filters as loadResults
+ * @returns {{ current: TrialResult[], conditions: Object|null, others: Array<{ conditions: Object, rows: number }> }}
+ */
+function loadResultPools(evalName, projectRoot, options = {}) {
+  return splitPools(loadResults(evalName, projectRoot, options));
+}
+
+/**
  * Ensure evals directory structure exists
  * @param {string} projectRoot - Project root directory
  */
@@ -686,20 +473,23 @@ module.exports = {
   runSetup,
   writeIsolationSettings,
   buildIsolationSettings,
-  buildPluginDirSettings: () => buildIsolationSettings({ excludeClaudeMd: false }),
+  buildPluginDirSettings: () => buildIsolationSettings({ forPluginDir: true }),
   parseStreamJsonOutput,
   parseActionsFromTranscript,
   resolveMaxTurns,
   runTrial,
+  stopIfTrialWroteRepo,
   buildTrialPrompt,
   resolveTrialTimeoutMs,
   DEFAULT_TRIAL_TIMEOUT_MS,
   executeAndGradeTrial,
   runSkillEval,
   runWorkflowEval,
+  sharedArmOptions,
   saveTranscript,
   appendResult,
   loadResults,
+  loadResultPools,
   ensureEvalsDir,
   // Re-export graders for backward compatibility
   ...graders,

@@ -49,10 +49,13 @@ COMMANDS:
       --max-turns    Max turns for Claude CLI (overrides scenario)
       --effort       Reasoning effort passed to spawned trials
   eval preflight <name>              Run baseline trials to check scenario discriminability
+      --plugin-dir   Plugin dir the A/B will load (sets the baseline budget; nothing is loaded)
+      --max-turns    Max turns for the baseline trials (pass what you will pass to eval ab)
+      --effort       Reasoning effort passed to spawned trials
   eval lint <name>                   Validate scenario file (sections, assertion shape)
   eval ab <name> [--skill-file path] A/B skill/workflow eval (requires prior PASS preflight)
-      --plugin-dir   Plugin directory for treatment trials
-      --max-turns    Max turns for treatment trials (overrides scenario)
+      --plugin-dir   Plugin directory for treatment trials (workflow scope only)
+      --max-turns    Max turns for both arms (overrides scenario)
       --interleave   Alternate baseline/treatment trials instead of running arms back-to-back
       --effort       Reasoning effort passed to spawned trials
   eval compare <name>                Compare A/B results

@@ -750,7 +750,10 @@ Do something.
     it('should disable all plugins and auto-memory', () => {
       const settings = JSON.parse(buildPluginDirSettings());
       expect(settings.autoMemoryEnabled).toBe(false);
-      expect(settings).not.toHaveProperty('claudeMdExcludes');
+      // Same CLAUDE.md/rules excludes as the isolated baseline (arm parity);
+      // only disableAllHooks is left off, so the plugin keeps its hooks.
+      expect(settings.claudeMdExcludes).toContain('**/CLAUDE.md');
+      expect(settings).not.toHaveProperty('disableAllHooks');
     });
 
     it('should include enabledPlugins all set to false', () => {
@@ -772,7 +775,10 @@ Do something.
       expect(() => JSON.parse(result)).not.toThrow();
       const settings = JSON.parse(result);
       expect(settings.autoMemoryEnabled).toBe(false);
-      expect(settings).not.toHaveProperty('claudeMdExcludes');
+      // Same CLAUDE.md/rules excludes as the isolated baseline (arm parity);
+      // only disableAllHooks is left off, so the plugin keeps its hooks.
+      expect(settings.claudeMdExcludes).toContain('**/CLAUDE.md');
+      expect(settings).not.toHaveProperty('disableAllHooks');
     });
   });
 
@@ -831,6 +837,33 @@ Do something.
       expect(result.infraError).toBe(true);
       expect(result.errorType).toBe('setup_failed');
       expect(fs.existsSync(result.trialDir)).toBe(false);
+    });
+
+    it('should stamp an A/B infraError row with the scenario version so version reads see it', () => {
+      const scenario = {
+        name: 'infra-versioned',
+        scenario: 'No-op.',
+        context: '',
+        assertions: [],
+        grader: 'code',
+        graderConfig: 'true',
+        setup: 'exit 1',
+        version: '3',
+      };
+      mockUtils.execCommand.mockReturnValueOnce({ stdout: '', stderr: 'boom', exitCode: 1 });
+
+      const result = executeAndGradeTrial(scenario, scenario, 1, 1, {
+        projectRoot: tempDir,
+        label: 'treatment',
+        runId: '20260930-000000',
+        isolated: false,
+      });
+
+      expect(result.infraError).toBe(true);
+      expect(result.version).toBe('3');
+      const pool = loadResults('infra-versioned-treatment', tempDir, { version: '3' });
+      expect(pool).toHaveLength(1);
+      expect(pool[0].errorType).toBe('setup_failed');
     });
 
     it('should use cached semi-isolation settings for pluginDir trials', () => {
@@ -985,6 +1018,33 @@ Do something.
 
       expect(result.infraError).toBeUndefined();
       expect(result.errorType).toBeUndefined();
+    });
+
+    it('should flag a provider refusal as infraError and keep it out of every scored pool', () => {
+      // Observed shape (#195): the limit message stands in for the agent's turn,
+      // zero output tokens, nothing else in the transcript.
+      const refusal = "You've hit your session limit · resets 3pm";
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: streamOf(agentText(refusal), {
+          type: 'result',
+          subtype: 'success',
+          result: refusal,
+          usage: { input_tokens: 0, output_tokens: 0 },
+        }),
+        stderr: '',
+        exitCode: 0,
+      });
+
+      const result = runTrial(killScenario('provider-refusal'), 1, 1, {
+        projectRoot: tempDir,
+        isolated: false,
+      });
+
+      expect(result.infraError).toBe(true);
+      expect(result.errorType).toBe('provider_refusal');
+      expect(fs.readFileSync(result.transcript, 'utf8')).toContain('session limit');
+      const { scorableResults } = require('../../scripts/lib/eval-stats');
+      expect(scorableResults([result])).toEqual([]);
     });
 
     it('should time a trial by wall clock and keep the CLI-reported duration separately', () => {
@@ -1329,6 +1389,32 @@ Do something.
   // ── getVerdict ────────────────────────────────────────────────
 
   describe('compareResults verdict policy', () => {
+    it('should hand the analyzer scored trials only, never a provider refusal', () => {
+      const gradersModule = require('../../scripts/lib/eval-graders');
+      const spy = jest.spyOn(gradersModule, 'compareWithModel').mockReturnValue(null);
+      try {
+        const scored = (trial) => makeResult({ trial, score: 1, passed: true });
+        const refusal = makeResult({
+          trial: 3,
+          infraError: true,
+          errorType: 'provider_refusal',
+          error: "Provider refused the trial in place of the agent's turn: session limit",
+        });
+        compareResults(
+          { grader: 'model', assertions: ['A1'] },
+          [scored(1), scored(2)],
+          [scored(1), scored(2), refusal],
+          tempDir,
+        );
+        const [, baseline, treatment] = spy.mock.calls[0];
+        expect(baseline.map((r) => r.trial)).toEqual([1, 2]);
+        expect(treatment.map((r) => r.trial)).toEqual([1, 2]);
+        expect(treatment.some((r) => r.infraError)).toBe(false);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
     it('should preserve default A/B delta CI verdict behavior', () => {
       const baseline = [
         makeResult({ score: 1, passed: true }),
@@ -1639,6 +1725,8 @@ Do something.
       );
 
       appendResult(
+        // Both arms on one model: a raw row is compared with the baseline pool of
+        // its own conditions (B-8), so the arms must share them.
         makeResult({
           eval: 'raw-eval-baseline',
           trial: 1,
@@ -1648,7 +1736,7 @@ Do something.
           duration_ms: 1000,
           input_tokens: 50,
           output_tokens: 80,
-          model: 'baseline-model',
+          model: 'shared-model',
           runId: '20260317-100000',
           version: '2',
           output: 'large transcript text should not be duplicated into dashboard raw metrics rows',
@@ -1668,7 +1756,7 @@ Do something.
           duration_ms: 1500,
           input_tokens: 60,
           output_tokens: 120,
-          model: 'treatment-model',
+          model: 'shared-model',
           runId: '20260317-100000',
           version: '2',
           assertionScores: [1],
@@ -1708,7 +1796,7 @@ Do something.
         input_tokens_delta_vs_baseline_avg: 0,
         output_tokens_delta_vs_baseline_avg: 0,
         total_tokens_delta_vs_baseline_avg: 0,
-        model: 'baseline-model',
+        model: 'shared-model',
         transcript_path: 'evals/results/raw-eval/20260317-100000/transcripts/baseline-trial-1.txt',
         assertion_count: 1,
         assertion_passed_count: 0,
@@ -1833,12 +1921,41 @@ Do something.
       const benchmark = generateBenchmark(tempDir);
       const data = benchmark.evals['model-eval'];
       expect(data).toBeDefined();
-      expect(data.trials).toBe(2);
+      // Two models are two conditions (B-8): the headline numbers come from one
+      // pool and the other is listed, never combined; by_model shows each.
+      expect(data.trials).toBe(1);
+      expect(data.other_pools).toHaveLength(1);
+      expect(data.other_pools[0].rows).toBe(1);
       expect(data.by_model).toBeDefined();
       expect(data.by_model.sonnet.trials).toBe(1);
       expect(data.by_model.sonnet.pass_rate).toBe(1.0);
       expect(data.by_model.opus.trials).toBe(1);
       expect(data.by_model.opus.pass_rate).toBe(0);
+    });
+
+    it('should keep default and user-settings rows in separate by_model groups', () => {
+      writeScenario(
+        tempDir,
+        'unpinned-eval.md',
+        '# Eval: unpinned-eval\n\n## Scope\nagent\n\n## Scenario\nTest.\n',
+      );
+      // 'default' = contained trial, Claude Code's own default model;
+      // 'user-settings' = a trial that read the operator's settings file. They
+      // may be different models and must not pool as one.
+      for (const [trial, model] of [
+        [1, 'default'],
+        [2, 'user-settings'],
+        [3, 'user-settings'],
+      ]) {
+        appendResult(
+          makeResult({ eval: 'unpinned-eval', trial, passed: true, score: 1.0, model }),
+          tempDir,
+        );
+      }
+
+      const data = generateBenchmark(tempDir).evals['unpinned-eval'];
+      expect(data.by_model.default.trials).toBe(1);
+      expect(data.by_model['user-settings'].trials).toBe(2);
     });
 
     it('should not include by_model when no model field in results', () => {
@@ -2600,8 +2717,9 @@ Do something.
       expect(callArgs[0]).toBe('claude');
       expect(callArgs[1]).toContain('--plugin-dir');
       expect(callArgs[1]).toContain(tempDir);
-      // Should NOT add --strict-mcp-config when pluginDir is used
-      expect(callArgs[1]).not.toContain('--strict-mcp-config');
+      // A plugin-dir trial strips MCP servers like the isolated baseline it is
+      // compared against, so the arms differ only by --plugin-dir.
+      expect(callArgs[1]).toContain('--strict-mcp-config');
     });
 
     it('should return infraError when pluginDir path does not exist', () => {
@@ -3159,7 +3277,8 @@ Do something.
         }
       }
 
-      runWorkflowEval(scenario, 1, { projectRoot: tempDir });
+      // A full-toolkit treatment must pin model and effort (arm parity).
+      runWorkflowEval(scenario, 1, { projectRoot: tempDir, model: 'sonnet', effort: 'high' });
 
       const claudeCalls = mockUtils.execCommand.mock.calls.filter(
         (c) => c[0] === 'claude' && c[1].includes('-p'),
@@ -3191,5 +3310,76 @@ describe('resolveTrialTimeoutMs — per-run ceiling override', () => {
         /ARCFORGE_EVAL_TRIAL_TIMEOUT_MS/,
       );
     }
+  });
+});
+
+describe('per-trial ceiling on the result row (B-10, #183)', () => {
+  let tempDir;
+  const saved = process.env.ARCFORGE_EVAL_TRIAL_TIMEOUT_MS;
+  const doneStream = [
+    JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'Done' }] } }),
+    JSON.stringify({ type: 'result', result: 'Done' }),
+  ].join('\n');
+  const scenarioWith = (overrides = {}) => ({
+    name: 'ceiling-row',
+    scenario: 'Test.',
+    context: '',
+    assertions: [],
+    grader: 'code',
+    graderConfig: 'true',
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    tempDir = makeTempDir();
+    // Drop return values an earlier suite queued but never consumed.
+    const actual = jest.requireActual('../../scripts/lib/utils');
+    mockUtils.execCommand.mockReset();
+    mockUtils.execCommand.mockImplementation((...args) => actual.execCommand(...args));
+  });
+  afterEach(() => {
+    if (saved === undefined) delete process.env.ARCFORGE_EVAL_TRIAL_TIMEOUT_MS;
+    else process.env.ARCFORGE_EVAL_TRIAL_TIMEOUT_MS = saved;
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('records the default ceiling on a completed trial', () => {
+    delete process.env.ARCFORGE_EVAL_TRIAL_TIMEOUT_MS;
+    mockUtils.execCommand.mockReturnValueOnce({ stdout: doneStream, stderr: '', exitCode: 0 });
+    const result = runTrial(scenarioWith(), 1, 1, { projectRoot: tempDir, isolated: false });
+    expect(result.trialTimeoutMs).toBe(900000);
+    expect(mockUtils.execCommand.mock.calls[0][2].timeout).toBe(900000);
+  });
+
+  it('records an overridden ceiling on an infraError row too', () => {
+    process.env.ARCFORGE_EVAL_TRIAL_TIMEOUT_MS = '1800000';
+    mockUtils.execCommand.mockReturnValueOnce({ stdout: '', stderr: 'boom', exitCode: 1 });
+    const result = runTrial(scenarioWith({ setup: 'exit 1' }), 1, 1, {
+      projectRoot: tempDir,
+      isolated: false,
+    });
+    expect(result.errorType).toBe('setup_failed');
+    expect(result.trialTimeoutMs).toBe(1800000);
+  });
+
+  it('refuses an invalid ceiling before the fixture Setup runs', () => {
+    process.env.ARCFORGE_EVAL_TRIAL_TIMEOUT_MS = '30m';
+    const scenario = scenarioWith({ setup: 'touch "$PROJECT_ROOT/setup-ran"' });
+    expect(() => runTrial(scenario, 1, 1, { projectRoot: tempDir, isolated: false })).toThrow(
+      /ARCFORGE_EVAL_TRIAL_TIMEOUT_MS/,
+    );
+    expect(fs.existsSync(path.join(tempDir, 'setup-ran'))).toBe(false);
+    expect(mockUtils.execCommand).not.toHaveBeenCalled();
+  });
+
+  it('refuses an invalid ceiling before an A/B run spawns anything', () => {
+    process.env.ARCFORGE_EVAL_TRIAL_TIMEOUT_MS = '0';
+    expect(() => runSkillEval(scenarioWith(), 1, { projectRoot: tempDir })).toThrow(
+      /ARCFORGE_EVAL_TRIAL_TIMEOUT_MS/,
+    );
+    expect(() => runWorkflowEval(scenarioWith(), 1, { projectRoot: tempDir })).toThrow(
+      /ARCFORGE_EVAL_TRIAL_TIMEOUT_MS/,
+    );
+    expect(mockUtils.execCommand).not.toHaveBeenCalled();
   });
 });

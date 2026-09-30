@@ -17,6 +17,7 @@ const path = require('node:path');
 const { ensureDir, getTimestamp } = require('./utils');
 const stats = require('./eval-stats');
 const graders = require('./eval-graders');
+const { splitPools, pairArms, pairKey } = require('./eval-pools');
 const {
   BENCHMARKS_DIR,
   loadResults,
@@ -116,17 +117,32 @@ function rawRowsForScenario(scenario, projectRoot, options = {}) {
     results: loadResults(evalName, projectRoot, filterOpts),
   }));
   const baselineResults = conditionResults.find((c) => c.condition === 'baseline')?.results || [];
-  const baseline = {
-    score: averageResultMetric(baselineResults, 'score'),
-    duration_ms: averageResultMetric(baselineResults, 'duration_ms'),
-    input_tokens: averageResultMetric(baselineResults, 'input_tokens'),
-    output_tokens: averageResultMetric(baselineResults, 'output_tokens'),
-    total_tokens: averageResultMetric(baselineResults, 'total_tokens'),
+  // One baseline average per pool (B-8): a row is compared with the baseline
+  // that ran under its own model, effort, ceiling and turn budget, the pairing
+  // eval compare uses. A row with no such baseline gets nulls.
+  const baselineByPair = new Map();
+  for (const r of baselineResults) {
+    const key = pairKey(r);
+    if (!baselineByPair.has(key)) baselineByPair.set(key, []);
+    baselineByPair.get(key).push(r);
+  }
+  const baselineFor = (result) => {
+    // Error rows stay in the export but never in the average: their score is a
+    // placeholder, not behavior (B-10).
+    const pool = stats.scorableResults(baselineByPair.get(pairKey(result)) || []);
+    return {
+      score: averageResultMetric(pool, 'score'),
+      duration_ms: averageResultMetric(pool, 'duration_ms'),
+      input_tokens: averageResultMetric(pool, 'input_tokens'),
+      output_tokens: averageResultMetric(pool, 'output_tokens'),
+      total_tokens: averageResultMetric(pool, 'total_tokens'),
+    };
   };
   const rows = [];
 
   for (const { condition, results } of conditionResults) {
     for (const result of results) {
+      const baseline = baselineFor(result);
       const { assertion_count, assertion_passed_count } = assertionSummary(result);
       const durationMs = resultMetricValue(result, 'duration_ms');
       const apiDurationMs = resultMetricValue(result, 'api_duration_ms');
@@ -145,6 +161,11 @@ function rawRowsForScenario(scenario, projectRoot, options = {}) {
         trial: result.trial,
         k: result.k,
         model: result.model || null,
+        effort: result.effort ?? null,
+        trialTimeoutMs: result.trialTimeoutMs ?? null,
+        maxTurns: result.maxTurns ?? null,
+        pluginDir: result.pluginDir ?? null,
+        isolation: result.isolation ?? null,
         passed: result.passed,
         score: result.score,
         duration_ms: durationMs,
@@ -241,9 +262,16 @@ function writeRawBenchmarkData(projectRoot, rawData) {
  * @returns {Object|null}
  */
 function comparisonFromAbResults(scenario, projectRoot, filterOpts) {
-  const baseline = loadResults(`${scenario.name}-baseline`, projectRoot, filterOpts);
-  const treatment = loadResults(`${scenario.name}-treatment`, projectRoot, filterOpts);
-  if (baseline.length === 0 || treatment.length === 0) return null;
+  const bRows = loadResults(`${scenario.name}-baseline`, projectRoot, filterOpts);
+  const tRows = loadResults(`${scenario.name}-treatment`, projectRoot, filterOpts);
+  if (bRows.length === 0 || tRows.length === 0) return null;
+  // Both arms on the newest pool pair that shares its conditions (B-8); every
+  // other pool is listed, never combined. No common pair: no comparison.
+  const paired = pairArms(bRows, tRows);
+  const otherPools = paired.unpaired;
+  if (paired.error) return { verdict: null, refused: paired.error, other_pools: otherPools };
+  const baseline = paired.baseline;
+  const treatment = paired.treatment;
 
   const bStats = stats.statsFromResults(baseline);
   const tStats = stats.statsFromResults(treatment);
@@ -259,6 +287,7 @@ function comparisonFromAbResults(scenario, projectRoot, filterOpts) {
     delta_ci: deltaCi,
     verdict,
     ...(scenario.verdictPolicy ? { verdict_policy: scenario.verdictPolicy } : {}),
+    ...(otherPools.length > 0 ? { other_pools: otherPools } : {}),
     metrics: {
       duration_ms: {
         baseline_avg: roundMetric(metricDeltas.baselineMeans.duration_ms),
@@ -301,12 +330,17 @@ function generateBenchmark(projectRoot, options = {}) {
     // Fall back to plain name for single-condition runs (eval run, not eval ab).
     const isAb = scenario.scope === 'skill' || scenario.scope === 'workflow';
     const filterOpts = { version: scenario.version, ...resultFilter };
-    let results = isAb ? loadResults(`${scenario.name}-treatment`, projectRoot, filterOpts) : [];
-    if (results.length === 0) {
-      results = loadResults(scenario.name, projectRoot, filterOpts);
+    let allRows = isAb ? loadResults(`${scenario.name}-treatment`, projectRoot, filterOpts) : [];
+    if (allRows.length === 0) {
+      allRows = loadResults(scenario.name, projectRoot, filterOpts);
     }
 
-    if (results.length === 0) continue;
+    if (allRows.length === 0) continue;
+
+    // Every number below comes from the newest condition's pool (B-8); rows
+    // measured under other conditions are listed in other_pools, not combined.
+    const pools = splitPools(allRows);
+    const results = pools.current;
 
     // One pool for every number in the entry. `compare` routes everything
     // through scorableResults(); the benchmark used to filter only the stats
@@ -320,13 +354,18 @@ function generateBenchmark(projectRoot, options = {}) {
 
     // Group by model for per-model breakdown
     const modelGroups = {};
-    for (const r of results) {
+    for (const r of allRows) {
       if (!r.model) continue;
       if (!modelGroups[r.model]) modelGroups[r.model] = [];
       modelGroups[r.model].push(r);
     }
     const byModel = {};
-    for (const [m, modelResults] of Object.entries(modelGroups)) {
+    for (const [m, modelRows] of Object.entries(modelGroups)) {
+      // Per model, too, only that model's newest pool counts.
+      const modelResults = splitPools(modelRows).current;
+      // A model with no scored trial is an instrument failure, already listed in
+      // other_pools; it has no numbers to report here.
+      if (modelResults.length === 0) continue;
       const ms = stats.statsFromResults(modelResults);
       byModel[m] = {
         trials: ms.count,
@@ -351,11 +390,12 @@ function generateBenchmark(projectRoot, options = {}) {
       ci95: s.ci95,
       pass_at_k: stats.passAtK(scorable),
       pass_all_k: stats.passAllK(scorable),
-      last_run: results[results.length - 1].timestamp,
+      last_run: results.length > 0 ? results[results.length - 1].timestamp : null,
       metrics,
       ...(comparison ? { compared: comparison } : {}),
       ...(warning ? { warning } : {}),
       ...(Object.keys(byModel).length > 0 ? { by_model: byModel } : {}),
+      ...(pools.others.length > 0 ? { other_pools: pools.others } : {}),
     };
   }
 
@@ -425,10 +465,12 @@ function compareResults(scenario, baseline, treatment, projectRoot) {
       verdict: result.verdict,
       ...(baselineWarning ? { baselineWarning } : {}),
     };
+    // The analyzer reads the same scored pool the metrics came from: an infra
+    // or grade error (a provider refusal, a killed trial) is not behavior (B-10).
     const modelAnalysis = graders.compareWithModel(
       scenario,
-      baseline,
-      treatment,
+      stats.scorableResults(baseline),
+      stats.scorableResults(treatment),
       projectRoot,
       metrics,
     );

@@ -246,7 +246,7 @@ function statusBadge(status) {
   return h('span', { className:'badge '+(cls[status]||'badge-no-runs') }, status);
 }
 function verdictBadge(v) {
-  const cls = { IMPROVED:'badge-improved',INCONCLUSIVE:'badge-inconclusive',REGRESSED:'badge-regressed',INSUFFICIENT_DATA:'badge-insufficient' };
+  const cls = { IMPROVED:'badge-improved',PASS:'badge-ship',INCONCLUSIVE:'badge-inconclusive',REGRESSED:'badge-regressed',INSUFFICIENT_DATA:'badge-insufficient' };
   return h('span', { className:'badge '+(cls[v]||'badge-no-runs') }, v||'');
 }
 function scoreBar(score) {
@@ -773,7 +773,7 @@ function buildBenchmarkTable(rows) {
       h('td',null,s.grader),
       h('td',null,statusBadge(s.status)),
       h('td',null,entry ? fmtPct(entry.pass_rate)+' / '+fmtScore(entry.avg_score) : '-'),
-      h('td',null,entry?.compared ? h('span',null,entry.compared.verdict+' · '+(entry.compared.verdict_policy || '-')) : h('span',{className:'mono-muted'},'no A/B')),
+      h('td',null,entry?.compared ? (entry.compared.refused ? h('span',{className:'mono-muted'},'refused: arms share no run conditions') : h('span',null,entry.compared.verdict+' · '+(entry.compared.verdict_policy || '-'))) : h('span',{className:'mono-muted'},'no A/B')),
       h('td',null,entry?.compared ? fmtDelta(entry.compared.delta, (n)=>n.toFixed(2)) : '-'),
       h('td',null,metricDeltaText(duration, (n)=>(n/1000).toFixed(2)+'s')),
       h('td',null,metricDeltaText(output, (n)=>Math.round(n).toLocaleString())),
@@ -828,7 +828,9 @@ async function showBenchmarkDetail(scenario) {
       grid.appendChild(h('div',{className:'compare-center'},
         h('div',{className:'delta-value '+dCls},(compareData.delta>0?'+':'')+compareData.delta.toFixed(2)),
         verdictBadge(compareData.verdict),
-        compareData.deltaCi?h('div',{className:'stat-label'},'CI: ['+compareData.deltaCi.lower+', '+compareData.deltaCi.upper+']'):null
+        compareData.deltaCi?h('div',{className:'stat-label'},'CI: ['+compareData.deltaCi.lower+', '+compareData.deltaCi.upper+']'):null,
+        ...(compareData.otherPools||[]).map((p)=>h('div',{className:'stat-label',style:'margin-top:4px'},
+          'Not combined ('+p.arm+'): '+p.rows+' row(s), model '+(p.conditions.model??'unrecorded')+', effort '+(p.conditions.effort??'unrecorded')+', ceiling '+(p.conditions.trialTimeoutMs??'unrecorded')+' ms, max turns '+(p.conditions.maxTurns??'none')+', plugin dir '+(p.conditions.pluginDir==null?'unrecorded':p.conditions.pluginDir?'yes':'no')))
       ));
       grid.appendChild(h('div',{className:'card'},
         h('div',{className:'card-title'},'Treatment'),

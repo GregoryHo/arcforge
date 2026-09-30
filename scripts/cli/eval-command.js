@@ -6,10 +6,65 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { output } = require('./shared');
 
+/**
+ * The name the blind comparator redacts for a skill file: its basename, or for
+ * a `SKILL.md` the skill's directory (the basename "SKILL" names nothing).
+ * @param {string} file - Skill file path
+ * @returns {string}
+ */
+/**
+ * --plugin-dir belongs to workflow scope. B-1: a plugin-routed comparison
+ * measures a workflow, never a skill; B-11: one skill's trigger rate is measured
+ * by `claude plugin eval`, outside this harness. Refusing it elsewhere also
+ * keeps any run from injecting a skill body while loading the plugin (#197).
+ * @param {{ scope: string }} scenario
+ * @param {string|undefined} pluginDir - The --plugin-dir option
+ * @param {string} cmd - Subcommand name for the message
+ */
+function refusePluginDirOutsideWorkflow(scenario, pluginDir, cmd) {
+  if (!pluginDir || scenario.scope === 'workflow') return;
+  console.error(
+    `Error: eval ${cmd} --plugin-dir is refused for a ${scenario.scope}-scope scenario. A plugin-routed comparison is a workflow measurement: give the scenario ## Scope workflow and ## Plugin Dir (B-1). A single skill's trigger rate is measured with \`claude plugin eval\`, not this harness (B-11).`,
+  );
+  process.exit(1);
+}
+
+/**
+ * A workflow A/B with no plugin dir runs its treatment on the user's full
+ * configuration, so it needs --model and --effort to keep both arms on one
+ * model and effort (runWorkflowEval refuses otherwise). Checked before the
+ * preflight gate and in preflight itself, so no remediation ever points at a
+ * preflight whose A/B could not run.
+ * @param {{ scope: string, pluginDir?: string }} scenario
+ * @param {Object} options - Parsed CLI options
+ * @param {string} cmd - Subcommand name for the message
+ */
+function requirePinnedToolkitFlags(scenario, options, cmd) {
+  if (scenario.scope !== 'workflow' || options['plugin-dir'] || scenario.pluginDir) return;
+  const missing = ['model', 'effort'].filter((flag) => !options[flag]).map((f) => `--${f}`);
+  if (missing.length === 0) return;
+  console.error(
+    `Error: eval ${cmd} on a workflow scenario with no plugin dir runs the treatment on your full user config, so both arms need --model and --effort pinned (missing: ${missing.join(', ')}).`,
+  );
+  process.exit(1);
+}
+
+function skillNameFromFile(file) {
+  const base = path.basename(file, '.md');
+  return base.toUpperCase() === 'SKILL' ? path.basename(path.dirname(file)) : base;
+}
+
 async function runEvalCommand(args, { projectRoot, asJson }) {
   const eval_ = require('../lib/eval');
   const benchmark_ = require('../lib/eval-benchmark');
   const { generateRunId } = require('../lib/utils');
+  const { otherPoolLines, pairArms, describeCondition } = require('../lib/eval-pools');
+  // Lines for the pools that failed as instruments: never the measurement, but
+  // always shown, so a fallback verdict is not read as the latest run's.
+  const failureLines = (pools) => otherPoolLines(pools.others.filter((p) => p.instrumentFailure));
+  // A verdict is judged on the newest condition's pool (B-8); the others are
+  // printed beside it, never combined.
+  const currentPool = (evalName, opts) => eval_.loadResultPools(evalName, projectRoot, opts);
   const subcommand = args.positional[0];
   const model = args.options.model;
   const effort = args.options.effort;
@@ -110,17 +165,23 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
         const s = eval_.parseScenario(file);
         const isAb = s.scope === 'skill' || s.scope === 'workflow';
         const resultsName = isAb ? `${s.name}-treatment` : s.name;
-        let results = eval_.loadResults(resultsName, projectRoot, { version: s.version });
-        if (results.length === 0 && isAb) {
-          results = eval_.loadResults(s.name, projectRoot, { version: s.version });
+        let pools = currentPool(resultsName, { version: s.version });
+        if (pools.current.length === 0 && pools.others.length === 0 && isAb) {
+          pools = currentPool(s.name, { version: s.version });
         }
-        const verdict = results.length > 0 ? eval_.getVerdict(results) : 'NO RUNS';
+        const results = pools.current;
+        const failures = failureLines(pools);
+        let verdict = 'NO RUNS';
+        if (results.length > 0) verdict = eval_.getVerdict(results);
+        else if (failures.length > 0) verdict = 'NO SCORED RUNS';
         const claimType = eval_.inferClaimType(s);
         console.log(`  ${s.name} (${s.scope}, ${s.grader}, ${claimType}) — ${verdict}`);
+        for (const line of failures) console.log(`    ${line}`);
       }
     }
   } else if (subcommand === 'run') {
     const scenario = requireScenario(args.positional[1], 'run');
+    eval_.resolveTrialTimeoutMs(); // refuse a bad ceiling before any Setup or session (B-10)
     const k = parseK(scenario, false);
     const isolated = !args.flags['no-isolate'];
     const pluginDir = args.options['plugin-dir'];
@@ -148,7 +209,10 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
           pluginDir,
           maxTurns,
         });
-        let graded = eval_.gradeTrialResult(result, scenario, projectRoot, result.actions);
+        // An infra error is recorded as it is: there is no agent turn to grade.
+        let graded = result.infraError
+          ? result
+          : eval_.gradeTrialResult(result, scenario, projectRoot, result.actions);
 
         if (graded.grader === 'human-pending') {
           console.log('HUMAN REVIEW');
@@ -162,17 +226,27 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
         const versioned = scenario.version ? { ...graded, version: scenario.version } : graded;
         eval_.appendResult(versioned, projectRoot);
         console.log(formatStatus(graded));
+        eval_.stopIfTrialWroteRepo(versioned, `trial ${t}`);
       }
     } finally {
       if (rl) rl.close();
     }
 
-    const results = eval_
-      .loadResults(scenario.name, projectRoot, {
-        version: scenario.version,
-        since: args.options.since,
-      })
-      .slice(-k);
+    // Filter before taking the last k, so an error trial neither moves the
+    // verdict nor shrinks the pool it is judged on (B-10).
+    const pools = currentPool(scenario.name, {
+      version: scenario.version,
+      since: args.options.since,
+    });
+    const results = eval_.scorableResults(pools.current).slice(-k);
+    if (!pools.current.some((r) => r.runId === runId)) {
+      console.log(
+        pools.conditions
+          ? `This run produced no scored trial; the verdict below is the most recent scored pool's (${describeCondition(pools.conditions)}), not this run's.`
+          : 'This run produced no scored trial, and no earlier scored pool exists.',
+      );
+    }
+    for (const line of failureLines(pools)) console.log(line);
     const verdictOpts = scenario.grader === 'model' ? { useCi: true } : {};
     console.log(`Verdict: ${eval_.getVerdict(results, verdictOpts)}`);
   } else if (subcommand === 'preflight') {
@@ -192,9 +266,22 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
       process.exit(1);
     }
 
+    refusePluginDirOutsideWorkflow(scenario, args.options['plugin-dir'], 'preflight');
+    requirePinnedToolkitFlags(scenario, args.options, 'preflight');
+    eval_.resolveTrialTimeoutMs(); // refuse a bad ceiling before any Setup or session (B-10)
     console.log(`Running preflight for "${scenarioName}"...`);
     const runId = generateRunId();
 
+    // Preflight measures the baseline the A/B will run, so it takes the same
+    // turn budget and permission mode that baseline gets (sharedArmOptions).
+    // --plugin-dir only resolves those here; nothing is loaded.
+    const abPluginDir =
+      args.options['plugin-dir'] ||
+      (scenario.scope === 'workflow' ? scenario.pluginDir : undefined);
+    const baselineArm = eval_.sharedArmOptions(scenario, {
+      maxTurns: args.options['max-turns'] ? parseInt(args.options['max-turns'], 10) : undefined,
+      pluginDir: abPluginDir,
+    });
     const stubRunTrial = (t, totalK) =>
       eval_.runTrial(scenario, t, totalK, {
         projectRoot,
@@ -202,9 +289,13 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
         effort,
         runId,
         isolated: true,
+        ...baselineArm,
       });
     const stubGrade = (result, _t) => {
       try {
+        // An infra error has no agent turn to grade — and grading a refusal
+        // would spawn a grader session while the account is limited.
+        if (result.infraError) return result;
         return eval_.gradeTrialResult(result, scenario, projectRoot, result.actions);
       } finally {
         eval_.cleanupTrialDir(result.trialDir);
@@ -216,6 +307,12 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
       gradeResult: stubGrade,
       model,
       effort,
+      conditions: {
+        maxTurns: baselineArm.maxTurns,
+        pluginDir: abPluginDir,
+        effort,
+        trialTimeoutMs: eval_.resolveTrialTimeoutMs(),
+      },
     });
 
     console.log(`Verdict: ${outcome.verdict}`);
@@ -287,6 +384,9 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     }
   } else if (subcommand === 'ab') {
     const scenario = requireScenario(args.positional[1], 'ab');
+    refusePluginDirOutsideWorkflow(scenario, args.options['plugin-dir'], 'ab');
+    requirePinnedToolkitFlags(scenario, args.options, 'ab');
+    eval_.resolveTrialTimeoutMs(); // refuse a bad ceiling before any Setup or session (B-10)
     const model = args.options.model;
     const effort = args.options.effort;
 
@@ -300,7 +400,25 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     if (shouldSkipPreflightGate(scenario)) {
       console.log(`Preflight: skipped by scenario policy (${scenario.name})`);
     } else {
-      const gateError = checkPreflightGate(scenario.name, projectRoot, { model });
+      // Keyed on the conditions this A/B's baseline will run under (the same
+      // resolution preflight used), so a PASS under another budget or without
+      // a plugin dir does not unlock it.
+      const abPluginDir =
+        args.options['plugin-dir'] ||
+        (scenario.scope === 'workflow' ? scenario.pluginDir : undefined);
+      const { maxTurns: abMaxTurns } = eval_.sharedArmOptions(scenario, {
+        maxTurns: args.options['max-turns'] ? parseInt(args.options['max-turns'], 10) : undefined,
+        pluginDir: abPluginDir,
+      });
+      const gateError = checkPreflightGate(scenario.name, projectRoot, {
+        model,
+        conditions: {
+          maxTurns: abMaxTurns,
+          pluginDir: abPluginDir,
+          effort,
+          trialTimeoutMs: eval_.resolveTrialTimeoutMs(),
+        },
+      });
       if (gateError) {
         console.error(`Error: ${gateError}`);
         process.exit(1);
@@ -359,7 +477,6 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
         model,
         effort,
         runId,
-        pluginDir,
         maxTurns,
       });
     }
@@ -376,7 +493,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     // fr-gr-005: blind-comparator auto-trigger
     const { runBlindAutoTrigger } = require('../lib/eval-blind-autotrigger');
     const skillFile = args.options['skill-file'] || scenario.target;
-    const skillName = skillFile ? path.basename(skillFile, '.md') : undefined;
+    const skillName = skillFile ? skillNameFromFile(skillFile) : undefined;
     const blindResult = runBlindAutoTrigger(
       scenario,
       result.baseline,
@@ -415,15 +532,24 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
       since: args.options.since,
       ...(model ? { model } : {}),
     };
-    const baseline = eval_.loadResults(`${name}-baseline`, projectRoot, filterOpts);
-    const treatment = eval_.loadResults(`${name}-treatment`, projectRoot, filterOpts);
-
-    if (baseline.length === 0 || treatment.length === 0) {
+    const bRows = eval_.loadResults(`${name}-baseline`, projectRoot, filterOpts);
+    const tRows = eval_.loadResults(`${name}-treatment`, projectRoot, filterOpts);
+    if (bRows.length === 0 || tRows.length === 0) {
       console.error(
         'Error: need both baseline and treatment results. Run: arcforge eval ab <name>',
       );
       process.exit(1);
     }
+    // Both arms on the newest pool pair that shares its conditions (B-8).
+    const paired = pairArms(bRows, tRows);
+    const unpairedLines = paired.unpaired.map((p) => otherPoolLines([p], p.arm)[0]);
+    if (paired.error) {
+      console.error(`Error: ${paired.error}`);
+      for (const line of unpairedLines) console.error(`  ${line}`);
+      process.exit(1);
+    }
+    const baseline = paired.baseline;
+    const treatment = paired.treatment;
 
     console.log(`A/B Comparison: ${name}`);
     if (scenario && scenario.grader !== 'code') {
@@ -446,6 +572,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
       tStats: comparison.treatment,
     });
     if (comparison.baselineWarning) console.log(`  ${comparison.baselineWarning}`);
+    for (const line of unpairedLines) console.log(`  ${line}`);
     if (comparison.modelAnalysis) {
       console.log(`\n  Analysis: ${comparison.modelAnalysis.analysis || ''}`);
       if (comparison.modelAnalysis.delta_explanation) {
@@ -511,12 +638,12 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
           let verdict;
           if (data.grader === 'model' && displayData.trials >= 5) {
             const scenarioFile = eval_.findScenario(evalName, projectRoot);
-            const results = eval_.loadResults(evalName, projectRoot, {
+            const results = currentPool(evalName, {
               version: scenarioFile?.version,
               ...(model ? { model } : {}),
-            });
+            }).current;
             verdict =
-              results.length >= 5
+              eval_.scorableResults(results).length >= 5
                 ? eval_.verdictFromCI(results)
                 : eval_.verdictFromRate(displayData.pass_rate);
           } else {
@@ -525,6 +652,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
           console.log(
             `  ${evalName}: ${(displayData.pass_rate * 100).toFixed(0)}% (${displayData.trials} trials) — ${verdict}`,
           );
+          for (const line of otherPoolLines(data.other_pools || [])) console.log(`    ${line}`);
           if (!model && data.by_model) {
             const parts = Object.entries(data.by_model).map(
               ([m, ms]) => `${m}: ${(ms.pass_rate * 100).toFixed(0)}% (${ms.trials})`,

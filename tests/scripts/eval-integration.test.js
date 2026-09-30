@@ -751,6 +751,10 @@ describe('runWorkflowEval A/B flow', () => {
     'echo pass',
   ].join('\n');
 
+  // A full-toolkit treatment reads the user settings file, so the runner
+  // refuses it unless both arms pin the model and effort explicitly.
+  const PINNED = { model: 'sonnet', effort: 'high' };
+
   beforeEach(() => {
     jest.restoreAllMocks();
     tmpDir = makeTempDir();
@@ -768,6 +772,7 @@ describe('runWorkflowEval A/B flow', () => {
 
     const { baseline, treatment } = runWorkflowEval(scenario, 2, {
       projectRoot: tmpDir,
+      ...PINNED,
     });
 
     expect(baseline).toHaveLength(2);
@@ -778,7 +783,7 @@ describe('runWorkflowEval A/B flow', () => {
     writeScenario(tmpDir, 'workflow-ab-test.md', scenarioContent);
     const scenario = parseScenario(path.join(tmpDir, SCENARIOS_DIR, 'workflow-ab-test.md'));
 
-    const { delta } = runWorkflowEval(scenario, 1, { projectRoot: tmpDir });
+    const { delta } = runWorkflowEval(scenario, 1, { projectRoot: tmpDir, ...PINNED });
 
     expect(typeof delta).toBe('number');
   });
@@ -795,7 +800,7 @@ describe('runWorkflowEval A/B flow', () => {
       return { stdout: 'ok', stderr: '', exitCode: 0 };
     });
 
-    runWorkflowEval(scenario, 1, { projectRoot: tmpDir });
+    runWorkflowEval(scenario, 1, { projectRoot: tmpDir, ...PINNED });
 
     // First trial = baseline (should have --strict-mcp-config)
     expect(trialCalls[0].args).toContain('--strict-mcp-config');
@@ -815,7 +820,7 @@ describe('runWorkflowEval A/B flow', () => {
       return { stdout: 'ok', stderr: '', exitCode: 0 };
     });
 
-    runWorkflowEval(scenario, 1, { projectRoot: tmpDir });
+    runWorkflowEval(scenario, 1, { projectRoot: tmpDir, ...PINNED });
 
     // Both baseline and treatment should get the same prompt
     expect(prompts[0]).toBe(prompts[1]);
@@ -825,7 +830,7 @@ describe('runWorkflowEval A/B flow', () => {
     writeScenario(tmpDir, 'workflow-ab-test.md', scenarioContent);
     const scenario = parseScenario(path.join(tmpDir, SCENARIOS_DIR, 'workflow-ab-test.md'));
 
-    runWorkflowEval(scenario, 1, { projectRoot: tmpDir });
+    runWorkflowEval(scenario, 1, { projectRoot: tmpDir, ...PINNED });
 
     const baselineResults = loadResults('workflow-ab-test-baseline', tmpDir);
     const treatmentResults = loadResults('workflow-ab-test-treatment', tmpDir);
@@ -840,6 +845,7 @@ describe('runWorkflowEval A/B flow', () => {
     const callback = jest.fn();
     runWorkflowEval(scenario, 2, {
       projectRoot: tmpDir,
+      ...PINNED,
       onTrialComplete: callback,
     });
 
@@ -862,6 +868,7 @@ describe('runWorkflowEval A/B flow', () => {
 
     runWorkflowEval(scenario, 2, {
       projectRoot: tmpDir,
+      ...PINNED,
       interleave: true,
     });
 
@@ -883,6 +890,7 @@ describe('runWorkflowEval A/B flow', () => {
 
     runWorkflowEval(scenario, 2, {
       projectRoot: tmpDir,
+      ...PINNED,
       interleave: false,
     });
 

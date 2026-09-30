@@ -14,6 +14,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { listScenarios, parseScenario } = require('./eval');
+const { stopIfTrialWroteRepo, DEFAULT_TRIAL_TIMEOUT_MS } = require('./eval-trial');
 
 /** Directory where preflight JSON files are stored */
 const PREFLIGHT_DIR = path.join('evals', 'preflight');
@@ -56,9 +57,34 @@ function computeScenarioHash(contents) {
  *   undefined if not specified (which means "harness default model")
  * @returns {string} Filename like `${hash}-${modelKey}.json`
  */
-function preflightFilename(hash, model) {
+function preflightFilename(hash, model, conditions = {}) {
   const modelKey = (model || 'default').replace(/[^A-Za-z0-9._-]/g, '_');
-  return `${hash}-${modelKey}.json`;
+  return `${hash}-${modelKey}${conditionsSuffix(conditions)}.json`;
+}
+
+/**
+ * The run conditions a baseline's competence depends on beyond scenario and
+ * model: its turn budget, whether a plugin dir was in play (which also sets
+ * the permission mode), and the --effort it ran at. A PASS measured under one
+ * set does not unlock an A/B run under another. Plain conditions (no budget,
+ * no plugin dir, no effort) add nothing to the file name, so records written
+ * before this key existed still match them.
+ * @param {{ maxTurns?: number, pluginDir?: string, effort?: string }} conditions
+ * @returns {string} '' or e.g. '-t10-pd', '-ehigh', '-t10-pd-ehigh'
+ */
+function conditionsSuffix({ maxTurns, pluginDir, effort, trialTimeoutMs } = {}) {
+  const budget =
+    maxTurns == null && !pluginDir ? '' : `-t${maxTurns ?? 'none'}${pluginDir ? '-pd' : ''}`;
+  const effortKey = effort ? `-e${String(effort).replace(/[^A-Za-z0-9._]/g, '_')}` : '';
+  // The ceiling only when it was moved, so records at the default keep matching.
+  const ceiling =
+    trialTimeoutMs && trialTimeoutMs !== DEFAULT_TRIAL_TIMEOUT_MS ? `-c${trialTimeoutMs}` : '';
+  return `${budget}${effortKey}${ceiling}`;
+}
+
+/** Human-readable conditions, as the gate names them. */
+function describeConditions({ maxTurns, pluginDir, effort, trialTimeoutMs } = {}) {
+  return `max turns ${maxTurns ?? 'none'}, plugin dir ${pluginDir ? 'yes' : 'no'}, effort ${effort || 'default'}, ceiling ${trialTimeoutMs || DEFAULT_TRIAL_TIMEOUT_MS} ms`;
 }
 
 /**
@@ -111,7 +137,7 @@ function resolveScenarioFile(name, projectRoot) {
  * @returns {{ scenario_hash: string, scenario_name: string, model: string|null, pass_rate: number|null, k: number, verdict: 'PASS'|'BLOCK', reason: string, timestamp: string }}
  */
 function runPreflight(name, projectRoot, opts = {}) {
-  const { runTrial, gradeResult, model } = opts;
+  const { runTrial, gradeResult, model, conditions = {} } = opts;
 
   const filePath = resolveScenarioFile(name, projectRoot);
   if (!filePath) {
@@ -120,11 +146,18 @@ function runPreflight(name, projectRoot, opts = {}) {
 
   const contents = fs.readFileSync(filePath, 'utf8');
   const hash = computeScenarioHash(contents);
-  const cacheFile = preflightFilename(hash, model);
+  const cacheFile = preflightFilename(hash, model, conditions);
+  const ranUnder = {
+    max_turns: conditions.maxTurns ?? null,
+    plugin_dir: Boolean(conditions.pluginDir),
+    effort: conditions.effort || null,
+    trial_timeout_ms: conditions.trialTimeoutMs || DEFAULT_TRIAL_TIMEOUT_MS,
+  };
 
   const results = [];
   for (let t = 1; t <= PREFLIGHT_K; t++) {
     const raw = runTrial(t, PREFLIGHT_K);
+    stopIfTrialWroteRepo(raw, `preflight trial ${t}`);
     const graded = gradeResult(raw, t);
     results.push(graded);
   }
@@ -146,6 +179,7 @@ function runPreflight(name, projectRoot, opts = {}) {
       scenario_hash: hash,
       scenario_name: name,
       model: model || null,
+      ...ranUnder,
       pass_rate: null,
       k: PREFLIGHT_K,
       errored: errored.length,
@@ -172,6 +206,7 @@ function runPreflight(name, projectRoot, opts = {}) {
     scenario_hash: hash,
     scenario_name: name,
     model: model || null,
+    ...ranUnder,
     pass_rate,
     k: PREFLIGHT_K,
     verdict,
@@ -205,10 +240,12 @@ function runPreflight(name, projectRoot, opts = {}) {
  * @param {string} [opts.model] - Model identifier the A/B run will use; the
  *   gate verifies a preflight record exists for this exact model. Pass the
  *   same value `arcforge eval ab` will pass to its trials.
+ * @param {{ maxTurns?: number, pluginDir?: string }} [opts.conditions] - The turn
+ *   budget and plugin dir the A/B baseline will run under; the record must match.
  * @returns {null|string} null if cleared to proceed; error message string if blocked
  */
 function checkPreflightGate(name, projectRoot, opts = {}) {
-  const { model } = opts;
+  const { model, conditions = {} } = opts;
 
   const filePath = resolveScenarioFile(name, projectRoot);
   if (!filePath) {
@@ -217,18 +254,11 @@ function checkPreflightGate(name, projectRoot, opts = {}) {
 
   const contents = fs.readFileSync(filePath, 'utf8');
   const hash = computeScenarioHash(contents);
-  const cacheFile = preflightFilename(hash, model);
+  const cacheFile = preflightFilename(hash, model, conditions);
 
   const preflightFile = path.join(projectRoot, PREFLIGHT_DIR, cacheFile);
   if (!fs.existsSync(preflightFile)) {
-    const modelLabel = model || 'default';
-    const remediationFlag = model ? ` --model ${model}` : '';
-    return (
-      `No preflight record found for scenario "${name}" (hash: ${hash}, model: ${modelLabel}).\n` +
-      `Run: arcforge eval preflight ${name}${remediationFlag}\n` +
-      `Preflight is per-(scenario, model) — baseline pass rate is model-dependent, ` +
-      `so a PASS under one model does not unblock A/B runs on another.`
-    );
+    return missingPreflightMessage(name, projectRoot, { hash, model, conditions });
   }
 
   let record;
@@ -258,6 +288,59 @@ function checkPreflightGate(name, projectRoot, opts = {}) {
   }
 
   return null;
+}
+
+/**
+ * Explain a missing preflight record: name the conditions this run needs, any
+ * conditions the same scenario and model were preflighted under instead, and
+ * the exact command that produces the record the gate is looking for.
+ */
+function missingPreflightMessage(name, projectRoot, { hash, model, conditions }) {
+  const modelLabel = model || 'default';
+  const flags = [
+    model ? `--model ${model}` : '',
+    conditions.maxTurns != null ? `--max-turns ${conditions.maxTurns}` : '',
+    conditions.pluginDir ? `--plugin-dir ${conditions.pluginDir}` : '',
+    conditions.effort ? `--effort ${conditions.effort}` : '',
+  ].filter(Boolean);
+  // The ceiling is set by environment, not a flag, so the command carries it.
+  const ceilingEnv =
+    conditions.trialTimeoutMs && conditions.trialTimeoutMs !== DEFAULT_TRIAL_TIMEOUT_MS
+      ? `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=${conditions.trialTimeoutMs} `
+      : '';
+  const prefix = preflightFilename(hash, model).replace(/\.json$/, '');
+  const dir = path.join(projectRoot, PREFLIGHT_DIR);
+  const recorded = (fs.existsSync(dir) ? fs.readdirSync(dir) : [])
+    .filter(
+      (f) =>
+        f === `${prefix}.json` ||
+        (['-t', '-e', '-c'].some((s) => f.startsWith(`${prefix}${s}`)) && f.endsWith('.json')),
+    )
+    .map((f) => {
+      try {
+        const r = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
+        return describeConditions({
+          maxTurns: r.max_turns ?? undefined,
+          pluginDir: r.plugin_dir,
+          effort: r.effort,
+          trialTimeoutMs: r.trial_timeout_ms,
+        });
+      } catch {
+        return null; // unreadable record: it cannot say what it ran under
+      }
+    })
+    .filter(Boolean);
+  const mismatch =
+    recorded.length > 0
+      ? `A preflight exists for this scenario and model, recorded under: ${recorded.join('; ')}.\n`
+      : '';
+  return (
+    `No preflight record found for scenario "${name}" (hash: ${hash}, model: ${modelLabel}, ${describeConditions(conditions)}).\n` +
+    mismatch +
+    `Run: ${ceilingEnv}arcforge eval preflight ${[name, ...flags].join(' ')}\n` +
+    `Preflight is per-(scenario, model, effort, turn budget, plugin dir, ceiling) — baseline pass rate depends ` +
+    `on each, so a PASS under one does not unblock A/B runs under another.`
+  );
 }
 
 module.exports = {

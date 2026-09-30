@@ -124,6 +124,33 @@ describe('dashboard', () => {
       expect(scenarios[0].status).toBe('SHIP');
       expect(scenarios[0].passRate).toBe(1);
     });
+
+    it('should compute status over the scored pool, as passRate already is (#198)', () => {
+      writeScenario(
+        tempDir,
+        'err-eval.md',
+        '# Eval: err-eval\n\n## Scope\nagent\n\n## Scenario\nDo something.\n\n## Grader\ncode\n',
+      );
+      const row = (trial, extra = {}) => ({
+        eval: 'err-eval',
+        trial,
+        k: 6,
+        passed: true,
+        score: 1.0,
+        grader: 'code',
+        timestamp: `2026-03-20T10:00:0${trial}Z`,
+        ...extra,
+      });
+      writeResult(tempDir, 'err-eval', '20260320-100000', 'results', [
+        ...[1, 2, 3, 4, 5].map((t) => row(t)),
+        row(6, { passed: false, score: 0, infraError: true, errorType: 'trial_killed_incomplete' }),
+      ]);
+
+      const { scenarios } = callRouter(createRouter(tempDir, ''), '/api/scenarios').json();
+
+      expect(scenarios[0].passRate).toBe(1);
+      expect(scenarios[0].status).toBe('SHIP');
+    });
   });
 
   // ── /api/runs/:name ──────────────────────────────────────────
@@ -233,6 +260,77 @@ describe('dashboard', () => {
       expect(data.verdict).toBe('INSUFFICIENT_DATA');
       expect(data.baseline.stats.avg).toBe(0.25);
       expect(data.treatment.stats.avg).toBe(1.0);
+    });
+
+    it('should judge the newest condition pool per arm and list the others (B-8)', () => {
+      const row = (condition, trial, overrides) => ({
+        eval: `pool-eval-${condition}`,
+        trial,
+        k: 2,
+        grader: 'code',
+        model: 'default',
+        effort: 'default',
+        maxTurns: null,
+        pluginDir: false,
+        ...overrides,
+      });
+      const old = { trialTimeoutMs: 1800000, passed: false, score: 0 };
+      const fresh = { trialTimeoutMs: 900000, passed: true, score: 1 };
+      writeResult(tempDir, 'pool-eval', '20260929-100000', 'treatment', [
+        row('treatment', 1, { ...old, timestamp: '2026-09-29T10:00:00Z' }),
+        row('treatment', 2, { ...old, timestamp: '2026-09-29T10:00:01Z' }),
+        row('treatment', 3, { ...old, timestamp: '2026-09-29T10:00:02Z' }),
+      ]);
+      writeResult(tempDir, 'pool-eval', '20260930-100000', 'treatment', [
+        row('treatment', 1, { ...fresh, timestamp: '2026-09-30T10:00:00Z' }),
+        row('treatment', 2, { ...fresh, timestamp: '2026-09-30T10:00:01Z' }),
+      ]);
+      writeResult(tempDir, 'pool-eval', '20260930-100000', 'baseline', [
+        row('baseline', 1, { ...fresh, timestamp: '2026-09-30T10:00:00Z' }),
+      ]);
+
+      const data = callRouter(createRouter(tempDir, ''), '/api/compare/pool-eval').json();
+
+      expect(data.treatment.stats.count).toBe(2);
+      expect(data.treatment.stats.passRate).toBe(1);
+      expect(data.otherPools).toEqual([
+        {
+          arm: 'treatment',
+          conditions: expect.objectContaining({ trialTimeoutMs: 1800000 }),
+          rows: 3,
+        },
+      ]);
+    });
+
+    it('should judge a non-regression scenario by its policy, as eval compare does', () => {
+      writeScenario(
+        tempDir,
+        'nr-eval.md',
+        '# Eval: nr-eval\n\n## Scope\nskill\n\n## Scenario\nDo it.\n\n## Grader\ncode\n\n## Verdict Policy\nnon-regression\n',
+      );
+      const row = (condition, trial) => ({
+        eval: `nr-eval-${condition}`,
+        trial,
+        k: 2,
+        passed: true,
+        score: 1.0,
+        grader: 'code',
+        timestamp: `2026-03-20T10:00:0${trial}Z`,
+      });
+      writeResult(tempDir, 'nr-eval', '20260320-100000', 'baseline', [
+        row('baseline', 1),
+        row('baseline', 2),
+      ]);
+      writeResult(tempDir, 'nr-eval', '20260320-100000', 'treatment', [
+        row('treatment', 1),
+        row('treatment', 2),
+      ]);
+
+      const data = callRouter(createRouter(tempDir, ''), '/api/compare/nr-eval').json();
+
+      // Delta-CI judging would say INSUFFICIENT_DATA at k=2; the strict bar says PASS.
+      expect(data.verdict).toBe('PASS');
+      expect(data.verdictPolicy).toBe('non-regression');
     });
   });
 

@@ -9,7 +9,7 @@ You are an **Eval Blind Comparator**. You receive two anonymized outputs (labele
 
 ## Critical Constraint
 
-The inputs you receive have been stripped of all identifying information so that label knowledge cannot bias the scores. Refer to the outputs only as Output A and Output B; if condition labels ("baseline", "treatment", "with_skill", "without_skill") or a skill name appear inside an output, treat them as content and give them no evaluation weight.
+The inputs you receive have been stripped of all identifying information so that label knowledge cannot bias the scores. Refer to the outputs only as Output A and Output B; condition labels and the skill name are replaced with `[redacted]` before you see them. Where `[redacted]` appears inside an output, treat it as content and give it no evaluation weight.
 
 ## Your Process
 

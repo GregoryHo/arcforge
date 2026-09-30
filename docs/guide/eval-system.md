@@ -56,10 +56,22 @@ three trials, and measures how often it passes with no change applied at all.
 A BLOCK is a verdict about your *scenario*, not your change. Make the task
 harder, or find the failure mode you were actually worried about.
 
+Preflight runs its baseline the way the A/B will run it: with the same turn
+budget and permission mode. Give `preflight` the `--max-turns`,
+`--plugin-dir` and `--effort` you will give `ab`. There `--plugin-dir` only sets the
+budget and permission mode; nothing is loaded into the baseline. Like `ab`,
+`preflight` takes `--plugin-dir` for a `workflow` scenario only. A `workflow`
+scenario's `## Plugin Dir` counts on its own. With a plugin dir and no other limit, the
+budget is 10 turns.
+
 Preflight results are cached per scenario **and per model**, keyed on the
-scenario's content. Edit the scenario or switch models and you need a fresh one —
-baseline competence is not transferable between models, and a PASS earned under
-one does not unblock A/B runs under another.
+scenario's content, and per turn budget, plugin dir, `--effort` and per-trial
+ceiling (`ARCFORGE_EVAL_TRIAL_TIMEOUT_MS`). Edit the scenario, switch models, or
+change the budget, plugin dir, effort or ceiling, and you need a fresh one:
+baseline competence is not transferable between conditions, and a PASS earned under one
+does not unblock A/B runs under another. When `ab` finds no record for its own
+conditions, it stops. It names the conditions it needed and any it found
+instead, and gives the exact `preflight` command to run.
 
 A scenario that measures "this must not get worse" rather than "this must
 improve" opts out by declaring `skip`:
@@ -81,14 +93,82 @@ Runs both arms and stores every trial. Useful flags:
 |------|--------|
 | `--k` | Trials per arm. Defaults to 5, or 10 when a model grades |
 | `--model` | Which model to run trials on |
+| `--effort` | Reasoning effort for the trial sessions, passed through to `claude --effort` (also on `run` and `preflight`) |
 | `--interleave` | Alternate the arms instead of running each in a block, so drift over the run hits both equally |
 | `--max-turns` | Turn budget per trial, overriding the scenario |
-| `--plugin-dir` | Load a plugin directory into the treatment arm |
+| `--skill-file` | Skill-scope only: inject this skill body into the treatment prompt. Falls back to the scenario's `## Target` |
+| `--plugin-dir` | `workflow` scope only: load this plugin into the treatment arm. Refused for any other scope |
 
 Each trial's `claude -p` session is capped at 900 s; a trial killed at the cap is
 an infra error and never scores. Set `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=<milliseconds>`
 to move that ceiling for one run — for a treatment whose pipeline builds or
-renders and runs past the cap on a loaded machine.
+renders and runs past the cap on a loaded machine. Anything that is not a
+positive integer is refused before the run starts, ahead of any fixture
+`## Setup`. Every result row records the ceiling its trial ran under as
+`trialTimeoutMs`, so a pool that mixes ceilings can be told apart; report the
+value whenever a run moved it.
+
+A trial the provider refused — a session-limit or quota message in place of the
+agent's turn, reported with zero output tokens and no tool call — is recorded as
+an infra error (`provider_refusal`) and never scores either. Without that, the
+fixture's own files would pass some assertions and an exhausted quota would read
+as a regression.
+
+Every trial runs in a fresh fixture directory under `.eval-trials/`, with
+arcforge's own state redirected into it. By default the session is also
+isolated. Plugins and MCP servers are stripped, `CLAUDE.md` files and rules are
+excluded, the output style is pinned to the default and hooks are disabled. Your
+user settings file (`~/.claude/settings.json`) is not read at all, so nothing
+set there reaches the trial: not your hooks, output style, `model` or effort
+level, `env`, permissions, or an `apiKeyHelper`. Credentials stored in your
+keychain still work, and environment variables from your shell are passed
+through. A `--plugin-dir` trial is contained the same way, `CLAUDE.md` excludes
+included, except that it loads the plugin under test and leaves hooks on so the
+plugin's own hooks run.
+
+In a comparison, both arms run `claude` with the same flags apart from the
+injection itself. They share the settings sources, the turn budget, the
+permission mode (neither arm stops for permission prompts when a plugin is
+loaded) and `--model` / `--effort`. Their settings files differ only in that
+the baseline switches every hook off: it loads no plugin, so that costs it
+nothing. Every result row records the `model` and `effort` it ran with, the flag
+value when one was given. Otherwise it says `default` for a contained trial,
+meaning Claude Code's own default since your settings are not read. It says
+`user-settings` for a trial that reads your settings file, such as `eval run
+--no-isolate`. A `workflow` A/B with no
+plugin directory is the exception. Its treatment runs on your full configuration,
+so it refuses to start unless you pass both `--model` and `--effort`. Both
+`eval ab` and `eval preflight` check this before anything else, so a missing flag
+is reported before any preflight lookup or trial.
+
+Isolation is not a sandbox. The agent runs with your filesystem permissions.
+Isolated and `--plugin-dir` trials are told to stay inside their directory, but
+nothing enforces it. So the runner checks afterwards: it snapshots the project
+and the plugin directory before each trial and compares after. That includes
+the baseline of a plugin-dir comparison and its preflight, which load no plugin
+but could still edit it before the treatment loads it. The plugin directory is
+walked on its own even when it sits inside the project as a separate checkout.
+
+A trial that added, changed or removed anything the check covers, a change to a
+file's permissions included, is recorded as
+an infra error (`trial_wrote_repo`) naming the paths, and never scores. The
+run then stops before the next trial starts, because every later trial would
+run against the changed files. That applies to `eval run`, `eval ab` and
+`eval preflight`. The command prints which trial wrote where and exits
+non-zero. Rows already recorded stay on disk. The runner does not undo the
+change: inspect the paths with `git status`, reset the repository (and the
+plugin directory) yourself, then rerun. An edit you make to the same project
+while a trial runs looks identical, so a long run is best left alone.
+
+The check has blind spots. Any folder named `.git`, `node_modules` or
+`.eval-trials` is skipped at any depth. So are the project's own
+`evals/results/` and any nested repository other than the plugin directory. A
+write into any of these goes unnoticed. The check also stops at 50,000 files per
+directory. Past that it fails closed. The runner prints one line saying the
+repository is too large for the write check and how many files it saw, and every
+trial is recorded as an infra error (`repo_check_skipped`, with
+`repoCheck: "skipped"` on the row) that never scores. Run evals from a smaller
+project root.
 
 `--skill-file` injects a skill body into the treatment prompt — that measures a
 **skill**. `--plugin-dir` loads a real plugin instead — that measures a
@@ -96,11 +176,50 @@ renders and runs past the cap on a loaded machine.
 `--skill-file` when you meant to test the environment quietly turns a workflow
 eval into a skill eval.
 
+The two never mix, and `--plugin-dir` belongs to `workflow` scope. On a
+`skill` (or `agent`) scenario, `eval ab --plugin-dir` is refused, and so is
+`preflight --plugin-dir`. A comparison with the plugin loaded measures a
+workflow, so write it as a `workflow` scenario with `## Plugin Dir`. Whether a
+single skill triggers from its description is `claude plugin eval`'s question,
+not this harness's. No run ever injects a skill body while also loading the
+plugin.
+
 To run one condition on its own, without a comparison:
 
 ```bash
 arcforge eval run <name> --k 5
 ```
+
+`eval run` takes `--k`, `--model`, `--effort`, `--max-turns` and `--plugin-dir`
+like `ab`, plus `--no-isolate`. What that flag readmits depends on the scenario.
+
+- **No `## Plugin Dir` (and no `--plugin-dir`):** the whole surrounding
+  configuration comes back. That means your installed plugins, MCP servers,
+  `CLAUDE.md` files and rules, and your user settings file with its hooks,
+  output style, model and effort level.
+- **With `## Plugin Dir`:** only that plugin comes back. The trial runs as a
+  `--plugin-dir` trial: the named plugin loads with its hooks, every other
+  installed plugin stays disabled, MCP servers stay stripped and your user
+  settings file is still not read. `CLAUDE.md` files and rules stay excluded.
+
+Either way the trial runs in its own fixture directory with arcforge's state
+redirected, so your real learning state stays out of it.
+
+`eval run` has no second arm, so its verdict is about the condition alone, not a
+change. It is judged over the last k **scored** trials — an infra or grade error
+is recorded and printed but never counted, and never shortens the pool:
+
+| Verdict | Meaning |
+|---------|---------|
+| `SHIP` | Every scored trial passed |
+| `NEEDS WORK` | At least 60% passed |
+| `BLOCKED` | Fewer than 60% passed, or nothing was scored |
+
+For a `model`-graded scenario with at least five scored trials, `SHIP` instead
+means the 95% confidence interval on the mean score sits at or above 0.8, which
+tolerates the grader's noise. `eval list`, `eval report` and the dashboard show
+the same vocabulary over the same scored pool (`eval list` always applies the
+pass-rate rule).
 
 ## Step 4 — read the verdict
 
@@ -114,14 +233,29 @@ arcforge eval compare eval-tdd-test-first-gate
 | `REGRESSED` | It sits entirely below zero |
 | `INCONCLUSIVE` | It straddles zero — this is a real answer, not a failure to get one |
 | `INSUFFICIENT_DATA` | Fewer than 5 trials in an arm; no defensible verdict exists yet |
+| `PASS` | `non-regression` policy only (below): every scored treatment trial passed |
 
 `INCONCLUSIVE` at k=5 usually means the effect is smaller than the noise. Raising
 k narrows the interval; it does not manufacture an effect that is not there.
 
 A scenario declaring `## Verdict Policy non-regression` is judged differently:
 there is no delta to interpret, and it passes only when **every** treatment trial
-that produced a score passes and at least one did. That is the right policy for
-"this must keep working", the wrong one for "this should help".
+that produced a score passes and at least one did — `PASS`, otherwise
+`REGRESSED`, never `INSUFFICIENT_DATA`. `eval ab`, `eval compare` and the
+dashboard's A/B view all apply it. That is the right policy for "this must keep
+working", the wrong one for "this should help". This `PASS` is an A/B verdict,
+not the preflight `PASS` from step 2.
+
+When every assertion in a scenario is model-graded, `eval ab` also runs a
+**blind comparator** on each baseline/treatment pair and prints a preference
+count (treatment / baseline / tie / errors). It is a supplementary signal, never
+a verdict. The two outputs are shuffled into A and B, and condition labels and the
+skill name are redacted. The comparator writes a rubric of weighted criteria
+derived from the task and scores each output from 0 to 1 per criterion. The
+harness then does the arithmetic: each output's total is its weighted mean
+score, and one output wins only when its total beats the other's by more than
+0.1. Anything closer is a tie. A malformed rubric or score counts as an error,
+not a tie.
 
 ## Scenario format
 
@@ -141,6 +275,8 @@ A scenario is one markdown file in `evals/scenarios/`. Sections the parser reads
 | `## Max Turns` | Turn budget per trial |
 | `## Preflight` | `skip` to opt out of the discriminability gate |
 | `## Verdict Policy` | `non-regression` to judge pass/fail instead of delta |
+| `## Claim Type` | What a pass is evidence of: `discriminative-lift`, `non-regression`, `self-improvement-smoke`, or `infra`. Inferred from the name and target when absent. `eval list` shows it and `eval report` groups by it |
+| `## Plugin Dir` | The one plugin to load in the treatment of a `workflow` A/B, or under `eval run --no-isolate`. Every other installed plugin stays disabled. `${PROJECT_ROOT}` expands to the project root |
 | `## Version` | Result-pooling generation — see below |
 
 Only `## Context` and `## Scenario` reach the agent. Everything else is
@@ -194,6 +330,23 @@ assertions plus a model reading the transcript — passes at **0.8 or above**. A
 `code` grader, which runs your own script and reads its per-assertion labels, and
 a `model` grader both require **every** assertion to land.
 
+The model grader reads its method from a prompt that ships with arcforge, as do
+the analyzer behind `eval compare` and the blind comparator described under
+step 4. They load from the installed plugin, whichever project you run in. If one
+is missing or empty, the command stops with an error that names the file rather
+than grading without it.
+
+A "floor" assertion (a minimum the agent must always meet, such as "the tests
+still pass") is not a separate type, and it gets no extra weight:
+
+- **Behavioral and `mixed` scenarios:** a floor is one assertion among the
+  others, one equal share of the score. Missing it costs that share, and the
+  trial still passes if the score stays at or above 0.8.
+- **`code` graders:** the score is the share of `A<N>:` labels your script
+  prints as `PASS`. A floor checked outside those labels adds nothing to the
+  score. If it makes the script exit non-zero, though, the trial fails whatever
+  its labels say.
+
 An assertion that no run can satisfy is worse than no assertion — it scores zero
 in both arms and buries the signal you were looking for. When an assertion fails
 in every trial of both conditions, suspect the assertion before the agent.
@@ -202,8 +355,9 @@ in every trial of both conditions, suspect the assertion before the agent.
 
 `## Version` decides which stored results count.
 
-Results are recorded with the version they ran under, and every read filters to
-the scenario's current version. Bump it and the old rows stop counting — the pool
+Results are recorded with the version they ran under — infra-error rows
+included, so a benchmark's error count covers the same pool as its scores — and
+every read filters to the scenario's current version. Bump it and the old rows stop counting — the pool
 starts empty and refills from the next run.
 
 That is exactly what you want when you change the task, the fixture, or an
@@ -211,6 +365,37 @@ assertion, because results from before the edit answered a different question.
 It is exactly what you do not want for a cosmetic edit, which would throw away
 good data for nothing. Bump when the scenario's meaning changed; leave it alone
 when only its prose did.
+
+A pool is narrower than a version. Every row also records the conditions it ran
+under: `model`, `effort`, the per-trial ceiling (`trialTimeoutMs`), the turn
+budget (`maxTurns`), whether a plugin was loaded (`pluginDir`), and the isolation
+mode (`isolation`: `isolated`, `plugin-dir`, or `toolkit` for `--no-isolate`). Rows under
+different conditions answered different questions, so no reader combines them.
+`eval run`, `list`, `compare`, `report` and the dashboard judge the newest
+condition's pool. Each other pool is listed beside it with its row count and
+conditions, as a "Not combined" line in the terminal, `other_pools` in the
+benchmark, and `otherPools` in the dashboard. Rows written before these
+fields existed form a pool of their own, shown as "unrecorded".
+
+Only a pool with at least one scored trial can be the measurement. A pool where
+every trial is an infra or grade error, such as quota refusals after switching
+models, is an instrument failure. It is never judged or paired. The previous
+scored pool stays current, and the failed pool is listed separately as
+"Instrument failure, not a measurement" (`instrumentFailure: true` in the JSON).
+When the run you just finished produced no scored trial, `eval run` says the
+verdict it prints belongs to the earlier scored pool, not to this run. `eval
+list` prints the failed pool under the scenario's verdict, and shows
+`NO SCORED RUNS` when nothing was ever scored.
+
+An A/B comparison (`compare`, the benchmark's `compared` entry, the dashboard's
+A/B view) pairs its arms rather than taking each arm's newest pool on its own.
+It uses the newest pair of pools, one per arm, that ran under the same model,
+effort, ceiling, turn budget and isolation mode. The one allowed difference is
+the treatment itself: an isolated baseline against a treatment that loads a
+plugin dir or the full toolkit. When the newest runs of the two arms don't match, the
+older matching pair is judged and the rest are listed as "Not combined". When
+the arms share no conditions at all, the comparison is refused and every pool
+is listed; rerun `eval ab` so both arms run under the same conditions.
 
 ## Benchmarks
 
@@ -222,6 +407,14 @@ Aggregates everything on record into a snapshot: per-scenario trial counts, pass
 rates, average scores, 95% confidence intervals, and A/B comparisons where both
 arms exist. Snapshots are written under `evals/benchmarks/` as `latest.json` plus
 a date-stamped copy, so history is kept rather than overwritten.
+
+A per-trial export goes to `evals/benchmarks/raw/` the same way. Each raw row
+carries its run conditions (`model`, `effort`, `trialTimeoutMs`, `maxTurns`,
+`pluginDir`, `isolation`). Its baseline-relative fields (`baseline_score_avg`,
+`score_delta_vs_baseline_avg` and the rest) are computed against the baseline
+pool that ran under the same model, effort, ceiling and turn budget. That
+average leaves out the pool's infra and grade errors, which stay in the export
+as rows of their own. A row with no such baseline gets `null` there.
 
 ```bash
 arcforge eval report --since 2026-08-01
