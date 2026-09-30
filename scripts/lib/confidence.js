@@ -14,7 +14,7 @@ const path = require('node:path');
 
 const { getArcforgeHome } = require('./utils');
 const { writeAuditEntry } = require('./learning-audit-log');
-const { readActivationState } = require('./learning-curator/activate');
+const { readActivationState } = require('./learning-curator/activation-state');
 
 // ─────────────────────────────────────────────
 // Constants
