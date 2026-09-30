@@ -116,12 +116,23 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
 
   // Merge CLI overrides with scenario defaults (only when not fully isolated)
   const pluginDir = rawPluginDir || (!isolated ? scenario.pluginDir : undefined) || undefined;
-  // What the row says the trial ran with: the flag when one was passed; else
-  // Claude Code's default for a contained trial (it does not read the user
-  // settings file), or whatever that file sets for one that does.
+  const resolvedMaxTurns = resolveMaxTurns({
+    maxTurns: rawMaxTurns,
+    scenarioMaxTurns: scenario.maxTurns,
+    pluginDir,
+  });
+  // The run conditions every row records, which readers pool by (B-8). Model and
+  // effort are the flag when one was passed; else Claude Code's default for a
+  // contained trial (it does not read the user settings file), or whatever that
+  // file sets for one that does.
   function ranWith() {
     const unset = isolated || pluginDir ? 'default' : 'user-settings';
-    return { model: model || unset, effort: effort || unset };
+    return {
+      model: model || unset,
+      effort: effort || unset,
+      maxTurns: resolvedMaxTurns ?? null,
+      pluginDir: Boolean(pluginDir),
+    };
   }
 
   // Validate pluginDir exists before running trial
@@ -154,11 +165,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     contained: isolated || Boolean(pluginDir),
     pluginDir,
     skipPermissions: rawSkipPermissions ?? Boolean(pluginDir),
-    maxTurns: resolveMaxTurns({
-      maxTurns: rawMaxTurns,
-      scenarioMaxTurns: scenario.maxTurns,
-      pluginDir,
-    }),
+    maxTurns: resolvedMaxTurns,
     model,
     effort,
   });

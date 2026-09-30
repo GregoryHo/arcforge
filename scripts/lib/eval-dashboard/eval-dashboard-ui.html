@@ -828,7 +828,9 @@ async function showBenchmarkDetail(scenario) {
       grid.appendChild(h('div',{className:'compare-center'},
         h('div',{className:'delta-value '+dCls},(compareData.delta>0?'+':'')+compareData.delta.toFixed(2)),
         verdictBadge(compareData.verdict),
-        compareData.deltaCi?h('div',{className:'stat-label'},'CI: ['+compareData.deltaCi.lower+', '+compareData.deltaCi.upper+']'):null
+        compareData.deltaCi?h('div',{className:'stat-label'},'CI: ['+compareData.deltaCi.lower+', '+compareData.deltaCi.upper+']'):null,
+        ...(compareData.otherPools||[]).map((p)=>h('div',{className:'stat-label',style:'margin-top:4px'},
+          'Not combined ('+p.arm+'): '+p.rows+' row(s), model '+(p.conditions.model??'unrecorded')+', effort '+(p.conditions.effort??'unrecorded')+', ceiling '+(p.conditions.trialTimeoutMs??'unrecorded')+' ms, max turns '+(p.conditions.maxTurns??'none')+', plugin dir '+(p.conditions.pluginDir==null?'unrecorded':p.conditions.pluginDir?'yes':'no')))
       ));
       grid.appendChild(h('div',{className:'card'},
         h('div',{className:'card-title'},'Treatment'),

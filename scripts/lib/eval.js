@@ -39,6 +39,7 @@ const {
   buildTrialPrompt,
   stopIfTrialWroteRepo,
 } = require('./eval-trial');
+const { splitPools } = require('./eval-pools');
 
 /**
  * Eval scenario parsed from a markdown file
@@ -80,6 +81,8 @@ const {
  * @property {string} [repoCheck] - 'skipped' when the tree was too large for the repository-write check
  * @property {string} [model] - Model flag the trial ran with ('default' when none was passed)
  * @property {string} [effort] - Effort flag the trial ran with ('default' when none was passed)
+ * @property {number|null} [maxTurns] - Turn budget the trial ran under (null: none)
+ * @property {boolean} [pluginDir] - Whether a plugin dir was loaded into the trial
  * @property {number[]} [assertionScores] - Per-assertion scores (0.0-1.0)
  * @property {string[]} [evidence] - Per-assertion evidence notes from grader
  * @property {number[][]} [blockRefs] - Per-assertion transcript block references (1-indexed)
@@ -432,6 +435,20 @@ function loadResults(evalName, projectRoot, options = {}) {
 }
 
 /**
+ * Load results and split them into pools by run conditions (B-8): `current` is
+ * the newest condition's pool, the one a verdict is computed over; `others`
+ * lists the rest with their conditions and row counts. Readers never combine
+ * pools.
+ * @param {string} evalName - Eval name (may carry a -baseline/-treatment suffix)
+ * @param {string} projectRoot - Project root directory
+ * @param {Object} [options] - Same filters as loadResults
+ * @returns {{ current: TrialResult[], conditions: Object|null, others: Array<{ conditions: Object, rows: number }> }}
+ */
+function loadResultPools(evalName, projectRoot, options = {}) {
+  return splitPools(loadResults(evalName, projectRoot, options));
+}
+
+/**
  * Ensure evals directory structure exists
  * @param {string} projectRoot - Project root directory
  */
@@ -471,6 +488,7 @@ module.exports = {
   saveTranscript,
   appendResult,
   loadResults,
+  loadResultPools,
   ensureEvalsDir,
   // Re-export graders for backward compatibility
   ...graders,

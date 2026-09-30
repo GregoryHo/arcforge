@@ -17,6 +17,7 @@ const path = require('node:path');
 const { ensureDir, getTimestamp } = require('./utils');
 const stats = require('./eval-stats');
 const graders = require('./eval-graders');
+const { splitPools } = require('./eval-pools');
 const {
   BENCHMARKS_DIR,
   loadResults,
@@ -241,9 +242,17 @@ function writeRawBenchmarkData(projectRoot, rawData) {
  * @returns {Object|null}
  */
 function comparisonFromAbResults(scenario, projectRoot, filterOpts) {
-  const baseline = loadResults(`${scenario.name}-baseline`, projectRoot, filterOpts);
-  const treatment = loadResults(`${scenario.name}-treatment`, projectRoot, filterOpts);
+  // Each arm is judged on its newest condition's pool (B-8); older pools are
+  // listed, never combined.
+  const bPools = splitPools(loadResults(`${scenario.name}-baseline`, projectRoot, filterOpts));
+  const tPools = splitPools(loadResults(`${scenario.name}-treatment`, projectRoot, filterOpts));
+  const baseline = bPools.current;
+  const treatment = tPools.current;
   if (baseline.length === 0 || treatment.length === 0) return null;
+  const otherPools = [
+    ...bPools.others.map((p) => ({ arm: 'baseline', ...p })),
+    ...tPools.others.map((p) => ({ arm: 'treatment', ...p })),
+  ];
 
   const bStats = stats.statsFromResults(baseline);
   const tStats = stats.statsFromResults(treatment);
@@ -259,6 +268,7 @@ function comparisonFromAbResults(scenario, projectRoot, filterOpts) {
     delta_ci: deltaCi,
     verdict,
     ...(scenario.verdictPolicy ? { verdict_policy: scenario.verdictPolicy } : {}),
+    ...(otherPools.length > 0 ? { other_pools: otherPools } : {}),
     metrics: {
       duration_ms: {
         baseline_avg: roundMetric(metricDeltas.baselineMeans.duration_ms),
@@ -301,12 +311,17 @@ function generateBenchmark(projectRoot, options = {}) {
     // Fall back to plain name for single-condition runs (eval run, not eval ab).
     const isAb = scenario.scope === 'skill' || scenario.scope === 'workflow';
     const filterOpts = { version: scenario.version, ...resultFilter };
-    let results = isAb ? loadResults(`${scenario.name}-treatment`, projectRoot, filterOpts) : [];
-    if (results.length === 0) {
-      results = loadResults(scenario.name, projectRoot, filterOpts);
+    let allRows = isAb ? loadResults(`${scenario.name}-treatment`, projectRoot, filterOpts) : [];
+    if (allRows.length === 0) {
+      allRows = loadResults(scenario.name, projectRoot, filterOpts);
     }
 
-    if (results.length === 0) continue;
+    if (allRows.length === 0) continue;
+
+    // Every number below comes from the newest condition's pool (B-8); rows
+    // measured under other conditions are listed in other_pools, not combined.
+    const pools = splitPools(allRows);
+    const results = pools.current;
 
     // One pool for every number in the entry. `compare` routes everything
     // through scorableResults(); the benchmark used to filter only the stats
@@ -320,13 +335,15 @@ function generateBenchmark(projectRoot, options = {}) {
 
     // Group by model for per-model breakdown
     const modelGroups = {};
-    for (const r of results) {
+    for (const r of allRows) {
       if (!r.model) continue;
       if (!modelGroups[r.model]) modelGroups[r.model] = [];
       modelGroups[r.model].push(r);
     }
     const byModel = {};
-    for (const [m, modelResults] of Object.entries(modelGroups)) {
+    for (const [m, modelRows] of Object.entries(modelGroups)) {
+      // Per model, too, only that model's newest pool counts.
+      const modelResults = splitPools(modelRows).current;
       const ms = stats.statsFromResults(modelResults);
       byModel[m] = {
         trials: ms.count,
@@ -356,6 +373,7 @@ function generateBenchmark(projectRoot, options = {}) {
       ...(comparison ? { compared: comparison } : {}),
       ...(warning ? { warning } : {}),
       ...(Object.keys(byModel).length > 0 ? { by_model: byModel } : {}),
+      ...(pools.others.length > 0 ? { other_pools: pools.others } : {}),
     };
   }
 

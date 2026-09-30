@@ -318,6 +318,12 @@ describe('both arms of a comparison run the same claude argv but for the injecti
       ['default', 'default'],
       ['default', 'default'],
     ]);
+    // The turn budget and plugin dir are recorded too: they are part of a pool's
+    // conditions (B-8). Both arms share the budget; only the treatment loads.
+    expect(rows.map((r) => [r.maxTurns, r.pluginDir])).toEqual([
+      [10, false],
+      [10, true],
+    ]);
   });
 
   it('refuses a full-toolkit workflow A/B that does not pin both model and effort', () => {
@@ -331,7 +337,7 @@ describe('both arms of a comparison run the same claude argv but for the injecti
 });
 
 describe('the baseline of a plugin-dir comparison watches the plugin it does not load', () => {
-  const { runSkillEval, runWorkflowEval } = require('../../scripts/lib/eval');
+  const { runWorkflowEval } = require('../../scripts/lib/eval');
   let tempDir;
   let plugin;
 

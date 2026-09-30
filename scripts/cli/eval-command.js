@@ -38,6 +38,10 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
   const eval_ = require('../lib/eval');
   const benchmark_ = require('../lib/eval-benchmark');
   const { generateRunId } = require('../lib/utils');
+  const { otherPoolLines } = require('../lib/eval-pools');
+  // A verdict is judged on the newest condition's pool (B-8); the others are
+  // printed beside it, never combined.
+  const currentPool = (evalName, opts) => eval_.loadResultPools(evalName, projectRoot, opts);
   const subcommand = args.positional[0];
   const model = args.options.model;
   const effort = args.options.effort;
@@ -138,9 +142,9 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
         const s = eval_.parseScenario(file);
         const isAb = s.scope === 'skill' || s.scope === 'workflow';
         const resultsName = isAb ? `${s.name}-treatment` : s.name;
-        let results = eval_.loadResults(resultsName, projectRoot, { version: s.version });
+        let results = currentPool(resultsName, { version: s.version }).current;
         if (results.length === 0 && isAb) {
-          results = eval_.loadResults(s.name, projectRoot, { version: s.version });
+          results = currentPool(s.name, { version: s.version }).current;
         }
         const verdict = results.length > 0 ? eval_.getVerdict(results) : 'NO RUNS';
         const claimType = eval_.inferClaimType(s);
@@ -204,10 +208,10 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     // verdict nor shrinks the pool it is judged on (B-10).
     const results = eval_
       .scorableResults(
-        eval_.loadResults(scenario.name, projectRoot, {
+        currentPool(scenario.name, {
           version: scenario.version,
           since: args.options.since,
-        }),
+        }).current,
       )
       .slice(-k);
     const verdictOpts = scenario.grader === 'model' ? { useCi: true } : {};
@@ -483,8 +487,10 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
       since: args.options.since,
       ...(model ? { model } : {}),
     };
-    const baseline = eval_.loadResults(`${name}-baseline`, projectRoot, filterOpts);
-    const treatment = eval_.loadResults(`${name}-treatment`, projectRoot, filterOpts);
+    const bPools = currentPool(`${name}-baseline`, filterOpts);
+    const tPools = currentPool(`${name}-treatment`, filterOpts);
+    const baseline = bPools.current;
+    const treatment = tPools.current;
 
     if (baseline.length === 0 || treatment.length === 0) {
       console.error(
@@ -514,6 +520,12 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
       tStats: comparison.treatment,
     });
     if (comparison.baselineWarning) console.log(`  ${comparison.baselineWarning}`);
+    for (const line of [
+      ...otherPoolLines(bPools.others, 'baseline'),
+      ...otherPoolLines(tPools.others, 'treatment'),
+    ]) {
+      console.log(`  ${line}`);
+    }
     if (comparison.modelAnalysis) {
       console.log(`\n  Analysis: ${comparison.modelAnalysis.analysis || ''}`);
       if (comparison.modelAnalysis.delta_explanation) {
@@ -579,10 +591,10 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
           let verdict;
           if (data.grader === 'model' && displayData.trials >= 5) {
             const scenarioFile = eval_.findScenario(evalName, projectRoot);
-            const results = eval_.loadResults(evalName, projectRoot, {
+            const results = currentPool(evalName, {
               version: scenarioFile?.version,
               ...(model ? { model } : {}),
-            });
+            }).current;
             verdict =
               eval_.scorableResults(results).length >= 5
                 ? eval_.verdictFromCI(results)
@@ -593,6 +605,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
           console.log(
             `  ${evalName}: ${(displayData.pass_rate * 100).toFixed(0)}% (${displayData.trials} trials) — ${verdict}`,
           );
+          for (const line of otherPoolLines(data.other_pools || [])) console.log(`    ${line}`);
           if (!model && data.by_model) {
             const parts = Object.entries(data.by_model).map(
               ([m, ms]) => `${m}: ${(ms.pass_rate * 100).toFixed(0)}% (${ms.trials})`,

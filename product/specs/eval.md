@@ -99,7 +99,9 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   it ran under and every read filters to the current one — editing a
   scenario's *meaning* (task, fixture, assertions) bumps the version and
   empties the pool, because old rows answered a different question; cosmetic
-  prose edits do not.
+  prose edits do not. A pool is the scenario version plus the run conditions
+  (model, effort, ceiling, turn budget, plugin dir), and readers never combine
+  conditions (D-021).
 - **B-10 A trial the runner cut off is an instrument failure, not a
   measurement.** Every trial's `claude -p` session runs under a per-trial
   ceiling: 900 s, unless `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS` moves it for one run —

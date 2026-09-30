@@ -209,10 +209,12 @@ function handleApiScenarios(res, projectRoot) {
     const s = eval_.parseScenario(f);
     const isAb = s.scope === 'skill' || s.scope === 'workflow';
     const resultsName = isAb ? `${s.name}-treatment` : s.name;
-    let results = eval_.loadResults(resultsName, projectRoot, { version: s.version });
-    if (results.length === 0 && isAb) {
-      results = eval_.loadResults(s.name, projectRoot, { version: s.version });
+    // Newest condition pool only (B-8); the others are counted, never combined.
+    let pools = eval_.loadResultPools(resultsName, projectRoot, { version: s.version });
+    if (pools.current.length === 0 && isAb) {
+      pools = eval_.loadResultPools(s.name, projectRoot, { version: s.version });
     }
+    const results = pools.current;
     const st = results.length > 0 ? stats.statsFromResults(results) : null;
     const verdictOpts = s.grader === 'model' ? { useCi: true } : {};
     return {
@@ -226,6 +228,7 @@ function handleApiScenarios(res, projectRoot) {
       passRate: st ? st.passRate : 0,
       avgScore: st ? st.avg : 0,
       lastRun: results.length > 0 ? results[results.length - 1].timestamp : null,
+      otherPools: pools.others,
     };
   });
   sendJson(res, { scenarios });
@@ -298,10 +301,12 @@ function handleApiResults(res, projectRoot, evalName, query) {
   const baseName = evalName.replace(/-(baseline|treatment)$/, '');
   const scenario = eval_.findScenario(baseName, projectRoot);
   if (scenario?.version) opts.version = scenario.version;
-  const results = eval_.loadResults(evalName, projectRoot, opts);
+  const pools = eval_.loadResultPools(evalName, projectRoot, opts);
+  const results = pools.current;
   const st = results.length > 0 ? stats.statsFromResults(results) : null;
   sendJson(res, {
     eval: evalName,
+    otherPools: pools.others,
     results: results.map((r) => ({
       ...trialSummary(r),
       k: r.k,
@@ -319,8 +324,15 @@ function handleApiCompare(res, projectRoot, scenarioName, query) {
   const opts = filterOpts(query);
   const scenario = eval_.findScenario(scenarioName, projectRoot);
   if (scenario?.version) opts.version = scenario.version;
-  const baseline = eval_.loadResults(`${scenarioName}-baseline`, projectRoot, opts);
-  const treatment = eval_.loadResults(`${scenarioName}-treatment`, projectRoot, opts);
+  // Each arm on its newest condition pool (B-8); older pools listed, not combined.
+  const bPools = eval_.loadResultPools(`${scenarioName}-baseline`, projectRoot, opts);
+  const tPools = eval_.loadResultPools(`${scenarioName}-treatment`, projectRoot, opts);
+  const baseline = bPools.current;
+  const treatment = tPools.current;
+  const otherPools = [
+    ...bPools.others.map((p) => ({ arm: 'baseline', ...p })),
+    ...tPools.others.map((p) => ({ arm: 'treatment', ...p })),
+  ];
 
   if (baseline.length === 0 && treatment.length === 0) {
     return sendError(res, 404, 'No A/B results found');
@@ -344,6 +356,7 @@ function handleApiCompare(res, projectRoot, scenarioName, query) {
     verdict,
     ...(verdictPolicy ? { verdictPolicy } : {}),
     metricDeltas,
+    otherPools,
   });
 }
 

@@ -364,6 +364,16 @@ It is exactly what you do not want for a cosmetic edit, which would throw away
 good data for nothing. Bump when the scenario's meaning changed; leave it alone
 when only its prose did.
 
+A pool is narrower than a version. Every row also records the conditions it ran
+under: `model`, `effort`, the per-trial ceiling (`trialTimeoutMs`), the turn
+budget (`maxTurns`) and whether a plugin was loaded (`pluginDir`). Rows under
+different conditions answered different questions, so no reader combines them.
+`eval run`, `list`, `compare`, `report` and the dashboard judge the newest
+condition's pool. Each other pool is listed beside it with its row count and
+conditions, as a "Not combined" line in the terminal, `other_pools` in the
+benchmark, and `otherPools` in the dashboard. Rows written before these
+fields existed form a pool of their own, shown as "unrecorded".
+
 ## Benchmarks
 
 ```bash

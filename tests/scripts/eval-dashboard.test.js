@@ -262,6 +262,46 @@ describe('dashboard', () => {
       expect(data.treatment.stats.avg).toBe(1.0);
     });
 
+    it('should judge the newest condition pool per arm and list the others (B-8)', () => {
+      const row = (condition, trial, overrides) => ({
+        eval: `pool-eval-${condition}`,
+        trial,
+        k: 2,
+        grader: 'code',
+        model: 'default',
+        effort: 'default',
+        maxTurns: null,
+        pluginDir: false,
+        ...overrides,
+      });
+      const old = { trialTimeoutMs: 1800000, passed: false, score: 0 };
+      const fresh = { trialTimeoutMs: 900000, passed: true, score: 1 };
+      writeResult(tempDir, 'pool-eval', '20260929-100000', 'treatment', [
+        row('treatment', 1, { ...old, timestamp: '2026-09-29T10:00:00Z' }),
+        row('treatment', 2, { ...old, timestamp: '2026-09-29T10:00:01Z' }),
+        row('treatment', 3, { ...old, timestamp: '2026-09-29T10:00:02Z' }),
+      ]);
+      writeResult(tempDir, 'pool-eval', '20260930-100000', 'treatment', [
+        row('treatment', 1, { ...fresh, timestamp: '2026-09-30T10:00:00Z' }),
+        row('treatment', 2, { ...fresh, timestamp: '2026-09-30T10:00:01Z' }),
+      ]);
+      writeResult(tempDir, 'pool-eval', '20260930-100000', 'baseline', [
+        row('baseline', 1, { ...fresh, timestamp: '2026-09-30T10:00:00Z' }),
+      ]);
+
+      const data = callRouter(createRouter(tempDir, ''), '/api/compare/pool-eval').json();
+
+      expect(data.treatment.stats.count).toBe(2);
+      expect(data.treatment.stats.passRate).toBe(1);
+      expect(data.otherPools).toEqual([
+        {
+          arm: 'treatment',
+          conditions: expect.objectContaining({ trialTimeoutMs: 1800000 }),
+          rows: 3,
+        },
+      ]);
+    });
+
     it('should judge a non-regression scenario by its policy, as eval compare does', () => {
       writeScenario(
         tempDir,

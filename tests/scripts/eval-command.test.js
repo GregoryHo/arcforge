@@ -110,6 +110,56 @@ describe('eval command', () => {
     });
   });
 
+  describe('eval compare pools by run conditions (B-8)', () => {
+    it('judges the newest pool and lists the older one, never combined', async () => {
+      writeScenario(tempDir, 'pooled');
+      const row = (condition, trial, overrides) => ({
+        eval: `pooled-${condition}`,
+        trial,
+        k: 5,
+        grader: 'code',
+        model: 'default',
+        effort: 'default',
+        maxTurns: null,
+        pluginDir: false,
+        ...overrides,
+      });
+      // Older run at an 1800 s ceiling: both arms fail. Newer run at 900 s:
+      // the treatment passes every trial.
+      for (let t = 1; t <= 6; t++) {
+        const old = {
+          trialTimeoutMs: 1800000,
+          passed: false,
+          score: 0,
+          timestamp: '2026-09-29T10:00:00.000Z',
+          runId: '20260929-100000',
+        };
+        evalLib.appendResult(row('baseline', t, old), tempDir);
+        evalLib.appendResult(row('treatment', t, old), tempDir);
+      }
+      for (let t = 1; t <= 5; t++) {
+        const fresh = {
+          trialTimeoutMs: 900000,
+          timestamp: '2026-09-30T10:00:00.000Z',
+          runId: '20260930-100000',
+        };
+        evalLib.appendResult(row('baseline', t, { ...fresh, passed: false, score: 0 }), tempDir);
+        evalLib.appendResult(row('treatment', t, { ...fresh, passed: true, score: 1 }), tempDir);
+      }
+
+      await runEvalCommand(args(['compare', 'pooled']), { projectRoot: tempDir, asJson: false });
+
+      const out = logs.join('\n');
+      expect(out).toMatch(/Baseline: {2}5 trials/);
+      expect(out).toMatch(/Treatment: 5 trials/);
+      expect(out).toContain('Verdict:   IMPROVED');
+      expect(out).toContain(
+        'Not combined (baseline): 6 row(s) under model default, effort default, ceiling 1800000 ms',
+      );
+      expect(out).toContain('Not combined (treatment): 6 row(s)');
+    });
+  });
+
   describe('eval run stops on a repository write', () => {
     it('aborts after the trial that wrote, keeping its row', async () => {
       writeScenario(tempDir, 'run-stop');

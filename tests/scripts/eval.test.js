@@ -1919,7 +1919,11 @@ Do something.
       const benchmark = generateBenchmark(tempDir);
       const data = benchmark.evals['model-eval'];
       expect(data).toBeDefined();
-      expect(data.trials).toBe(2);
+      // Two models are two conditions (B-8): the headline numbers come from one
+      // pool and the other is listed, never combined; by_model shows each.
+      expect(data.trials).toBe(1);
+      expect(data.other_pools).toHaveLength(1);
+      expect(data.other_pools[0].rows).toBe(1);
       expect(data.by_model).toBeDefined();
       expect(data.by_model.sonnet.trials).toBe(1);
       expect(data.by_model.sonnet.pass_rate).toBe(1.0);
