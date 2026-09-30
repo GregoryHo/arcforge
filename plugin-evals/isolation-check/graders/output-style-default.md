@@ -1,4 +1,5 @@
 ---
+# Gate: the agent reports the default output style.
 type: regex
 target: last_message
 match: contains

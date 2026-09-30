@@ -1,0 +1,3 @@
+# Merged with prompt.md, which supplies everything else. Declared explicitly,
+# as in speccing-trigger; the runner would otherwise default it.
+schema_version: "1.1"

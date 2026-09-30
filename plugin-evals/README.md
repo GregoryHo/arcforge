@@ -71,13 +71,32 @@ add `--trust-plugin`.
 
 ## Reading the results
 
-**isolation-check** passes only if every grader passes:
-`output-style-default`, `no-user-claude-md` (the phrase that opens the
-operator's user `CLAUDE.md` is absent from the answer), `no-user-claude-md-in-trace`
-(the same phrase is absent from the whole trace), `home-sandboxed` and
-`config-dir-sandboxed` (both point somewhere other than `/Users/…`), and
-`arcforge-loaded`. Also read the `PLUGINS:` and `USER_HOOKS:` lines by hand: any
-plugin other than arcforge, or any hook, is a leak no regex can enumerate.
+**isolation-check** passes only if every grader passes, in both runs. The gate
+is what the agent reports:
+
+- `output-style-default` — `OUTPUT_STYLE: default`
+- `user-claude-md-none` — `USER_CLAUDE_MD: none`
+- `user-hooks-none` — `USER_HOOKS: none`
+- `arcforge-loaded` — `PLUGINS:` names arcforge
+- `home-sandboxed` and `config-dir-sandboxed` — `HOME:` and `CLAUDE_CONFIG_DIR:`
+  are absolute paths not under `/Users/`. **These two assume a macOS operator
+  home under `/Users/`**; on any other platform, adapt their patterns to the
+  operator's real home before running. A static grader cannot read the caller's
+  environment, so they only rule out the common leak.
+
+Two extras back the gate up without replacing it: `no-user-claude-md` and
+`no-user-claude-md-in-trace` assert that the sentence opening this repo
+author's user `CLAUDE.md` ("Behavioral guidelines to reduce common LLM coding
+mistakes") is absent from the answer and from the whole trace. They are
+author-specific and catch a leak the agent misreports.
+
+Then read by hand, before trusting the routing run:
+
+- Compare the printed `HOME:` and `CLAUDE_CONFIG_DIR:` against your real ones
+  (`printenv HOME`, `printenv CLAUDE_CONFIG_DIR` in your own shell). They must
+  differ; the regexes cannot check that.
+- Read the `PLUGINS:` and `USER_HOOKS:` lines: any plugin other than arcforge,
+  or any hook, is a leak no regex can enumerate.
 
 **speccing-trigger** has one grader, `skill-fired`: a `Skill` call whose input
 names `speccing`, with or without the `arcforge:` namespace. The case score
