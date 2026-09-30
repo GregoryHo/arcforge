@@ -37,7 +37,7 @@ Decide whether the note benefits from visual elements. Vault SCHEMA.md may decla
 
 ## Index
 
-Add the new note to `index.md`. Find the section matching the note's type (per SCHEMA.md), add `- [[Note Title]] — one-line summary`, update `Last updated:`. No user confirmation (catalog registration, not a content decision). If `index.md` doesn't exist, suggest: *"No index yet — run audit lint to generate one."* Audit LINT does the full rebuild; this step is the incremental add.
+Add the new note to `index.md`. Find the section matching the note's type (per SCHEMA.md), add `- [[Note Title]] — one-line summary`, update `Last updated:`. No user confirmation (catalog registration, not a content decision). If `index.md` doesn't exist, suggest: *"No index yet — run audit link to generate one."* Audit LINK does the full rebuild (`audit.md`, *Index rebuild*); this step is the incremental add.
 
 ## Propagate
 
@@ -67,5 +67,5 @@ Append to `<vault>/log.md`:
 ## Special Modes
 
 - **Query-as-Ingest** ("file this back" / "save this insight" / "crystallize this") — skip Classify; context determines type per vault contract (typically Synthesis or Decision in LLM-Wiki vaults). Go straight to Create.
-- **Batch (`--batch`)** — fast-path classification, **skip Index and Propagate during batch**; audit LINT rebuilds afterward. Parallel batch agents can't resolve cross-references between concurrently created notes — a post-batch `audit link` pass is mandatory.
+- **Batch (`--batch`)** — fast-path classification, **skip Index and Propagate during batch**. A post-batch `audit link` pass is mandatory: it rebuilds `index.md`, and parallel batch agents can't resolve cross-references between concurrently created notes.
 - **LINK-on-Create (`--link`)** — after Create, trigger audit LINK on the new note only.

@@ -7,6 +7,7 @@ link graph and Raw Source provenance are covered by test_vault_links.py.
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -99,6 +100,92 @@ def test_fenced_examples_under_the_taxonomy_declare_nothing(vault):
     report = _run(vault, "--tag-min", "1")
     assert report["schema"]["declared_tags"] == ["arcforge", "entity"]
     assert report["tags"]["ghost"] == {"count": 1, "declared": False, "exceeds": True}
+
+
+def test_fences_in_list_items_and_comments_declare_nothing(vault):
+    # #186: a fence under a list item is a fence at its item's offset, however
+    # far it sits from the margin, and a comment is not rendered: neither the
+    # example tag inside the one nor the retired tag and type inside the other
+    # are declarations.
+    schema = vault / "SCHEMA.md"
+    schema.write_text(
+        schema.read_text(encoding="utf-8").replace(
+            "LINT checks:\n",
+            "- `arcforge` again, with an example:\n\n    ```\n    - `ghost` — not a real tag\n    ```\n\n"
+            "<!--\n- `retired` — no longer used\n```yaml\ntype: phantom\n```\n-->\n\nLINT checks:\n",
+        ),
+        encoding="utf-8",
+    )
+    report = _run(vault)
+    assert report["schema"]["declared_tags"] == ["arcforge", "entity"]
+    assert report["schema"]["declared_types"] == ["entity", "source"]
+
+
+def test_a_yaml_fence_under_a_list_item_declares_no_type(vault):
+    # A fence nested in a list item is an illustration, like one in a callout:
+    # its `type:` declares nothing, even though the body parses once the item's
+    # indentation is removed.
+    schema = vault / "SCHEMA.md"
+    schema.write_text(
+        schema.read_text(encoding="utf-8").replace(
+            "## Tag Taxonomy\n",
+            "## Phantom\n\n- For example:\n\n  ```yaml\n  ---\n  type: phantom\n  mood: \"\"\n  ---\n  ```\n\n"
+            "## Tag Taxonomy\n",
+        ),
+        encoding="utf-8",
+    )
+    assert _run(vault)["schema"]["declared_types"] == ["entity", "source"]
+
+
+def test_quoted_list_items_honour_yaml_escapes(vault):
+    # #187: `''` inside single quotes; `\"`, `\\` and `\n` inside double quotes.
+    (vault / "Wiki" / "gamma-orphan.md").write_text(
+        GAMMA.replace(
+            "tags: [entity, entity/tool, tdd]",
+            "tags: ['it''s', \"say \\\"hi\\\"\", \"back\\\\slash\", \"two\\nlines\"]",
+        ),
+        encoding="utf-8",
+    )
+    tags = _run(vault)["tags"]
+    assert {"it's", 'say "hi"', "back\\slash", "two\nlines"} <= set(tags)
+    assert not {"it", "s", "say \\", "back\\\\slash", "two\\nlines"} & set(tags)
+
+
+def test_an_out_of_range_escape_stays_literal_and_the_vault_still_lints(vault):
+    # `\U00110000` is past the last code point and `\ud800` is a lone surrogate:
+    # neither is a character, so each is kept as written instead of aborting the run.
+    (vault / "Wiki" / "gamma-orphan.md").write_text(
+        GAMMA.replace(
+            "extra_field: yes\n",
+            'extra_field: yes\ntitle: "\\U00110000"\n',
+        ).replace("tags: [entity, entity/tool, tdd]", 'tags: ["\\U00110000", "\\ud800", tdd]'),
+        encoding="utf-8",
+    )
+    report = _run(vault)
+    assert report["notes"]["total"] == 3
+    assert {"\\U00110000", "\\ud800", "tdd"} <= set(report["tags"])
+    assert "Wiki/gamma-orphan.md" in report["links"]["orphans"]
+
+
+def test_every_flag_the_skill_passes_to_lint_exists():
+    # A flag the skill tells the agent to pass must be one the script parses;
+    # `--all` is the audit's own scope word, which the skill maps to `--scope all`.
+    help_text = subprocess.run(
+        [sys.executable, str(SCRIPT), "--help"], capture_output=True, text=True, check=True
+    ).stdout
+    known = set(re.findall(r"--[a-z][\w-]*", help_text)) | {"--all"}
+    skill = SCRIPT.parents[1]
+    invocations = [
+        (path.relative_to(skill), tail)
+        for path in sorted(skill.rglob("*.md"))
+        for tail in re.findall(r"(?:audit lint|lint_vault\.py)([^`#\n]*)", path.read_text(encoding="utf-8"))
+    ]
+    assert invocations, "no LINT invocation found in the skill's prose"
+    unknown = [
+        f"{path}: {flag}" for path, tail in invocations for flag in re.findall(r"--[a-z][\w-]*", tail)
+        if flag not in known
+    ]
+    assert unknown == []
 
 
 def test_log_path_tokens_are_not_satisfied_by_a_basename_elsewhere(vault):

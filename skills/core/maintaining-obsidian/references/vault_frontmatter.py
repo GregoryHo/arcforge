@@ -1,8 +1,9 @@
 """Frontmatter, fence, and code-span parsing for lint_vault.py.
 
 Reads a note as UTF-8 with line endings normalized, splits its frontmatter from
-its body, and parses the frontmatter as a block: inline values, inline lists,
-block lists (indented or at column 0), and one-level nested mappings. Also
+its body, and parses the frontmatter as a block: inline values (quoted ones with
+their YAML escapes), inline lists, block lists (indented or at column 0), and
+one-level nested mappings. Also
 extracts the top-level ```yaml fences of a SCHEMA.md, and masks fenced code
 blocks, inline code, and Obsidian / HTML comments so a literal `[[link]]` shown
 as an example or hidden in a comment is not a link. Stdlib only; imported by
@@ -15,6 +16,17 @@ import re
 from pathlib import Path
 
 KEY_RE = re.compile(r"^([A-Za-z0-9_-]+):(.*)$")
+# Quoted YAML scalars: `''` is the only escape inside single quotes; inside
+# double quotes a backslash escapes the next character.
+SINGLE_QUOTED_RE = re.compile(r"'((?:[^']|'')*)'?")
+DOUBLE_QUOTED_RE = re.compile(r'"((?:[^"\\]|\\.)*)"?', re.DOTALL)
+FLOW_ITEM_RE = re.compile(r"\"(?:[^\"\\]|\\.)*\"|'(?:[^']|'')*'|[^,]+")
+DOUBLE_ESCAPE_RE = re.compile(r"\\(x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}|.)", re.DOTALL)
+DOUBLE_ESCAPES = {
+    "0": "\0", "a": "\a", "b": "\b", "t": "\t", "\t": "\t", "n": "\n", "v": "\v",
+    "f": "\f", "r": "\r", "e": "\x1b", " ": " ", '"': '"', "/": "/", "\\": "\\",
+    "N": "\x85", "_": "\xa0", "L": " ", "P": " ",
+}
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*\S)")
 # A fence delimiter may be indented by at most three spaces (CommonMark); four
 # is an indented code block whose backticks are literal text. A fence inside a
@@ -28,6 +40,11 @@ INLINE_CODE_RE = re.compile(r"(?<!`)(`+)(?!`)((?:(?!\n\n)[\s\S])+?)(?<!`)\1(?!`)
 # Obsidian comments (`%% hidden %%`) and HTML comments are not rendered, so a
 # [[link]] inside one is not a link.
 COMMENT_RE = re.compile(r"%%.*?%%|<!--.*?-->", re.DOTALL)
+COMMENT_OR_SPAN_RE = re.compile(r"<!--|%%|`+")
+COMMENT_CLOSERS = {"<!--": "-->", "%%": "%%"}
+# A list item: up to three spaces, a bullet or an ordinal, then spaces or the
+# line's end. Its content column is the marker's end plus 1–4 spaces (CommonMark).
+LIST_ITEM_RE = re.compile(r"( *)([-+*]|\d{1,9}[.)])( +|$)")
 
 
 def read_text(path: Path) -> str:
@@ -47,17 +64,39 @@ def split_frontmatter(text: str) -> tuple[str | None, str]:
     return text[4:end], text[end + 5 :]
 
 
+def _unescape_double(match: re.Match) -> str:
+    code = match.group(1)
+    if code[0] in "xuU":
+        point = int(code[1:], 16)
+        # Past U+10FFFF, or a lone surrogate, is not a character: keep the escape as written.
+        if point > 0x10FFFF or 0xD800 <= point <= 0xDFFF:
+            return match.group(0)
+        return chr(point)
+    return DOUBLE_ESCAPES.get(code, match.group(0))
+
+
+def _quoted(value: str) -> str:
+    """The text of a quoted YAML scalar, escapes honoured: `''` inside single
+    quotes is one quote; inside double quotes a backslash escapes (`\\"`, `\\\\`,
+    `\\n`, `\\t`, `\\xNN`, `\\uNNNN`, ...). An unclosed quote runs to the end."""
+    match = (SINGLE_QUOTED_RE if value[0] == "'" else DOUBLE_QUOTED_RE).match(value)
+    body = match.group(1)
+    if value[0] == "'":
+        return body.replace("''", "'")
+    return DOUBLE_ESCAPE_RE.sub(_unescape_double, body)
+
+
 def _scalar(raw: str):
     """Parse one inline YAML value: quoted string, inline list, empty, or bare."""
     value = raw.strip()
     if value[:1] in ("'", '"'):
-        close = value.find(value[0], 1)
-        return value[1:close] if close != -1 else value[1:]
+        return _quoted(value)
     value = re.split(r"\s+#", value, maxsplit=1)[0].strip()
     if value.startswith("[") and value.endswith("]"):
-        # Flow list: a quoted item keeps its commas (`["[[Smith, John]]", b]`).
+        # Flow list: a quoted item keeps its commas (`["[[Smith, John]]", b]`)
+        # and its escaped quotes (`['O''Brien', "a \"b\""]`).
         inner = value[1:-1].strip()
-        items = re.findall(r"\"[^\"]*\"|'[^']*'|[^,]+", inner)
+        items = FLOW_ITEM_RE.findall(inner)
         return [_scalar(item) for item in items if item.strip()] if inner else []
     if value in ("", "null", "~"):
         return ""
@@ -137,54 +176,153 @@ def is_raw_source(fm: dict | None) -> bool:
     return fm is not None and "sha256" in fm and note_type(fm) is None
 
 
+def _run_closer(run: str) -> re.Pattern:
+    """A backtick run of exactly this length — the only thing that closes a span it opened."""
+    return re.compile(rf"(?<!`){run}(?!`)")
+
+
+def _span_closes(lines: list[str], i: int, run: str, pos: int) -> bool:
+    """Whether a code span opened by `run` at `lines[i][pos:]` closes before the
+    paragraph ends (a blank line). An unclosed run is literal backticks."""
+    closer = _run_closer(run)
+    if closer.search(lines[i], pos):
+        return True
+    for line in lines[i + 1 :]:
+        if not line.strip():
+            return False
+        if closer.search(line):
+            return True
+    return False
+
+
+def _comment_after(lines: list[str], i: int, closer: str | None, span: str | None):
+    """(comment closer, code-span run) still awaited at the end of `lines[i]`.
+    `closer` (`-->` or `%%`) and `span` are what was awaited at its start. An
+    opener inside a code span is code, even when the span crosses a line
+    break, so it opens no comment."""
+    line, pos = lines[i], 0
+    while True:
+        if span is not None:
+            end = _run_closer(span).search(line, pos)
+            if not end:
+                return None, span
+            pos, span = end.end(), None
+        elif closer is not None:
+            end = line.find(closer, pos)
+            if end == -1:
+                return closer, None
+            pos, closer = end + len(closer), None
+        token = COMMENT_OR_SPAN_RE.search(line, pos)
+        if not token:
+            return None, None
+        pos = token.end()
+        if token.group(0).startswith("`"):
+            if _span_closes(lines, i, token.group(0), pos):
+                span = token.group(0)
+        else:
+            closer = COMMENT_CLOSERS[token.group(0)]
+
+
+def _list_content(line: str, offsets: list[int]) -> tuple[int, str]:
+    """Track the open list items for one line outside a fence, and return
+    (column where the line's content starts, the content). `offsets` is the
+    stack of content columns of the open items, innermost last; a line indented
+    less than an item's column ends that item, and a marker opens a new one at
+    its content column (CommonMark §5.2)."""
+    indent = len(line) - len(line.lstrip(" "))
+    while offsets and indent < offsets[-1]:
+        offsets.pop()
+    base = offsets[-1] if offsets else 0
+    while True:
+        item = LIST_ITEM_RE.match(line, base)
+        if not item or item.start(2) - base > 3:
+            return base, line[base:]
+        gap = len(item.group(3))
+        base = item.end(2) + (gap if 1 <= gap <= 4 and item.end() < len(line) else 1)
+        offsets.append(base)
+
+
 def _walk_fences(text: str):
-    """Yield (state, info, line, quoted) per line: `text` outside any fence; `open`,
-    `body`, `close` inside one; `quoted` when the fence sits in a blockquote or
-    callout. A fence closes only at a delimiter of its own character and
-    at least its own length (CommonMark), so a ```yaml inside a ```` illustration
-    fence is body, the illustration's closer does not open a new fence, and a
-    ``` fence closed by ```` ends where the longer delimiter is. A delimiter
-    indented four spaces or more is literal text, not a fence. A fence inside a
-    blockquote or callout (`> ```yaml`) is recognised, its body yielded with the
-    `> ` prefix removed.
+    """Yield (state, info, line, nested) per line: `text` outside any fence;
+    `open`, `body`, `close` inside one; `comment` inside a comment block that
+    spans lines; `nested` when the fence sits in a blockquote, callout, or list
+    item. A fence closes only at a delimiter of its own character and at least
+    its own length (CommonMark), so a ```yaml inside a ```` illustration fence
+    is body, the illustration's closer does not open a new fence, and a ```
+    fence closed by ```` ends where the longer delimiter is. A delimiter
+    indented four spaces or more past its container's content column is literal
+    text, not a fence. A fence inside a blockquote or callout (`> ```yaml`) is
+    recognised, its body yielded with the `> ` prefix removed; one inside a list
+    item is measured from the item's content column, closes early when the item
+    does, and its body is yielded with that indentation removed. The lines
+    between a comment's opener and its closer (`<!--` … `-->`, `%%` … `%%`)
+    are `comment`: a delimiter there opens no fence. The opener's and the
+    closer's lines stay `text`, so joining the text lines still leaves the whole
+    comment for COMMENT_RE to remove.
     """
     marker: str | None = None
     info = ""
     prefix = ""
-    for line in text.split("\n"):
-        if marker is None:
-            quoted = QUOTE_PREFIX_RE.match(line)
-            prefix = quoted.group(0) if quoted else ""
-            match = FENCE_OPEN_RE.match(line[len(prefix):].rstrip())
-            if match:
-                marker, info = match.group(1), match.group(2).lower()
-                yield "open", info, line, bool(prefix)
+    base = 0
+    comment: str | None = None
+    span: str | None = None
+    offsets: list[int] = []
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        if marker is not None:
+            # Inside a quoted fence each line carries its own `>` run; strip that
+            # line's prefix, not the opener's (`> ```yaml` may close as `>```` `).
+            if prefix:
+                quoted = QUOTE_PREFIX_RE.match(line)
+                inner = line[quoted.end():] if quoted else line
+            elif line.strip() and len(line) - len(line.lstrip(" ")) < base:
+                marker = None  # the list item ended, and its fence with it
             else:
-                yield "text", "", line, False
+                inner = line[base:]
+            if marker is not None:
+                if re.fullmatch(rf" {{0,3}}{re.escape(marker[0])}{{{len(marker)},}}\s*", inner):
+                    yield "close", info, line, bool(prefix or base)
+                    marker = None
+                else:
+                    yield "body", info, inner, bool(prefix or base)
+                continue
+        if comment is not None:
+            comment, span = _comment_after(lines, i, comment, None)
+            yield ("comment" if comment else "text"), "", line, False
             continue
-        # Inside a quoted fence each line carries its own `>` run; strip that
-        # line's prefix, not the opener's (`> ```yaml` may close as `>```` `).
+        if span is not None:
+            # Inside a code span that crosses lines: this line is span text.
+            comment, span = _comment_after(lines, i, None, span)
+            yield "text", "", line, False
+            continue
+        quoted = QUOTE_PREFIX_RE.match(line)
+        prefix = quoted.group(0) if quoted else ""
         if prefix:
-            quoted = QUOTE_PREFIX_RE.match(line)
-            inner = line[quoted.end():] if quoted else line
+            offsets.clear()
+            base, content = 0, line[len(prefix):]
+        elif line.strip():
+            base, content = _list_content(line, offsets)
         else:
-            inner = line
-        if re.fullmatch(rf" {{0,3}}{re.escape(marker[0])}{{{len(marker)},}}\s*", inner):
-            yield "close", info, line, bool(prefix)
-            marker = None
-        else:
-            yield "body", info, inner, bool(prefix)
+            base, content = (offsets[-1] if offsets else 0), line
+        match = FENCE_OPEN_RE.match(content.rstrip())
+        if match:
+            marker, info = match.group(1), match.group(2).lower()
+            yield "open", info, line, bool(prefix or base)
+            continue
+        comment, span = _comment_after(lines, i, None, None)
+        yield "text", "", line, False
 
 
 def yaml_fences(text: str) -> list[tuple[str, str]]:
     """(headings, body) per top-level ```yaml fence. `headings` is the enclosing
     heading path joined with " / " (`Source / Frontmatter`), "" before any. A
-    fence inside a blockquote or callout is an illustration and is not returned
-    (see _walk_fences for nesting)."""
+    fence inside a blockquote, callout, or list item is an illustration and is
+    not returned, and one inside a comment is not a fence (see _walk_fences for
+    nesting)."""
     fences: list[tuple[str, str]] = []
     stack: list[str] = []
     buf: list[str] = []
-    for state, info, line, quoted in _walk_fences(text):
+    for state, info, line, nested in _walk_fences(text):
         if state == "text":
             match = HEADING_RE.match(line)
             if match:
@@ -196,13 +334,13 @@ def yaml_fences(text: str) -> list[tuple[str, str]]:
             buf = []
         elif state == "body":
             buf.append(line)
-        elif state == "close" and info in ("yaml", "yml") and not quoted:
+        elif state == "close" and info in ("yaml", "yml") and not nested:
             fences.append((" / ".join(h for h in stack if h), "\n".join(buf)))
     return fences
 
 
 def text_lines(text: str) -> list[str]:
-    """The lines outside every fence, inline code left in place."""
+    """The lines outside every fence and comment block, inline code left in place."""
     return [line for state, _, line, _ in _walk_fences(text) if state == "text"]
 
 

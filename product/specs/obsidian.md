@@ -77,7 +77,11 @@ work carries provenance a reader can check.
   Python toolchain — no arcforge engine coupling). Validation renders a PNG
   and *reads it* each iteration, because composition defects are invisible in
   JSON; every save to the vault is checked by a verifier, and a diagram
-  without a verified save is a claim, not a deliverable.
+  without a verified save is a claim, not a deliverable. On the `ea.create()`
+  save path the drawing is a compressed-json block, and the verifier checks
+  its format markers only; parsing the JSON, re-rendering the canvas and
+  comparing its size happen only on the manual-fallback path, which saves
+  uncompressed JSON.
 - **B-9 The pair composes by invocation.** Diagram work inside a vault
   operation is handed to `/diagramming-obsidian` — after user approval, and
   only by prose invocation, per [skill-system](skill-system.md) B-5.

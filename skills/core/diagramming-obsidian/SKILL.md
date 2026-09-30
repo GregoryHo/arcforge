@@ -165,7 +165,10 @@ deviation corrupts silently. Then verify, always:
 uv run python verify_saved_diagram.py <vault-path>/<name>.excalidraw.md
 ```
 
-Non-zero exit means format corruption or a render mismatch. On failure,
+Non-zero exit means format corruption or a render mismatch. An `ea.create()`
+save is a compressed-json block, which the verifier does not decode. On that
+path it checks the format markers only, so exit zero does not show the canvas
+renders. On failure,
 regenerate from the canonical template in `references/save-format.md` — not from
 the file you just wrote, which is the corrupt one. Embed with
 `![[diagram-name]]`, outside any bilingual callout: diagrams are language-neutral.
