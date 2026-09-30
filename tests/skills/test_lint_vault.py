@@ -135,6 +135,22 @@ def test_quoted_list_items_honour_yaml_escapes(vault):
     assert not {"it", "s", "say \\", "back\\\\slash", "two\\nlines"} & set(tags)
 
 
+def test_an_out_of_range_escape_stays_literal_and_the_vault_still_lints(vault):
+    # `\U00110000` is past the last code point and `\ud800` is a lone surrogate:
+    # neither is a character, so each is kept as written instead of aborting the run.
+    (vault / "Wiki" / "gamma-orphan.md").write_text(
+        GAMMA.replace(
+            "extra_field: yes\n",
+            'extra_field: yes\ntitle: "\\U00110000"\n',
+        ).replace("tags: [entity, entity/tool, tdd]", 'tags: ["\\U00110000", "\\ud800", tdd]'),
+        encoding="utf-8",
+    )
+    report = _run(vault)
+    assert report["notes"]["total"] == 3
+    assert {"\\U00110000", "\\ud800", "tdd"} <= set(report["tags"])
+    assert "Wiki/gamma-orphan.md" in report["links"]["orphans"]
+
+
 def test_every_flag_the_skill_passes_to_lint_exists():
     # A flag the skill tells the agent to pass must be one the script parses;
     # `--all` is the audit's own scope word, which the skill maps to `--scope all`.

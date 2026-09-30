@@ -67,7 +67,11 @@ def split_frontmatter(text: str) -> tuple[str | None, str]:
 def _unescape_double(match: re.Match) -> str:
     code = match.group(1)
     if code[0] in "xuU":
-        return chr(int(code[1:], 16))
+        point = int(code[1:], 16)
+        # Past U+10FFFF, or a lone surrogate, is not a character: keep the escape as written.
+        if point > 0x10FFFF or 0xD800 <= point <= 0xDFFF:
+            return match.group(0)
+        return chr(point)
     return DOUBLE_ESCAPES.get(code, match.group(0))
 
 
