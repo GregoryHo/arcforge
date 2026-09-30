@@ -120,23 +120,16 @@ function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts
     pluginDir,
     maxTurns,
   });
-  if (result.infraError) {
-    try {
-      appendResult(result, projectRoot);
-      if (onTrialComplete) onTrialComplete(label, trialNumber, result);
-      return result;
-    } finally {
-      cleanupTrialDir(result.trialDir);
-    }
-  }
+  // Every row carries the scenario version — infraError rows too, or a
+  // version-scoped read drops them and error_trials undercounts (B-8).
+  const stamp = (row) => (gradeScenario.version ? { ...row, version: gradeScenario.version } : row);
   try {
-    const graded = graders.gradeTrialResult(result, gradeScenario, projectRoot, result.actions);
-    const versioned = gradeScenario.version
-      ? { ...graded, version: gradeScenario.version }
-      : graded;
-    appendResult(versioned, projectRoot);
-    if (onTrialComplete) onTrialComplete(label, trialNumber, versioned);
-    return versioned;
+    const recorded = result.infraError
+      ? stamp(result)
+      : stamp(graders.gradeTrialResult(result, gradeScenario, projectRoot, result.actions));
+    appendResult(recorded, projectRoot);
+    if (onTrialComplete) onTrialComplete(label, trialNumber, recorded);
+    return recorded;
   } finally {
     cleanupTrialDir(result.trialDir);
   }

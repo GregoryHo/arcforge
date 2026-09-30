@@ -212,8 +212,9 @@ in every trial of both conditions, suspect the assertion before the agent.
 
 `## Version` decides which stored results count.
 
-Results are recorded with the version they ran under, and every read filters to
-the scenario's current version. Bump it and the old rows stop counting — the pool
+Results are recorded with the version they ran under — infra-error rows
+included, so a benchmark's error count covers the same pool as its scores — and
+every read filters to the scenario's current version. Bump it and the old rows stop counting — the pool
 starts empty and refills from the next run.
 
 That is exactly what you want when you change the task, the fixture, or an

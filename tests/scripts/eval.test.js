@@ -833,6 +833,33 @@ Do something.
       expect(fs.existsSync(result.trialDir)).toBe(false);
     });
 
+    it('should stamp an A/B infraError row with the scenario version so version reads see it', () => {
+      const scenario = {
+        name: 'infra-versioned',
+        scenario: 'No-op.',
+        context: '',
+        assertions: [],
+        grader: 'code',
+        graderConfig: 'true',
+        setup: 'exit 1',
+        version: '3',
+      };
+      mockUtils.execCommand.mockReturnValueOnce({ stdout: '', stderr: 'boom', exitCode: 1 });
+
+      const result = executeAndGradeTrial(scenario, scenario, 1, 1, {
+        projectRoot: tempDir,
+        label: 'treatment',
+        runId: '20260930-000000',
+        isolated: false,
+      });
+
+      expect(result.infraError).toBe(true);
+      expect(result.version).toBe('3');
+      const pool = loadResults('infra-versioned-treatment', tempDir, { version: '3' });
+      expect(pool).toHaveLength(1);
+      expect(pool[0].errorType).toBe('setup_failed');
+    });
+
     it('should use cached semi-isolation settings for pluginDir trials', () => {
       const scenario = {
         name: 'cached-semi',
