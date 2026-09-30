@@ -141,6 +141,16 @@ arcforge learn instinct contradict <id>
 
 Contradict it enough and it archives itself.
 
+Confidence also decays with the time since you last confirmed an instinct: a
+fixed amount for each full week, charged once no matter how many sessions you
+start in that week. An instinct that decays far enough is moved to the
+`archived` folder beside it, the file is stamped `archive_reason: decay` so you
+can tell it from one you contradicted away, and the move is written to the
+review audit log under the instinct's name. An instinct you activated is never
+archived by decay — it leaves the injected set only when you deactivate it — and
+when the record of which instincts are activated cannot be read, decay archives
+nothing and the session start message says so.
+
 ## Review: from candidate to active
 
 Once learning is on, observations turn into **candidates** automatically. That is
@@ -177,7 +187,10 @@ The buttons offered on a candidate are only the ones legal from its current
 state, so you cannot activate something that was never materialized. Activating
 and deactivating carry an extra gate on top of that: both are refused unless the
 request carries an explicit acknowledgement that you understand it changes
-behavior.
+behavior, and the dashboard asks you for it. Before either is sent, it shows you
+that the step changes how future sessions behave — for **Activate**, together
+with the exact file activation writes — and sends the acknowledgement only once
+you confirm what it showed. Decline, and nothing is sent.
 
 Every action is written to an audit log, accepted or rejected, with the reason.
 Do not route around the dashboard by editing state files by hand — that is the
@@ -189,10 +202,10 @@ The CLI works the **same queue** the dashboard does. It is the scriptable way
 into the same review loop, not a second one: it reads through the same event
 log, offers only the transitions the same legality matrix allows, and writes to
 the same audit log. On the CLI, the acknowledgement that gates activation is the
-typed command itself: `learn activate <id>` prints the behavior-change warning
-and the target path to stderr, and carries its own acknowledgement. So a
-scripted `learn activate --json` activates with no further prompt; the command
-you typed was the gate.
+typed command itself: `learn activate <id>` prints the same behavior-change
+warning the dashboard shows, and the target path, to stderr, and carries its
+own acknowledgement. So a scripted `learn activate --json` activates with no
+further prompt; the command you typed was the gate.
 
 ```bash
 arcforge learn inbox --project
@@ -297,7 +310,20 @@ as `{"error": "..."}` and a non-zero exit.
 arcforge learn disable --project
 ```
 
-That stops new observations and analysis for the scope. Instincts you already
+That stops new observations and analysis for the scope. The background analysis
+checks the opt-in before each run and again immediately before each attempt to
+send a batch, so turning learning off mid-run — or off and back on — withdraws
+a batch that has not gone out yet; the next run rebuilds it under the new
+opt-in. It only ever sends what was recorded since
+learning was last turned on — observations by their own timestamp, and the
+diaries, reflections and recalls that go with them by theirs (a diary by the
+date it is filed under and when it was first written — though on a filesystem
+that records no creation time only the last modification is known, so there an
+edit made after you turned learning back on can still let that day's earlier
+diary through; a reflection or recall by when it was created). So nothing recorded before you turned learning off is sent for
+analysis — not now, and not if you turn learning back on later; it stays on
+disk, and only what is recorded after the new opt-in is analyzed. With learning
+off everywhere, the background process is not even started. Instincts you already
 activated stay active — disabling learning stops it accumulating more, it does
 not undo what you accepted. To retire an individual instinct, deactivate it from
 the dashboard.
@@ -305,20 +331,31 @@ the dashboard.
 ## What is stored, and where
 
 All state stays on your own machine — arcforge has no telemetry and no server of
-its own to report to. The one thing that leaves is diary enrichment, and it only
-happens once you have turned learning on: it runs `claude` locally over a parsed
-summary of the session, so that summary reaches the model exactly the way
-anything you type in a session does. That run used to skip every permission
-check; it no longer does. It gets two tools, `Read` and `Write`, and the diary
-directory is added to the places it is allowed to work in. It is not sealed off,
-though: it still starts in your project directory, and edits inside those places
-are approved automatically, because a background run has nobody to ask. What it
-no longer has is a blanket pass over your whole machine.
+its own to report to. Two things send content to a model, and both happen only
+once you have turned learning on.
 
-Turn learning off and the enrichment stops: diary drafts are still written from
-your session record — the counts and the files you touched — but their
-`TO BE ENRICHED` sections stay unfilled, which is what an un-enriched draft is
-supposed to look like. The same opt-in decides whether your recent message text
+The first is diary enrichment: it runs `claude` locally over a parsed summary of
+the session, so that summary reaches the model exactly the way anything you type
+in a session does. That run used to skip every permission check; it no longer
+does. It gets two tools, `Read` and `Write`, and the diary directory is added to
+the places it is allowed to work in. It is not sealed off, though: it still
+starts in your project directory, and edits inside those places are approved
+automatically, because a background run has nobody to ask. What it no longer
+has is a blanket pass over your whole machine.
+
+The second is the curator's analysis, which turns your observations into
+candidates: a background process sends a batch of sanitized observations to
+`claude` and reads back a proposal. That run gets no tools at all — no built-in
+tool and no MCP server — so it can read the batch it was handed and answer, and
+can touch nothing on your machine. Each run leaves a manifest under
+`learning/curator-runs/`, and its `tool_access` field records the access that
+run actually had, read from the command it was started with.
+
+Turn learning off and both stop. The curator's analysis sends nothing — not
+even observations or diaries left over from when learning was on. Diary drafts are still
+written from your session record — the counts and the files you touched — but
+their `TO BE ENRICHED` sections stay unfilled, which is what an un-enriched
+draft is supposed to look like. The same opt-in decides whether your recent message text
 is stored in the session record at all.
 
 Almost everything sits under `~/.arcforge/`: diaries in

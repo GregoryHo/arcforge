@@ -36,6 +36,11 @@ const {
 const { isLegalInsertionStatus, LIFECYCLE_STATUS } = require('./lifecycle');
 const { SANITIZER_POLICY_VERSION } = require('../sanitize-observation');
 const { atomicWriteFile, sha256Truncated, getArcforgeHome } = require('../utils');
+const { toolAccessFromArgv } = require('./curator-invocation');
+
+// Layer 4 transport_status values a failure manifest may carry; `cancelled` is
+// a run withdrawn before submission because learning was turned off (B-1).
+const FAILURE_TRANSPORT_STATUSES = ['timeout', 'transport_error', 'cancelled'];
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -231,9 +236,19 @@ function buildCandidateRecord(proposal, batchManifest, now) {
  * @param {string} options.responseFile — path to the LLM JSON response file
  * @param {string} [options.homeDir] — override home directory (tests)
  * @param {number} [options.durationMs] — elapsed time for run manifest
+ * @param {string[]} options.curatorArgv — the argv the curator's `claude` run
+ *   used; the manifest's `invocation.tool_access` is derived from it. Required:
+ *   without it nothing is ingested, so no manifest claims an access level
+ *   nobody recorded
  * @returns {{ run_id, parse_status, accepted, rejected }}
  */
-function ingestProposal({ batchId, responseFile, homeDir: homeOverride, durationMs } = {}) {
+function ingestProposal({
+  batchId,
+  responseFile,
+  homeDir: homeOverride,
+  durationMs,
+  curatorArgv,
+} = {}) {
   if (typeof batchId !== 'string' || !batchId.trim()) {
     throw new Error('ingestProposal: batchId must be a non-empty string');
   }
@@ -243,6 +258,7 @@ function ingestProposal({ batchId, responseFile, homeDir: homeOverride, duration
   if (!fs.existsSync(responseFile)) {
     throw new Error(`ingestProposal: responseFile does not exist: ${responseFile}`);
   }
+  const toolAccess = toolAccessFromArgv(curatorArgv);
 
   const homeDir = homeOverride;
   const now = new Date();
@@ -312,7 +328,7 @@ function ingestProposal({ batchId, responseFile, homeDir: homeOverride, duration
     model: null,
     provider: null,
     invocation: {
-      tool_access: false,
+      tool_access: toolAccess,
       duration_ms: durationMs || null,
       transport_status: 'completed',
     },
@@ -573,15 +589,32 @@ function ingestProposal({ batchId, responseFile, homeDir: homeOverride, duration
  * @param {string} options.parseStatus — 'transport_error' | 'timeout'
  * @param {string} [options.detail]    — free-text reason
  * @param {string} [options.homeDir]   — override home directory (tests)
+ * @param {string[]} options.curatorArgv — the argv the failed `claude` run used;
+ *   required, as in ingestProposal, so the manifest records its tool access
+ * @param {string} [options.transportStatus] — 'timeout' | 'transport_error' |
+ *   'cancelled' (a run withdrawn before submission); defaults to parseStatus
  * @returns {{ run_id, parse_status, accepted, rejected }}
  */
-function recordRunFailure({ batchId, parseStatus, detail, homeDir: homeOverride } = {}) {
+function recordRunFailure({
+  batchId,
+  parseStatus,
+  detail,
+  homeDir: homeOverride,
+  curatorArgv,
+  transportStatus = parseStatus,
+} = {}) {
   if (typeof batchId !== 'string' || !batchId.trim()) {
     throw new Error('recordRunFailure: batchId must be a non-empty string');
   }
   if (typeof parseStatus !== 'string' || !parseStatus.trim()) {
     throw new Error('recordRunFailure: parseStatus must be a non-empty string');
   }
+  if (!FAILURE_TRANSPORT_STATUSES.includes(transportStatus)) {
+    throw new Error(
+      `recordRunFailure: transportStatus must be one of ${FAILURE_TRANSPORT_STATUSES.join(', ')} (got "${transportStatus}")`,
+    );
+  }
+  const toolAccess = toolAccessFromArgv(curatorArgv);
 
   const homeDir = homeOverride;
   const now = new Date();
@@ -597,6 +630,10 @@ function recordRunFailure({ batchId, parseStatus, detail, homeDir: homeOverride 
     run_id: runId,
     created_at: createdAt,
     source_batch_id: batchId,
+    invocation: {
+      tool_access: toolAccess,
+      transport_status: transportStatus,
+    },
     parse_status: parseStatus,
     detail: detail || null,
     accepted_count: 0,
@@ -614,4 +651,4 @@ function recordRunFailure({ batchId, parseStatus, detail, homeDir: homeOverride 
   return { run_id: runId, parse_status: parseStatus, accepted: 0, rejected: 0 };
 }
 
-module.exports = { ingestProposal, recordRunFailure };
+module.exports = { FAILURE_TRANSPORT_STATUSES, ingestProposal, recordRunFailure };

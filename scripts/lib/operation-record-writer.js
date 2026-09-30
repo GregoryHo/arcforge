@@ -20,7 +20,7 @@ const { atomicWriteFile, getArcforgeHome } = require('./utils');
 const KIND_DIRS = { reflect: 'reflections', recall: 'recalls' };
 
 // Filename prefix the curator batch-assembler matches on
-// (^reflect-.*\.md$ / ^recall-.*\.md$ in learning-curator/batch-assembler.js).
+// (^reflect-.*\.md$ / ^recall-.*\.md$ in learning-curator/evidence-files.js).
 // The id becomes `<id>.md`, so the id MUST carry this prefix or the assembler
 // silently skips the record. Fail fast at the writer instead.
 const KIND_ID_PREFIX = { reflect: 'reflect-', recall: 'recall-' };

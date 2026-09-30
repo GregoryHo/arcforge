@@ -65,6 +65,16 @@ assert_not_match() {
   fi
 }
 
+# The daemon analyzes a project only where learning is enabled (learning B-1),
+# and only observations recorded at or after the opt-in took effect, so every
+# test that expects analysis opts in globally, stamped before its fixture rows.
+enable_global_learning() {
+  local home="$1"
+  mkdir -p "${home}/.arcforge/learning"
+  printf '{"scope":"global","enabled":true,"updated_at":"2026-01-01T00:00:00.000Z"}\n' \
+    > "${home}/.arcforge/learning/config.json"
+}
+
 # ─────────────────────────────────────────────
 # C5: --max-turns value is 15
 # ─────────────────────────────────────────────
@@ -166,6 +176,7 @@ trap 'rm -rf "$TMPDIR_C3" "$TMPDIR_C4"' EXIT
 TEST_HOME_C4="${TMPDIR_C4}/home"
 STUB_BIN="${TMPDIR_C4}/bin"
 mkdir -p "$TEST_HOME_C4" "$STUB_BIN"
+enable_global_learning "$TEST_HOME_C4"
 
 # Stub 'claude' that sleeps 10 seconds (longer than 3s test watchdog)
 cat > "${STUB_BIN}/claude" << 'STUB_EOF'
@@ -178,7 +189,7 @@ chmod +x "${STUB_BIN}/claude"
 PROJ_DIR="${TEST_HOME_C4}/.arcforge/observations/test-proj"
 mkdir -p "$PROJ_DIR"
 for i in $(seq 1 15); do
-  echo '{"event":"tool_start","tool":"Read"}' >> "${PROJ_DIR}/observations.jsonl"
+  echo '{"ts":"2026-05-21T01:00:00.000Z","event":"tool_start","tool":"Read"}' >> "${PROJ_DIR}/observations.jsonl"
 done
 
 C4_LOG=$(
@@ -251,6 +262,7 @@ trap 'rm -rf "$TMPDIR_PRF"' EXIT
 TEST_HOME_PRF="${TMPDIR_PRF}/home"
 STUB_BIN_PRF="${TMPDIR_PRF}/bin"
 mkdir -p "$TEST_HOME_PRF" "$STUB_BIN_PRF"
+enable_global_learning "$TEST_HOME_PRF"
 
 # Stub 'claude' that exits 1 immediately (transport_error)
 cat > "${STUB_BIN_PRF}/claude" << 'STUB_EOF'
@@ -298,6 +310,22 @@ else
   FAIL=$((FAIL + 1))
   ERRORS+=('PR-F-T1: failure manifest with parse_status=transport_error was written')
 fi
+
+# B-9: a failed run's manifest records the tool access of the argv it ran with.
+manifest_tool_access() {
+  node -e '
+    const m = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+    process.stdout.write(String(m.invocation && m.invocation.tool_access));
+  ' "$1" 2>/dev/null || true
+}
+assert_eq \
+  'B9-T2: timeout failure manifest records tool_access false' \
+  'false' \
+  "$([ -n "$C4_TIMEOUT_STATUS" ] && manifest_tool_access "$C4_TIMEOUT_STATUS")"
+assert_eq \
+  'B9-T2: transport_error failure manifest records tool_access false' \
+  'false' \
+  "$([ -n "$PRF_TRANSPORT_MANIFEST" ] && manifest_tool_access "$PRF_TRANSPORT_MANIFEST")"
 
 # ─────────────────────────────────────────────
 # E2-G1: daemon no longer writes to per-project instincts subdir
@@ -370,6 +398,7 @@ trap 'rm -rf "$TMPDIR_G3"' EXIT
 TEST_HOME_G3="${TMPDIR_G3}/home"
 STUB_BIN_G3="${TMPDIR_G3}/bin"
 mkdir -p "$TEST_HOME_G3" "$STUB_BIN_G3"
+enable_global_learning "$TEST_HOME_G3"
 
 # Seed 15 observations so the MIN_OBSERVATIONS gate passes
 G3_PROJECT="e2-test-proj"
@@ -393,8 +422,11 @@ done
 # so the response file is a CLI envelope whose .structured_output holds the payload.
 # The stub reads the latest batch manifest to get the real batch_hash and evidence_ids,
 # then emits a valid CandidateProposalPayload with ≥2 evidence_refs (MIN_EVIDENCE_REFS=2).
+G3_ARGV_FILE="${TMPDIR_G3}/claude-argv.txt"
 cat > "${STUB_BIN_G3}/claude" << STUB_EOF
 #!/usr/bin/env bash
+# Record the argv, one bracketed arg per line, so an empty arg stays visible
+printf '<%s>\n' "\$@" > "${G3_ARGV_FILE}"
 # Consume stdin (prompt file piped in)
 cat > /dev/null
 # Find the most recent batch manifest in TEST_HOME_G3
@@ -532,6 +564,346 @@ else
   FAIL=$((FAIL + 1))
   ERRORS+=('E2-G3: curator run manifests created')
 fi
+
+# ─────────────────────────────────────────────
+# B9-T1: the curator run is tool-less, and its manifest says so
+# learning B-9 / D-023: the argv carries `--tools ""` plus a strict, empty MCP
+# config, and the run manifest's tool_access is derived from that argv.
+# Reuses the E2-G3 run above, whose stub recorded the argv it was given.
+# ─────────────────────────────────────────────
+
+echo ""
+echo "=== B9-T1: Curator run is tool-less ==="
+
+G3_ARGV=$(cat "$G3_ARGV_FILE" 2>/dev/null || true)
+G3_TOOLS_VALUE=$(printf '%s\n' "$G3_ARGV" | grep -A1 -x '<--tools>' | sed -n 2p)
+assert_eq \
+  'B9-T1: claude argv carries --tools with an empty value' \
+  '<>' \
+  "$G3_TOOLS_VALUE"
+assert_match \
+  'B9-T1: claude argv carries --strict-mcp-config' \
+  '^<--strict-mcp-config>$' \
+  "$G3_ARGV"
+
+G3_TOOL_ACCESS=""
+G3_RUN_MANIFEST=$(find "$G3_RUNS_DIR" -name '*.manifest.json' 2>/dev/null | head -1 || true)
+if [ -n "$G3_RUN_MANIFEST" ]; then
+  G3_TOOL_ACCESS=$(node -e '
+    const m = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+    process.stdout.write(String(m.invocation && m.invocation.tool_access));
+  ' "$G3_RUN_MANIFEST" 2>/dev/null || true)
+fi
+assert_eq \
+  'B9-T1: run manifest records tool_access false, derived from the argv' \
+  'false' \
+  "$G3_TOOL_ACCESS"
+
+# ─────────────────────────────────────────────
+# B1-T1: a project learning is not enabled for is never analyzed
+# learning B-1 / D-023: observations left behind by an earlier opt-in must not
+# reach the model. The stub claude leaves a marker if it is ever invoked.
+# B1-T2 is the positive control: the same setup under a project-scope opt-in,
+# found through the project root SessionStart records, does reach the model.
+# ─────────────────────────────────────────────
+
+echo ""
+echo "=== B1-T1: Disabled project is skipped ==="
+
+TMPDIR_B1=$(mktemp -d)
+trap 'rm -rf "$TMPDIR_G3" "$TMPDIR_B1"' EXIT
+STUB_BIN_B1="${TMPDIR_B1}/bin"
+mkdir -p "$STUB_BIN_B1"
+cat > "${STUB_BIN_B1}/claude" << STUB_EOF
+#!/usr/bin/env bash
+cat > "\${CLAUDE_MARKER}.prompt"
+touch "\${CLAUDE_MARKER}"
+exit 1
+STUB_EOF
+chmod +x "${STUB_BIN_B1}/claude"
+
+seed_b1_home() {
+  local home="$1"
+  local obs_dir="${home}/.arcforge/observations/b1-proj"
+  mkdir -p "$obs_dir"
+  for i in $(seq 1 15); do
+    printf '{"ts":"2026-05-22T01:%02d:00.000Z","event":"tool_start","tool":"Read","session":"s1","project":"b1-proj","project_id":"proj_abc123456789ab","evidence_status":"present","input_summary":"file %d"}\n' \
+      "$i" "$i" >> "${obs_dir}/observations.jsonl"
+  done
+}
+
+run_b1_analysis() {
+  local home="$1"
+  (
+    HOME="$home"
+    PATH="${STUB_BIN_B1}:${PATH}"
+    CLAUDE_MARKER="${home}/claude-was-called"
+    export CLAUDE_MARKER
+    OBSERVER_DAEMON_WATCHDOG_SECS=10
+    set +e
+    # shellcheck source=/dev/null
+    source "$DAEMON_SCRIPT" 2>/dev/null
+    mkdir -p "$INSTINCTS_DIR"
+    analyze_project 'b1-proj' 2>/dev/null || true
+    cat "$LOG_FILE" 2>/dev/null || true
+  ) 2>/dev/null
+}
+
+B1_OFF_HOME="${TMPDIR_B1}/off"
+seed_b1_home "$B1_OFF_HOME"
+# An earlier opt-in that was since turned off: the project root is on record,
+# its project-scope config now says disabled.
+mkdir -p "${B1_OFF_HOME}/b1-proj/.arcforge/learning" "${B1_OFF_HOME}/.arcforge/learning/project-roots"
+printf '{"scope":"project","enabled":false}\n' > "${B1_OFF_HOME}/b1-proj/.arcforge/learning/config.json"
+printf '{"project":"b1-proj","project_root":"%s"}\n' "${B1_OFF_HOME}/b1-proj" \
+  > "${B1_OFF_HOME}/.arcforge/learning/project-roots/b1-proj.json"
+B1_OFF_LOG=$(run_b1_analysis "$B1_OFF_HOME")
+
+assert_match \
+  'B1-T1: logs that learning is not enabled for the project' \
+  'Skipping b1-proj: learning is not enabled' \
+  "$B1_OFF_LOG"
+assert_eq \
+  'B1-T1: claude is never invoked for a disabled project' \
+  'no' \
+  "$([ -f "${B1_OFF_HOME}/claude-was-called" ] && echo yes || echo no)"
+assert_eq \
+  'B1-T1: no curator batch is assembled for a disabled project' \
+  '0' \
+  "$(find "${B1_OFF_HOME}/.arcforge/learning/curator-batches" -name '*.manifest.json' 2>/dev/null | wc -l | tr -d ' ')"
+
+B1_ON_HOME="${TMPDIR_B1}/on"
+seed_b1_home "$B1_ON_HOME"
+mkdir -p "${B1_ON_HOME}/b1-proj/.arcforge/learning" "${B1_ON_HOME}/.arcforge/learning/project-roots"
+printf '{"scope":"project","enabled":true,"updated_at":"2026-01-01T00:00:00.000Z"}\n' \
+  > "${B1_ON_HOME}/b1-proj/.arcforge/learning/config.json"
+printf '{"project":"b1-proj","project_root":"%s"}\n' "${B1_ON_HOME}/b1-proj" \
+  > "${B1_ON_HOME}/.arcforge/learning/project-roots/b1-proj.json"
+run_b1_analysis "$B1_ON_HOME" > /dev/null
+
+assert_eq \
+  'B1-T2: claude is invoked for a project under its project-scope opt-in' \
+  'yes' \
+  "$([ -f "${B1_ON_HOME}/claude-was-called" ] && echo yes || echo no)"
+
+# B1-T3: disable, then enable again, then run. Observations recorded under the
+# first opt-in are older than the re-enable's stamp, so they are never
+# submitted — by their own timestamps, not by moving the file.
+REPO_CLI="$(cd "$(dirname "$0")/../.." && pwd)/scripts/cli.js"
+B1_RE_HOME="${TMPDIR_B1}/re"
+B1_RE_ROOT="${B1_RE_HOME}/b1-proj"
+mkdir -p "$B1_RE_ROOT" "${B1_RE_HOME}/.arcforge/learning/project-roots"
+printf '{"project":"b1-proj","project_root":"%s"}\n' "$B1_RE_ROOT" \
+  > "${B1_RE_HOME}/.arcforge/learning/project-roots/b1-proj.json"
+b1_learn() {
+  env -u ARCFORGE_HOME HOME="$B1_RE_HOME" CLAUDE_PROJECT_DIR="$B1_RE_ROOT" \
+    node "$REPO_CLI" learn "$1" --project > /dev/null 2>&1
+}
+b1_rows() {
+  local label="$1" count="$2" obs_dir="${B1_RE_HOME}/.arcforge/observations/b1-proj" ts
+  mkdir -p "$obs_dir"
+  for i in $(seq 1 "$count"); do
+    ts=$(node -e 'process.stdout.write(new Date().toISOString())')
+    printf '{"ts":"%s","event":"tool_start","tool":"Bash","session":"s1","project":"b1-proj","project_id":"proj_abc123456789ab","evidence_status":"present","input":"%s row %d"}\n' \
+      "$ts" "$label" "$i" >> "${obs_dir}/observations.jsonl"
+  done
+}
+
+b1_diary() {
+  local label="$1" day dir
+  day=$(node -e 'process.stdout.write(new Date().toISOString().slice(0, 10))')
+  dir="${B1_RE_HOME}/.arcforge/diaries/b1-proj/${day}"
+  mkdir -p "$dir"
+  printf '# Session Summary\n\n%s diary entry\n' "$label" > "${dir}/diary-${label}.md"
+}
+
+b1_learn enable
+b1_rows pre-disable 15
+b1_diary pre-disable
+sleep 1
+b1_learn disable
+sleep 1
+b1_learn enable
+sleep 1
+B1_RE_LOG=$(run_b1_analysis "$B1_RE_HOME")
+
+assert_eq \
+  'B1-T3: after disable then enable, the earlier backlog alone is not submitted' \
+  'no' \
+  "$([ -f "${B1_RE_HOME}/claude-was-called" ] && echo yes || echo no)"
+assert_match \
+  'B1-T3: logs that too few observations were recorded since the re-enable' \
+  'fewer than 10 observations recorded since learning was enabled' \
+  "$B1_RE_LOG"
+assert_eq \
+  'B1-T3: the earlier observations stay on disk' \
+  '15' \
+  "$(wc -l < "${B1_RE_HOME}/.arcforge/observations/b1-proj/observations.jsonl" | tr -d ' ')"
+
+b1_rows post-enable 12
+b1_diary post-enable
+run_b1_analysis "$B1_RE_HOME" > /dev/null
+B1_RE_PROMPT=$(cat "${B1_RE_HOME}/claude-was-called.prompt" 2>/dev/null || true)
+
+assert_match \
+  'B1-T3: rows recorded after the re-enable are submitted' \
+  'post-enable row 12' \
+  "$B1_RE_PROMPT"
+assert_not_match \
+  'B1-T3: rows recorded before the opt-out are not submitted' \
+  'pre-disable row' \
+  "$B1_RE_PROMPT"
+assert_match \
+  'B1-T3: a diary written after the re-enable is submitted' \
+  'post-enable diary entry' \
+  "$B1_RE_PROMPT"
+assert_not_match \
+  'B1-T3: a diary written before the opt-out is not submitted' \
+  'pre-disable diary entry' \
+  "$B1_RE_PROMPT"
+assert_eq \
+  'B1-T3: the earlier diary stays on disk' \
+  '1' \
+  "$(find "${B1_RE_HOME}/.arcforge/diaries/b1-proj" -name 'diary-pre-disable.md' | wc -l | tr -d ' ')"
+
+# ─────────────────────────────────────────────
+# B1-T4: consent is re-checked immediately before every model attempt
+# learning B-1: a `learn disable` after the batch is assembled but before
+# claude is spawned is honoured — nothing is submitted, and the run's failure
+# manifest records transport_status "cancelled". A `node` wrapper on PATH turns
+# learning off right after assemble-batch returns.
+# ─────────────────────────────────────────────
+
+echo ""
+echo "=== B1-T4: Consent re-checked before the model call ==="
+
+TMPDIR_B4=$(mktemp -d)
+trap 'rm -rf "$TMPDIR_G3" "$TMPDIR_B1" "$TMPDIR_B4"' EXIT
+B4_HOME="${TMPDIR_B4}/home"
+B4_BIN="${TMPDIR_B4}/bin"
+mkdir -p "$B4_BIN"
+enable_global_learning "$B4_HOME"
+REAL_NODE="$(command -v node)"
+cat > "${B4_BIN}/node" << STUB_EOF
+#!/usr/bin/env bash
+"${REAL_NODE}" "\$@"
+status=\$?
+if [ "\$2" = "assemble-batch" ]; then
+  printf '{"scope":"global","enabled":false,"updated_at":"2026-06-01T00:00:00.000Z"}\n' \
+    > "${B4_HOME}/.arcforge/learning/config.json"
+fi
+exit \$status
+STUB_EOF
+chmod +x "${B4_BIN}/node"
+cat > "${B4_BIN}/claude" << STUB_EOF
+#!/usr/bin/env bash
+cat > /dev/null
+touch "${TMPDIR_B4}/claude-was-called"
+exit 1
+STUB_EOF
+chmod +x "${B4_BIN}/claude"
+B4_OBS="${B4_HOME}/.arcforge/observations/b4-proj"
+mkdir -p "$B4_OBS"
+for i in $(seq 1 15); do
+  printf '{"ts":"2026-05-22T01:%02d:00.000Z","event":"tool_start","tool":"Read","session":"s1","project":"b4-proj","project_id":"proj_abc123456789ab","evidence_status":"present","input":"file %d"}\n' \
+    "$i" "$i" >> "${B4_OBS}/observations.jsonl"
+done
+
+B4_LOG=$(
+  HOME="$B4_HOME"
+  PATH="${B4_BIN}:${PATH}"
+  OBSERVER_DAEMON_WATCHDOG_SECS=10
+  set +e
+  # shellcheck source=/dev/null
+  source "$DAEMON_SCRIPT" 2>/dev/null
+  mkdir -p "$INSTINCTS_DIR"
+  analyze_project 'b4-proj' 2>/dev/null || true
+  cat "$LOG_FILE" 2>/dev/null || true
+) 2>/dev/null
+
+assert_eq \
+  'B1-T4: claude is not invoked after learning is turned off mid-run' \
+  'no' \
+  "$([ -f "${TMPDIR_B4}/claude-was-called" ] && echo yes || echo no)"
+assert_match \
+  'B1-T4: logs the withdrawn consent' \
+  'learning was turned off before the batch was submitted' \
+  "$B4_LOG"
+B4_CANCELLED=$(find "${B4_HOME}/.arcforge/learning/curator-runs" -name '*.manifest.json' \
+  -exec grep -l '"transport_status": *"cancelled"' {} \; 2>/dev/null | head -1 || true)
+assert_eq \
+  'B1-T4: the failure manifest records transport_status cancelled' \
+  'yes' \
+  "$([ -n "$B4_CANCELLED" ] && echo yes || echo no)"
+
+# ─────────────────────────────────────────────
+# B1-T5: a disable and re-enable between assembly and the model call
+# The batch was rendered under the old opt-in stamp, so it may carry evidence
+# from the earlier period: the recheck compares stamps, and a changed stamp
+# withdraws the run just like a disable. The wrapper rewrites the config with
+# learning still on but a new updated_at — what disable-then-enable leaves.
+# ─────────────────────────────────────────────
+
+echo ""
+echo "=== B1-T5: Re-enable between assembly and the model call ==="
+
+TMPDIR_B5=$(mktemp -d)
+trap 'rm -rf "$TMPDIR_G3" "$TMPDIR_B1" "$TMPDIR_B4" "$TMPDIR_B5"' EXIT
+B5_HOME="${TMPDIR_B5}/home"
+B5_BIN="${TMPDIR_B5}/bin"
+mkdir -p "$B5_BIN"
+enable_global_learning "$B5_HOME"
+cat > "${B5_BIN}/node" << STUB_EOF
+#!/usr/bin/env bash
+"${REAL_NODE}" "\$@"
+status=\$?
+if [ "\$2" = "assemble-batch" ]; then
+  printf '{"scope":"global","enabled":true,"updated_at":"2026-06-02T00:00:00.000Z"}\n' \
+    > "${B5_HOME}/.arcforge/learning/config.json"
+fi
+exit \$status
+STUB_EOF
+chmod +x "${B5_BIN}/node"
+cat > "${B5_BIN}/claude" << STUB_EOF
+#!/usr/bin/env bash
+cat > /dev/null
+touch "${TMPDIR_B5}/claude-was-called"
+exit 1
+STUB_EOF
+chmod +x "${B5_BIN}/claude"
+B5_OBS="${B5_HOME}/.arcforge/observations/b5-proj"
+mkdir -p "$B5_OBS"
+for i in $(seq 1 15); do
+  printf '{"ts":"2026-05-22T01:%02d:00.000Z","event":"tool_start","tool":"Read","session":"s1","project":"b5-proj","project_id":"proj_abc123456789ab","evidence_status":"present","input":"file %d"}\n' \
+    "$i" "$i" >> "${B5_OBS}/observations.jsonl"
+done
+
+B5_LOG=$(
+  HOME="$B5_HOME"
+  PATH="${B5_BIN}:${PATH}"
+  OBSERVER_DAEMON_WATCHDOG_SECS=10
+  set +e
+  # shellcheck source=/dev/null
+  source "$DAEMON_SCRIPT" 2>/dev/null
+  mkdir -p "$INSTINCTS_DIR"
+  analyze_project 'b5-proj' 2>/dev/null || true
+  cat "$LOG_FILE" 2>/dev/null || true
+) 2>/dev/null
+
+assert_eq \
+  'B1-T5: claude is not invoked after a disable and re-enable mid-run' \
+  'no' \
+  "$([ -f "${TMPDIR_B5}/claude-was-called" ] && echo yes || echo no)"
+assert_match \
+  'B1-T5: logs that the opt-in changed since the batch was assembled' \
+  'opt-in changed since the batch was assembled' \
+  "$B5_LOG"
+B5_CANCELLED=$(find "${B5_HOME}/.arcforge/learning/curator-runs" -name '*.manifest.json' \
+  -exec grep -l '"transport_status": *"cancelled"' {} \; 2>/dev/null | head -1 || true)
+assert_eq \
+  'B1-T5: the failure manifest records transport_status cancelled' \
+  'yes' \
+  "$([ -n "$B5_CANCELLED" ] && echo yes || echo no)"
 
 # ─────────────────────────────────────────────
 # Results

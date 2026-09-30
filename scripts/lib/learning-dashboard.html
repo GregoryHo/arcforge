@@ -319,13 +319,45 @@
         }
       }
 
+      // Activate and deactivate change how future sessions behave, so the page
+      // shows that — and, for activate, the file it writes — and sends the
+      // safety_ack only for what the reviewer was shown and accepted.
+      // Returns the ack, or null when the reviewer declined.
+      async function acknowledgeBehaviorChange(candidateId, action) {
+        const res = await fetch('/api/candidates/' + encodeURIComponent(candidateId));
+        const detail = await res.json();
+        if (!res.ok) throw new Error(detail.error || 'Could not load the candidate');
+        const name = detail.name || candidateId;
+        const target = detail.active_target_path;
+        const lines = [];
+        if (action === 'activate') {
+          lines.push('Activate ' + name + '?');
+          lines.push('This changes how future sessions behave: an active instinct is injected at SessionStart until it is deactivated.');
+          if (target) lines.push('Target: ' + target + ' — created, or overwritten with the file currently there kept under .backups/.');
+        } else {
+          lines.push('Deactivate ' + name + '?');
+          lines.push('This changes how future sessions behave: the instinct stops being injected at SessionStart.');
+          if (target) lines.push('Its active file ' + target + ' moves to .disabled/.');
+        }
+        if (!confirm(lines.join('\n\n'))) return null;
+        const ack = { reviewer_saw_behavior_change_warning: true };
+        if (action === 'activate' && target) ack.reviewer_saw_target_path_summary = true;
+        return ack;
+      }
+
       async function performAction(candidateId, action, button) {
         if (button) button.disabled = true;
         try {
+          const request = { action: action };
+          if (action === 'activate' || action === 'deactivate') {
+            const ack = await acknowledgeBehaviorChange(candidateId, action);
+            if (!ack) { if (button) button.disabled = false; return; }
+            request.safety_ack = ack;
+          }
           const res = await fetch('/api/candidates/' + encodeURIComponent(candidateId) + '/action', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-ArcForge-Dashboard': '1', 'X-ArcForge-Dashboard-Token': DASHBOARD_TOKEN },
-            body: JSON.stringify({ action: action }),
+            body: JSON.stringify(request),
           });
           const data = await res.json();
           if (!res.ok || !data.accepted) { alert(data.error || data.reason || 'Action failed'); }

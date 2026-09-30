@@ -1100,3 +1100,76 @@ describe('observe: shouldObserve — ARCFORGE_OBSERVE_SELF_ANALYSIS env guard (C
     );
   });
 });
+
+// learning B-1: the daemon finds a project-scope opt-in through the project-root
+// record, so an observation keeps it current — a mid-session `learn enable
+// --project` must not wait for the next SessionStart — and rewrites nothing
+// when the record already says the same.
+describe('observe: keeps the project-root record current', () => {
+  const originalEnv = { ...process.env };
+  let testDir;
+  let projectRoot;
+  let homeDir;
+
+  beforeEach(() => {
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-observe-root-record-'));
+    projectRoot = path.join(testDir, 'root-proj');
+    homeDir = path.join(testDir, 'home');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    process.env.HOME = homeDir;
+    process.env.CLAUDE_PROJECT_DIR = projectRoot;
+    delete process.env.ARCFORGE_HOME;
+    delete require.cache[require.resolve('../../scripts/lib/learning')];
+    delete require.cache[require.resolve('../../scripts/lib/utils')];
+  });
+
+  afterEach(() => {
+    fs.rmSync(testDir, { recursive: true, force: true });
+    for (const key of Object.keys(process.env)) delete process.env[key];
+    Object.assign(process.env, originalEnv);
+  });
+
+  function observeOnce() {
+    const { spawnSync } = require('node:child_process');
+    const scriptPath = path.join(__dirname, '..', 'observe', 'main.js');
+    const result = spawnSync('node', [scriptPath, 'pre'], {
+      input: JSON.stringify({
+        session_id: 'root-record-session',
+        hook_event_name: 'PreToolUse',
+        cwd: projectRoot,
+        tool_name: 'Read',
+        tool_input: { file_path: 'a.txt' },
+      }),
+      env: { ...process.env, ARCFORGE_OBSERVE_NO_SPAWN: '1' },
+      encoding: 'utf8',
+    });
+    assert.strictEqual(result.status, 0, `stderr: ${result.stderr}`);
+  }
+
+  function recordPath() {
+    return path.join(homeDir, '.arcforge', 'learning', 'project-roots', 'root-proj.json');
+  }
+
+  it('creates the record on the first observation, and leaves it untouched after', () => {
+    const learning = require('../../scripts/lib/learning');
+    learning.setLearningEnabled({ scope: 'project', enabled: true, projectRoot });
+    assert.strictEqual(fs.existsSync(recordPath()), false);
+
+    observeOnce();
+    assert.deepStrictEqual(JSON.parse(fs.readFileSync(recordPath(), 'utf8')), {
+      project: 'root-proj',
+      project_root: path.resolve(projectRoot),
+    });
+    const past = new Date(Date.now() - 60_000);
+    fs.utimesSync(recordPath(), past, past);
+    const before = fs.statSync(recordPath()).mtimeMs;
+
+    observeOnce();
+    assert.strictEqual(fs.statSync(recordPath()).mtimeMs, before, 'identical record rewritten');
+  });
+
+  it('writes no record when learning is off', () => {
+    observeOnce();
+    assert.strictEqual(fs.existsSync(recordPath()), false);
+  });
+});

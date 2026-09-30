@@ -33,7 +33,36 @@ afterEach(() => {
 // Fresh module getters (called after jest.resetModules())
 // ---------------------------------------------------------------------------
 
+// The daemon's curator argv, minus the schema value (irrelevant to tool access).
+const TOOL_LESS_ARGV = [
+  '--model',
+  'haiku',
+  '--tools',
+  '',
+  '--max-turns',
+  '15',
+  '--print',
+  '--output-format',
+  'json',
+  '--disable-slash-commands',
+  '--strict-mcp-config',
+  '--mcp-config',
+  '{"mcpServers":{}}',
+];
+
+// ingestProposal and recordRunFailure refuse to run without the curator argv
+// (B-9, D-023), so every case that is not about that argv records as the
+// daemon does: tool-less.
 function getIngestor() {
+  const ingestor = require('../../scripts/lib/learning-curator/proposal-ingestor');
+  return {
+    ...ingestor,
+    ingestProposal: (opts) => ingestor.ingestProposal({ curatorArgv: TOOL_LESS_ARGV, ...opts }),
+    recordRunFailure: (opts) => ingestor.recordRunFailure({ curatorArgv: TOOL_LESS_ARGV, ...opts }),
+  };
+}
+
+function getRawIngestor() {
   return require('../../scripts/lib/learning-curator/proposal-ingestor');
 }
 
@@ -263,7 +292,82 @@ describe('ingestProposal — valid path', () => {
     expect(runManifest.handed_to_layer5).toBe(true);
     expect(runManifest.raw_prompt_saved).toBe(false);
     expect(runManifest.raw_response_saved).toBe(false);
-    expect(runManifest.invocation.tool_access).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B-9 / D-023: the manifest records the tool access the run actually had,
+// derived from the argv the daemon ran `claude` with — never a constant.
+// ---------------------------------------------------------------------------
+
+describe('ingestProposal — invocation.tool_access derived from the curator argv', () => {
+  function runManifestFor(curatorArgv) {
+    const { ingestProposal } = getRawIngestor();
+    const { manifest, batchId } = makeBatchManifest();
+    const payload = makeValidProposalPayload(batchId, manifest.batch_hash);
+    const responsePath = makeResponseFile(payload);
+    const result = ingestProposal({ batchId, responseFile: responsePath, curatorArgv });
+    const runsDir = path.join(tmpDir, '.arcforge', 'learning', 'curator-runs');
+    return JSON.parse(
+      fs.readFileSync(path.join(runsDir, `${result.run_id}.manifest.json`), 'utf8'),
+    );
+  }
+
+  test('a tool-less argv records tool_access false', () => {
+    expect(runManifestFor(TOOL_LESS_ARGV).invocation.tool_access).toBe(false);
+  });
+
+  test('an argv without --tools records tool_access true', () => {
+    const argv = TOOL_LESS_ARGV.filter(
+      (a, i) => a !== '--tools' && TOOL_LESS_ARGV[i - 1] !== '--tools',
+    );
+    expect(runManifestFor(argv).invocation.tool_access).toBe(true);
+  });
+
+  test('a missing argv is refused before anything is written, never guessed', () => {
+    expect(() => runManifestFor(undefined)).toThrow(/curator argv is required/);
+    const runsDir = path.join(tmpDir, '.arcforge', 'learning', 'curator-runs');
+    expect(fs.existsSync(runsDir) ? fs.readdirSync(runsDir) : []).toEqual([]);
+    expect(Object.keys(readCurrentCandidates())).toEqual([]);
+  });
+});
+
+describe('toolAccessFromArgv', () => {
+  function toolAccess(argv) {
+    return require('../../scripts/lib/learning-curator/curator-invocation').toolAccessFromArgv(
+      argv,
+    );
+  }
+
+  test('empty --tools with MCP cleared is tool-less', () => {
+    expect(toolAccess(TOOL_LESS_ARGV)).toBe(false);
+    expect(
+      toolAccess(['--tools=', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}']),
+    ).toBe(false);
+  });
+
+  test('a named or default tool set is tool access', () => {
+    expect(toolAccess(['--tools', 'Read', '--strict-mcp-config'])).toBe(true);
+    expect(toolAccess(['--tools', 'default', '--strict-mcp-config'])).toBe(true);
+    expect(toolAccess(['--print'])).toBe(true);
+  });
+
+  test('empty built-ins still count as tool access while MCP servers may load', () => {
+    expect(toolAccess(['--tools', ''])).toBe(true);
+    expect(
+      toolAccess(['--tools', '', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{"x":{}}}']),
+    ).toBe(true);
+  });
+
+  test('the last --tools wins, as in the CLI', () => {
+    expect(toolAccess(['--tools', 'Read', '--tools', '', '--strict-mcp-config'])).toBe(false);
+  });
+
+  test('rejects an argv that is missing or not an array of strings', () => {
+    expect(() => toolAccess(undefined)).toThrow(/curator argv is required/);
+    expect(() => toolAccess(null)).toThrow(/curator argv is required/);
+    expect(() => toolAccess('--tools ""')).toThrow(/array of strings/);
+    expect(() => toolAccess([1])).toThrow(/array of strings/);
   });
 });
 
@@ -702,6 +806,66 @@ describe('recordRunFailure — writes failure manifest', () => {
     expect(manifest.response_hash).toBeNull();
     expect(manifest.raw_prompt_saved).toBe(false);
     expect(manifest.raw_response_saved).toBe(false);
+    expect(manifest.invocation).toEqual({
+      tool_access: false,
+      transport_status: 'transport_error',
+    });
+  });
+
+  test('a failed run records the tool access its argv gave it, and its transport status', () => {
+    const { recordRunFailure } = getRawIngestor();
+    const withTools = TOOL_LESS_ARGV.filter(
+      (a, i) => a !== '--tools' && TOOL_LESS_ARGV[i - 1] !== '--tools',
+    );
+    const result = recordRunFailure({
+      batchId: 'batch_y',
+      parseStatus: 'timeout',
+      homeDir: tmpDir,
+      curatorArgv: withTools,
+    });
+    const runsDir = path.join(tmpDir, '.arcforge', 'learning', 'curator-runs');
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(runsDir, `${result.run_id}.manifest.json`), 'utf8'),
+    );
+    expect(manifest.invocation).toEqual({ tool_access: true, transport_status: 'timeout' });
+  });
+
+  test('a run withdrawn before submission records transport_status cancelled', () => {
+    const { recordRunFailure } = getIngestor();
+    const result = recordRunFailure({
+      batchId: 'batch_c',
+      parseStatus: 'transport_error',
+      transportStatus: 'cancelled',
+      detail: 'learning disabled before submission',
+      homeDir: tmpDir,
+    });
+    const runsDir = path.join(tmpDir, '.arcforge', 'learning', 'curator-runs');
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(runsDir, `${result.run_id}.manifest.json`), 'utf8'),
+    );
+    expect(manifest.invocation).toEqual({ tool_access: false, transport_status: 'cancelled' });
+    expect(manifest.parse_status).toBe('transport_error');
+  });
+
+  test('rejects a transport status outside the failure set', () => {
+    const { recordRunFailure } = getIngestor();
+    expect(() =>
+      recordRunFailure({
+        batchId: 'batch_d',
+        parseStatus: 'timeout',
+        transportStatus: 'completed',
+        homeDir: tmpDir,
+      }),
+    ).toThrow(/transportStatus/);
+  });
+
+  test('a failure without the curator argv is refused and writes nothing', () => {
+    const { recordRunFailure } = getRawIngestor();
+    expect(() =>
+      recordRunFailure({ batchId: 'batch_z', parseStatus: 'timeout', homeDir: tmpDir }),
+    ).toThrow(/curator argv is required/);
+    const runsDir = path.join(tmpDir, '.arcforge', 'learning', 'curator-runs');
+    expect(fs.existsSync(runsDir) ? fs.readdirSync(runsDir) : []).toEqual([]);
   });
 
   test('persisted manifest has correct fields for both spec parse_status values', () => {

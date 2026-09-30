@@ -21,6 +21,7 @@ const {
 const { SANITIZER_POLICY_VERSION } = require('../sanitize-observation');
 const { appendTransitionEvent } = require('./dashboard-events');
 const { draftArtifactsIntact } = require('./materialize');
+const { getActivationsDir, readActivationState } = require('./activation-state');
 
 // ---------------------------------------------------------------------------
 // First-slice supported target kinds
@@ -65,10 +66,6 @@ function projectScopeDir(scope) {
 function buildActiveInstinctPath(arcforgeRoot, candidate) {
   const scopeDir = projectScopeDir(candidate.scope || {});
   return path.join(arcforgeRoot, 'instincts', scopeDir, `${candidate.candidate_id}.md`);
-}
-
-function getActivationsDir(arcforgeRoot) {
-  return path.join(arcforgeRoot, 'learning', 'activations');
 }
 
 // ---------------------------------------------------------------------------
@@ -759,39 +756,7 @@ function findLatestActivation(arcforgeRoot, candidateId) {
  * @returns {Set<string>} candidate ids whose latest action === 'activate'
  */
 function listActivatedCandidateIds(arcforgeRoot) {
-  const activated = new Set();
-  const activationsDir = getActivationsDir(arcforgeRoot);
-  if (!fs.existsSync(activationsDir)) return activated;
-
-  let entries;
-  try {
-    entries = fs.readdirSync(activationsDir).sort();
-  } catch {
-    return activated;
-  }
-
-  // candidate_id -> { action, created_at }
-  const latestByCandidate = new Map();
-  for (const entry of entries) {
-    if (!entry.endsWith('.json')) continue;
-    try {
-      const record = JSON.parse(fs.readFileSync(path.join(activationsDir, entry), 'utf8'));
-      const id = record.candidate_id;
-      if (!id || (record.action !== 'activate' && record.action !== 'deactivate')) continue;
-      const prev = latestByCandidate.get(id);
-      // Sorted file iteration gives a stable tiebreak when created_at ties.
-      if (!prev || record.created_at >= prev.created_at) {
-        latestByCandidate.set(id, { action: record.action, created_at: record.created_at });
-      }
-    } catch {
-      // Corrupted record — skip
-    }
-  }
-
-  for (const [id, latest] of latestByCandidate) {
-    if (latest.action === 'activate') activated.add(id);
-  }
-  return activated;
+  return readActivationState(arcforgeRoot).activated;
 }
 
 // ---------------------------------------------------------------------------

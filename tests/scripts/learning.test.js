@@ -10,8 +10,11 @@ const {
   isLearningEnabled,
   isLearningEnabledAnyScope,
   isInjectActivatedInstinctsEnabled,
+  isLearningEnabledForProject,
   learningEnabledSince,
+  learningEnabledSinceForProject,
   readLearningConfig,
+  recordProjectRoot,
   setLearningEnabled,
 } = require('../../scripts/lib/learning');
 
@@ -85,6 +88,122 @@ describe('the learning opt-in', () => {
 
   // The stale-draft healthcheck needs "since when", not just "is it on":
   // drafts from a learning-off period are by-design stubs (D-009).
+  // B-1 / D-023: the machine-wide observer daemon knows a project only by the
+  // name its observations are filed under, so it asks this before analyzing.
+  describe('isLearningEnabledForProject', () => {
+    const project = () => path.basename(projectRoot);
+
+    it('is false with learning off everywhere, even with the project root on record', () => {
+      recordProjectRoot({ projectRoot, homeDir });
+      expect(isLearningEnabledForProject(project(), { homeDir })).toBe(false);
+    });
+
+    it('follows the project opt-in through the recorded root, including a later opt-out', () => {
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      recordProjectRoot({ projectRoot, homeDir });
+      expect(isLearningEnabledForProject(project(), { homeDir })).toBe(true);
+
+      setLearningEnabled({ scope: 'project', enabled: false, projectRoot, homeDir });
+      expect(isLearningEnabledForProject(project(), { homeDir })).toBe(false);
+    });
+
+    it('is true under the global opt-in whether or not a root is on record', () => {
+      setLearningEnabled({ scope: 'global', enabled: true, projectRoot, homeDir });
+      expect(isLearningEnabledForProject('never-seen', { homeDir })).toBe(true);
+    });
+
+    it('fails closed on a project-scope opt-in whose root was never recorded', () => {
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      expect(isLearningEnabledForProject(project(), { homeDir })).toBe(false);
+    });
+
+    it('records the root under the name observations are filed under', () => {
+      const oddRoot = path.join(testDir, 'my project!');
+      fs.mkdirSync(oddRoot);
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot: oddRoot, homeDir });
+      const recorded = recordProjectRoot({ projectRoot: oddRoot, homeDir });
+      expect(recorded.project).toBe('my-project');
+      expect(isLearningEnabledForProject('my-project', { homeDir })).toBe(true);
+    });
+
+    it('rejects a project name that is not a plain directory name', () => {
+      expect(() => isLearningEnabledForProject('../escape', { homeDir })).toThrow(/project/);
+      expect(() => isLearningEnabledForProject('', { homeDir })).toThrow(/project/);
+    });
+
+    // B-1: only observations recorded under the current opt-in are analyzed,
+    // so the daemon filters on the stamp of the opt-in that authorizes them.
+    it('reports the stamp of the latest enable after an opt-out, not the first opt-in', () => {
+      const FIRST = '2026-05-01T00:00:00.000Z';
+      const OFF = '2026-05-02T00:00:00.000Z';
+      const AGAIN = '2026-05-03T00:00:00.000Z';
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir, now: FIRST });
+      recordProjectRoot({ projectRoot, homeDir });
+      setLearningEnabled({ scope: 'project', enabled: false, projectRoot, homeDir, now: OFF });
+      expect(learningEnabledSinceForProject(project(), { homeDir })).toBeNull();
+
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir, now: AGAIN });
+      expect(learningEnabledSinceForProject(project(), { homeDir })).toBe(Date.parse(AGAIN));
+    });
+
+    // The project-roots record's schema: owner is learning.js, and a reader
+    // trusts only a record of exactly this shape.
+    it('writes the record as exactly { project, project_root }', () => {
+      recordProjectRoot({ projectRoot, homeDir });
+      const recordPath = path.join(
+        homeDir,
+        '.arcforge',
+        'learning',
+        'project-roots',
+        'project.json',
+      );
+      const record = JSON.parse(fs.readFileSync(recordPath, 'utf8'));
+      expect(Object.keys(record).sort()).toEqual(['project', 'project_root']);
+      expect(typeof record.project).toBe('string');
+      expect(typeof record.project_root).toBe('string');
+      expect(record.project).toBe(path.basename(projectRoot));
+      expect(path.isAbsolute(record.project_root)).toBe(true);
+      expect(record.project_root).toBe(path.resolve(projectRoot));
+    });
+
+    describe('a record that fails the shape is refused, not trusted', () => {
+      const recordPath = () =>
+        path.join(homeDir, '.arcforge', 'learning', 'project-roots', 'project.json');
+      function writeRecord(content) {
+        fs.mkdirSync(path.dirname(recordPath()), { recursive: true });
+        fs.writeFileSync(recordPath(), content);
+      }
+      const cases = {
+        'not JSON': '{nope',
+        'an array': '[]',
+        'an extra key': () =>
+          JSON.stringify({ project: 'project', project_root: projectRoot, x: 1 }),
+        'a missing key': JSON.stringify({ project: 'project' }),
+        'a relative root': JSON.stringify({ project: 'project', project_root: 'rel/project' }),
+        'a non-string root': JSON.stringify({ project: 'project', project_root: 7 }),
+        'another project name': () =>
+          JSON.stringify({ project: 'other', project_root: path.join(testDir, 'other') }),
+        'a root filed under another name': () =>
+          JSON.stringify({ project: 'project', project_root: path.join(testDir, 'elsewhere') }),
+      };
+      for (const [label, content] of Object.entries(cases)) {
+        it(`refuses ${label}`, () => {
+          setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+          writeRecord(typeof content === 'function' ? content() : content);
+          expect(() => learningEnabledSinceForProject('project', { homeDir })).toThrow(
+            /project-root record .*project\.json/,
+          );
+        });
+      }
+    });
+
+    it('reports the global stamp for a project with no root on record', () => {
+      const AT = '2026-05-04T00:00:00.000Z';
+      setLearningEnabled({ scope: 'global', enabled: true, projectRoot, homeDir, now: AT });
+      expect(learningEnabledSinceForProject('never-seen', { homeDir })).toBe(Date.parse(AT));
+    });
+  });
+
   describe('learningEnabledSince', () => {
     const EARLY = '2026-01-01T00:00:00.000Z';
     const LATE = '2026-06-01T00:00:00.000Z';
@@ -222,6 +341,47 @@ describe('the learning opt-in', () => {
 
     it('defaults ON when no config exists', () => {
       expect(isInjectActivatedInstinctsEnabled({ homeDir })).toBe(true);
+    });
+
+    // learning-5: `learn enable` / `learn disable` merge into the config, so the
+    // kill-switch a user wrote by hand survives the opt-in toggling.
+    it('survives learn enable and learn disable, as does any other key', () => {
+      writeGlobalConfig({
+        scope: 'global',
+        enabled: false,
+        inject_activated_instincts: false,
+        x: 1,
+      });
+      const configPath = getLearningConfigPath({ scope: 'global', homeDir });
+
+      setLearningEnabled({ scope: 'global', enabled: true, homeDir });
+      expect(isInjectActivatedInstinctsEnabled({ homeDir })).toBe(false);
+      expect(JSON.parse(fs.readFileSync(configPath, 'utf8'))).toMatchObject({
+        enabled: true,
+        inject_activated_instincts: false,
+        x: 1,
+      });
+
+      setLearningEnabled({ scope: 'global', enabled: false, homeDir });
+      expect(isInjectActivatedInstinctsEnabled({ homeDir })).toBe(false);
+      expect(JSON.parse(fs.readFileSync(configPath, 'utf8')).x).toBe(1);
+    });
+
+    it('keeps the project config’s other keys through a toggle', () => {
+      const configPath = getLearningConfigPath({ scope: 'project', projectRoot });
+      fs.mkdirSync(path.dirname(configPath), { recursive: true });
+      fs.writeFileSync(
+        configPath,
+        JSON.stringify({ scope: 'project', enabled: true, note: 'kept' }),
+      );
+
+      setLearningEnabled({ scope: 'project', enabled: false, projectRoot, homeDir });
+
+      expect(JSON.parse(fs.readFileSync(configPath, 'utf8'))).toMatchObject({
+        scope: 'project',
+        enabled: false,
+        note: 'kept',
+      });
     });
 
     it('defaults ON when the field is absent', () => {

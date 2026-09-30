@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { readJsonFile, writeJsonFile, getArcforgeHome } = require('./utils');
+const { readJsonFile, writeJsonFile, getArcforgeHome, sanitizeProjectName } = require('./utils');
 
 /**
  * learning.js — the learning opt-in and the paths that follow from it.
@@ -92,6 +92,116 @@ function isLearningEnabledAnyScope({ projectRoot = process.cwd(), homeDir } = {}
     isLearningEnabled({ scope: 'project', projectRoot, homeDir }) ||
     isLearningEnabled({ scope: 'global', projectRoot, homeDir })
   );
+}
+
+/**
+ * Where the root of the project whose observations are filed under `project`
+ * is on record. The observer daemon is machine-wide and knows a project only by
+ * that name, while the project-scope opt-in lives in the project's own tree.
+ */
+function getProjectRootRecordPath(project, { homeDir } = {}) {
+  if (typeof project !== 'string' || !project || sanitizeProjectName(project) !== project) {
+    throw new Error(`project must be a sanitized project directory name (got "${project}")`);
+  }
+  return path.join(arcforgeRoot(homeDir), 'learning', 'project-roots', `${project}.json`);
+}
+
+/**
+ * Put a project's root on record under the name its observations are filed
+ * under (the `getProjectName()` key), so `isLearningEnabledForProject` can find
+ * the project-scope opt-in. SessionStart and every observation keep it current
+ * while learning is on there, so it is cheap and idempotent: a record that
+ * already says the same is not rewritten. A record that fails its shape is
+ * replaced — the writer is the one party that knows the right answer.
+ *
+ * @returns {{ project: string, project_root: string }}
+ */
+function recordProjectRoot({ projectRoot = process.cwd(), homeDir } = {}) {
+  const resolved = path.resolve(projectRoot);
+  const record = { project: sanitizeProjectName(path.basename(resolved)), project_root: resolved };
+  let existing = null;
+  try {
+    existing = readProjectRootRecord(record.project, { homeDir });
+  } catch {
+    // An unusable record is exactly what this write repairs, so it is not an error here.
+  }
+  if (existing && existing.project_root === resolved) return record;
+  writeJsonFile(getProjectRootRecordPath(record.project, { homeDir }), record);
+  return record;
+}
+
+/**
+ * Read the project-root record filed under `project`, or null when there is
+ * none. The record is trusted only in exactly the shape `recordProjectRoot`
+ * writes — `{ project, project_root }`, both strings, `project` the name it is
+ * filed under, `project_root` an absolute path whose directory name files
+ * under that name. Anything else throws, so a caller asking whether it may
+ * analyze fails closed instead of following a root nobody recorded.
+ *
+ * @returns {{ project: string, project_root: string }|null}
+ */
+function readProjectRootRecord(project, { homeDir } = {}) {
+  const recordPath = getProjectRootRecordPath(project, { homeDir });
+  if (!fs.existsSync(recordPath)) return null;
+  const refuse = (why) => {
+    throw new Error(`project-root record ${recordPath} is not usable: ${why}`);
+  };
+  let record;
+  try {
+    record = JSON.parse(fs.readFileSync(recordPath, 'utf8'));
+  } catch (err) {
+    refuse(`not JSON (${err.message})`);
+  }
+  if (!record || typeof record !== 'object' || Array.isArray(record)) refuse('not an object');
+  const keys = Object.keys(record).sort().join(',');
+  if (keys !== 'project,project_root') refuse(`keys must be project, project_root (got ${keys})`);
+  if (record.project !== project) refuse(`project is "${record.project}", filed as "${project}"`);
+  const root = record.project_root;
+  if (typeof root !== 'string' || !path.isAbsolute(root)) {
+    refuse(`project_root must be an absolute path (got ${JSON.stringify(root)})`);
+  }
+  if (sanitizeProjectName(path.basename(root)) !== project) {
+    refuse(`project_root ${root} does not file under "${project}"`);
+  }
+  return record;
+}
+
+/**
+ * When learning took effect for the project whose observations are filed under
+ * `project`, in epoch ms, or null when it is not enabled for it (B-1).
+ *
+ * With the project's root on record this is `learningEnabledSince` at that root
+ * — the earliest enabled scope's stamp, which a disable overwrites, so a
+ * re-enable starts a new period. Without a record only the global opt-in can
+ * authorize the project, so it is the global scope's stamp, or null (fail
+ * closed). The observer daemon analyzes only observations recorded at or after
+ * this instant, so nothing captured under an earlier opt-in is analyzed later.
+ *
+ * @param {string} project - sanitized project directory name
+ * @param {Object} [opts]
+ * @param {string} [opts.homeDir] - Override for the arcforge home's parent.
+ * @returns {number|null}
+ */
+function learningEnabledSinceForProject(project, { homeDir } = {}) {
+  const record = readProjectRootRecord(project, { homeDir });
+  if (record) return learningEnabledSince({ projectRoot: record.project_root, homeDir });
+  const global = readScopeConfig({ scope: 'global', homeDir });
+  if (global.enabled !== true) return null;
+  return scopeEnabledAt(global, getLearningConfigPath({ scope: 'global', homeDir }));
+}
+
+/**
+ * True when learning is enabled for the project whose observations are filed
+ * under `project` — the question the observer daemon asks before analyzing
+ * (B-1). See `learningEnabledSinceForProject`.
+ *
+ * @param {string} project - sanitized project directory name
+ * @param {Object} [opts]
+ * @param {string} [opts.homeDir] - Override for the arcforge home's parent.
+ * @returns {boolean}
+ */
+function isLearningEnabledForProject(project, { homeDir } = {}) {
+  return learningEnabledSinceForProject(project, { homeDir }) !== null;
 }
 
 /**
@@ -205,7 +315,12 @@ function setLearningEnabled({
   // which is exactly why the fallback has to be captured here instead of
   // re-derived on the next read.
   const preserved = previous.enabled === next ? preservedStamp(previous, configPath) : null;
-  const config = { scope, enabled: next, updated_at: preserved ?? now };
+  // Merge, never replace: the file carries keys the opt-in does not own — the
+  // `inject_activated_instincts` kill-switch among them — and a toggle that
+  // dropped them would silently turn a user's own setting back off.
+  const raw = readJsonFile(configPath, null);
+  const existing = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const config = { ...existing, scope, enabled: next, updated_at: preserved ?? now };
   writeJsonFile(configPath, config);
   return config;
 }
@@ -217,7 +332,10 @@ module.exports = {
   isInjectActivatedInstinctsEnabled,
   isLearningEnabled,
   isLearningEnabledAnyScope,
+  isLearningEnabledForProject,
   learningEnabledSince,
+  learningEnabledSinceForProject,
   readLearningConfig,
+  recordProjectRoot,
   setLearningEnabled,
 };

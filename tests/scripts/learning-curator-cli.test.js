@@ -159,6 +159,10 @@ describe('CLI record-run-failure', () => {
       'transport_error',
       '--detail',
       'claude exit 1',
+      '--',
+      '--tools',
+      '',
+      '--strict-mcp-config',
     ]);
     const parsed = JSON.parse(output);
     expect(parsed.run_id).toMatch(/^curator_run_/);
@@ -172,6 +176,7 @@ describe('CLI record-run-failure', () => {
     expect(fs.existsSync(manifestPath)).toBe(true);
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     expect(manifest.parse_status).toBe('transport_error');
+    expect(manifest.invocation.tool_access).toBe(false);
   });
 
   test('timeout parse-status persists correctly', () => {
@@ -183,9 +188,56 @@ describe('CLI record-run-failure', () => {
       'timeout',
       '--detail',
       'watchdog killed claude',
+      '--',
+      '--tools',
+      '',
+      '--strict-mcp-config',
     ]);
     const parsed = JSON.parse(output);
     expect(parsed.parse_status).toBe('timeout');
+  });
+
+  test('--transport-status cancelled is recorded; any other override is refused', () => {
+    const output = runCLI([
+      'record-run-failure',
+      '--batch-id',
+      'batch_test_rf_cancel',
+      '--parse-status',
+      'transport_error',
+      '--transport-status',
+      'cancelled',
+      '--',
+      '--tools',
+      '',
+      '--strict-mcp-config',
+    ]);
+    const parsed = JSON.parse(output);
+    const runsDir = path.join(tmpDir, '.arcforge', 'learning', 'curator-runs');
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(runsDir, `${parsed.run_id}.manifest.json`), 'utf8'),
+    );
+    expect(manifest.invocation.transport_status).toBe('cancelled');
+
+    const { spawnSync } = require('node:child_process');
+    const bad = spawnSync(
+      'node',
+      [
+        CLI_PATH,
+        'record-run-failure',
+        '--batch-id',
+        'batch_test_rf_bad',
+        '--parse-status',
+        'timeout',
+        '--transport-status',
+        'completed',
+        '--',
+        '--tools',
+        '',
+      ],
+      { env: { ...process.env, HOME: tmpDir }, encoding: 'utf8' },
+    );
+    expect(bad.status).toBe(1);
+    expect(bad.stderr).toMatch(/--transport-status/);
   });
 
   test('invalid parse-status (e.g. cli_not_found) is rejected — only spec enum values allowed', () => {
@@ -238,5 +290,113 @@ describe('CLI record-run-failure', () => {
       },
     );
     expect(result.status).not.toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// learning B-1: learning-enabled — the observer daemon's consent gate
+// ---------------------------------------------------------------------------
+
+describe('CLI learning-enabled', () => {
+  const { spawnSync } = require('node:child_process');
+
+  function learningEnabled(project) {
+    const env = { ...process.env, HOME: tmpDir };
+    delete env.ARCFORGE_HOME;
+    return spawnSync('node', [CLI_PATH, 'learning-enabled', '--project', project], {
+      env,
+      encoding: 'utf8',
+    });
+  }
+
+  function writeJson(filePath, value) {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify(value));
+  }
+
+  test('exits 3 with learning off everywhere', () => {
+    const result = learningEnabled('demo');
+    expect(result.status).toBe(3);
+    expect(JSON.parse(result.stdout)).toEqual({
+      project: 'demo',
+      enabled: false,
+      enabled_since: null,
+    });
+  });
+
+  test('exits 0 under the project opt-in at the recorded root', () => {
+    const root = path.join(tmpDir, 'demo');
+    writeJson(path.join(root, '.arcforge', 'learning', 'config.json'), {
+      scope: 'project',
+      enabled: true,
+      updated_at: '2026-05-03T00:00:00.000Z',
+    });
+    writeJson(path.join(tmpDir, '.arcforge', 'learning', 'project-roots', 'demo.json'), {
+      project: 'demo',
+      project_root: root,
+    });
+    const result = learningEnabled('demo');
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual({
+      project: 'demo',
+      enabled: true,
+      enabled_since: '2026-05-03T00:00:00.000Z',
+    });
+  });
+
+  test('exits 1 on a project name that is not a plain directory name', () => {
+    const result = learningEnabled('../escape');
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/project/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// learning B-1: assemble-batch refuses a malformed --since / --min-observations
+// rather than building a batch with no opt-in filter (fail closed)
+// ---------------------------------------------------------------------------
+
+describe('CLI assemble-batch argument validation', () => {
+  const { spawnSync } = require('node:child_process');
+
+  function assemble(extra) {
+    seedObservations('val-proj', 12);
+    const env = { ...process.env, HOME: tmpDir };
+    delete env.ARCFORGE_HOME;
+    return spawnSync('node', [CLI_PATH, 'assemble-batch', '--project', 'val-proj', ...extra], {
+      env,
+      encoding: 'utf8',
+    });
+  }
+
+  function batchesWritten() {
+    const dir = path.join(tmpDir, '.arcforge', 'learning', 'curator-batches');
+    return fs.existsSync(dir) ? fs.readdirSync(dir) : [];
+  }
+
+  const refusals = {
+    '--since with no value': [['--since'], /--since/],
+    '--since followed by another flag': [['--since', '--min-observations', '10'], /--since/],
+    '--since that is not a date': [['--since', 'yesterday'], /--since/],
+    '--min-observations with no value': [
+      ['--since', '2026-01-01T00:00:00Z', '--min-observations'],
+      /--min-observations/,
+    ],
+    '--min-observations that is not digits': [['--min-observations', '1e1'], /--min-observations/],
+    '--min-observations that is negative': [['--min-observations', '-1'], /--min-observations/],
+  };
+  for (const [label, [extra, message]] of Object.entries(refusals)) {
+    test(`exits 1 on ${label}, writing nothing`, () => {
+      const result = assemble(extra);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toMatch(message);
+      expect(batchesWritten()).toEqual([]);
+    });
+  }
+
+  test('a well-formed --since and --min-observations still assemble', () => {
+    const result = assemble(['--since', '2026-01-01T00:00:00Z', '--min-observations', '10']);
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout).batch_id).toMatch(/^batch_/);
   });
 });

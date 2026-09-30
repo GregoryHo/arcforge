@@ -188,6 +188,11 @@ type DashboardCandidateDetail = DashboardCandidateCard & {
 
   materialization?: CandidateLifecycleState["materialization"];
   activation?: CandidateLifecycleState["activation"];
+
+  // Instinct candidates whose legal actions include activate or deactivate:
+  // the file activation writes (or deactivation retires), which the page shows
+  // before it sends the safety_ack naming it.
+  active_target_path?: string;
 };
 ```
 

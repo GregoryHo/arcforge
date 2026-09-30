@@ -102,6 +102,15 @@ count_observations() {
   wc -l < "$obs_file" | tr -d ' '
 }
 
+# Print the instant learning took effect for a project (the engine's
+# `learning-enabled` query), or nothing when it is not enabled or the query
+# fails. Returns non-zero in both of those cases.
+current_enabled_since() {
+  local json=""
+  json=$(node "$CURATOR_CLI" learning-enabled --project "$1" 2>/dev/null) || return 1
+  printf '%s' "$json" | sed -n 's/.*"enabled_since":"\([^"]*\)".*/\1/p'
+}
+
 analyze_project() {
   local project="$1"
   local obs_file="${OBS_DIR}/${project}/observations.jsonl"
@@ -115,6 +124,28 @@ analyze_project() {
 
   if [ "$obs_count" -lt "$MIN_OBSERVATIONS" ]; then
     log_msg "Skipping ${project}: only ${obs_count} observations (need ${MIN_OBSERVATIONS})"
+    return
+  fi
+
+  # Consent gate (learning B-1): analysis sends observations to a model, so it
+  # runs only where learning is enabled for this project, and only over what was
+  # recorded under that opt-in. The engine answers both — global opt-in, or the
+  # project-scope opt-in at the recorded root, and the stamp it took effect —
+  # and anything other than a clear yes, errors included, skips. Observations
+  # recorded before the stamp (an earlier opt-in, since turned off) are never
+  # put in a batch; they stay on disk.
+  if ! command -v node &>/dev/null; then
+    log_msg "WARNING: node not found, skipping analysis"
+    return
+  fi
+  local enabled_status=0 enabled_since=""
+  enabled_since=$(current_enabled_since "$project") || enabled_status=$?
+  if [ "$enabled_status" -ne 0 ]; then
+    log_msg "Skipping ${project}: learning is not enabled for it"
+    return
+  fi
+  if [ -z "$enabled_since" ]; then
+    log_msg "Skipping ${project}: learning-enabled returned no enable stamp"
     return
   fi
 
@@ -136,11 +167,6 @@ analyze_project() {
 
   log_msg "Analyzing ${project}: ${obs_count} observations"
 
-  # Verify Node CLI is available
-  if ! command -v node &>/dev/null; then
-    log_msg "WARNING: node not found, skipping analysis"
-    return
-  fi
   if [ ! -f "$CURATOR_CLI" ]; then
     log_msg "ERROR: curator CLI not found at ${CURATOR_CLI}"
     return
@@ -148,12 +174,23 @@ analyze_project() {
 
   # ── Layer 3: Assemble batch via Node CLI ──────────────────────────────────
   # Bash 'set -e' aborts the function if `var=$(node ...)` non-zero, so the
-  # error check must use `if !` form (a failed assignment via `set -e` skips
-  # the next-line check entirely).
+  # exit status is captured with `|| status=$?` (a bare failed assignment under
+  # `set -e` would skip the next-line check entirely).
+  # --since keeps observations recorded before the opt-in stamp out of the
+  # batch; exit 3 means too few are left, and nothing was written.
   local batch_info=""
   local batch_err_file="${INSTINCTS_DIR}/.assemble-batch.err"
+  local assemble_status=0
   mkdir -p "$INSTINCTS_DIR"
-  if ! batch_info=$(node "$CURATOR_CLI" assemble-batch --project "$project" 2>"$batch_err_file"); then
+  batch_info=$(node "$CURATOR_CLI" assemble-batch --project "$project" \
+    --since "$enabled_since" --min-observations "$MIN_OBSERVATIONS" \
+    2>"$batch_err_file") || assemble_status=$?
+  if [ "$assemble_status" -eq 3 ]; then
+    log_msg "Skipping ${project}: fewer than ${MIN_OBSERVATIONS} observations recorded since learning was enabled (${enabled_since})"
+    rm -f "$batch_err_file"
+    return
+  fi
+  if [ "$assemble_status" -ne 0 ]; then
     log_msg "ERROR: assemble-batch failed for ${project}: $(cat "$batch_err_file" 2>/dev/null || true)"
     rm -f "$batch_err_file"
     echo $((fail_count + 1)) > "$fail_count_file"
@@ -208,7 +245,6 @@ analyze_project() {
   # structured payload under the `structured_output` field.
   #
   # Response file: transient, cleaned in EXIT trap and after ingestion.
-  # Note: Layer 4 spec says tool_access=false — no --tools flag.
   local response_file="${INSTINCTS_DIR}/.curator-response.${batch_id}.json"
   local analysis_success=false
   local retry_count=0
@@ -224,6 +260,19 @@ analyze_project() {
   local schema_json
   schema_json=$(cat "$schema_path")
 
+  # The curator run gets no tools at all (learning B-9, D-023): `--tools ""`
+  # empties the built-in set, and the strict, empty MCP config loads no server,
+  # so the run can read the batch it is handed and return a proposal, and can
+  # touch nothing on the machine. The same argv goes to ingest-proposal, which
+  # derives the run manifest's tool_access from it rather than asserting one.
+  local -a claude_args=(--model haiku --tools ""
+    --max-turns 15
+    --print
+    --output-format json
+    --json-schema "$schema_json"
+    --disable-slash-commands
+    --strict-mcp-config --mcp-config '{"mcpServers":{}}')
+
   # Ensure INSTINCTS_DIR exists for the response file
   mkdir -p "$INSTINCTS_DIR"
 
@@ -236,6 +285,29 @@ analyze_project() {
   local watchdog_fired_marker="${INSTINCTS_DIR}/.watchdog-fired.${batch_id}"
 
   while [ "$retry_count" -le "$max_retries" ] && [ "$analysis_success" = false ]; do
+    # Consent is re-checked immediately before every model attempt, retries
+    # included (learning B-1). The batch was rendered under `enabled_since`, so
+    # the run is withdrawn not only when learning is now off but also when the
+    # stamp moved — a disable and re-enable since assembly — because the prompt
+    # may carry evidence from the earlier period. The next cycle rebuilds it.
+    local recheck_since="" recheck_status=0 withdrawn=""
+    recheck_since=$(current_enabled_since "$project") || recheck_status=$?
+    if [ "$recheck_status" -ne 0 ] || [ -z "$recheck_since" ]; then
+      withdrawn="learning was turned off before the batch was submitted"
+    elif [ "$recheck_since" != "$enabled_since" ]; then
+      withdrawn="the opt-in changed since the batch was assembled (${enabled_since} -> ${recheck_since})"
+    fi
+    if [ -n "$withdrawn" ]; then
+      log_msg "Aborting ${project}: ${withdrawn}; nothing was sent"
+      node "$CURATOR_CLI" record-run-failure \
+        --batch-id "$batch_id" \
+        --parse-status "transport_error" \
+        --transport-status "cancelled" \
+        --detail "${withdrawn}; nothing was sent" \
+        -- "${claude_args[@]}" \
+        > /dev/null 2>&1 || true
+      return
+    fi
     if command -v claude &>/dev/null; then
       local exit_code=0
       local claude_pid=""
@@ -246,13 +318,7 @@ analyze_project() {
       # --output-format json + --json-schema forces structured output (no
       # markdown wrap possible). The payload lives at .structured_output in
       # the envelope; ingest-proposal extracts it.
-      (claude --model haiku \
-        --max-turns 15 \
-        --print \
-        --output-format json \
-        --json-schema "$schema_json" \
-        --disable-slash-commands \
-        --strict-mcp-config --mcp-config '{"mcpServers":{}}' \
+      (claude "${claude_args[@]}" \
         < "$prompt_path" \
         > "$response_file" 2>"$tmp_out") &
       claude_pid=$!
@@ -286,6 +352,7 @@ analyze_project() {
             --batch-id "$batch_id" \
             --parse-status "timeout" \
             --detail "claude CLI exceeded watchdog timeout (${OBSERVER_DAEMON_WATCHDOG_SECS}s)" \
+            -- "${claude_args[@]}" \
             > /dev/null 2>&1 || true
           last_was_timeout=true
         else
@@ -306,6 +373,7 @@ analyze_project() {
         --batch-id "$batch_id" \
         --parse-status "transport_error" \
         --detail "claude CLI not found in PATH" \
+        -- "${claude_args[@]}" \
         > /dev/null 2>&1 || true
       return
     fi
@@ -322,6 +390,7 @@ analyze_project() {
         --batch-id "$batch_id" \
         --parse-status "transport_error" \
         --detail "claude CLI exited non-zero after ${max_retries} retries" \
+        -- "${claude_args[@]}" \
         > /dev/null 2>&1 || true
     fi
     return
@@ -332,7 +401,8 @@ analyze_project() {
   local ingest_err_file="${INSTINCTS_DIR}/.ingest-proposal.err"
   if ! ingest_result=$(node "$CURATOR_CLI" ingest-proposal \
       --batch-id "$batch_id" \
-      --response-file "$response_file" 2>"$ingest_err_file"); then
+      --response-file "$response_file" \
+      -- "${claude_args[@]}" 2>"$ingest_err_file"); then
     log_msg "ERROR: ingest-proposal failed for batch ${batch_id}: $(cat "$ingest_err_file" 2>/dev/null || true)"
     rm -f "$ingest_err_file" "$response_file"
     echo $((fail_count + 1)) > "$fail_count_file"

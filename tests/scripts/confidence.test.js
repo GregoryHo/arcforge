@@ -213,13 +213,22 @@ confidence: 0.50
 
   describe('runDecayCycle', () => {
     const testDir = path.join(os.tmpdir(), `confidence-decay-test-${Date.now()}`);
+    // Decay reads ActivationRecords and writes its audit under the arcforge
+    // home, so every case runs against a scratch home, never the real one.
+    const testHome = path.join(os.tmpdir(), `confidence-decay-home-${Date.now()}`);
+    let savedHome;
 
     beforeEach(() => {
       fs.mkdirSync(testDir, { recursive: true });
+      savedHome = process.env.ARCFORGE_HOME;
+      process.env.ARCFORGE_HOME = testHome;
     });
 
     afterEach(() => {
       fs.rmSync(testDir, { recursive: true, force: true });
+      fs.rmSync(testHome, { recursive: true, force: true });
+      if (savedHome === undefined) delete process.env.ARCFORGE_HOME;
+      else process.env.ARCFORGE_HOME = savedHome;
     });
 
     it('returns empty for non-existent directory', () => {
@@ -355,6 +364,256 @@ last_confirmed: 2026-01-17
           expect(reflFm.confidence).toBeGreaterThan(autoFm.confidence);
         }
       }
+    });
+  });
+
+  // B-10 / D-022: decay charges each elapsed period once, never archives an
+  // activated instinct, and audits + stamps every archive it does perform.
+  describe('runDecayCycle — B-10 charge once, spare the activated, audit the archive', () => {
+    let root;
+    let home;
+    let savedHome;
+    const NOW = new Date('2026-03-01T12:00:00.000Z');
+    const FOUR_WEEKS_BEFORE = '2026-02-01';
+
+    function instinct(id, confidence, lastConfirmed, source = 'session-observation') {
+      return `---
+id: ${id}
+confidence: ${confidence}
+source: ${source}
+last_confirmed: ${lastConfirmed}
+---
+
+# ${id}
+
+## Action
+Do the thing.
+`;
+    }
+
+    function writeInstinct(dir, id, confidence, lastConfirmed, source) {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, `${id}.md`),
+        instinct(id, confidence, lastConfirmed, source),
+        'utf-8',
+      );
+    }
+
+    function readFm(filePath) {
+      return parseConfidenceFrontmatter(fs.readFileSync(filePath, 'utf-8')).frontmatter;
+    }
+
+    function recordActivation(candidateId, action = 'activate') {
+      const dir = path.join(home, 'learning', 'activations');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, `${Date.now()}-${candidateId}-${action}.json`),
+        JSON.stringify({
+          candidate_id: candidateId,
+          action,
+          created_at: new Date().toISOString(),
+        }),
+      );
+    }
+
+    function auditLines() {
+      const logPath = path.join(home, 'learning', 'dashboard', 'actions.jsonl');
+      if (!fs.existsSync(logPath)) return [];
+      return fs
+        .readFileSync(logPath, 'utf-8')
+        .split('\n')
+        .filter(Boolean)
+        .map((l) => JSON.parse(l));
+    }
+
+    beforeEach(() => {
+      root = fs.mkdtempSync(path.join(os.tmpdir(), 'decay-b10-'));
+      home = path.join(root, 'home');
+      savedHome = process.env.ARCFORGE_HOME;
+      process.env.ARCFORGE_HOME = home;
+    });
+
+    afterEach(() => {
+      fs.rmSync(root, { recursive: true, force: true });
+      if (savedHome === undefined) delete process.env.ARCFORGE_HOME;
+      else process.env.ARCFORGE_HOME = savedHome;
+    });
+
+    it('five cycles over the same interval equal one cycle', () => {
+      const once = path.join(root, 'once');
+      const five = path.join(root, 'five');
+      writeInstinct(once, 'p', '0.50', FOUR_WEEKS_BEFORE);
+      writeInstinct(five, 'p', '0.50', FOUR_WEEKS_BEFORE);
+
+      runDecayCycle(once, { now: NOW });
+      for (let i = 0; i < 5; i++) runDecayCycle(five, { now: NOW });
+
+      expect(fs.existsSync(path.join(five, 'p.md'))).toBe(true);
+      expect(fs.existsSync(path.join(five, 'archived', 'p.md'))).toBe(false);
+      const single = readFm(path.join(once, 'p.md'));
+      expect(single.confidence).toBeCloseTo(0.5 - 4 * DECAY_PER_WEEK, 5);
+      expect(readFm(path.join(five, 'p.md')).confidence).toBe(single.confidence);
+    });
+
+    it('cycles spread across the interval charge the same total as one at its end', () => {
+      const once = path.join(root, 'once');
+      const spread = path.join(root, 'spread');
+      writeInstinct(once, 'p', '0.50', FOUR_WEEKS_BEFORE);
+      writeInstinct(spread, 'p', '0.50', FOUR_WEEKS_BEFORE);
+
+      runDecayCycle(once, { now: NOW });
+      // Daily sessions: each one alone is less than a period, so nothing may be
+      // lost to rounding and nothing may be charged twice.
+      for (let day = 1; day <= 28; day++) {
+        const at = new Date(Date.parse(`${FOUR_WEEKS_BEFORE}T12:00:00.000Z`) + day * 86400000);
+        runDecayCycle(spread, { now: at });
+      }
+
+      expect(readFm(path.join(spread, 'p.md')).confidence).toBe(
+        readFm(path.join(once, 'p.md')).confidence,
+      );
+    });
+
+    it('a confirmation after a charge restarts the clock from last_confirmed', () => {
+      const dir = path.join(root, 'confirm');
+      writeInstinct(dir, 'p', '0.50', FOUR_WEEKS_BEFORE);
+      // Charges four whole weeks, through 2026-03-01.
+      runDecayCycle(dir, { now: new Date('2026-03-05T00:00:00.000Z') });
+      const filePath = path.join(dir, 'p.md');
+      fs.writeFileSync(
+        filePath,
+        updateConfidenceFrontmatter(fs.readFileSync(filePath, 'utf-8'), {
+          confidence: 0.47,
+          last_confirmed: '2026-03-06',
+        }),
+      );
+
+      // Eight days after the charge, three after the confirmation: no period
+      // has elapsed since the user last confirmed it.
+      runDecayCycle(dir, { now: new Date('2026-03-09T00:00:00.000Z') });
+
+      expect(readFm(filePath).confidence).toBe(0.47);
+    });
+
+    it('never archives an activated instinct', () => {
+      const dir = path.join(root, 'instincts', 'proj');
+      writeInstinct(dir, 'cand_active', '0.12', '2025-01-01');
+      recordActivation('cand_active');
+
+      const result = runDecayCycle(dir, { now: NOW });
+
+      expect(result.archived).not.toContain('cand_active.md');
+      expect(fs.existsSync(path.join(dir, 'cand_active.md'))).toBe(true);
+      expect(fs.existsSync(path.join(dir, 'archived', 'cand_active.md'))).toBe(false);
+      expect(auditLines()).toHaveLength(0);
+    });
+
+    it('archives an instinct once deactivated, like any other', () => {
+      const dir = path.join(root, 'instincts', 'proj');
+      writeInstinct(dir, 'cand_gone', '0.12', '2025-01-01');
+      recordActivation('cand_gone', 'activate');
+      recordActivation('cand_gone', 'deactivate');
+
+      const result = runDecayCycle(dir, { now: NOW });
+
+      expect(result.archived).toContain('cand_gone.md');
+    });
+
+    it('holds the archive back, source in place, when the audit cannot be written', () => {
+      const dir = path.join(root, 'instincts', 'proj');
+      writeInstinct(dir, 'dying', '0.12', '2025-01-01');
+      const before = fs.readFileSync(path.join(dir, 'dying.md'), 'utf-8');
+      // The audit log's directory is a file, so the append must fail.
+      fs.mkdirSync(path.join(home, 'learning'), { recursive: true });
+      fs.writeFileSync(path.join(home, 'learning', 'dashboard'), 'not a directory');
+
+      const result = runDecayCycle(dir, { now: NOW });
+
+      expect(result.archived).toEqual([]);
+      expect(result.archiveFailed).toHaveLength(1);
+      expect(result.archiveFailed[0].file).toBe('dying.md');
+      expect(result.archiveFailed[0].error).toMatch(/\S/);
+      expect(fs.readFileSync(path.join(dir, 'dying.md'), 'utf-8')).toBe(before);
+      expect(fs.existsSync(path.join(dir, 'archived', 'dying.md'))).toBe(false);
+    });
+
+    it('skips archiving, but still decays, when activation state cannot be read', () => {
+      const dir = path.join(root, 'instincts', 'proj');
+      writeInstinct(dir, 'maybe_active', '0.12', '2025-01-01');
+      const activations = path.join(home, 'learning', 'activations');
+      fs.mkdirSync(activations, { recursive: true });
+      fs.writeFileSync(path.join(activations, '0001-broken.json'), '{ not json');
+
+      const result = runDecayCycle(dir, { now: NOW });
+
+      expect(result.archived).toEqual([]);
+      expect(result.archiveSkipped).toHaveLength(1);
+      expect(result.archiveSkipped[0].file).toBe('maybe_active.md');
+      expect(result.archiveSkipped[0].reason).toMatch(/activation state/);
+      expect(fs.existsSync(path.join(dir, 'maybe_active.md'))).toBe(true);
+      expect(fs.existsSync(path.join(dir, 'archived'))).toBe(false);
+      expect(readFm(path.join(dir, 'maybe_active.md')).confidence).toBe(MIN_CONFIDENCE);
+      expect(auditLines()).toHaveLength(0);
+    });
+
+    it('never overwrites an existing archive of the same name', () => {
+      const dir = path.join(root, 'instincts', 'proj');
+      writeInstinct(dir, 'dying', '0.12', '2025-01-01');
+      const olderPath = path.join(dir, 'archived', 'dying.md');
+      fs.mkdirSync(path.dirname(olderPath), { recursive: true });
+      fs.writeFileSync(olderPath, 'an earlier contradiction archive\n');
+
+      const result = runDecayCycle(dir, { now: NOW });
+
+      expect(fs.readFileSync(olderPath, 'utf-8')).toBe('an earlier contradiction archive\n');
+      expect(result.archived).toEqual(['dying.md']);
+      expect(result.archivedTo).toEqual([path.join('archived', 'dying.2026-03-01.md')]);
+      const written = readFm(path.join(dir, 'archived', 'dying.2026-03-01.md'));
+      expect(written.archive_reason).toBe('decay');
+      expect(auditLines()[0].archived_to).toBe(path.join('archived', 'dying.2026-03-01.md'));
+    });
+
+    it('rolls back only its own copy when the audit fails beside an existing archive', () => {
+      const dir = path.join(root, 'instincts', 'proj');
+      writeInstinct(dir, 'dying', '0.12', '2025-01-01');
+      const olderPath = path.join(dir, 'archived', 'dying.md');
+      fs.mkdirSync(path.dirname(olderPath), { recursive: true });
+      fs.writeFileSync(olderPath, 'an earlier contradiction archive\n');
+      fs.mkdirSync(path.join(home, 'learning'), { recursive: true });
+      fs.writeFileSync(path.join(home, 'learning', 'dashboard'), 'not a directory');
+
+      const result = runDecayCycle(dir, { now: NOW });
+
+      expect(result.archiveFailed).toHaveLength(1);
+      expect(fs.readFileSync(olderPath, 'utf-8')).toBe('an earlier contradiction archive\n');
+      expect(fs.readdirSync(path.join(dir, 'archived'))).toEqual(['dying.md']);
+      expect(fs.existsSync(path.join(dir, 'dying.md'))).toBe(true);
+    });
+
+    it('stamps the archived file with the decay reason and audits the instinct by name', () => {
+      const dir = path.join(root, 'instincts', 'proj');
+      writeInstinct(dir, 'dying', '0.12', '2025-01-01');
+
+      const result = runDecayCycle(dir, { now: NOW });
+
+      expect(result.archived).toEqual(['dying.md']);
+      const archived = readFm(path.join(dir, 'archived', 'dying.md'));
+      expect(archived.archive_reason).toBe('decay');
+      expect(archived.archived_at).toBe('2026-03-01');
+
+      const lines = auditLines();
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toMatchObject({
+        accepted: true,
+        action: 'decay_archive',
+        instinct_id: 'dying',
+        reason: 'decay',
+        actor: { actor_type: 'decay_cycle' },
+      });
+      expect(lines[0].confidence_before).toBe(0.12);
+      // The audit trail carries no absolute filesystem path.
+      expect(JSON.stringify(lines[0])).not.toContain(root);
     });
   });
 

@@ -51,7 +51,7 @@ fails if either the declaration or the emptiness goes away.
 | Event | Registration | Kind | What runs |
 |-------|--------------|------|-----------|
 | SessionStart | `inject-context` | sync | Loads previous session context / activated instincts |
-| SessionStart | `session-start` | async | Initializes the session file, lazily starts the observer daemon |
+| SessionStart | `session-start` | async | Initializes the session file, starts the observer daemon when learning is on |
 | UserPromptSubmit | `user-message-counter` | sync | Counts user messages (stdin passthrough) |
 | PreToolUse | `secrets-guard` | sync | Warn-only credential scan (never denies) |
 | PreToolUse | `observe-pre` | async | Captures the pre-tool observation |

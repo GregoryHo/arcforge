@@ -16,6 +16,10 @@ current project, only when learning is enabled (`isLearningEnabled()`).
 Payloads are sanitized before persistence (`sanitize-observation.js`) and
 capped in size (`MAX_INPUT_LENGTH`, `MAX_FILE_SIZE`) before being written.
 
+While learning is on it also keeps the project's root on record, so the
+background analysis can check this project's opt-in — including one made
+mid-session. The record is rewritten only when it changes.
+
 ## Related
 
 See `docs/guide/learning-dashboard.md` for the full observation → instinct

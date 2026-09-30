@@ -7,7 +7,7 @@ Provides session persistence and SessionStart context injection.
 | Script | Event | Mode | Role |
 |--------|-------|------|------|
 | `inject-context.js` | SessionStart | sync | Inject context to Claude + a user summary |
-| `start.js` | SessionStart | async | Background init (session file, observer daemon, decay) |
+| `start.js` | SessionStart | async | Background init (session file, observer daemon when learning is on, decay) |
 | `end.js` | Stop | — | Session metrics + diary-capture |
 
 ## Features
@@ -38,8 +38,12 @@ explicit `false` in the global learning config silences injection.
 ### On Session Start — background tasks (`start.js`, async)
 
 - Initializes the new session file (filters out diary files `diary-*.md`)
-- Checks/starts the observer daemon
-- Runs decay cycles on instincts
+- Starts the observer daemon **only when learning is enabled in some scope**
+  for this project, and records the project's root so the daemon can check
+  that project's opt-in before it analyzes the observations filed under its
+  name; with learning off, no daemon is started
+- Runs decay cycles on instincts: each elapsed week is charged once, and an
+  activated instinct is never archived by decay
 
 **Note:** Diary-trigger counters are NOT reset on session start. They accumulate
 across sessions until the threshold is met; reset is owned exclusively by
