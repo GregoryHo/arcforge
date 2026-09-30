@@ -126,19 +126,22 @@ so it refuses to start unless you pass both `--model` and `--effort`.
 Isolation is not a sandbox. The agent runs with your filesystem permissions.
 Isolated and `--plugin-dir` trials are told to stay inside their directory, but
 nothing enforces it. So the runner checks afterwards: it snapshots the project
-(and the plugin directory, when that lives elsewhere) before each trial and
-compares after. A trial that added, changed or removed anything it covers is
-recorded as an infra error (`trial_wrote_repo`) naming the paths, and never
-scores.
+and the plugin directory before each trial and compares after. The plugin
+directory is walked on its own even when it sits inside the project as a
+separate checkout. A trial that added, changed or removed anything the check
+covers is recorded as an infra error (`trial_wrote_repo`) naming the paths, and
+never scores. Check those paths with `git status`. An edit you make to the same
+project while a trial runs looks identical, so a long run is best left alone.
 
 The check has blind spots. Any folder named `.git`, `node_modules` or
 `.eval-trials` is skipped at any depth. So are the project's own
-`evals/results/` and every nested folder that is a repository of its own. A
-write into any of these goes unnoticed. Past 50,000 files the snapshot stops and
-the check is skipped for that trial. The runner says so on stderr and marks the
-row `repoCheck: "skipped"`, so a pool that was never checked can be told apart. Check those paths with `git status`. An edit you make
-to the same project while a trial runs looks identical, so a long run is best
-left alone.
+`evals/results/` and any nested repository other than the plugin directory. A
+write into any of these goes unnoticed. The check also stops at 50,000 files per
+directory. Past that it fails closed. The runner prints one line saying the
+repository is too large for the write check and how many files it saw, and every
+trial is recorded as an infra error (`repo_check_skipped`, with
+`repoCheck: "skipped"` on the row) that never scores. Run evals from a smaller
+project root.
 
 `--skill-file` injects a skill body into the treatment prompt — that measures a
 **skill**. `--plugin-dir` loads a real plugin instead — that measures a

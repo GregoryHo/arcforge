@@ -13,7 +13,11 @@ jest.mock('../../scripts/lib/utils', () => {
 });
 const mockUtils = require('../../scripts/lib/utils');
 const { buildIsolationSettings, runTrial } = require('../../scripts/lib/eval');
-const { snapshotTree, diffSnapshots } = require('../../scripts/lib/eval-trial-guard');
+const {
+  snapshotTree,
+  diffSnapshots,
+  watchForWrites,
+} = require('../../scripts/lib/eval-trial-guard');
 
 const DONE_STREAM = [
   JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'Done' }] } }),
@@ -316,12 +320,15 @@ describe('eval-trial-guard snapshots', () => {
     expect(snapshotTree(root, 3).complete).toBe(true);
   });
 
-  it('records on the row that the repository check was skipped', () => {
+  it('fails a trial closed when the repository was too large to check', () => {
     const errSpy = jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {
       jest.isolateModules(() => {
         jest.doMock('../../scripts/lib/eval-trial-guard', () => ({
-          watchForWrites: () => () => ({ changed: [], incomplete: ['/huge/repo'] }),
+          watchForWrites: () => () => ({
+            changed: [],
+            incomplete: [{ root: '/huge/repo', seen: 50000 }],
+          }),
         }));
         const { runTrial: isolatedRunTrial } = require('../../scripts/lib/eval-trial');
         // This registry has its own copy of the mocked utils.
@@ -332,13 +339,40 @@ describe('eval-trial-guard snapshots', () => {
         });
         const result = isolatedRunTrial(SCENARIO, 1, 1, { projectRoot: root, isolated: false });
         expect(result.repoCheck).toBe('skipped');
-        expect(result.infraError).toBeUndefined();
+        expect(result.infraError).toBe(true);
+        expect(result.errorType).toBe('repo_check_skipped');
       });
-      expect(errSpy.mock.calls.join('')).toContain('/huge/repo');
+      const printed = errSpy.mock.calls.join('');
+      expect(printed).toContain('/huge/repo is too large for the write check');
+      expect(printed).toContain('50000');
     } finally {
       jest.dontMock('../../scripts/lib/eval-trial-guard');
       errSpy.mockRestore();
     }
+  });
+
+  it('reports how many entries it saw when a root is past the budget', () => {
+    for (const name of ['a', 'b', 'c']) fs.writeFileSync(path.join(root, name), 'x');
+    const { incomplete } = watchForWrites([root], { maxEntries: 2 })();
+    expect(incomplete).toEqual([{ root: path.resolve(root), seen: 2 }]);
+  });
+
+  it('watches a plugin checkout nested in the project that the outer walk skips', () => {
+    const plugin = path.join(root, 'vendor', 'plugin');
+    fs.mkdirSync(plugin, { recursive: true });
+    fs.writeFileSync(path.join(plugin, '.git'), 'gitdir: elsewhere\n');
+    fs.writeFileSync(path.join(plugin, 'SKILL.md'), 'original');
+    const writes = watchForWrites([root, plugin]);
+    fs.writeFileSync(path.join(plugin, 'SKILL.md'), 'edited by the trial');
+    expect(writes().changed).toEqual([path.join(path.resolve(plugin), 'SKILL.md')]);
+  });
+
+  it('reports a write once when a watched plugin dir is inside the project walk', () => {
+    const plugin = path.join(root, 'plugin');
+    fs.mkdirSync(plugin);
+    const writes = watchForWrites([root, plugin]);
+    fs.writeFileSync(path.join(plugin, 'new.md'), 'x');
+    expect(writes().changed).toEqual([path.join(path.resolve(plugin), 'new.md')]);
   });
 
   it('reports added, changed and removed paths', () => {

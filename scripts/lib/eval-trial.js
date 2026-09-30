@@ -22,6 +22,9 @@ const { parseStreamJsonOutput, parseActionsFromTranscript } = require('./eval-tr
 const { isTrialKilled, isOutputComplete, isProviderRefusal } = require('./eval-trial-outcome');
 const { watchForWrites } = require('./eval-trial-guard');
 
+// Roots already reported as too large for the write check in this process.
+const warnedTooLarge = new Set();
+
 // Mirror of eval.js constants to avoid circular imports
 const RESULTS_DIR = path.join('evals', 'results');
 
@@ -180,11 +183,14 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   });
   const wallDuration = Date.now() - t0;
   const repoWrites = writesSince();
-  for (const root of repoWrites.incomplete) {
+  for (const { root, seen } of repoWrites.incomplete) {
+    if (warnedTooLarge.has(root)) continue; // one line per run, not per trial
+    warnedTooLarge.add(root);
     process.stderr.write(
-      `Warning: ${root} is too large to snapshot; writes the trial made there were not checked.\n`,
+      `Error: ${root} is too large for the write check (stopped after ${seen} files); the trial is recorded as repo_check_skipped and does not score.\n`,
     );
   }
+
   if (process.env.EVAL_DEBUG) {
     console.error(`[eval-debug] exitCode: ${result.exitCode}`);
     console.error(`[eval-debug] stdout length: ${(result.stdout || '').length}`);
@@ -231,12 +237,24 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     effort: effort || 'default',
     ...(runId ? { runId } : {}),
   };
+  // A tree too large to snapshot was not checked, so the trial may have changed
+  // it unseen: fail closed rather than score an unverified trial.
+  if (repoWrites.incomplete.length > 0) {
+    return {
+      ...base,
+      output: parsedOutput || '',
+      repoCheck: 'skipped',
+      error: `Repository too large for the write check: ${repoWrites.incomplete
+        .map(({ root, seen }) => `${root} (${seen}+ files)`)
+        .join(', ')}`,
+      errorType: 'repo_check_skipped',
+      infraError: true,
+    };
+  }
+
   // A trial that changed the repository it ran from measured a different
   // environment than its arm describes, and may have changed what the next
   // trial sees. It is an instrument failure whatever it scored (eval-10).
-  // A tree too large to snapshot was not checked; the row says so rather than
-  // passing for checked.
-  if (repoWrites.incomplete.length > 0) base.repoCheck = 'skipped';
   if (repoWrites.changed.length > 0) {
     const shown = repoWrites.changed.slice(0, 5).join(', ');
     const more = repoWrites.changed.length > 5 ? ` and ${repoWrites.changed.length - 5} more` : '';

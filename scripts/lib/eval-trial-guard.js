@@ -84,28 +84,31 @@ function diffSnapshots(before, after) {
 
 /**
  * Start watching repository roots for writes; call the returned function after
- * the trial to get what changed. Roots nested inside another root are folded.
+ * the trial to get what changed. Every distinct root is walked on its own: a
+ * plugin dir nested in the project may sit under a skipped name or hold its own
+ * `.git` (a separate checkout), and the project walk would then never see it.
+ * A path both walks cover is reported once.
  * @param {string[]} roots - Directories the trial must leave untouched
- * @returns {() => { changed: string[], incomplete: string[] }} changed paths are absolute
+ * @param {{ maxEntries?: number }} [opts] - Walk budget per root
+ * @returns {() => { changed: string[], incomplete: Array<{ root: string, seen: number }> }}
+ *   changed paths are absolute; a root past the budget is listed in incomplete
+ *   with the number of files seen, and its changes are unknown
  */
-function watchForWrites(roots) {
+function watchForWrites(roots, { maxEntries = MAX_ENTRIES } = {}) {
   const resolved = [...new Set(roots.filter(Boolean).map((r) => path.resolve(r)))];
-  const outer = resolved.filter(
-    (r) => !resolved.some((o) => o !== r && r.startsWith(`${o}${path.sep}`)),
-  );
-  const before = outer.map((root) => ({ root, snap: snapshotTree(root) }));
+  const before = resolved.map((root) => ({ root, snap: snapshotTree(root, maxEntries) }));
   return () => {
-    const changed = [];
+    const changed = new Set();
     const incomplete = [];
     for (const { root, snap } of before) {
-      const after = snapshotTree(root);
+      const after = snapshotTree(root, maxEntries);
       if (!snap.complete || !after.complete) {
-        incomplete.push(root);
+        incomplete.push({ root, seen: Math.max(snap.files.size, after.files.size) });
         continue;
       }
-      for (const rel of diffSnapshots(snap.files, after.files)) changed.push(path.join(root, rel));
+      for (const rel of diffSnapshots(snap.files, after.files)) changed.add(path.join(root, rel));
     }
-    return { changed, incomplete };
+    return { changed: [...changed].sort(), incomplete };
   };
 }
 
