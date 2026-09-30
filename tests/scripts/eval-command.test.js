@@ -280,6 +280,61 @@ describe('eval command', () => {
     });
   });
 
+  describe('eval run and eval list say when the verdict comes from an older pool', () => {
+    const scoredRow = (trial) => ({
+      eval: 'fallback',
+      trial,
+      k: 2,
+      passed: true,
+      score: 1,
+      grader: 'code',
+      model: 'sonnet',
+      effort: 'default',
+      trialTimeoutMs: 900000,
+      maxTurns: null,
+      pluginDir: false,
+      isolation: 'isolated',
+      timestamp: '2026-09-29T10:00:00.000Z',
+      runId: '20260929-100000',
+    });
+
+    beforeEach(() => {
+      writeScenario(tempDir, 'fallback');
+      evalLib.appendResult(scoredRow(1), tempDir);
+      evalLib.appendResult(scoredRow(2), tempDir);
+      // This run switched model and the provider refused every trial.
+      evalLib.runTrial.mockImplementation((_s, t) => ({
+        ...scoredRow(t),
+        model: 'opus',
+        passed: false,
+        score: 0,
+        infraError: true,
+        errorType: 'provider_refusal',
+        timestamp: '2026-09-30T10:00:00.000Z',
+        runId: '20260930-100000',
+      }));
+    });
+
+    it('eval run prints the fallback and the failed pool', async () => {
+      await runEvalCommand(args(['run', 'fallback'], { k: '2' }), {
+        projectRoot: tempDir,
+        asJson: false,
+      });
+      const out = logs.join('\n');
+      expect(out).toContain('This run produced no scored trial');
+      expect(out).toContain('Instrument failure, not a measurement: 2 row(s) under model opus');
+      expect(out).toContain('Verdict: SHIP');
+    });
+
+    it('eval list prints the failed pool next to the older verdict', async () => {
+      for (const t of [1, 2]) evalLib.appendResult(evalLib.runTrial(null, t), tempDir);
+      await runEvalCommand(args(['list']), { projectRoot: tempDir, asJson: false });
+      const out = logs.join('\n');
+      expect(out).toMatch(/fallback \(agent, code, .*\) — SHIP/);
+      expect(out).toContain('Instrument failure, not a measurement: 2 row(s) under model opus');
+    });
+  });
+
   describe('eval run stops on a repository write', () => {
     it('aborts after the trial that wrote, keeping its row', async () => {
       writeScenario(tempDir, 'run-stop');

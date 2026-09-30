@@ -58,7 +58,10 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
   const eval_ = require('../lib/eval');
   const benchmark_ = require('../lib/eval-benchmark');
   const { generateRunId } = require('../lib/utils');
-  const { otherPoolLines, pairArms } = require('../lib/eval-pools');
+  const { otherPoolLines, pairArms, describeCondition } = require('../lib/eval-pools');
+  // Lines for the pools that failed as instruments: never the measurement, but
+  // always shown, so a fallback verdict is not read as the latest run's.
+  const failureLines = (pools) => otherPoolLines(pools.others.filter((p) => p.instrumentFailure));
   // A verdict is judged on the newest condition's pool (B-8); the others are
   // printed beside it, never combined.
   const currentPool = (evalName, opts) => eval_.loadResultPools(evalName, projectRoot, opts);
@@ -162,13 +165,18 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
         const s = eval_.parseScenario(file);
         const isAb = s.scope === 'skill' || s.scope === 'workflow';
         const resultsName = isAb ? `${s.name}-treatment` : s.name;
-        let results = currentPool(resultsName, { version: s.version }).current;
-        if (results.length === 0 && isAb) {
-          results = currentPool(s.name, { version: s.version }).current;
+        let pools = currentPool(resultsName, { version: s.version });
+        if (pools.current.length === 0 && pools.others.length === 0 && isAb) {
+          pools = currentPool(s.name, { version: s.version });
         }
-        const verdict = results.length > 0 ? eval_.getVerdict(results) : 'NO RUNS';
+        const results = pools.current;
+        const failures = failureLines(pools);
+        let verdict = 'NO RUNS';
+        if (results.length > 0) verdict = eval_.getVerdict(results);
+        else if (failures.length > 0) verdict = 'NO SCORED RUNS';
         const claimType = eval_.inferClaimType(s);
         console.log(`  ${s.name} (${s.scope}, ${s.grader}, ${claimType}) — ${verdict}`);
+        for (const line of failures) console.log(`    ${line}`);
       }
     }
   } else if (subcommand === 'run') {
@@ -226,14 +234,19 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
 
     // Filter before taking the last k, so an error trial neither moves the
     // verdict nor shrinks the pool it is judged on (B-10).
-    const results = eval_
-      .scorableResults(
-        currentPool(scenario.name, {
-          version: scenario.version,
-          since: args.options.since,
-        }).current,
-      )
-      .slice(-k);
+    const pools = currentPool(scenario.name, {
+      version: scenario.version,
+      since: args.options.since,
+    });
+    const results = eval_.scorableResults(pools.current).slice(-k);
+    if (!pools.current.some((r) => r.runId === runId)) {
+      console.log(
+        pools.conditions
+          ? `This run produced no scored trial; the verdict below is the most recent scored pool's (${describeCondition(pools.conditions)}), not this run's.`
+          : 'This run produced no scored trial, and no earlier scored pool exists.',
+      );
+    }
+    for (const line of failureLines(pools)) console.log(line);
     const verdictOpts = scenario.grader === 'model' ? { useCi: true } : {};
     console.log(`Verdict: ${eval_.getVerdict(results, verdictOpts)}`);
   } else if (subcommand === 'preflight') {

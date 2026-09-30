@@ -382,6 +382,10 @@ every trial is an infra or grade error, such as quota refusals after switching
 models, is an instrument failure. It is never judged or paired. The previous
 scored pool stays current, and the failed pool is listed separately as
 "Instrument failure, not a measurement" (`instrumentFailure: true` in the JSON).
+When the run you just finished produced no scored trial, `eval run` says the
+verdict it prints belongs to the earlier scored pool, not to this run. `eval
+list` prints the failed pool under the scenario's verdict, and shows
+`NO SCORED RUNS` when nothing was ever scored.
 
 An A/B comparison (`compare`, the benchmark's `compared` entry, the dashboard's
 A/B view) pairs its arms rather than taking each arm's newest pool on its own.
