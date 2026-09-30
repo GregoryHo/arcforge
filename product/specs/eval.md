@@ -42,7 +42,7 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   already passes ≥80% of the time — at a ceiling, a good change and a useless
   one produce the same numbers, so any delta measured there is noise. A BLOCK
   is a verdict about the scenario, not the change. Results are cached per
-  scenario content, model, effort, turn budget and plugin-dir setting: baseline
+  scenario content, model, effort, ceiling, turn budget and plugin-dir setting: baseline
   competence is not transferable, and an A/B run whose baseline conditions
   differ from the cached preflight is refused until preflight is rerun under
   them. Non-regression
@@ -100,7 +100,7 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   scenario's *meaning* (task, fixture, assertions) bumps the version and
   empties the pool, because old rows answered a different question; cosmetic
   prose edits do not. A pool is the scenario version plus the run conditions
-  (model, effort, ceiling, turn budget, plugin dir), and readers never combine
+  (model, effort, ceiling, turn budget, plugin dir, isolation), and readers never combine
   conditions (D-021).
 - **B-10 A trial the runner cut off is an instrument failure, not a
   measurement.** Every trial's `claude -p` session runs under a per-trial
