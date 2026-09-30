@@ -31,7 +31,11 @@
  */
 
 const { assembleBatch } = require('./batch-assembler');
-const { ingestProposal, recordRunFailure } = require('./proposal-ingestor');
+const {
+  FAILURE_TRANSPORT_STATUSES,
+  ingestProposal,
+  recordRunFailure,
+} = require('./proposal-ingestor');
 const { learningEnabledSinceForProject } = require('../learning');
 
 // Spec layer-4 §parse_status enum for daemon-side failures.
@@ -180,11 +184,20 @@ function cmdRecordRunFailure(argv) {
     process.exit(1);
   }
 
+  const transportStatus = args['transport-status'] ?? parseStatus;
+  if (!FAILURE_TRANSPORT_STATUSES.includes(transportStatus)) {
+    console.error(
+      `Error: --transport-status must be one of ${FAILURE_TRANSPORT_STATUSES.join(', ')} (got ${JSON.stringify(transportStatus)})`,
+    );
+    process.exit(1);
+  }
+
   let result;
   try {
     result = recordRunFailure({
       batchId,
       parseStatus,
+      transportStatus,
       detail: detail || undefined,
       curatorArgv,
     });
@@ -240,7 +253,7 @@ function cmdHelp() {
       "    The argv after -- (required) is the curator run's; it decides the manifest's tool_access.",
       '    Prints JSON: { run_id, parse_status, accepted, rejected }',
       '',
-      '  record-run-failure --batch-id <batch_id> --parse-status <transport_error|timeout> [--detail <msg>] -- <claude argv...>',
+      '  record-run-failure --batch-id <batch_id> --parse-status <transport_error|timeout> [--transport-status <timeout|transport_error|cancelled>] [--detail <msg>] -- <claude argv...>',
       '    Layer 4: write a CuratorRunManifest for a daemon transport failure.',
       '    Prints JSON: { run_id, parse_status, accepted, rejected }',
       '',

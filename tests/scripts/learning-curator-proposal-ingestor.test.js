@@ -830,6 +830,35 @@ describe('recordRunFailure — writes failure manifest', () => {
     expect(manifest.invocation).toEqual({ tool_access: true, transport_status: 'timeout' });
   });
 
+  test('a run withdrawn before submission records transport_status cancelled', () => {
+    const { recordRunFailure } = getIngestor();
+    const result = recordRunFailure({
+      batchId: 'batch_c',
+      parseStatus: 'transport_error',
+      transportStatus: 'cancelled',
+      detail: 'learning disabled before submission',
+      homeDir: tmpDir,
+    });
+    const runsDir = path.join(tmpDir, '.arcforge', 'learning', 'curator-runs');
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(runsDir, `${result.run_id}.manifest.json`), 'utf8'),
+    );
+    expect(manifest.invocation).toEqual({ tool_access: false, transport_status: 'cancelled' });
+    expect(manifest.parse_status).toBe('transport_error');
+  });
+
+  test('rejects a transport status outside the failure set', () => {
+    const { recordRunFailure } = getIngestor();
+    expect(() =>
+      recordRunFailure({
+        batchId: 'batch_d',
+        parseStatus: 'timeout',
+        transportStatus: 'completed',
+        homeDir: tmpDir,
+      }),
+    ).toThrow(/transportStatus/);
+  });
+
   test('a failure without the curator argv is refused and writes nothing', () => {
     const { recordRunFailure } = getRawIngestor();
     expect(() =>

@@ -309,7 +309,9 @@ arcforge learn disable --project
 ```
 
 That stops new observations and analysis for the scope. The background analysis
-checks the opt-in before each run and only ever sends what was recorded since
+checks the opt-in before each run and again immediately before each attempt to
+send a batch, so turning learning off mid-run withdraws a batch that has not
+gone out yet. It only ever sends what was recorded since
 learning was last turned on — observations by their own timestamp, and the
 diaries, reflections and recalls that go with them by theirs (a diary by the
 date it is filed under and when it was first written — though on a filesystem

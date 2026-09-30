@@ -277,6 +277,20 @@ analyze_project() {
   local watchdog_fired_marker="${INSTINCTS_DIR}/.watchdog-fired.${batch_id}"
 
   while [ "$retry_count" -le "$max_retries" ] && [ "$analysis_success" = false ]; do
+    # Consent is re-checked immediately before every model attempt, retries
+    # included (learning B-1): a `learn disable` after assembly, or during a
+    # retry delay, withdraws the run before anything is submitted.
+    if ! node "$CURATOR_CLI" learning-enabled --project "$project" > /dev/null 2>&1; then
+      log_msg "Aborting ${project}: learning was turned off before the batch was submitted; nothing was sent"
+      node "$CURATOR_CLI" record-run-failure \
+        --batch-id "$batch_id" \
+        --parse-status "transport_error" \
+        --transport-status "cancelled" \
+        --detail "learning was turned off before submission; nothing was sent" \
+        -- "${claude_args[@]}" \
+        > /dev/null 2>&1 || true
+      return
+    fi
     if command -v claude &>/dev/null; then
       local exit_code=0
       local claude_pid=""

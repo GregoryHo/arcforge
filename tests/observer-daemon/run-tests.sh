@@ -767,6 +767,76 @@ assert_eq \
   "$(find "${B1_RE_HOME}/.arcforge/diaries/b1-proj" -name 'diary-pre-disable.md' | wc -l | tr -d ' ')"
 
 # ─────────────────────────────────────────────
+# B1-T4: consent is re-checked immediately before every model attempt
+# learning B-1: a `learn disable` after the batch is assembled but before
+# claude is spawned is honoured — nothing is submitted, and the run's failure
+# manifest records transport_status "cancelled". A `node` wrapper on PATH turns
+# learning off right after assemble-batch returns.
+# ─────────────────────────────────────────────
+
+echo ""
+echo "=== B1-T4: Consent re-checked before the model call ==="
+
+TMPDIR_B4=$(mktemp -d)
+trap 'rm -rf "$TMPDIR_G3" "$TMPDIR_B1" "$TMPDIR_B4"' EXIT
+B4_HOME="${TMPDIR_B4}/home"
+B4_BIN="${TMPDIR_B4}/bin"
+mkdir -p "$B4_BIN"
+enable_global_learning "$B4_HOME"
+REAL_NODE="$(command -v node)"
+cat > "${B4_BIN}/node" << STUB_EOF
+#!/usr/bin/env bash
+"${REAL_NODE}" "\$@"
+status=\$?
+if [ "\$2" = "assemble-batch" ]; then
+  printf '{"scope":"global","enabled":false,"updated_at":"2026-06-01T00:00:00.000Z"}\n' \
+    > "${B4_HOME}/.arcforge/learning/config.json"
+fi
+exit \$status
+STUB_EOF
+chmod +x "${B4_BIN}/node"
+cat > "${B4_BIN}/claude" << STUB_EOF
+#!/usr/bin/env bash
+cat > /dev/null
+touch "${TMPDIR_B4}/claude-was-called"
+exit 1
+STUB_EOF
+chmod +x "${B4_BIN}/claude"
+B4_OBS="${B4_HOME}/.arcforge/observations/b4-proj"
+mkdir -p "$B4_OBS"
+for i in $(seq 1 15); do
+  printf '{"ts":"2026-05-22T01:%02d:00.000Z","event":"tool_start","tool":"Read","session":"s1","project":"b4-proj","project_id":"proj_abc123456789ab","evidence_status":"present","input":"file %d"}\n' \
+    "$i" "$i" >> "${B4_OBS}/observations.jsonl"
+done
+
+B4_LOG=$(
+  HOME="$B4_HOME"
+  PATH="${B4_BIN}:${PATH}"
+  OBSERVER_DAEMON_WATCHDOG_SECS=10
+  set +e
+  # shellcheck source=/dev/null
+  source "$DAEMON_SCRIPT" 2>/dev/null
+  mkdir -p "$INSTINCTS_DIR"
+  analyze_project 'b4-proj' 2>/dev/null || true
+  cat "$LOG_FILE" 2>/dev/null || true
+) 2>/dev/null
+
+assert_eq \
+  'B1-T4: claude is not invoked after learning is turned off mid-run' \
+  'no' \
+  "$([ -f "${TMPDIR_B4}/claude-was-called" ] && echo yes || echo no)"
+assert_match \
+  'B1-T4: logs the withdrawn consent' \
+  'learning was turned off before the batch was submitted' \
+  "$B4_LOG"
+B4_CANCELLED=$(find "${B4_HOME}/.arcforge/learning/curator-runs" -name '*.manifest.json' \
+  -exec grep -l '"transport_status": *"cancelled"' {} \; 2>/dev/null | head -1 || true)
+assert_eq \
+  'B1-T4: the failure manifest records transport_status cancelled' \
+  'yes' \
+  "$([ -n "$B4_CANCELLED" ] && echo yes || echo no)"
+
+# ─────────────────────────────────────────────
 # Results
 # ─────────────────────────────────────────────
 

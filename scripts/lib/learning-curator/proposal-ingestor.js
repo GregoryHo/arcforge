@@ -38,6 +38,10 @@ const { SANITIZER_POLICY_VERSION } = require('../sanitize-observation');
 const { atomicWriteFile, sha256Truncated, getArcforgeHome } = require('../utils');
 const { toolAccessFromArgv } = require('./curator-invocation');
 
+// Layer 4 transport_status values a failure manifest may carry; `cancelled` is
+// a run withdrawn before submission because learning was turned off (B-1).
+const FAILURE_TRANSPORT_STATUSES = ['timeout', 'transport_error', 'cancelled'];
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -587,6 +591,8 @@ function ingestProposal({
  * @param {string} [options.homeDir]   — override home directory (tests)
  * @param {string[]} options.curatorArgv — the argv the failed `claude` run used;
  *   required, as in ingestProposal, so the manifest records its tool access
+ * @param {string} [options.transportStatus] — 'timeout' | 'transport_error' |
+ *   'cancelled' (a run withdrawn before submission); defaults to parseStatus
  * @returns {{ run_id, parse_status, accepted, rejected }}
  */
 function recordRunFailure({
@@ -595,12 +601,18 @@ function recordRunFailure({
   detail,
   homeDir: homeOverride,
   curatorArgv,
+  transportStatus = parseStatus,
 } = {}) {
   if (typeof batchId !== 'string' || !batchId.trim()) {
     throw new Error('recordRunFailure: batchId must be a non-empty string');
   }
   if (typeof parseStatus !== 'string' || !parseStatus.trim()) {
     throw new Error('recordRunFailure: parseStatus must be a non-empty string');
+  }
+  if (!FAILURE_TRANSPORT_STATUSES.includes(transportStatus)) {
+    throw new Error(
+      `recordRunFailure: transportStatus must be one of ${FAILURE_TRANSPORT_STATUSES.join(', ')} (got "${transportStatus}")`,
+    );
   }
   const toolAccess = toolAccessFromArgv(curatorArgv);
 
@@ -620,7 +632,7 @@ function recordRunFailure({
     source_batch_id: batchId,
     invocation: {
       tool_access: toolAccess,
-      transport_status: parseStatus,
+      transport_status: transportStatus,
     },
     parse_status: parseStatus,
     detail: detail || null,
@@ -639,4 +651,4 @@ function recordRunFailure({
   return { run_id: runId, parse_status: parseStatus, accepted: 0, rejected: 0 };
 }
 
-module.exports = { ingestProposal, recordRunFailure };
+module.exports = { FAILURE_TRANSPORT_STATUSES, ingestProposal, recordRunFailure };

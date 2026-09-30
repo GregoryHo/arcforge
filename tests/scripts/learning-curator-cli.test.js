@@ -197,6 +197,49 @@ describe('CLI record-run-failure', () => {
     expect(parsed.parse_status).toBe('timeout');
   });
 
+  test('--transport-status cancelled is recorded; any other override is refused', () => {
+    const output = runCLI([
+      'record-run-failure',
+      '--batch-id',
+      'batch_test_rf_cancel',
+      '--parse-status',
+      'transport_error',
+      '--transport-status',
+      'cancelled',
+      '--',
+      '--tools',
+      '',
+      '--strict-mcp-config',
+    ]);
+    const parsed = JSON.parse(output);
+    const runsDir = path.join(tmpDir, '.arcforge', 'learning', 'curator-runs');
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(runsDir, `${parsed.run_id}.manifest.json`), 'utf8'),
+    );
+    expect(manifest.invocation.transport_status).toBe('cancelled');
+
+    const { spawnSync } = require('node:child_process');
+    const bad = spawnSync(
+      'node',
+      [
+        CLI_PATH,
+        'record-run-failure',
+        '--batch-id',
+        'batch_test_rf_bad',
+        '--parse-status',
+        'timeout',
+        '--transport-status',
+        'completed',
+        '--',
+        '--tools',
+        '',
+      ],
+      { env: { ...process.env, HOME: tmpDir }, encoding: 'utf8' },
+    );
+    expect(bad.status).toBe(1);
+    expect(bad.stderr).toMatch(/--transport-status/);
+  });
+
   test('invalid parse-status (e.g. cli_not_found) is rejected — only spec enum values allowed', () => {
     const { spawnSync } = require('node:child_process');
     const result = spawnSync(
