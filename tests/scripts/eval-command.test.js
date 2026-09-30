@@ -135,6 +135,67 @@ describe('eval command', () => {
     });
   });
 
+  describe('eval preflight turn budget', () => {
+    const infraRow = (t) => ({
+      eval: 'x',
+      trial: t,
+      k: 3,
+      passed: false,
+      score: 0,
+      grader: 'code',
+      timestamp: '2026-09-30T00:00:00.000Z',
+      infraError: true,
+      errorType: 'setup_failed',
+    });
+
+    async function preflightOpts(name, options = {}) {
+      evalLib.runTrial.mockImplementation((_s, t) => infraRow(t));
+      jest.spyOn(process, 'exit').mockImplementation((code) => {
+        throw new Error(`process.exit(${code})`);
+      });
+      await expect(
+        runEvalCommand(args(['preflight', name], options), { projectRoot: tempDir, asJson: false }),
+      ).rejects.toThrow('process.exit(1)');
+      return evalLib.runTrial.mock.calls.map(([, , , opts]) => opts);
+    }
+
+    it('gives the baseline the budget a plugin-dir A/B baseline gets', async () => {
+      const dir = path.join(tempDir, evalLib.SCENARIOS_DIR);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, 'pf-workflow.md'),
+        SCENARIO('pf-workflow', `\n## Plugin Dir\n${tempDir}\n`).replace(
+          '## Scope\nagent',
+          '## Scope\nworkflow',
+        ),
+      );
+      const calls = await preflightOpts('pf-workflow');
+      for (const opts of calls) {
+        expect(opts.isolated).toBe(true);
+        expect(opts.pluginDir).toBeUndefined();
+        expect(opts.maxTurns).toBe(10);
+        expect(opts.skipPermissions).toBe(true);
+      }
+    });
+
+    it('honours --max-turns and --plugin-dir the way eval ab resolves them', async () => {
+      writeScenario(tempDir, 'pf-skill');
+      const [capped] = await preflightOpts('pf-skill', { 'max-turns': '4' });
+      expect(capped.maxTurns).toBe(4);
+      evalLib.runTrial.mockClear();
+      const [plugin] = await preflightOpts('pf-skill', { 'plugin-dir': tempDir });
+      expect(plugin.maxTurns).toBe(10);
+      expect(plugin.pluginDir).toBeUndefined();
+    });
+
+    it('leaves the budget unset when the A/B baseline would have none', async () => {
+      writeScenario(tempDir, 'pf-plain');
+      const [opts] = await preflightOpts('pf-plain');
+      expect(opts.maxTurns).toBeUndefined();
+      expect(opts.skipPermissions).toBe(false);
+    });
+  });
+
   describe('eval ab, skill scope (B-1, #197)', () => {
     const SKILL_BODY = 'SKILL BODY THAT MUST NOT REACH A PLUGIN-ROUTED TREATMENT';
 

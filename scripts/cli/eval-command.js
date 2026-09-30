@@ -204,6 +204,16 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     console.log(`Running preflight for "${scenarioName}"...`);
     const runId = generateRunId();
 
+    // Preflight measures the baseline the A/B will run, so it takes the same
+    // turn budget and permission mode that baseline gets (sharedArmOptions).
+    // --plugin-dir only resolves those here; nothing is loaded.
+    const abPluginDir =
+      args.options['plugin-dir'] ||
+      (scenario.scope === 'workflow' ? scenario.pluginDir : undefined);
+    const baselineArm = eval_.sharedArmOptions(scenario, {
+      maxTurns: args.options['max-turns'] ? parseInt(args.options['max-turns'], 10) : undefined,
+      pluginDir: abPluginDir,
+    });
     const stubRunTrial = (t, totalK) =>
       eval_.runTrial(scenario, t, totalK, {
         projectRoot,
@@ -211,6 +221,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
         effort,
         runId,
         isolated: true,
+        ...baselineArm,
       });
     const stubGrade = (result, _t) => {
       try {

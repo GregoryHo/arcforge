@@ -462,6 +462,7 @@ module.exports = {
   executeAndGradeTrial,
   runSkillEval,
   runWorkflowEval,
+  sharedArmOptions,
   saveTranscript,
   appendResult,
   loadResults,
