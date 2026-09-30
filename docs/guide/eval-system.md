@@ -81,6 +81,7 @@ Runs both arms and stores every trial. Useful flags:
 |------|--------|
 | `--k` | Trials per arm. Defaults to 5, or 10 when a model grades |
 | `--model` | Which model to run trials on |
+| `--effort` | Reasoning effort for the trial sessions, passed through to `claude --effort` (also on `run` and `preflight`) |
 | `--interleave` | Alternate the arms instead of running each in a block, so drift over the run hits both equally |
 | `--max-turns` | Turn budget per trial, overriding the scenario |
 | `--skill-file` | Skill-scope only: inject this skill body into the treatment prompt. Falls back to the scenario's `## Target` |
@@ -140,6 +141,12 @@ To run one condition on its own, without a comparison:
 arcforge eval run <name> --k 5
 ```
 
+`eval run` takes `--k`, `--model`, `--effort`, `--max-turns` and `--plugin-dir`
+like `ab`, plus `--no-isolate`. That flag lets the surrounding toolkit back into
+the trial: your plugins, MCP servers and `CLAUDE.md` files, and the scenario's
+`## Plugin Dir`. The trial still runs in its own fixture directory, with
+arcforge's state redirected, so your real learning state stays out of it.
+
 `eval run` has no second arm, so its verdict is about the condition alone, not a
 change. It is judged over the last k **scored** trials — an infra or grade error
 is recorded and printed but never counted, and never shortens the pool:
@@ -173,6 +180,14 @@ arcforge eval compare eval-tdd-test-first-gate
 `INCONCLUSIVE` at k=5 usually means the effect is smaller than the noise. Raising
 k narrows the interval; it does not manufacture an effect that is not there.
 
+A scenario declaring `## Verdict Policy non-regression` is judged differently:
+there is no delta to interpret, and it passes only when **every** treatment trial
+that produced a score passes and at least one did — `PASS`, otherwise
+`REGRESSED`, never `INSUFFICIENT_DATA`. `eval ab`, `eval compare` and the
+dashboard's A/B view all apply it. That is the right policy for "this must keep
+working", the wrong one for "this should help". This `PASS` is an A/B verdict,
+not the preflight `PASS` from step 2.
+
 When every assertion in a scenario is model-graded, `eval ab` also runs a
 **blind comparator** on each baseline/treatment pair and prints a preference
 count (treatment / baseline / tie / errors). It is a supplementary signal, never
@@ -183,14 +198,6 @@ harness then does the arithmetic: each output's total is its weighted mean
 score, and one output wins only when its total beats the other's by more than
 0.1. Anything closer is a tie. A malformed rubric or score counts as an error,
 not a tie.
-
-A scenario declaring `## Verdict Policy non-regression` is judged differently:
-there is no delta to interpret, and it passes only when **every** treatment trial
-that produced a score passes and at least one did — `PASS`, otherwise
-`REGRESSED`, never `INSUFFICIENT_DATA`. `eval ab`, `eval compare` and the
-dashboard's A/B view all apply it. That is the right policy for "this must keep
-working", the wrong one for "this should help". This `PASS` is an A/B verdict,
-not the preflight `PASS` from step 2.
 
 ## Scenario format
 
@@ -210,6 +217,8 @@ A scenario is one markdown file in `evals/scenarios/`. Sections the parser reads
 | `## Max Turns` | Turn budget per trial |
 | `## Preflight` | `skip` to opt out of the discriminability gate |
 | `## Verdict Policy` | `non-regression` to judge pass/fail instead of delta |
+| `## Claim Type` | What a pass is evidence of: `discriminative-lift`, `non-regression`, `self-improvement-smoke`, or `infra`. Inferred from the name and target when absent. `eval list` shows it and `eval report` groups by it |
+| `## Plugin Dir` | Plugin to load when the scenario runs with the toolkit: the treatment of a `workflow` A/B, or `eval run --no-isolate`. `${PROJECT_ROOT}` expands to the project root |
 | `## Version` | Result-pooling generation — see below |
 
 Only `## Context` and `## Scenario` reach the agent. Everything else is
