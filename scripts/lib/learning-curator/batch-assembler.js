@@ -24,7 +24,7 @@ const path = require('node:path');
 
 const { sanitizeObservationPayload, SANITIZER_POLICY_VERSION } = require('../sanitize-observation');
 const { atomicWriteFile, sha256Truncated, getArcforgeHome } = require('../utils');
-const { draftIsStale } = require('../diary-capture');
+const { MAX_DIARIES, MAX_REFLECTS, MAX_RECALLS, readRecentEvidence } = require('./evidence-files');
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -32,9 +32,6 @@ const { draftIsStale } = require('../diary-capture');
 
 // Per Section 4 Slice E + Layer 3 open question #2: first-slice bounds
 const MAX_OBSERVATIONS = 200;
-const MAX_DIARIES = 5;
-const MAX_REFLECTS = 10;
-const MAX_RECALLS = 10;
 const MAX_CHARS_PER_ITEM = 1000;
 const MAX_CHARS_TOTAL = 100000;
 const SELECTION_POLICY_VERSION = 'v1';
@@ -53,18 +50,6 @@ function getArcforgeDir(homeDir) {
 
 function getObsDir(homeDir) {
   return path.join(getArcforgeDir(homeDir), 'observations');
-}
-
-function getDiariesDir(homeDir) {
-  return path.join(getArcforgeDir(homeDir), 'diaries');
-}
-
-function getReflectionsDir(homeDir) {
-  return path.join(getArcforgeDir(homeDir), 'reflections');
-}
-
-function getRecallsDir(homeDir) {
-  return path.join(getArcforgeDir(homeDir), 'recalls');
 }
 
 function getBatchesDir(homeDir) {
@@ -103,132 +88,12 @@ function readObservations(homeDir, project) {
   return records;
 }
 
-// ---------------------------------------------------------------------------
-// Walk a directory recursively, collecting files matching a name pattern.
-// Returns { path, mtime } sorted by mtime descending.
-// ---------------------------------------------------------------------------
-
-function walkFilesByMtime(dir, namePattern) {
-  const files = [];
-  function walk(d) {
-    let entries;
-    try {
-      entries = fs.readdirSync(d, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      const full = path.join(d, entry.name);
-      if (entry.isDirectory()) {
-        walk(full);
-      } else if (entry.isFile() && namePattern.test(entry.name)) {
-        let mtime = 0;
-        try {
-          mtime = fs.statSync(full).mtimeMs;
-        } catch {
-          // unreadable; sort to the end
-        }
-        files.push({ path: full, mtime });
-      }
-    }
-  }
-  walk(dir);
-  files.sort((a, b) => b.mtime - a.mtime);
-  return files;
-}
-
-// ---------------------------------------------------------------------------
-// Read recent typed-evidence files (diary / reflect / recall)
-// ---------------------------------------------------------------------------
-
-// Per-kind config: dir resolver, filename regex, max-count, ID field name on the item,
-// and a builder for the kind-specific extra fields. Shared shape across all three is
-// applied in readRecentEvidence below.
-//
-// Note: evidence_id is derived from filePath (sha256[:12]). It's stable across runs
-// for the same file, but not content-addressed — content rename = same id. Content
-// identity is captured separately by source_ref.content_hash.
-const EVIDENCE_KIND_CONFIG = {
-  diary: {
-    getDir: getDiariesDir,
-    pattern: /^diary-.*\.md$/,
-    maxN: () => MAX_DIARIES,
-    idField: 'diary_id',
-    store: 'diary',
-    buildExtra: (sanitized) => ({ summary: sanitized }),
-    // Drafts whose enricher never ran still carry the TO BE ENRICHED stub.
-    // Skip them so a failed enrichment degrades to MISSING evidence rather
-    // than feeding template placeholders into the curator (S5-5).
-    skipStale: true,
-  },
-  reflect: {
-    getDir: getReflectionsDir,
-    pattern: /^reflect-.*\.md$/,
-    maxN: () => MAX_REFLECTS,
-    idField: 'reflect_id',
-    store: 'reflect',
-    buildExtra: (sanitized) => ({
-      pattern_summary: sanitized,
-      supporting_sessions: [],
-      support_count: 0,
-    }),
-  },
-  recall: {
-    getDir: getRecallsDir,
-    pattern: /^recall-.*\.md$/,
-    maxN: () => MAX_RECALLS,
-    idField: 'recall_id',
-    store: 'recall',
-    buildExtra: (sanitized) => ({ user_authored: true, summary: sanitized }),
-  },
-};
-
-function readRecentEvidence(kind, homeDir, project) {
-  const cfg = EVIDENCE_KIND_CONFIG[kind];
-  if (!cfg) throw new Error(`readRecentEvidence: unknown kind "${kind}"`);
-
-  const dir = path.join(cfg.getDir(homeDir), project);
-  if (!fs.existsSync(dir)) return { items: [], scanned: 0, selected: 0 };
-
-  const allFiles = walkFilesByMtime(dir, cfg.pattern);
-  const scanned = allFiles.length;
-  // Filter unenriched diary stubs before selecting so the maxN budget is spent
-  // on real evidence, not template placeholders (S5-5).
-  const eligible = cfg.skipStale ? allFiles.filter((f) => !draftIsStale(f.path)) : allFiles;
-  const selected = eligible.slice(0, cfg.maxN());
-
-  const items = [];
-  for (const { path: filePath } of selected) {
-    try {
-      const raw = fs.readFileSync(filePath, 'utf8');
-      const sanitized = sanitizeObservationPayload(raw, 2000);
-      const itemId = path.basename(filePath, '.md');
-
-      items.push({
-        evidence_id: `evd-${kind}-${sha256Truncated(filePath, 12)}`,
-        evidence_type: kind,
-        [cfg.idField]: itemId,
-        project,
-        project_id: '',
-        created_at: '',
-        ...cfg.buildExtra(sanitized),
-        source_ref: {
-          store: cfg.store,
-          path_hash: sha256Truncated(filePath, 16),
-          content_hash: sha256Truncated(raw, 16),
-        },
-      });
-    } catch {
-      // skip unreadable files
-    }
-  }
-
-  return { items, scanned, selected: items.length };
-}
-
-const readRecentDiaries = (homeDir, project) => readRecentEvidence('diary', homeDir, project);
-const readRecentReflects = (homeDir, project) => readRecentEvidence('reflect', homeDir, project);
-const readRecentRecalls = (homeDir, project) => readRecentEvidence('recall', homeDir, project);
+const readRecentDiaries = (homeDir, project, sinceMs) =>
+  readRecentEvidence('diary', getArcforgeDir(homeDir), project, sinceMs);
+const readRecentReflects = (homeDir, project, sinceMs) =>
+  readRecentEvidence('reflect', getArcforgeDir(homeDir), project, sinceMs);
+const readRecentRecalls = (homeDir, project, sinceMs) =>
+  readRecentEvidence('recall', getArcforgeDir(homeDir), project, sinceMs);
 
 // ---------------------------------------------------------------------------
 // Build evidence items from observation records
@@ -509,17 +374,17 @@ function assembleBatch({ project, homeDir: homeOverride, since, minObservations 
     items: diaryItems,
     scanned: diaryScanned,
     selected: diarySelected,
-  } = readRecentDiaries(homeDir, project);
+  } = readRecentDiaries(homeDir, project, sinceMs);
   const {
     items: reflectItems,
     scanned: reflectScanned,
     selected: reflectSelected,
-  } = readRecentReflects(homeDir, project);
+  } = readRecentReflects(homeDir, project, sinceMs);
   const {
     items: recallItems,
     scanned: recallScanned,
     selected: recallSelected,
-  } = readRecentRecalls(homeDir, project);
+  } = readRecentRecalls(homeDir, project, sinceMs);
 
   // Merge all evidence items: observations first, then diary/reflect/recall
   const evidenceItems = [...obsItems, ...diaryItems, ...reflectItems, ...recallItems];

@@ -519,3 +519,99 @@ describe('assembleBatch — since (the opt-in stamp)', () => {
     expect(() => assembleBatch({ project, since: 'yesterday' })).toThrow(/since/);
   });
 });
+
+describe('assembleBatch — since applies to diary, reflect and recall files too', () => {
+  const project = 'period-project';
+  const SINCE = '2026-05-02T12:00:00.000Z';
+
+  function writeDated(subdir, relPath, content, mtimeIso) {
+    const filePath = path.join(tmpDir, '.arcforge', subdir, project, relPath);
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, content, 'utf8');
+    const at = new Date(mtimeIso);
+    fs.utimesSync(filePath, at, at);
+  }
+
+  function batchFor(since) {
+    const { assembleBatch } = getAssembler();
+    const result = assembleBatch({ project, since });
+    return {
+      prompt: fs.readFileSync(result.prompt_path, 'utf8'),
+      byType: JSON.parse(fs.readFileSync(result.manifest_path, 'utf8')).quality_inputs
+        .selected_by_type,
+    };
+  }
+
+  const record = (id, createdAt, body) =>
+    `---\n${id}\nproject: ${project}\ncreated_at: ${createdAt}\n---\n\n${body}\n`;
+
+  beforeEach(() => {
+    seedObservations(project, [makeObservation({ project, ts: '2026-05-03T00:00:00.000Z' })]);
+    // Filed before the re-enable's day; the same day but written before it; after it.
+    writeDated(
+      'diaries',
+      '2026-05-01/diary-a.md',
+      '# S\n\nold-diary-marker',
+      '2026-05-01T10:00:00Z',
+    );
+    writeDated(
+      'diaries',
+      '2026-05-02/diary-b.md',
+      '# S\n\nsameday-old-marker',
+      '2026-05-02T09:00:00Z',
+    );
+    writeDated(
+      'diaries',
+      '2026-05-03/diary-c.md',
+      '# S\n\nnew-diary-marker',
+      '2026-05-03T10:00:00Z',
+    );
+    // Reflect and recall go by their own created_at, not by a later file write.
+    writeDated(
+      'reflections',
+      'reflect-old.md',
+      record('reflect_id: reflect-old', '2026-05-01T00:00:00.000Z', 'old-reflect-marker'),
+      '2026-05-04T00:00:00Z',
+    );
+    writeDated(
+      'reflections',
+      'reflect-new.md',
+      record('reflect_id: reflect-new', '2026-05-03T00:00:00.000Z', 'new-reflect-marker'),
+      '2026-05-03T00:00:00Z',
+    );
+    writeDated(
+      'recalls',
+      'recall-old.md',
+      record('recall_id: recall-old', '2026-05-01T00:00:00.000Z', 'old-recall-marker'),
+      '2026-05-04T00:00:00Z',
+    );
+    writeDated(
+      'recalls',
+      'recall-new.md',
+      record('recall_id: recall-new', '2026-05-03T00:00:00.000Z', 'new-recall-marker'),
+      '2026-05-03T00:00:00Z',
+    );
+  });
+
+  test('files recorded before the stamp stay out of the batch; later ones go in', () => {
+    const { prompt, byType } = batchFor(SINCE);
+    expect(byType).toMatchObject({ diary: 1, reflect: 1, recall: 1 });
+    for (const marker of ['old-diary', 'sameday-old', 'old-reflect']) {
+      expect(prompt).not.toContain(`${marker}-marker`);
+    }
+    for (const marker of ['new-diary', 'new-reflect']) {
+      expect(prompt).toContain(`${marker}-marker`);
+    }
+    // Left where they are.
+    expect(
+      fs.existsSync(path.join(tmpDir, '.arcforge', 'diaries', project, '2026-05-01', 'diary-a.md')),
+    ).toBe(true);
+  });
+
+  test('without since, selection is unchanged', () => {
+    const { prompt, byType } = batchFor(undefined);
+    expect(byType).toMatchObject({ diary: 3, reflect: 2, recall: 2 });
+    expect(prompt).toContain('old-diary-marker');
+    expect(prompt).toContain('old-reflect-marker');
+  });
+});

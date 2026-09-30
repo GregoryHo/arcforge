@@ -309,10 +309,12 @@ arcforge learn disable --project
 ```
 
 That stops new observations and analysis for the scope. The background analysis
-checks the opt-in before each run and only ever sends observations recorded
-since learning was last turned on, going by each observation's own timestamp.
-So observations recorded before you turned learning off are never sent for
-analysis — not now, and not if you turn learning back on later; they stay on
+checks the opt-in before each run and only ever sends what was recorded since
+learning was last turned on — observations by their own timestamp, and the
+diaries, reflections and recalls that go with them by theirs (a diary by the
+date it is filed under and when it was written, a reflection or recall by when
+it was created). So nothing recorded before you turned learning off is sent for
+analysis — not now, and not if you turn learning back on later; it stays on
 disk, and only what is recorded after the new opt-in is analyzed. With learning
 off everywhere, the background process is not even started. Instincts you already
 activated stay active — disabling learning stops it accumulating more, it does
@@ -343,7 +345,7 @@ can touch nothing on your machine. Each run leaves a manifest under
 run actually had, read from the command it was started with.
 
 Turn learning off and both stop. The curator's analysis sends nothing — not
-even observations left over from when learning was on. Diary drafts are still
+even observations or diaries left over from when learning was on. Diary drafts are still
 written from your session record — the counts and the files you touched — but
 their `TO BE ENRICHED` sections stay unfilled, which is what an un-enriched
 draft is supposed to look like. The same opt-in decides whether your recent message text

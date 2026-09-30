@@ -709,8 +709,17 @@ b1_rows() {
   done
 }
 
+b1_diary() {
+  local label="$1" day dir
+  day=$(node -e 'process.stdout.write(new Date().toISOString().slice(0, 10))')
+  dir="${B1_RE_HOME}/.arcforge/diaries/b1-proj/${day}"
+  mkdir -p "$dir"
+  printf '# Session Summary\n\n%s diary entry\n' "$label" > "${dir}/diary-${label}.md"
+}
+
 b1_learn enable
 b1_rows pre-disable 15
+b1_diary pre-disable
 sleep 1
 b1_learn disable
 sleep 1
@@ -732,6 +741,7 @@ assert_eq \
   "$(wc -l < "${B1_RE_HOME}/.arcforge/observations/b1-proj/observations.jsonl" | tr -d ' ')"
 
 b1_rows post-enable 12
+b1_diary post-enable
 run_b1_analysis "$B1_RE_HOME" > /dev/null
 B1_RE_PROMPT=$(cat "${B1_RE_HOME}/claude-was-called.prompt" 2>/dev/null || true)
 
@@ -741,8 +751,20 @@ assert_match \
   "$B1_RE_PROMPT"
 assert_not_match \
   'B1-T3: rows recorded before the opt-out are not submitted' \
-  'pre-disable' \
+  'pre-disable row' \
   "$B1_RE_PROMPT"
+assert_match \
+  'B1-T3: a diary written after the re-enable is submitted' \
+  'post-enable diary entry' \
+  "$B1_RE_PROMPT"
+assert_not_match \
+  'B1-T3: a diary written before the opt-out is not submitted' \
+  'pre-disable diary entry' \
+  "$B1_RE_PROMPT"
+assert_eq \
+  'B1-T3: the earlier diary stays on disk' \
+  '1' \
+  "$(find "${B1_RE_HOME}/.arcforge/diaries/b1-proj" -name 'diary-pre-disable.md' | wc -l | tr -d ' ')"
 
 # ─────────────────────────────────────────────
 # Results
