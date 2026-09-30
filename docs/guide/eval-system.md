@@ -141,9 +141,10 @@ so it refuses to start unless you pass both `--model` and `--effort`.
 Isolation is not a sandbox. The agent runs with your filesystem permissions.
 Isolated and `--plugin-dir` trials are told to stay inside their directory, but
 nothing enforces it. So the runner checks afterwards: it snapshots the project
-and the plugin directory before each trial and compares after. The plugin
-directory is walked on its own even when it sits inside the project as a
-separate checkout. A trial that added, changed or removed anything the check
+and the plugin directory before each trial and compares after. That includes
+the baseline of a plugin-dir comparison and its preflight, which load no plugin
+but could still edit it before the treatment loads it. The plugin directory is
+walked on its own even when it sits inside the project as a separate checkout. A trial that added, changed or removed anything the check
 covers is recorded as an infra error (`trial_wrote_repo`) naming the paths, and
 never scores. Check those paths with `git status`. An edit you make to the same
 project while a trial runs looks identical, so a long run is best left alone.

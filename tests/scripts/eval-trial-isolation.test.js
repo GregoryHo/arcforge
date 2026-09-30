@@ -318,6 +318,51 @@ describe('both arms of a comparison run the same claude argv but for the injecti
   });
 });
 
+describe('the baseline of a plugin-dir comparison watches the plugin it does not load', () => {
+  const { runSkillEval, runWorkflowEval } = require('../../scripts/lib/eval');
+  let tempDir;
+  let plugin;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-baseline-watch-'));
+    // A plugin checkout nested in the project: its own .git makes the project
+    // walk skip it, so only an explicit watch can see it.
+    plugin = path.join(tempDir, 'vendor', 'plugin');
+    fs.mkdirSync(plugin, { recursive: true });
+    fs.writeFileSync(path.join(plugin, '.git'), 'gitdir: elsewhere\n');
+    fs.writeFileSync(path.join(plugin, 'SKILL.md'), 'original');
+    mockUtils.execCommand.mockReset();
+    let trial = 0;
+    stubExec(() => {
+      trial++;
+      // Trial 1 is the baseline (arms run back to back): it edits the plugin.
+      if (trial === 1) fs.writeFileSync(path.join(plugin, 'SKILL.md'), 'edited by the baseline');
+      return { stdout: DONE_STREAM, stderr: '', exitCode: 0 };
+    });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('records a baseline write into the plugin as trial_wrote_repo (skill scope)', () => {
+    const { baseline } = runSkillEval(SCENARIO, 1, { projectRoot: tempDir, pluginDir: plugin });
+    expect(baseline[0].errorType).toBe('trial_wrote_repo');
+    expect(baseline[0].error).toContain(path.join('vendor', 'plugin', 'SKILL.md'));
+    const baselineArgs = mockUtils.execCommand.mock.calls.find(
+      (c) => c[0] === 'claude' && c[1].includes('-p'),
+    )[1];
+    expect(baselineArgs).not.toContain('--plugin-dir');
+  });
+
+  it('records a baseline write into the plugin as trial_wrote_repo (workflow scope)', () => {
+    const { baseline } = runWorkflowEval({ ...SCENARIO, scope: 'workflow', pluginDir: plugin }, 1, {
+      projectRoot: tempDir,
+    });
+    expect(baseline[0].errorType).toBe('trial_wrote_repo');
+  });
+});
+
 describe('eval-trial-guard snapshots', () => {
   let root;
 

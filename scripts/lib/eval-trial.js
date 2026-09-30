@@ -65,6 +65,8 @@ function resolveTrialTimeoutMs(env = process.env) {
  * @param {boolean} [options.isolated=true] - Whether to disable plugins and MCP
  * @param {string} [options.pluginDir] - Plugin directory for semi-isolated mode
  * @param {number} [options.maxTurns] - Max turns for Claude CLI
+ * @param {string[]} [options.watchRoots] - Extra directories the write check watches;
+ *   nothing is loaded from them (a comparison's baseline watches the plugin root)
  * @param {boolean} [options.skipPermissions] - Pass --dangerously-skip-permissions
  *   (default: when a plugin dir is loaded). A comparison passes one value to both arms.
  * @returns {TrialResult} Trial result
@@ -81,6 +83,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     pluginDir: rawPluginDir,
     maxTurns: rawMaxTurns,
     skipPermissions: rawSkipPermissions,
+    watchRoots = [],
   } = options;
   // Resolved before anything else so a bad override is refused ahead of the
   // fixture Setup and the session (B-10), and recorded on every row it produces.
@@ -166,7 +169,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     console.error(`[eval-debug] cmd: claude ${claudeArgs.join(' ')}`);
     console.error(`[eval-debug] prompt: ${prompt.slice(0, 100)}...`);
   }
-  const writesSince = watchForWrites([projectRoot, pluginDir]);
+  const writesSince = watchForWrites([projectRoot, pluginDir, ...watchRoots]);
   const t0 = Date.now();
   const result = execCommand('claude', claudeArgs, {
     input: prompt,
