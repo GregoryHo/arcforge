@@ -987,6 +987,33 @@ Do something.
       expect(result.errorType).toBeUndefined();
     });
 
+    it('should flag a provider refusal as infraError and keep it out of every scored pool', () => {
+      // Observed shape (#195): the limit message stands in for the agent's turn,
+      // zero output tokens, nothing else in the transcript.
+      const refusal = "You've hit your session limit · resets 3pm";
+      mockUtils.execCommand.mockReturnValueOnce({
+        stdout: streamOf(agentText(refusal), {
+          type: 'result',
+          subtype: 'success',
+          result: refusal,
+          usage: { input_tokens: 0, output_tokens: 0 },
+        }),
+        stderr: '',
+        exitCode: 0,
+      });
+
+      const result = runTrial(killScenario('provider-refusal'), 1, 1, {
+        projectRoot: tempDir,
+        isolated: false,
+      });
+
+      expect(result.infraError).toBe(true);
+      expect(result.errorType).toBe('provider_refusal');
+      expect(fs.readFileSync(result.transcript, 'utf8')).toContain('session limit');
+      const { scorableResults } = require('../../scripts/lib/eval-stats');
+      expect(scorableResults([result])).toEqual([]);
+    });
+
     it('should time a trial by wall clock and keep the CLI-reported duration separately', () => {
       const scenario = {
         name: 'duration-both-clocks',

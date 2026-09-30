@@ -50,4 +50,27 @@ function isOutputComplete({ textResult, actions } = {}) {
   return actions[actions.length - 1].type === 'text';
 }
 
-module.exports = { isTrialKilled, isOutputComplete };
+/**
+ * Did the provider answer in place of the agent?
+ *
+ * A session-limit or quota refusal arrives as ordinary final text, so
+ * isOutputComplete() reads it as a finished turn (#195). What gives it away is
+ * the cost: the result event reports zero output tokens — no model turn wrote
+ * that text — and the agent called no tool. The wording is deliberately not
+ * matched: provider messages change, the zero-cost shape does not. A trial whose
+ * usage was not reported (output_tokens null) is never flagged — absence of the
+ * number is not evidence.
+ *
+ * @param {Object} params
+ * @param {string} [params.textResult] - Final text from the stream-json result event
+ * @param {Array<{type: string}>} [params.actions] - Parsed action log
+ * @param {{ output_tokens?: number|null }} [params.usage] - Usage from the result event
+ * @returns {boolean}
+ */
+function isProviderRefusal({ textResult, actions, usage } = {}) {
+  if (usage?.output_tokens !== 0) return false;
+  if (typeof textResult !== 'string' || !textResult.trim()) return false;
+  return !(Array.isArray(actions) && actions.some((a) => a.type === 'tool'));
+}
+
+module.exports = { isTrialKilled, isOutputComplete, isProviderRefusal };

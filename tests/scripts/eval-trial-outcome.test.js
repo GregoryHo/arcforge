@@ -1,4 +1,8 @@
-const { isTrialKilled, isOutputComplete } = require('../../scripts/lib/eval-trial-outcome');
+const {
+  isTrialKilled,
+  isOutputComplete,
+  isProviderRefusal,
+} = require('../../scripts/lib/eval-trial-outcome');
 
 describe('eval-trial-outcome', () => {
   describe('isTrialKilled', () => {
@@ -59,6 +63,49 @@ describe('eval-trial-outcome', () => {
       expect(isOutputComplete({ textResult: '', actions: [] })).toBe(false);
       expect(isOutputComplete({})).toBe(false);
       expect(isOutputComplete()).toBe(false);
+    });
+  });
+
+  describe('isProviderRefusal', () => {
+    const limitText = "You've hit your session limit · resets 3pm";
+
+    it('should flag a limit message delivered with zero output tokens', () => {
+      expect(
+        isProviderRefusal({ textResult: limitText, actions: [], usage: { output_tokens: 0 } }),
+      ).toBe(true);
+    });
+
+    it('should flag it whatever the wording, since no model turn produced it', () => {
+      expect(
+        isProviderRefusal({
+          textResult: 'Quota exceeded for this organization',
+          usage: { output_tokens: 0 },
+        }),
+      ).toBe(true);
+    });
+
+    it('should not flag a real answer, which costs output tokens', () => {
+      expect(
+        isProviderRefusal({ textResult: limitText, actions: [], usage: { output_tokens: 42 } }),
+      ).toBe(false);
+    });
+
+    it('should not flag a trial whose usage was not reported', () => {
+      expect(isProviderRefusal({ textResult: limitText, usage: { output_tokens: null } })).toBe(
+        false,
+      );
+      expect(isProviderRefusal({ textResult: limitText })).toBe(false);
+    });
+
+    it('should not flag a trial that called a tool', () => {
+      const actions = [{ type: 'tool', name: 'Bash', index: 0 }];
+      expect(
+        isProviderRefusal({ textResult: limitText, actions, usage: { output_tokens: 0 } }),
+      ).toBe(false);
+    });
+
+    it('should not flag an empty turn — that is trial_output_missing', () => {
+      expect(isProviderRefusal({ textResult: '', usage: { output_tokens: 0 } })).toBe(false);
     });
   });
 });

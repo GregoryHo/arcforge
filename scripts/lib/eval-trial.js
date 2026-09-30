@@ -19,7 +19,7 @@ const {
   buildIsolationSettings,
 } = require('./eval-trial-env');
 const { parseStreamJsonOutput, parseActionsFromTranscript } = require('./eval-transcript');
-const { isTrialKilled, isOutputComplete } = require('./eval-trial-outcome');
+const { isTrialKilled, isOutputComplete, isProviderRefusal } = require('./eval-trial-outcome');
 
 // Mirror of eval.js constants to avoid circular imports
 const RESULTS_DIR = path.join('evals', 'results');
@@ -249,6 +249,19 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
       output: parsedOutput || '',
       error: 'Trial killed before the agent finished its turn (runner timeout)',
       errorType: 'trial_killed_incomplete',
+      infraError: true,
+    };
+  }
+
+  // A provider refusal (session limit, quota) is the provider talking, not the
+  // agent: scored, the fixture's own files pass some assertions and an exhausted
+  // quota reads as a behavioral regression (#195). Excluded like a killed trial.
+  if (isProviderRefusal({ textResult, actions, usage })) {
+    return {
+      ...base,
+      output: parsedOutput || '',
+      error: `Provider refused the trial in place of the agent's turn: ${textResult.trim().slice(0, 200)}`,
+      errorType: 'provider_refusal',
       infraError: true,
     };
   }

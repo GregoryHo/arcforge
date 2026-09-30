@@ -94,6 +94,12 @@ positive integer is refused before the run starts, ahead of any fixture
 `trialTimeoutMs`, so a pool that mixes ceilings can be told apart; report the
 value whenever a run moved it.
 
+A trial the provider refused — a session-limit or quota message in place of the
+agent's turn, reported with zero output tokens and no tool call — is recorded as
+an infra error (`provider_refusal`) and never scores either. Without that, the
+fixture's own files would pass some assertions and an exhausted quota would read
+as a regression.
+
 `--skill-file` injects a skill body into the treatment prompt — that measures a
 **skill**. `--plugin-dir` loads a real plugin instead — that measures a
 **workflow**, the whole environment. They answer different questions; using
