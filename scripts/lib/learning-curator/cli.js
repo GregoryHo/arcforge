@@ -7,10 +7,10 @@
  *     Layer 3: read observations, build CuratorBatch, write manifest + prompt file.
  *     Prints a single JSON line to stdout.
  *
- *   ingest-proposal --batch-id <batch_id> --response-file <path> [-- <claude argv...>]
+ *   ingest-proposal --batch-id <batch_id> --response-file <path> -- <claude argv...>
  *     Layer 4→5: parse LLM JSON output, validate, hand off to queue-writer.
  *     Everything after `--` is the argv the curator's `claude` run used; the
- *     run manifest's tool_access is derived from it.
+ *     run manifest's tool_access is derived from it, so it is required.
  *     Prints a single JSON line to stdout.
  *
  *   learning-enabled --project <project>
@@ -196,9 +196,9 @@ function cmdHelp() {
       '    Layer 3: assemble a CuratorBatch from recent observations.',
       '    Prints JSON: { batch_id, batch_hash, manifest_path, prompt_path, project }',
       '',
-      '  ingest-proposal --batch-id <batch_id> --response-file <path> [-- <claude argv...>]',
+      '  ingest-proposal --batch-id <batch_id> --response-file <path> -- <claude argv...>',
       '    Layer 4→5: parse LLM response and ingest proposals into candidate queue.',
-      "    The argv after -- is the curator run's; it decides the manifest's tool_access.",
+      "    The argv after -- (required) is the curator run's; it decides the manifest's tool_access.",
       '    Prints JSON: { run_id, parse_status, accepted, rejected }',
       '',
       '  record-run-failure --batch-id <batch_id> --parse-status <transport_error|timeout> [--detail <msg>]',

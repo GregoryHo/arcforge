@@ -346,7 +346,9 @@ type CuratorRunManifest = {
   provider?: string;
 
   invocation: {
-    tool_access: false;
+    // Derived from the argv the run was started with, never asserted; ingest
+    // refuses a run whose argv was not handed over (D-023).
+    tool_access: boolean;
     timeout_ms?: number;
     max_output_chars?: number;
     duration_ms?: number;

@@ -232,9 +232,10 @@ function buildCandidateRecord(proposal, batchManifest, now) {
  * @param {string} options.responseFile — path to the LLM JSON response file
  * @param {string} [options.homeDir] — override home directory (tests)
  * @param {number} [options.durationMs] — elapsed time for run manifest
- * @param {string[]} [options.curatorArgv] — the argv the curator's `claude` run
- *   used; the manifest's `invocation.tool_access` is derived from it (null when
- *   absent, so the manifest never claims an access level nobody recorded)
+ * @param {string[]} options.curatorArgv — the argv the curator's `claude` run
+ *   used; the manifest's `invocation.tool_access` is derived from it. Required:
+ *   without it nothing is ingested, so no manifest claims an access level
+ *   nobody recorded
  * @returns {{ run_id, parse_status, accepted, rejected }}
  */
 function ingestProposal({

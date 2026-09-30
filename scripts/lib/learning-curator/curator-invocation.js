@@ -53,11 +53,18 @@ function mcpCleared(argv) {
  * server can load (`--strict-mcp-config` with an empty `--mcp-config`). An
  * absent `--tools` is the default set; any named tool, or `default`, is access.
  *
- * @param {string[]|undefined|null} argv - the argv, or nothing when none was recorded
- * @returns {boolean|null} false when tool-less, true otherwise, null when unrecorded
+ * A run whose argv was not handed over has no truthful answer, so a missing
+ * argv throws rather than being recorded as a guess (fail closed).
+ *
+ * @param {string[]} argv - the argv the curator's `claude` run used
+ * @returns {boolean} false when tool-less, true otherwise
  */
 function toolAccessFromArgv(argv) {
-  if (argv === undefined || argv === null) return null;
+  if (argv === undefined || argv === null) {
+    throw new Error(
+      'curator argv is required: pass the argv the curator run used (ingest-proposal ... -- <claude argv>) so the manifest can record its tool access',
+    );
+  }
   if (!Array.isArray(argv) || argv.some((a) => typeof a !== 'string')) {
     throw new Error(`curator argv must be an array of strings (got ${JSON.stringify(argv)})`);
   }

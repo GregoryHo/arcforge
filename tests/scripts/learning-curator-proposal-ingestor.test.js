@@ -33,7 +33,34 @@ afterEach(() => {
 // Fresh module getters (called after jest.resetModules())
 // ---------------------------------------------------------------------------
 
+// The daemon's curator argv, minus the schema value (irrelevant to tool access).
+const TOOL_LESS_ARGV = [
+  '--model',
+  'haiku',
+  '--tools',
+  '',
+  '--max-turns',
+  '15',
+  '--print',
+  '--output-format',
+  'json',
+  '--disable-slash-commands',
+  '--strict-mcp-config',
+  '--mcp-config',
+  '{"mcpServers":{}}',
+];
+
+// ingestProposal refuses to run without the curator argv (B-9, D-023), so every
+// case that is not about that argv ingests as the daemon does: tool-less.
 function getIngestor() {
+  const ingestor = require('../../scripts/lib/learning-curator/proposal-ingestor');
+  return {
+    ...ingestor,
+    ingestProposal: (opts) => ingestor.ingestProposal({ curatorArgv: TOOL_LESS_ARGV, ...opts }),
+  };
+}
+
+function getRawIngestor() {
   return require('../../scripts/lib/learning-curator/proposal-ingestor');
 }
 
@@ -271,26 +298,9 @@ describe('ingestProposal — valid path', () => {
 // derived from the argv the daemon ran `claude` with — never a constant.
 // ---------------------------------------------------------------------------
 
-// The daemon's curator argv, minus the schema value (irrelevant to tool access).
-const TOOL_LESS_ARGV = [
-  '--model',
-  'haiku',
-  '--tools',
-  '',
-  '--max-turns',
-  '15',
-  '--print',
-  '--output-format',
-  'json',
-  '--disable-slash-commands',
-  '--strict-mcp-config',
-  '--mcp-config',
-  '{"mcpServers":{}}',
-];
-
 describe('ingestProposal — invocation.tool_access derived from the curator argv', () => {
   function runManifestFor(curatorArgv) {
-    const { ingestProposal } = getIngestor();
+    const { ingestProposal } = getRawIngestor();
     const { manifest, batchId } = makeBatchManifest();
     const payload = makeValidProposalPayload(batchId, manifest.batch_hash);
     const responsePath = makeResponseFile(payload);
@@ -312,8 +322,11 @@ describe('ingestProposal — invocation.tool_access derived from the curator arg
     expect(runManifestFor(argv).invocation.tool_access).toBe(true);
   });
 
-  test('no recorded argv records tool_access null, not a guess', () => {
-    expect(runManifestFor(undefined).invocation.tool_access).toBeNull();
+  test('a missing argv is refused before anything is written, never guessed', () => {
+    expect(() => runManifestFor(undefined)).toThrow(/curator argv is required/);
+    const runsDir = path.join(tmpDir, '.arcforge', 'learning', 'curator-runs');
+    expect(fs.existsSync(runsDir) ? fs.readdirSync(runsDir) : []).toEqual([]);
+    expect(Object.keys(readCurrentCandidates())).toEqual([]);
   });
 });
 
@@ -348,7 +361,9 @@ describe('toolAccessFromArgv', () => {
     expect(toolAccess(['--tools', 'Read', '--tools', '', '--strict-mcp-config'])).toBe(false);
   });
 
-  test('rejects an argv that is not an array of strings', () => {
+  test('rejects an argv that is missing or not an array of strings', () => {
+    expect(() => toolAccess(undefined)).toThrow(/curator argv is required/);
+    expect(() => toolAccess(null)).toThrow(/curator argv is required/);
     expect(() => toolAccess('--tools ""')).toThrow(/array of strings/);
     expect(() => toolAccess([1])).toThrow(/array of strings/);
   });
