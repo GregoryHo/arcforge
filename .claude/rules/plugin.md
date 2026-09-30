@@ -139,10 +139,14 @@ Product-level rationale — why Codex gets skills and nothing else — is
 - **Residual:** that manifest key is now the ONLY thing loading the registry. If
   a future Claude Code stops honouring it, every hook goes silent and no static
   check can tell — `check:hooks` proves the wiring is self-consistent, not that
-  the host reads it. A live session is the only proof. The verification above
-  loaded the plugin from a source tree with `--plugin-dir`; a marketplace-installed
-  copy resolving components out of the version-keyed cache is untested, and cannot
-  be tested before the branch is pushed — check it on the first 6.1.0 install
+  the host reads it. A live session is the only proof. Two are on record: the
+  source tree via `--plugin-dir` (2.1.258), and, on 2026-09-30 with 2.1.285, the
+  6.1.0 copy installed from the `arcforge-dev` marketplace and resolved out of
+  the version-keyed cache — enabled at local scope in an empty directory, one
+  `-p` session wrote its record under `~/.arcforge/sessions/<dir>/`, which only
+  `session-tracker` does. That marketplace's source is a local directory, so a
+  GitHub-sourced install is still unverified; check it on the first install
+  from the published marketplace
 - Use `${CLAUDE_PLUGIN_ROOT}` (with braces) for all path references in hooks
 - Handler types: `command` (shell), `prompt` (LLM evaluation), `agent` (multi-turn subagent)
 - Supported events: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure, PreCompact, Stop, SubagentStop, SubagentStart, SessionEnd, PermissionRequest, Notification, TeammateIdle, TaskCompleted
