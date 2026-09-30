@@ -69,10 +69,24 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   the answer.
 - **B-7 Trials cannot contaminate the user.** Every trial runs in a clean
   fixture directory with toolkit state redirected away from the user's real
-  learning state — unconditionally. On top of that, isolation is the default:
-  the trial session is stripped of plugins and MCP servers, and opting out
+  learning state — unconditionally. Nor does the user's configuration reach
+  the trial. On top of that, isolation is the default: plugins and MCP servers are
+  stripped, `CLAUDE.md` files and rules are excluded, the output style is
+  pinned to the default, hooks are disabled, and the user settings file is
+  not read, so the operator's hooks, output style, model, effort level, env
+  and permissions reach neither arm. A plugin-dir trial is contained the same
+  way but keeps the plugin under test with its own hooks and the fixture's
+  `CLAUDE.md` files; the user settings file is dropped there too, which costs
+  a credential that lives only in that file. Both arms of a comparison run
+  the same `claude` flags apart from the injection itself, and every row
+  records the `model` and `effort` it ran with. Opting out
   (`--no-isolate`) readmits the surrounding toolkit into the trial — never the
-  user's real state.
+  user's real state. Isolation is not a sandbox, and that is a limit rather
+  than a promise: the agent runs with the operator's filesystem permissions.
+  What the runner adds is detection after the fact, within the blind spots the
+  guide lists: a trial that wrote inside the repository it ran from is
+  recorded as an instrument failure (`trial_wrote_repo`) and leaves every
+  scored pool.
 - **B-8 Results pool by scenario version.** Every result records the version
   it ran under and every read filters to the current one — editing a
   scenario's *meaning* (task, fixture, assertions) bumps the version and
@@ -95,7 +109,10 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   `infraError` and leaves every scored pool (D-018). The ceiling is part of
   the measurement conditions, so a run that moved it MUST be reported with the
   value it used, the way B-9 treats a `--since`-bounded snapshot, and every
-  result row records the ceiling its trial ran under (D-018).
+  result row records the ceiling its trial ran under (D-018). Residual: a
+  refusal that arrives after the agent has already acted — tool calls made,
+  output tokens spent — is not distinguished from a completed turn and scores
+  as one.
 
 ### Benchmarks
 - **B-9 Snapshots keep history and gate releases.** `eval report` writes
