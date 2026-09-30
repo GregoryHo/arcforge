@@ -100,7 +100,7 @@ LINK / LINT / GROW mechanics, the sha256 Source Drift check, EVOLVE patterns,
 and vault-declared LINT extensibility: `references/audit.md`.
 
 - **The deterministic scans run in code.** `references/lint_vault.py` emits the LINT fact base as JSON — schema fill counts, orphans, sha256 drift, log consistency, tag counts, duplicate-title candidates; `audit.md` says how to run it. EVOLVE, GROW, and what to fix stay judgment calls.
-- **Only LINK modifies notes.** LINT and GROW report and propose; they never write to the wiki layer.
+- **Only LINK modifies notes and the index.** It resolves relationships and rebuilds `index.md`. LINT and GROW report and propose; they never write to the wiki layer or the index.
 - **A LINT finding is a hypothesis.** Read the file before acting on it.
 - **Never create a stub entity note without source backing.** Broken wikilink with a Raw Source behind it → ingest it; referenced by 3+ notes with no source → ask the user; 1–2 references → convert to plain text.
 - Thresholds come from the vault's SCHEMA.md and reach the script as flags. Where it declares none, report the observation instead of inventing a number.

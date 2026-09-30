@@ -42,7 +42,7 @@ Five typed notes live in the domain layer: Task / Milestone / Decision / Sprint 
 - `AGENTS.md` (this file) — thin runtime contract + schema authority.
 - `SCHEMA.md` — domain schema and policy.
 - `CLAUDE.md` — Claude Code entry shim.
-- `index.md` — content catalog. Rebuilt by `audit lint`.
+- `index.md` — content catalog. Rebuilt by `audit link`.
 - `log.md` — append-only operations log.
 - `_audits/` — default audit report folder unless SCHEMA.md declares another path.
 

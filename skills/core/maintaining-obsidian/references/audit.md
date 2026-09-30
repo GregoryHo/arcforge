@@ -37,7 +37,8 @@ an example to the script, not a link.
 
 ## LINK — resolve relationships
 
-The only sub-check that modifies existing notes.
+The only sub-check that modifies existing notes, and the one that rebuilds
+`index.md`.
 
 1. Find notes whose `## Relationships` section is still plain text (no `[[`).
 2. Search the vault for each mention on the active search route. A semantic route
@@ -49,9 +50,45 @@ The only sub-check that modifies existing notes.
 4. Update aggregator notes (map-of-content, Topic, Milestone, DailyAggregate — per
    the vault's SCHEMA.md) whose declared `scope:` or roll-up criteria now match.
 5. Collect unresolved mentions and hand them to GROW as candidates.
+6. Rebuild `index.md` — the procedure below.
 
 Single-file mode — `audit link --file=<path>` — runs on one note only; ingest's
-`--link` flag uses it.
+`--link` flag uses it. It skips the index rebuild: ingest's Index step has
+already added that note.
+
+### Index rebuild
+
+The full rebuild of `index.md` lives here and nowhere else. Ingest adds one
+entry per note; a batch ingest skips that step and relies on this one. Query
+reads `index.md` first, so an index that falls behind hides notes from queries.
+
+**Reads.** The vault's SCHEMA.md, for the declared types in the order it
+declares them, and every typed note in the wiki layer. Skip the same folders
+and files LINT skips (see *What to scan, what to skip*). The rebuild always
+covers the whole vault, even when the audit scope is `recent:N`, because a
+partial index is a wrong index. It also reads the current `index.md`, if there
+is one, to keep the summaries already written.
+
+**Maps.** Each type SCHEMA.md declares gets one `## <Type>` section, with the
+heading SCHEMA.md gives that type, in SCHEMA.md's order. A variant (the
+llm-wiki Paper) goes in its type's section, because it has the same `type:`.
+Each note is one line, `- [[Note Title]] — one-line summary`, sorted by title
+within its section. An existing entry keeps its summary. A note with no entry
+gets a summary written from its opening lines. A declared type with no notes
+gets no section. A `type:` that SCHEMA.md does not declare goes under
+`## Other`. An untyped note is not listed; LINT reports it. The rebuild does not
+invent sub-groups. If a section is larger than the vault's declared index size,
+that is a vault-declared LINT observation for the user, not a regroup.
+
+**Writes.** Only `index.md`. It keeps the `# <Vault Name> Index` title and any
+prose above the first type section, and replaces everything from that section
+down. Entries whose note no longer exists are dropped. `Last updated:` is set to
+today only when an entry was added, removed or changed. If `index.md` is
+missing, the rebuild creates it with that title.
+
+**Idempotent.** A second run on an unchanged vault leaves `index.md`
+byte-identical. The report's `### Index` line gives the counts of entries
+added, removed and kept.
 
 ## LINT — mechanical checks
 
@@ -216,6 +253,7 @@ tags: [audit]
 ---
 
 ## LINK Results
+### Index
 
 ## LINT Results
 ### Schema Issues

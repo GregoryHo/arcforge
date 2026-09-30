@@ -81,7 +81,7 @@ Empty starter:
 Last updated: YYYY-MM-DD
 ```
 
-(Substitute `<Vault Name>` with the user's real vault name. Audit LINT will populate sections on first run.)
+(Substitute `<Vault Name>` with the user's real vault name. The first `audit link` run populates the index's sections.)
 
 ### 8. Seed `<path>/log.md`
 

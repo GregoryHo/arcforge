@@ -41,7 +41,7 @@ Six typed notes live in the Wiki layer: Source / Entity / Synthesis / MOC / Deci
 - `AGENTS.md` (this file) — thin runtime contract + schema authority.
 - `SCHEMA.md` — domain schema and policy.
 - `CLAUDE.md` — Claude Code entry shim, redirects to this contract.
-- `index.md` — content catalog. Rebuilt by `audit lint`. Read first when querying.
+- `index.md` — content catalog. Rebuilt by `audit link`. Read first when querying.
 - `log.md` — append-only operations log (`## [YYYY-MM-DD] <op> | <detail>`).
 - `_audits/` — default audit report folder unless SCHEMA.md declares another path.
 
@@ -85,6 +85,6 @@ Use the `/maintaining-obsidian` skill (arcforge) for ingest, query, and audit. B
 ## Maintenance Cadence
 
 - After every ingest → skill updates `index.md` incrementally and appends to `log.md`.
-- Weekly → `audit lint` for schema, Source Drift, tag hygiene, and index rebuild.
+- Weekly → `audit lint` for schema, Source Drift, and tag hygiene; `audit link` for the index rebuild.
 - Monthly → `audit grow` for synthesis/entity/MOC gaps and stale topics.
 - After major reorganization → `audit link`.
