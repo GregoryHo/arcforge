@@ -58,9 +58,10 @@ harder, or find the failure mode you were actually worried about.
 
 Preflight runs its baseline the way the A/B will run it: with the same turn
 budget and permission mode. Give `preflight` the `--max-turns`,
-`--plugin-dir` and `--effort` you will give `ab`. There `--plugin-dir` only sets those two
-things; nothing is loaded into the baseline. A `workflow` scenario's
-`## Plugin Dir` counts on its own. With a plugin dir and no other limit, the
+`--plugin-dir` and `--effort` you will give `ab`. There `--plugin-dir` only sets the
+budget and permission mode; nothing is loaded into the baseline. Like `ab`,
+`preflight` takes `--plugin-dir` for a `workflow` scenario only. A `workflow`
+scenario's `## Plugin Dir` counts on its own. With a plugin dir and no other limit, the
 budget is 10 turns.
 
 Preflight results are cached per scenario **and per model**, keyed on the
@@ -96,8 +97,7 @@ Runs both arms and stores every trial. Useful flags:
 | `--interleave` | Alternate the arms instead of running each in a block, so drift over the run hits both equally |
 | `--max-turns` | Turn budget per trial, overriding the scenario |
 | `--skill-file` | Skill-scope only: inject this skill body into the treatment prompt. Falls back to the scenario's `## Target` |
-| `--plugin-dir` | Load this plugin into the treatment arm instead. Never combined with `--skill-file` |
-| `--skill-name` | The skill name the blind comparator redacts. Defaults to the `--skill-file` or `## Target` name (the skill's folder for a `SKILL.md`) |
+| `--plugin-dir` | `workflow` scope only: load this plugin into the treatment arm. Refused for any other scope |
 
 Each trial's `claude -p` session is capped at 900 s; a trial killed at the cap is
 an infra error and never scores. Set `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=<milliseconds>`
@@ -174,12 +174,13 @@ project root.
 `--skill-file` when you meant to test the environment quietly turns a workflow
 eval into a skill eval.
 
-The two never mix. On a skill-scope scenario, `--plugin-dir` gives you a
-baseline with no plugin and a treatment with the plugin loaded, where the agent
-reaches the skill through its description as a user's session would. No skill
-body is injected. With no `## Target`, pass `--skill-name <name>` so the blind
-comparator can redact the routed skill's name; without either, the run is
-refused. Passing `--skill-file` and `--plugin-dir` together is refused too.
+The two never mix, and `--plugin-dir` belongs to `workflow` scope. On a
+`skill` (or `agent`) scenario, `eval ab --plugin-dir` is refused, and so is
+`preflight --plugin-dir`. A comparison with the plugin loaded measures a
+workflow, so write it as a `workflow` scenario with `## Plugin Dir`. Whether a
+single skill triggers from its description is `claude plugin eval`'s question,
+not this harness's. No run ever injects a skill body while also loading the
+plugin.
 
 To run one condition on its own, without a comparison:
 

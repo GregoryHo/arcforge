@@ -12,6 +12,23 @@ const { output } = require('./shared');
  * @param {string} file - Skill file path
  * @returns {string}
  */
+/**
+ * --plugin-dir belongs to workflow scope. B-1: a plugin-routed comparison
+ * measures a workflow, never a skill; B-11: one skill's trigger rate is measured
+ * by `claude plugin eval`, outside this harness. Refusing it elsewhere also
+ * keeps any run from injecting a skill body while loading the plugin (#197).
+ * @param {{ scope: string }} scenario
+ * @param {string|undefined} pluginDir - The --plugin-dir option
+ * @param {string} cmd - Subcommand name for the message
+ */
+function refusePluginDirOutsideWorkflow(scenario, pluginDir, cmd) {
+  if (!pluginDir || scenario.scope === 'workflow') return;
+  console.error(
+    `Error: eval ${cmd} --plugin-dir is refused for a ${scenario.scope}-scope scenario. A plugin-routed comparison is a workflow measurement: give the scenario ## Scope workflow and ## Plugin Dir (B-1). A single skill's trigger rate is measured with \`claude plugin eval\`, not this harness (B-11).`,
+  );
+  process.exit(1);
+}
+
 function skillNameFromFile(file) {
   const base = path.basename(file, '.md');
   return base.toUpperCase() === 'SKILL' ? path.basename(path.dirname(file)) : base;
@@ -212,6 +229,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
       process.exit(1);
     }
 
+    refusePluginDirOutsideWorkflow(scenario, args.options['plugin-dir'], 'preflight');
     eval_.resolveTrialTimeoutMs(); // refuse a bad ceiling before any Setup or session (B-10)
     console.log(`Running preflight for "${scenarioName}"...`);
     const runId = generateRunId();
@@ -323,6 +341,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     }
   } else if (subcommand === 'ab') {
     const scenario = requireScenario(args.positional[1], 'ab');
+    refusePluginDirOutsideWorkflow(scenario, args.options['plugin-dir'], 'ab');
     eval_.resolveTrialTimeoutMs(); // refuse a bad ceiling before any Setup or session (B-10)
     const model = args.options.model;
     const effort = args.options.effort;
@@ -368,7 +387,6 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     };
 
     let result;
-    let abSkillName;
     if (scenario.scope === 'workflow') {
       console.log(
         `A/B eval (workflow): ${scenario.name} (k=${k})${interleave ? ' [interleaved]' : ''}`,
@@ -385,51 +403,23 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
         maxTurns,
       });
     } else {
-      // B-1: --skill-file injects a body and measures a skill; --plugin-dir loads
-      // the plugin, which routes to the skill by its description, and measures
-      // that. Never both: with --plugin-dir no body is injected.
-      if (pluginDir && args.options['skill-file']) {
+      const skillFile = args.options['skill-file'] || scenario.target;
+      if (!skillFile) {
         console.error(
-          'Error: eval ab takes --skill-file or --plugin-dir, not both — one injects the skill body, the other loads the plugin',
+          'Error: eval ab for skill scope requires --skill-file <path> or ## Target in scenario',
         );
         process.exit(1);
       }
-      let skillInstruction;
-      if (pluginDir) {
-        // No body is injected, so nothing names the routed skill for the blind
-        // comparator's redaction unless the operator does.
-        abSkillName =
-          args.options['skill-name'] || (scenario.target && skillNameFromFile(scenario.target));
-        if (!abSkillName) {
-          console.error(
-            "Error: eval ab --plugin-dir on a skill-scope scenario needs the routed skill's name, so the blind comparator can redact it: pass --skill-name <name> or add ## Target to the scenario",
-          );
-          process.exit(1);
-        }
-      } else {
-        const skillFile = args.options['skill-file'] || scenario.target;
-        if (!skillFile) {
-          console.error(
-            'Error: eval ab for skill scope requires --skill-file <path>, --plugin-dir <path>, or ## Target in scenario',
-          );
-          process.exit(1);
-        }
-        const resolvedSkillFile = path.resolve(projectRoot, skillFile);
-        if (!fs.existsSync(resolvedSkillFile)) {
-          console.error(`Error: skill file not found: ${skillFile}`);
-          process.exit(1);
-        }
-        skillInstruction = fs.readFileSync(resolvedSkillFile, 'utf8');
-        abSkillName = args.options['skill-name'] || skillNameFromFile(skillFile);
+      const resolvedSkillFile = path.resolve(projectRoot, skillFile);
+      if (!fs.existsSync(resolvedSkillFile)) {
+        console.error(`Error: skill file not found: ${skillFile}`);
+        process.exit(1);
       }
+      const skillInstruction = fs.readFileSync(resolvedSkillFile, 'utf8');
       console.log(
         `A/B eval (skill): ${scenario.name} (k=${k})${interleave ? ' [interleaved]' : ''}`,
       );
-      console.log(
-        pluginDir
-          ? `Baseline: isolated (no plugin) | Treatment: plugin ${pluginDir} (no skill body injected)\n`
-          : `Skill: ${args.options['skill-file'] || scenario.target}\n`,
-      );
+      console.log(`Skill: ${skillFile}\n`);
       result = eval_.runSkillEval(scenario, k, {
         projectRoot,
         skillInstruction,
@@ -438,7 +428,6 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
         model,
         effort,
         runId,
-        pluginDir,
         maxTurns,
       });
     }
@@ -455,10 +444,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     // fr-gr-005: blind-comparator auto-trigger
     const { runBlindAutoTrigger } = require('../lib/eval-blind-autotrigger');
     const skillFile = args.options['skill-file'] || scenario.target;
-    const skillName =
-      abSkillName ||
-      args.options['skill-name'] ||
-      (skillFile ? skillNameFromFile(skillFile) : undefined);
+    const skillName = skillFile ? skillNameFromFile(skillFile) : undefined;
     const blindResult = runBlindAutoTrigger(
       scenario,
       result.baseline,

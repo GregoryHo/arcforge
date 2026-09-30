@@ -10,7 +10,7 @@
  *   eval preflight <name>            Run baseline trials to check scenario discriminability
  *   eval lint <name>                 Validate scenario file structure
  *   eval report [name] [--model <name>] [--since ISO] Show eval benchmark report
- *   eval ab <name> [--skill-file <path>] [--skill-name <name>] [--k N] [--model <name>] [--interleave] [--plugin-dir <path>] [--max-turns N]
+ *   eval ab <name> [--skill-file <path>] [--k N] [--model <name>] [--interleave] [--plugin-dir <path>] [--max-turns N]
  *   eval compare <name> [--model <name>]      Compare A/B results
  *   eval history                     List benchmark snapshots
  *   eval audit [--top N]             Audit grading history for promotion/retirement candidates

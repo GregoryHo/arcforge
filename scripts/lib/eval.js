@@ -200,15 +200,14 @@ function sharedArmOptions(scenario, { maxTurns, pluginDir }) {
 
 /**
  * Run a skill eval as A/B comparison: baseline (without skill) vs treatment (with skill).
- * The baseline always runs isolated. The treatment either prepends the skill body
- * (skillInstruction, isolated like the baseline) or loads a plugin that routes to
- * the skill by its description (pluginDir, plugin-dir settings) — never both (B-1).
+ * Both arms run isolated; the treatment prepends the skill body. There is no
+ * plugin dir in skill scope: a plugin-routed comparison is a workflow (B-1), and
+ * a single skill's trigger rate is `claude plugin eval`'s question (B-11).
  * @param {EvalScenario} scenario - Scenario with scope='skill'
  * @param {number} k - Number of trials per condition
  * @param {Object} options - Run options
  * @param {string} [options.projectRoot] - Project root
  * @param {string} [options.skillInstruction] - Instruction to prepend for treatment trials
- * @param {string} [options.pluginDir] - Plugin to load into the treatment instead of a body
  * @param {boolean} [options.interleave=false] - Alternate baseline/treatment trials
  * @returns {{ baseline: TrialResult[], treatment: TrialResult[], delta: number }}
  */
@@ -224,10 +223,11 @@ function runSkillEval(scenario, k, options = {}) {
     pluginDir,
     maxTurns,
   } = options;
-  if (skillInstruction && pluginDir) {
-    // B-1: an injected body measures a skill, a loaded plugin measures routing
-    // to it; one treatment arm cannot answer both.
-    throw new Error('runSkillEval: skillInstruction and pluginDir are exclusive (B-1)');
+  if (pluginDir) {
+    // #197: no run injects a skill body while also loading the plugin.
+    throw new Error(
+      'runSkillEval: skill scope takes no plugin dir; a plugin-routed comparison is workflow scope (B-1)',
+    );
   }
   resolveTrialTimeoutMs(); // refuse a bad ceiling before any trial spawns (B-10)
   const isolationSettings = buildIsolationSettings();
@@ -237,7 +237,7 @@ function runSkillEval(scenario, k, options = {}) {
     context: skillInstruction ? `${skillInstruction}\n\n${scenario.context}` : scenario.context,
   };
 
-  const shared = sharedArmOptions(scenario, { maxTurns, pluginDir });
+  const shared = sharedArmOptions(scenario, { maxTurns });
   const bOpts = {
     projectRoot,
     label: 'baseline',
@@ -252,14 +252,10 @@ function runSkillEval(scenario, k, options = {}) {
     projectRoot,
     label: 'treatment',
     onTrialComplete,
-    // A plugin-dir treatment needs the plugin's hooks, which full isolation turns off.
-    isolationSettings: pluginDir
-      ? buildIsolationSettings({ forPluginDir: true })
-      : isolationSettings,
+    isolationSettings,
     model,
     effort,
     runId,
-    ...(pluginDir ? { pluginDir, isolated: false } : {}),
     ...shared,
   };
   return runAbTrials(scenario, treatmentScenario, scenario, k, bOpts, tOpts, interleave);

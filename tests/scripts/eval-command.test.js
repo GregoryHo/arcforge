@@ -213,14 +213,25 @@ describe('eval command', () => {
       }
     });
 
-    it('honours --max-turns and --plugin-dir the way eval ab resolves them', async () => {
+    it('honours --max-turns the way eval ab resolves it', async () => {
       writeScenario(tempDir, 'pf-skill');
       const [capped] = await preflightOpts('pf-skill', { 'max-turns': '4' });
       expect(capped.maxTurns).toBe(4);
-      evalLib.runTrial.mockClear();
-      const [plugin] = await preflightOpts('pf-skill', { 'plugin-dir': tempDir });
-      expect(plugin.maxTurns).toBe(10);
-      expect(plugin.pluginDir).toBeUndefined();
+    });
+
+    it('refuses --plugin-dir outside workflow scope', async () => {
+      writeScenario(tempDir, 'pf-skill-plugin');
+      jest.spyOn(process, 'exit').mockImplementation((code) => {
+        throw new Error(`process.exit(${code})`);
+      });
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+      await expect(
+        runEvalCommand(args(['preflight', 'pf-skill-plugin'], { 'plugin-dir': tempDir }), {
+          projectRoot: tempDir,
+          asJson: false,
+        }),
+      ).rejects.toThrow('process.exit(1)');
+      expect(evalLib.runTrial).not.toHaveBeenCalled();
     });
 
     it('leaves the budget unset when the A/B baseline would have none', async () => {
@@ -236,16 +247,11 @@ describe('eval command', () => {
     let errors;
 
     beforeEach(() => {
-      fs.mkdirSync(path.join(tempDir, 'skills', 'demo'), { recursive: true });
-      fs.writeFileSync(path.join(tempDir, 'skills', 'demo', 'SKILL.md'), 'body');
       const dir = path.join(tempDir, evalLib.SCENARIOS_DIR);
       fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(
         path.join(dir, 'gated.md'),
-        SCENARIO('gated', '\n## Target\nskills/demo/SKILL.md\n').replace(
-          '## Scope\nagent',
-          '## Scope\nskill',
-        ),
+        SCENARIO('gated').replace('## Scope\nagent', '## Scope\nworkflow'),
       );
       // A PASS recorded under a plugin-dir baseline: 10 turns, plugin dir in play.
       runPreflight('gated', tempDir, {
@@ -253,7 +259,7 @@ describe('eval command', () => {
         gradeResult: (r) => r,
         conditions: { maxTurns: 10, pluginDir: tempDir },
       });
-      evalLib.runSkillEval.mockReturnValue({ baseline: [], treatment: [], delta: 0 });
+      evalLib.runWorkflowEval.mockReturnValue({ baseline: [], treatment: [], delta: 0 });
       errors = [];
       jest.spyOn(console, 'error').mockImplementation((...a) => errors.push(a.join(' ')));
       jest.spyOn(process, 'exit').mockImplementation((code) => {
@@ -266,14 +272,14 @@ describe('eval command', () => {
         projectRoot: tempDir,
         asJson: false,
       });
-      expect(evalLib.runSkillEval).toHaveBeenCalledTimes(1);
+      expect(evalLib.runWorkflowEval).toHaveBeenCalledTimes(1);
     });
 
     it('refuses, naming the mismatch and the command, when they differ (miss)', async () => {
       await expect(
         runEvalCommand(args(['ab', 'gated']), { projectRoot: tempDir, asJson: false }),
       ).rejects.toThrow('process.exit(1)');
-      expect(evalLib.runSkillEval).not.toHaveBeenCalled();
+      expect(evalLib.runWorkflowEval).not.toHaveBeenCalled();
       const message = errors.join('\n');
       expect(message).toContain('max turns none, plugin dir no');
       expect(message).toContain('recorded under: max turns 10, plugin dir yes');
@@ -282,7 +288,7 @@ describe('eval command', () => {
   });
 
   describe('eval ab, skill scope (B-1, #197)', () => {
-    const SKILL_BODY = 'SKILL BODY THAT MUST NOT REACH A PLUGIN-ROUTED TREATMENT';
+    const SKILL_BODY = 'THE SKILL BODY';
 
     function writeSkillScenario(name, { target = true } = {}) {
       fs.mkdirSync(path.join(tempDir, 'skills', 'demo'), { recursive: true });
@@ -304,56 +310,18 @@ describe('eval command', () => {
       jest.spyOn(console, 'error').mockImplementation(() => {});
     });
 
-    it('loads the plugin without injecting the ## Target body', async () => {
+    it('refuses --plugin-dir, pointing at workflow scope and claude plugin eval', async () => {
       writeSkillScenario('ab-plugin');
-      await runEvalCommand(args(['ab', 'ab-plugin'], { 'plugin-dir': tempDir }), {
-        projectRoot: tempDir,
-        asJson: false,
-      });
-      const [, , opts] = evalLib.runSkillEval.mock.calls[0];
-      expect(opts.pluginDir).toBe(tempDir);
-      expect(opts.skillInstruction).toBeUndefined();
-    });
-
-    it('runs a plugin-routed comparison for a scenario with no ## Target', async () => {
-      writeSkillScenario('ab-plugin-no-target', { target: false });
-      await runEvalCommand(
-        args(['ab', 'ab-plugin-no-target'], { 'plugin-dir': tempDir, 'skill-name': 'demo' }),
-        { projectRoot: tempDir, asJson: false },
-      );
-      expect(evalLib.runSkillEval).toHaveBeenCalledTimes(1);
-    });
-
-    it('refuses a plugin-routed run with no ## Target and no --skill-name', async () => {
-      writeSkillScenario('ab-plugin-nameless', { target: false });
       await expect(
-        runEvalCommand(args(['ab', 'ab-plugin-nameless'], { 'plugin-dir': tempDir }), {
+        runEvalCommand(args(['ab', 'ab-plugin'], { 'plugin-dir': tempDir }), {
           projectRoot: tempDir,
           asJson: false,
         }),
       ).rejects.toThrow('process.exit(1)');
       expect(evalLib.runSkillEval).not.toHaveBeenCalled();
-      expect(console.error.mock.calls.join('\n')).toMatch(/--skill-name/);
-    });
-
-    it('tells the blind comparator to redact the routed skill name', async () => {
-      writeSkillScenario('ab-plugin-named', { target: false });
-      await runEvalCommand(
-        args(['ab', 'ab-plugin-named'], { 'plugin-dir': tempDir, 'skill-name': 'speccing' }),
-        { projectRoot: tempDir, asJson: false },
-      );
-      const [, , , , opts] = runBlindAutoTrigger.mock.calls.at(-1);
-      expect(opts.skillName).toBe('speccing');
-    });
-
-    it('derives the name from ## Target, using the skill directory for a SKILL.md', async () => {
-      writeSkillScenario('ab-plugin-target');
-      await runEvalCommand(args(['ab', 'ab-plugin-target'], { 'plugin-dir': tempDir }), {
-        projectRoot: tempDir,
-        asJson: false,
-      });
-      const [, , , , opts] = runBlindAutoTrigger.mock.calls.at(-1);
-      expect(opts.skillName).toBe('demo');
+      const message = console.error.mock.calls.join('\n');
+      expect(message).toContain('workflow');
+      expect(message).toContain('claude plugin eval');
     });
 
     it('refuses --skill-file together with --plugin-dir', async () => {
@@ -368,6 +336,13 @@ describe('eval command', () => {
         ),
       ).rejects.toThrow('process.exit(1)');
       expect(evalLib.runSkillEval).not.toHaveBeenCalled();
+    });
+
+    it('redacts the skill folder name, not "SKILL", for a SKILL.md target', async () => {
+      writeSkillScenario('ab-name');
+      await runEvalCommand(args(['ab', 'ab-name']), { projectRoot: tempDir, asJson: false });
+      const [, , , , opts] = runBlindAutoTrigger.mock.calls.at(-1);
+      expect(opts.skillName).toBe('demo');
     });
 
     it('still injects the body when only --skill-file (or ## Target) is given', async () => {

@@ -173,8 +173,8 @@ describe('a trial that writes outside its directory is an instrument failure (ev
   });
 });
 
-describe('runSkillEval with a plugin dir measures routing, not an injected body (B-1)', () => {
-  const { runSkillEval } = require('../../scripts/lib/eval');
+describe('skill scope takes no plugin dir (B-1, #197)', () => {
+  const { runSkillEval, runWorkflowEval } = require('../../scripts/lib/eval');
   let tempDir;
 
   beforeEach(() => {
@@ -186,27 +186,32 @@ describe('runSkillEval with a plugin dir measures routing, not an injected body 
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it('refuses a skill body and a plugin dir together', () => {
+  it('refuses a plugin dir, with or without a skill body', () => {
+    expect(() => runSkillEval(SCENARIO, 1, { projectRoot: tempDir, pluginDir: tempDir })).toThrow(
+      /workflow scope/,
+    );
     expect(() =>
       runSkillEval(SCENARIO, 1, {
         projectRoot: tempDir,
         skillInstruction: 'x',
         pluginDir: tempDir,
       }),
-    ).toThrow(/exclusive/);
+    ).toThrow(/workflow scope/);
+    expect(mockUtils.execCommand).not.toHaveBeenCalled();
   });
 
-  it('runs the plugin-dir treatment under plugin-dir settings, so its hooks load', () => {
-    const settingsByArm = {};
+  it('runs a workflow plugin-dir treatment under plugin-dir settings, so its hooks load', () => {
+    const settingsByArm = [];
     stubExec((opts) => {
-      const arm = opts.input.includes('## Task') && opts.cwd;
-      settingsByArm[arm] = JSON.parse(
-        fs.readFileSync(path.join(opts.cwd, '.claude', 'settings.json'), 'utf8'),
+      settingsByArm.push(
+        JSON.parse(fs.readFileSync(path.join(opts.cwd, '.claude', 'settings.json'), 'utf8')),
       );
       return { stdout: DONE_STREAM, stderr: '', exitCode: 0 };
     });
-    runSkillEval(SCENARIO, 1, { projectRoot: tempDir, pluginDir: tempDir });
-    const [baseline, treatment] = Object.values(settingsByArm);
+    runWorkflowEval({ ...SCENARIO, scope: 'workflow', pluginDir: tempDir }, 1, {
+      projectRoot: tempDir,
+    });
+    const [baseline, treatment] = settingsByArm;
     expect(baseline.disableAllHooks).toBe(true);
     expect(treatment).not.toHaveProperty('disableAllHooks');
     expect(treatment.outputStyle).toBe('default');
@@ -265,8 +270,12 @@ describe('both arms of a comparison run the same claude argv but for the injecti
 
   const collect = (_label, _t, row) => rows.push(row);
 
-  it('skill scope with --plugin-dir, no model or effort given', () => {
-    runSkillEval(SCENARIO, 1, { projectRoot: tempDir, pluginDir, onTrialComplete: collect });
+  it('workflow scope with a plugin dir, no model or effort given', () => {
+    runWorkflowEval({ ...SCENARIO, scope: 'workflow' }, 1, {
+      projectRoot: tempDir,
+      pluginDir,
+      onTrialComplete: collect,
+    });
     expect(argvs).toHaveLength(2);
     expectOnlyInjectionDiffers(argvs);
     expect(argvs[0]).toContain('--setting-sources');
@@ -274,8 +283,8 @@ describe('both arms of a comparison run the same claude argv but for the injecti
     expect(argvs[0][argvs[0].indexOf('--max-turns') + 1]).toBe('10');
   });
 
-  it('skill scope with --plugin-dir, model, effort and max turns given', () => {
-    runSkillEval(SCENARIO, 1, {
+  it('workflow scope with a plugin dir, model, effort and max turns given', () => {
+    runWorkflowEval({ ...SCENARIO, scope: 'workflow' }, 1, {
       projectRoot: tempDir,
       pluginDir,
       model: 'opus',
@@ -301,7 +310,10 @@ describe('both arms of a comparison run the same claude argv but for the injecti
   });
 
   it('records the model and effort every row ran with, default when none was passed', () => {
-    runSkillEval(SCENARIO, 1, { projectRoot: tempDir, pluginDir, onTrialComplete: collect });
+    runWorkflowEval({ ...SCENARIO, scope: 'workflow', pluginDir }, 1, {
+      projectRoot: tempDir,
+      onTrialComplete: collect,
+    });
     expect(rows.map((r) => [r.model, r.effort])).toEqual([
       ['default', 'default'],
       ['default', 'default'],
@@ -351,16 +363,6 @@ describe('the baseline of a plugin-dir comparison watches the plugin it does not
     require('../../scripts/lib/eval').loadResults('isolation-baseline', tempDir)[0];
   const trialCalls = () =>
     mockUtils.execCommand.mock.calls.filter((c) => c[0] === 'claude' && c[1].includes('-p'));
-
-  it('records a baseline write into the plugin as trial_wrote_repo (skill scope)', () => {
-    expect(() =>
-      runSkillEval(SCENARIO, 1, { projectRoot: tempDir, pluginDir: plugin, runId: 'r1' }),
-    ).toThrow(/baseline trial 1 wrote outside its directory/);
-    expect(baselineRow().errorType).toBe('trial_wrote_repo');
-    expect(baselineRow().error).toContain(path.join('vendor', 'plugin', 'SKILL.md'));
-    expect(trialCalls()).toHaveLength(1);
-    expect(trialCalls()[0][1]).not.toContain('--plugin-dir');
-  });
 
   it('records a baseline write into the plugin as trial_wrote_repo (workflow scope)', () => {
     expect(() =>

@@ -54,8 +54,7 @@ COMMANDS:
       --effort       Reasoning effort passed to spawned trials
   eval lint <name>                   Validate scenario file (sections, assertion shape)
   eval ab <name> [--skill-file path] A/B skill/workflow eval (requires prior PASS preflight)
-      --plugin-dir   Plugin directory for treatment trials
-      --skill-name   Name the blind comparator redacts (required with --plugin-dir in skill scope unless ## Target is set)
+      --plugin-dir   Plugin directory for treatment trials (workflow scope only)
       --max-turns    Max turns for both arms (overrides scenario)
       --interleave   Alternate baseline/treatment trials instead of running arms back-to-back
       --effort       Reasoning effort passed to spawned trials
