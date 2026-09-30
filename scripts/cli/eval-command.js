@@ -6,6 +6,17 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { output } = require('./shared');
 
+/**
+ * The name the blind comparator redacts for a skill file: its basename, or for
+ * a `SKILL.md` the skill's directory (the basename "SKILL" names nothing).
+ * @param {string} file - Skill file path
+ * @returns {string}
+ */
+function skillNameFromFile(file) {
+  const base = path.basename(file, '.md');
+  return base.toUpperCase() === 'SKILL' ? path.basename(path.dirname(file)) : base;
+}
+
 async function runEvalCommand(args, { projectRoot, asJson }) {
   const eval_ = require('../lib/eval');
   const benchmark_ = require('../lib/eval-benchmark');
@@ -357,6 +368,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     };
 
     let result;
+    let abSkillName;
     if (scenario.scope === 'workflow') {
       console.log(
         `A/B eval (workflow): ${scenario.name} (k=${k})${interleave ? ' [interleaved]' : ''}`,
@@ -383,7 +395,18 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
         process.exit(1);
       }
       let skillInstruction;
-      if (!pluginDir) {
+      if (pluginDir) {
+        // No body is injected, so nothing names the routed skill for the blind
+        // comparator's redaction unless the operator does.
+        abSkillName =
+          args.options['skill-name'] || (scenario.target && skillNameFromFile(scenario.target));
+        if (!abSkillName) {
+          console.error(
+            "Error: eval ab --plugin-dir on a skill-scope scenario needs the routed skill's name, so the blind comparator can redact it: pass --skill-name <name> or add ## Target to the scenario",
+          );
+          process.exit(1);
+        }
+      } else {
         const skillFile = args.options['skill-file'] || scenario.target;
         if (!skillFile) {
           console.error(
@@ -397,6 +420,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
           process.exit(1);
         }
         skillInstruction = fs.readFileSync(resolvedSkillFile, 'utf8');
+        abSkillName = args.options['skill-name'] || skillNameFromFile(skillFile);
       }
       console.log(
         `A/B eval (skill): ${scenario.name} (k=${k})${interleave ? ' [interleaved]' : ''}`,
@@ -431,7 +455,10 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     // fr-gr-005: blind-comparator auto-trigger
     const { runBlindAutoTrigger } = require('../lib/eval-blind-autotrigger');
     const skillFile = args.options['skill-file'] || scenario.target;
-    const skillName = skillFile ? path.basename(skillFile, '.md') : undefined;
+    const skillName =
+      abSkillName ||
+      args.options['skill-name'] ||
+      (skillFile ? skillNameFromFile(skillFile) : undefined);
     const blindResult = runBlindAutoTrigger(
       scenario,
       result.baseline,

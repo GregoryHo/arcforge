@@ -86,6 +86,7 @@ const CLI_MANIFEST = {
       '--top',
       '--port',
       '--skill-file',
+      '--skill-name',
       '--interleave',
     ],
     output: null,

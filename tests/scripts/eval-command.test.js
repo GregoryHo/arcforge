@@ -21,6 +21,12 @@ jest.mock('../../scripts/lib/eval', () => {
   };
 });
 const evalLib = require('../../scripts/lib/eval');
+// The blind comparator is observed, not run: these tests check what it is told
+// to redact.
+jest.mock('../../scripts/lib/eval-blind-autotrigger', () => ({
+  runBlindAutoTrigger: jest.fn(() => ({ skipped: true })),
+}));
+const { runBlindAutoTrigger } = require('../../scripts/lib/eval-blind-autotrigger');
 const { runEvalCommand } = require('../../scripts/cli/eval-command');
 
 const SCENARIO = (name, extra = '') => `# Eval: ${name}
@@ -311,11 +317,43 @@ describe('eval command', () => {
 
     it('runs a plugin-routed comparison for a scenario with no ## Target', async () => {
       writeSkillScenario('ab-plugin-no-target', { target: false });
-      await runEvalCommand(args(['ab', 'ab-plugin-no-target'], { 'plugin-dir': tempDir }), {
+      await runEvalCommand(
+        args(['ab', 'ab-plugin-no-target'], { 'plugin-dir': tempDir, 'skill-name': 'demo' }),
+        { projectRoot: tempDir, asJson: false },
+      );
+      expect(evalLib.runSkillEval).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses a plugin-routed run with no ## Target and no --skill-name', async () => {
+      writeSkillScenario('ab-plugin-nameless', { target: false });
+      await expect(
+        runEvalCommand(args(['ab', 'ab-plugin-nameless'], { 'plugin-dir': tempDir }), {
+          projectRoot: tempDir,
+          asJson: false,
+        }),
+      ).rejects.toThrow('process.exit(1)');
+      expect(evalLib.runSkillEval).not.toHaveBeenCalled();
+      expect(console.error.mock.calls.join('\n')).toMatch(/--skill-name/);
+    });
+
+    it('tells the blind comparator to redact the routed skill name', async () => {
+      writeSkillScenario('ab-plugin-named', { target: false });
+      await runEvalCommand(
+        args(['ab', 'ab-plugin-named'], { 'plugin-dir': tempDir, 'skill-name': 'speccing' }),
+        { projectRoot: tempDir, asJson: false },
+      );
+      const [, , , , opts] = runBlindAutoTrigger.mock.calls.at(-1);
+      expect(opts.skillName).toBe('speccing');
+    });
+
+    it('derives the name from ## Target, using the skill directory for a SKILL.md', async () => {
+      writeSkillScenario('ab-plugin-target');
+      await runEvalCommand(args(['ab', 'ab-plugin-target'], { 'plugin-dir': tempDir }), {
         projectRoot: tempDir,
         asJson: false,
       });
-      expect(evalLib.runSkillEval).toHaveBeenCalledTimes(1);
+      const [, , , , opts] = runBlindAutoTrigger.mock.calls.at(-1);
+      expect(opts.skillName).toBe('demo');
     });
 
     it('refuses --skill-file together with --plugin-dir', async () => {

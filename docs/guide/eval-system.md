@@ -97,6 +97,7 @@ Runs both arms and stores every trial. Useful flags:
 | `--max-turns` | Turn budget per trial, overriding the scenario |
 | `--skill-file` | Skill-scope only: inject this skill body into the treatment prompt. Falls back to the scenario's `## Target` |
 | `--plugin-dir` | Load this plugin into the treatment arm instead. Never combined with `--skill-file` |
+| `--skill-name` | The skill name the blind comparator redacts. Defaults to the `--skill-file` or `## Target` name (the skill's folder for a `SKILL.md`) |
 
 Each trial's `claude -p` session is capped at 900 s; a trial killed at the cap is
 an infra error and never scores. Set `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=<milliseconds>`
@@ -176,8 +177,9 @@ eval into a skill eval.
 The two never mix. On a skill-scope scenario, `--plugin-dir` gives you a
 baseline with no plugin and a treatment with the plugin loaded, where the agent
 reaches the skill through its description as a user's session would. No skill
-body is injected, and `## Target` is not needed. Passing `--skill-file` and
-`--plugin-dir` together is refused.
+body is injected. With no `## Target`, pass `--skill-name <name>` so the blind
+comparator can redact the routed skill's name; without either, the run is
+refused. Passing `--skill-file` and `--plugin-dir` together is refused too.
 
 To run one condition on its own, without a comparison:
 
