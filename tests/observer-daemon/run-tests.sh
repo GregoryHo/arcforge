@@ -837,6 +837,75 @@ assert_eq \
   "$([ -n "$B4_CANCELLED" ] && echo yes || echo no)"
 
 # ─────────────────────────────────────────────
+# B1-T5: a disable and re-enable between assembly and the model call
+# The batch was rendered under the old opt-in stamp, so it may carry evidence
+# from the earlier period: the recheck compares stamps, and a changed stamp
+# withdraws the run just like a disable. The wrapper rewrites the config with
+# learning still on but a new updated_at — what disable-then-enable leaves.
+# ─────────────────────────────────────────────
+
+echo ""
+echo "=== B1-T5: Re-enable between assembly and the model call ==="
+
+TMPDIR_B5=$(mktemp -d)
+trap 'rm -rf "$TMPDIR_G3" "$TMPDIR_B1" "$TMPDIR_B4" "$TMPDIR_B5"' EXIT
+B5_HOME="${TMPDIR_B5}/home"
+B5_BIN="${TMPDIR_B5}/bin"
+mkdir -p "$B5_BIN"
+enable_global_learning "$B5_HOME"
+cat > "${B5_BIN}/node" << STUB_EOF
+#!/usr/bin/env bash
+"${REAL_NODE}" "\$@"
+status=\$?
+if [ "\$2" = "assemble-batch" ]; then
+  printf '{"scope":"global","enabled":true,"updated_at":"2026-06-02T00:00:00.000Z"}\n' \
+    > "${B5_HOME}/.arcforge/learning/config.json"
+fi
+exit \$status
+STUB_EOF
+chmod +x "${B5_BIN}/node"
+cat > "${B5_BIN}/claude" << STUB_EOF
+#!/usr/bin/env bash
+cat > /dev/null
+touch "${TMPDIR_B5}/claude-was-called"
+exit 1
+STUB_EOF
+chmod +x "${B5_BIN}/claude"
+B5_OBS="${B5_HOME}/.arcforge/observations/b5-proj"
+mkdir -p "$B5_OBS"
+for i in $(seq 1 15); do
+  printf '{"ts":"2026-05-22T01:%02d:00.000Z","event":"tool_start","tool":"Read","session":"s1","project":"b5-proj","project_id":"proj_abc123456789ab","evidence_status":"present","input":"file %d"}\n' \
+    "$i" "$i" >> "${B5_OBS}/observations.jsonl"
+done
+
+B5_LOG=$(
+  HOME="$B5_HOME"
+  PATH="${B5_BIN}:${PATH}"
+  OBSERVER_DAEMON_WATCHDOG_SECS=10
+  set +e
+  # shellcheck source=/dev/null
+  source "$DAEMON_SCRIPT" 2>/dev/null
+  mkdir -p "$INSTINCTS_DIR"
+  analyze_project 'b5-proj' 2>/dev/null || true
+  cat "$LOG_FILE" 2>/dev/null || true
+) 2>/dev/null
+
+assert_eq \
+  'B1-T5: claude is not invoked after a disable and re-enable mid-run' \
+  'no' \
+  "$([ -f "${TMPDIR_B5}/claude-was-called" ] && echo yes || echo no)"
+assert_match \
+  'B1-T5: logs that the opt-in changed since the batch was assembled' \
+  'opt-in changed since the batch was assembled' \
+  "$B5_LOG"
+B5_CANCELLED=$(find "${B5_HOME}/.arcforge/learning/curator-runs" -name '*.manifest.json' \
+  -exec grep -l '"transport_status": *"cancelled"' {} \; 2>/dev/null | head -1 || true)
+assert_eq \
+  'B1-T5: the failure manifest records transport_status cancelled' \
+  'yes' \
+  "$([ -n "$B5_CANCELLED" ] && echo yes || echo no)"
+
+# ─────────────────────────────────────────────
 # Results
 # ─────────────────────────────────────────────
 

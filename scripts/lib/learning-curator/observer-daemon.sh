@@ -102,6 +102,15 @@ count_observations() {
   wc -l < "$obs_file" | tr -d ' '
 }
 
+# Print the instant learning took effect for a project (the engine's
+# `learning-enabled` query), or nothing when it is not enabled or the query
+# fails. Returns non-zero in both of those cases.
+current_enabled_since() {
+  local json=""
+  json=$(node "$CURATOR_CLI" learning-enabled --project "$1" 2>/dev/null) || return 1
+  printf '%s' "$json" | sed -n 's/.*"enabled_since":"\([^"]*\)".*/\1/p'
+}
+
 analyze_project() {
   local project="$1"
   local obs_file="${OBS_DIR}/${project}/observations.jsonl"
@@ -129,13 +138,12 @@ analyze_project() {
     log_msg "WARNING: node not found, skipping analysis"
     return
   fi
-  local enabled_json="" enabled_status=0 enabled_since=""
-  enabled_json=$(node "$CURATOR_CLI" learning-enabled --project "$project" 2>/dev/null) || enabled_status=$?
+  local enabled_status=0 enabled_since=""
+  enabled_since=$(current_enabled_since "$project") || enabled_status=$?
   if [ "$enabled_status" -ne 0 ]; then
-    log_msg "Skipping ${project}: learning is not enabled for it (learning-enabled exit ${enabled_status})"
+    log_msg "Skipping ${project}: learning is not enabled for it"
     return
   fi
-  enabled_since=$(printf '%s' "$enabled_json" | sed -n 's/.*"enabled_since":"\([^"]*\)".*/\1/p')
   if [ -z "$enabled_since" ]; then
     log_msg "Skipping ${project}: learning-enabled returned no enable stamp"
     return
@@ -278,15 +286,24 @@ analyze_project() {
 
   while [ "$retry_count" -le "$max_retries" ] && [ "$analysis_success" = false ]; do
     # Consent is re-checked immediately before every model attempt, retries
-    # included (learning B-1): a `learn disable` after assembly, or during a
-    # retry delay, withdraws the run before anything is submitted.
-    if ! node "$CURATOR_CLI" learning-enabled --project "$project" > /dev/null 2>&1; then
-      log_msg "Aborting ${project}: learning was turned off before the batch was submitted; nothing was sent"
+    # included (learning B-1). The batch was rendered under `enabled_since`, so
+    # the run is withdrawn not only when learning is now off but also when the
+    # stamp moved — a disable and re-enable since assembly — because the prompt
+    # may carry evidence from the earlier period. The next cycle rebuilds it.
+    local recheck_since="" recheck_status=0 withdrawn=""
+    recheck_since=$(current_enabled_since "$project") || recheck_status=$?
+    if [ "$recheck_status" -ne 0 ] || [ -z "$recheck_since" ]; then
+      withdrawn="learning was turned off before the batch was submitted"
+    elif [ "$recheck_since" != "$enabled_since" ]; then
+      withdrawn="the opt-in changed since the batch was assembled (${enabled_since} -> ${recheck_since})"
+    fi
+    if [ -n "$withdrawn" ]; then
+      log_msg "Aborting ${project}: ${withdrawn}; nothing was sent"
       node "$CURATOR_CLI" record-run-failure \
         --batch-id "$batch_id" \
         --parse-status "transport_error" \
         --transport-status "cancelled" \
-        --detail "learning was turned off before submission; nothing was sent" \
+        --detail "${withdrawn}; nothing was sent" \
         -- "${claude_args[@]}" \
         > /dev/null 2>&1 || true
       return
