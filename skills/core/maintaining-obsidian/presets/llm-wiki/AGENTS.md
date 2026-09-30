@@ -30,7 +30,7 @@ This vault follows Andrej Karpathy's 3-layer LLM Wiki pattern. The LLM owns the 
 
 This preset adopts the Raw Source pattern. Immutable originals live under `Raw/<topic>/` and format-specific folders such as `Excalidraw/<topic>/`. The Wiki layer extracts and summarizes these; originals stay untouched so you can re-extract or diff against future updates.
 
-Re-ingest behavior is mechanical and documented in `/maintaining-obsidian` `references/raw-sources.md`: same body `sha256` → skip; different `sha256` → drift detected; empty legacy `sha256` → backfill via audit.
+Re-ingest behavior is mechanical and documented in `/maintaining-obsidian` `references/raw-sources.md`: same body `sha256` → skip; different `sha256` → drift detected; empty legacy `sha256` → audit reports it, and re-ingest writes the digest.
 
 ## Layer 2 — Wiki
 

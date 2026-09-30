@@ -48,7 +48,7 @@ When ingesting (or re-ingesting) a Raw Source:
 |---|---|
 | New body sha256 == stored | Content unchanged. Skip wiki regeneration. Update `fetched` only if user asks for refresh. |
 | New body sha256 ≠ stored | **Drift detected.** Append `drift | <filename> | sha=<old>→<new>` to `log.md`. Prompt user before overwriting typed wiki note. |
-| Stored sha256 is empty | Compute and write sha256 + `ingested`. Offer batch backfill via audit LINT. |
+| Stored sha256 is empty | Compute and write sha256 + `ingested`. Audit LINT lists every such note as `unhashed` and writes nothing; a batch backfill re-ingests each one. |
 
 ### Extraction Methods
 

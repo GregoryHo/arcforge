@@ -7,6 +7,7 @@ link graph and Raw Source provenance are covered by test_vault_links.py.
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -132,6 +133,27 @@ def test_quoted_list_items_honour_yaml_escapes(vault):
     tags = _run(vault)["tags"]
     assert {"it's", 'say "hi"', "back\\slash", "two\nlines"} <= set(tags)
     assert not {"it", "s", "say \\", "back\\\\slash", "two\\nlines"} & set(tags)
+
+
+def test_every_flag_the_skill_passes_to_lint_exists():
+    # A flag the skill tells the agent to pass must be one the script parses;
+    # `--all` is the audit's own scope word, which the skill maps to `--scope all`.
+    help_text = subprocess.run(
+        [sys.executable, str(SCRIPT), "--help"], capture_output=True, text=True, check=True
+    ).stdout
+    known = set(re.findall(r"--[a-z][\w-]*", help_text)) | {"--all"}
+    skill = SCRIPT.parents[1]
+    invocations = [
+        (path.relative_to(skill), tail)
+        for path in sorted(skill.rglob("*.md"))
+        for tail in re.findall(r"(?:audit lint|lint_vault\.py)([^`#\n]*)", path.read_text(encoding="utf-8"))
+    ]
+    assert invocations, "no LINT invocation found in the skill's prose"
+    unknown = [
+        f"{path}: {flag}" for path, tail in invocations for flag in re.findall(r"--[a-z][\w-]*", tail)
+        if flag not in known
+    ]
+    assert unknown == []
 
 
 def test_log_path_tokens_are_not_satisfied_by_a_basename_elsewhere(vault):
