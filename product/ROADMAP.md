@@ -688,10 +688,12 @@ reverse one, append a superseding entry (see AGENTS.md).
 - Date: 2026-09-30
 - Version: 6.1.1
 - Status: Accepted
-- Decision: Re-measure whether `speccing` fires under real plugin routing on
-  the repaired instrument; if the rate stays low, document it as user-invoked
-  in practice rather than editing its description. Disclosing the current
-  measurement does not wait on the re-measurement.
+- Decision: Proposed: re-measure whether `speccing` fires under real plugin
+  routing on the repaired instrument; if the rate stays low, document it as
+  user-invoked in practice rather than editing its description. Until
+  accepted, it gates any edit to the `speccing` description and the final
+  README and skills-reference wording about how it fires; disclosing the
+  current measurement is not gated.
 - Why: D-015's +0.67 was measured with the skill body injected
   (`--skill-file`). With the plugin loaded and the description left to route
   (`--plugin-dir`), `eval-speccing-spec-before-code` scored 0/10 across two
@@ -713,11 +715,12 @@ reverse one, append a superseding entry (see AGENTS.md).
 - Date: 2026-09-30
 - Version: 6.1.1
 - Status: Accepted
-- Decision: Use `claude plugin eval` only to measure whether a named skill
-  fires under real plugin routing — first for #179 (D-024) — from an eval
-  directory outside `evals/`, with `--no-publish`, an explicit `--model` and a
-  `--max-cost-usd` on every run; it never produces the release snapshot and
-  never enters the release gate.
+- Decision: Proposed: use `claude plugin eval` only to measure whether a named
+  skill fires under real plugin routing — first for #179 (D-024) — from an
+  eval directory outside `evals/`, with `--no-publish`, an explicit `--model`
+  and a `--max-cost-usd` on every run; it never produces the release snapshot
+  and never enters the release gate. Until accepted, it gates the #179 routing
+  run and the two-session isolation check that precedes it.
 - Why: The existing harness cannot measure routing cleanly:
   `eval ab --plugin-dir` still injects the skill body in skill scope, so its
   arms are not "plugin loaded" against "plugin absent", and its trials leak the
@@ -735,10 +738,11 @@ reverse one, append a superseding entry (see AGENTS.md).
 - Date: 2026-09-30
 - Version: 6.1.1
 - Status: Accepted
-- Decision: The coverage ledger records the REGRESSED of the
+- Decision: Proposed: the coverage ledger records the REGRESSED of the
   `code-review-answering-feedback` scenario as measured, and for an
   injection-type treatment the cost-regression flag is informational — it is
-  reported, never counted toward the verdict.
+  reported, never counted toward the verdict. Until accepted, it gates the
+  ledger correction and the rewrite of the 6.0.0 benchmark evidence note.
 - Why: Under the non-regression policy (eval B-4) the verdict reads only
   whether every treatment trial passes; a treatment pass rate of 0.8 means one
   trial failed, and the cost flag never enters the verdict. The ledger and the
@@ -754,9 +758,10 @@ reverse one, append a superseding entry (see AGENTS.md).
 - Date: 2026-09-30
 - Version: 6.1.1
 - Status: Accepted
-- Decision: Keep the engine's current computation of floor assertions in the
-  pass bar and write that computation down in eval B-5 and the eval guide,
-  settled before any 6.1.1 result is read.
+- Decision: Proposed: keep the engine's current computation of floor
+  assertions in the pass bar and write that computation down in eval B-5 and
+  the eval guide, settled before any 6.1.1 result is read. Until accepted, it
+  gates reading the 6.1.1 results against the pass bar.
 - Why: The question has no ruling on file, and it can decide a release
   verdict: `writing-skills` t1 passes on a floor score of 0.83. Settling it
   before the results are read keeps the ruling from being chosen to fit them;
@@ -767,8 +772,10 @@ reverse one, append a superseding entry (see AGENTS.md).
 - Date: 2026-09-30
 - Version: 6.1.1
 - Status: Accepted
-- Decision: The full `index.md` rebuild is a write step of the audit's LINK
-  mode, its procedure defined in the skill's `references/audit.md`.
+- Decision: Proposed: the full `index.md` rebuild is a write step of the
+  audit's LINK mode, its procedure defined in the skill's
+  `references/audit.md`. Until accepted, it gates that procedure and every
+  reference that promises the rebuild.
 - Why: Seven places — the ingest mode (twice), the bootstrap workflow, and
   the llm-wiki (twice), news and project-tracker presets — say the audit's
   LINT rebuilds `index.md`, while

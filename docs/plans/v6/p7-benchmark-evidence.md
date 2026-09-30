@@ -222,6 +222,9 @@ references headless fallback 缺口續掛 P8。
   不是行為退化。**裁定：分數面 non-regression 成立入帳；成本旗標如實保留供 verifier 覆核；
   非 delta 類、無 redesign 事由。**（掛帳 P8：cost-regression 判準對 plugin 注入型 treatment
   的適用性複審。）
+- 更正（2026-09-30，D-026）：上面的裁定有誤。non-regression 判定只看 treatment 是否每個
+  trial 都過門檻，成本旗標從來不進判定；treatment 4/5 過，snapshot 記的 REGRESSED 來自
+  分數，不是成本。帳本已依此更正；此處保留原文作為歷史。
 - 兩支皆 5/5 有效 trial、零 error trial。
 
 ### Campaign 3：maintaining-obsidian（03:44 完，A1 重寫後首測）
