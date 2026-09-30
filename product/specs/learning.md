@@ -31,9 +31,10 @@ was recorded about them.
   bookkeeping: the durable session record, and the diary draft an active enough
   session produces, are continuity features that run either way
   ([hooks](hooks.md) B-6). The line falls where content leaves the machine or
-  the user's own words are stored: **diary enrichment — the one outbound path
-  (B-9) — runs only under the opt-in**, so with learning off a draft keeps its
-  unfilled sections permanently, and that stub is the contract rather than a
+  the user's own words are stored: **the two outbound paths — diary
+  enrichment and the curator's analysis (B-9) — run only under the opt-in**,
+  so with learning off a draft keeps its unfilled sections permanently, no
+  observation left behind by an earlier opt-in is analyzed, and that stub is the contract rather than a
   failure to report. Nothing invites the user into the loop from that state
   either: the reflection nudge waits for the same opt-in, because a permanent
   offer to analyze diaries is itself a way of not taking "off" for an answer.
@@ -130,11 +131,15 @@ was recorded about them.
 
 ### Privacy
 - **B-9 Local, legible, scoped.** All state stays on the user's machine:
-  arcforge has no telemetry and no service of its own to report to. The one
-  outbound path is diary enrichment, which runs the host tool over a parsed
-  summary of the session — so that summary reaches the model the way any turn
-  of the session does, and nowhere else. It is opt-in (B-1), and it no longer
-  runs with permissions switched off: it gets two tools, `Read` and `Write`,
+  arcforge has no telemetry and no service of its own to report to. Two
+  paths carry content to a model, both under the opt-in (B-1), and nothing
+  else does. Diary enrichment runs the host tool over a parsed summary of the
+  session — so that summary reaches the model the way any turn of the session
+  does, and nowhere else. The curator's analysis sends a batch of sanitized
+  observations to the host tool with no tools at all, so the run can read what
+  it was handed and return a proposal, and can touch nothing on the machine;
+  the manifest it writes records the tool access the run actually had (D-023).
+  Enrichment no longer runs with permissions switched off: it gets two tools, `Read` and `Write`,
   and the draft's own directory is added to the ones it may work in. It is not
   a sandbox, and the spec does not claim one — the run still inherits the
   directory it was started from, which is the project, and edits inside those
@@ -198,7 +203,7 @@ data contracts live in `docs/decisions/learning-curator-schema/`.
   refused activation, and `learn enable` erasing config (B-1, B-3, B-4).
 - **D-022** — decay is idempotent and never archives an activated instinct
   (B-4, B-6).
-- **D-023** — *proposed*: the curator is a second outbound path — tool-less,
+- **D-023** — the curator is a second outbound path — tool-less,
   under the opt-in, and named in B-9 (B-1, B-9).
 - **D-020** — 6.2.0 carries the new instinct commands and every change that
   moves learning state on disk.

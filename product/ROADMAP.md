@@ -661,11 +661,10 @@ reverse one, append a superseding entry (see AGENTS.md).
 ### D-023 — The curator is a second outbound path: tool-less, under the opt-in, and named in the spec
 - Date: 2026-09-30
 - Version: 6.1.1
-- Status: Proposed
-- Decision: Proposed: the curator's model run gets no tools, the observer
-  daemon starts and analyzes only where learning is enabled, and learning B-9
-  names the curator as a second outbound path beside diary enrichment. Until
-  accepted, it gates the curator and daemon changes and the rewrite of B-9.
+- Status: Accepted
+- Decision: The curator's model run gets no tools, the observer daemon starts
+  and analyzes only where learning is enabled, and learning B-1 and B-9 name
+  the curator as a second outbound path beside diary enrichment.
 - Why: B-9, D-009 and the learning-dashboard guide all promise that diary
   enrichment is the one outbound path. The observer daemon also sends
   observation batches to a model, with no tool restriction, while the proposal
@@ -789,12 +788,10 @@ reverse one, append a superseding entry (see AGENTS.md).
 ### D-029 — secrets-guard's docs say it scans the commit command, not the commit
 - Date: 2026-09-30
 - Version: 6.1.1
-- Status: Proposed
-- Decision: Proposed: hooks B-4, the README and the hooks guide say that on
-  `git commit` the guard scans the command string, not the content being
-  committed; scanning staged content becomes the `secrets-guard-staged-scan`
-  wish. Until accepted, it gates the B-4 rewrite and the README and guide
-  wording.
+- Status: Accepted
+- Decision: hooks B-4, the README and the hooks guide say that on `git commit`
+  the guard scans the command string, not the content being committed;
+  scanning staged content becomes the `secrets-guard-staged-scan` wish.
 - Why: B-4, the README and the guide all say commit content is scanned; the
   Bash branch runs `scanForSecrets` over the command string and reads no staged
   file, so a user believes a check stands before every commit when none does.

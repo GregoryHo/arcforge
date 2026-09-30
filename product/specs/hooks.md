@@ -167,7 +167,7 @@ implements fail-open is pinned in `.claude/rules/coding-standards.md`.
   under the opt-in (B-6).
 - **D-009** — the enrichment run that B-6 gates is also unprivileged
   ([learning](learning.md) B-9).
-- **D-029** — *proposed*: B-4 says the guard scans the commit command, not the
+- **D-029** — B-4 says the guard scans the commit command, not the
   committed content; a staged-content scan waits as a wish (B-4).
 - **D-031** — *proposed*: B-8 stops promising where the last session left off
   (B-8).
