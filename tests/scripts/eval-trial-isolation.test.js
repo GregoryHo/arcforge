@@ -72,9 +72,14 @@ describe('trial isolation keeps the operator user config out (B-7, #170)', () =>
   });
 
   it('pins the output style for plugin-dir trials but leaves the plugin its hooks', () => {
-    const settings = JSON.parse(buildIsolationSettings({ excludeClaudeMd: false }));
+    const settings = JSON.parse(buildIsolationSettings({ forPluginDir: true }));
     expect(settings.outputStyle).toBe('default');
     expect(settings).not.toHaveProperty('disableAllHooks');
+    // Trial dirs sit under <projectRoot>/.eval-trials/, so without this the
+    // plugin arm would read the project's own CLAUDE.md and rules.
+    expect(settings.claudeMdExcludes).toEqual(
+      JSON.parse(buildIsolationSettings()).claudeMdExcludes,
+    );
   });
 
   it('skips user-level settings, hooks included, in a plugin-dir trial', () => {
@@ -82,6 +87,18 @@ describe('trial isolation keeps the operator user config out (B-7, #170)', () =>
     const args = trialArgs();
     expect(args).toContain('--setting-sources');
     expect(args[args.indexOf('--setting-sources') + 1]).toBe('project,local');
+  });
+
+  it('records user-settings for a trial that reads the user settings file', () => {
+    const row = runTrial(SCENARIO, 1, 1, { projectRoot: tempDir, isolated: false });
+    expect([row.model, row.effort]).toEqual(['user-settings', 'user-settings']);
+    const pinned = runTrial(SCENARIO, 1, 1, {
+      projectRoot: tempDir,
+      isolated: false,
+      model: 'opus',
+      effort: 'high',
+    });
+    expect([pinned.model, pinned.effort]).toEqual(['opus', 'high']);
   });
 
   it('leaves a --no-isolate trial reading the surrounding config', () => {
@@ -201,6 +218,7 @@ describe('both arms of a comparison run the same claude argv but for the injecti
   let tempDir;
   let pluginDir;
   let argvs;
+  let settings;
   let rows;
 
   beforeEach(() => {
@@ -208,7 +226,11 @@ describe('both arms of a comparison run the same claude argv but for the injecti
     pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-parity-plugin-'));
     mockUtils.execCommand.mockReset();
     argvs = [];
+    settings = [];
     stubExec((opts) => {
+      settings.push(
+        JSON.parse(fs.readFileSync(path.join(opts.cwd, '.claude', 'settings.json'), 'utf8')),
+      );
       // The advisory names each trial's own directory; that is not an arm difference.
       const args = mockUtils.execCommand.mock.calls.at(-1)[1];
       argvs.push(args.map((a) => a.split(opts.cwd).join('<TRIAL_DIR>')));
@@ -229,6 +251,16 @@ describe('both arms of a comparison run the same claude argv but for the injecti
     expect(treatment[at + 1]).toBe(path.resolve(pluginDir));
     const withoutInjection = [...treatment.slice(0, at), ...treatment.slice(at + 2)];
     expect(withoutInjection).toEqual(baseline);
+    // Settings files too. The one allowed difference is disableAllHooks: the
+    // baseline loads no plugin, so turning every hook off costs it nothing,
+    // while the treatment must keep the plugin's hooks, which are part of what
+    // is under test. (User-level hooks are out of both arms already, through
+    // --setting-sources.)
+    const [bSettings, tSettings] = settings;
+    expect(bSettings.disableAllHooks).toBe(true);
+    expect(tSettings).not.toHaveProperty('disableAllHooks');
+    const { disableAllHooks: _allowed, ...bRest } = bSettings;
+    expect(tSettings).toEqual(bRest);
   }
 
   const collect = (_label, _t, row) => rows.push(row);

@@ -105,8 +105,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
       error,
       errorType,
       infraError: true,
-      model: model || 'default',
-      effort: effort || 'default',
+      ...ranWith(),
       ...(runId ? { runId } : {}),
       ...extra,
     };
@@ -114,6 +113,13 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
 
   // Merge CLI overrides with scenario defaults (only when not fully isolated)
   const pluginDir = rawPluginDir || (!isolated ? scenario.pluginDir : undefined) || undefined;
+  // What the row says the trial ran with: the flag when one was passed; else
+  // Claude Code's default for a contained trial (it does not read the user
+  // settings file), or whatever that file sets for one that does.
+  function ranWith() {
+    const unset = isolated || pluginDir ? 'default' : 'user-settings';
+    return { model: model || unset, effort: effort || unset };
+  }
 
   // Validate pluginDir exists before running trial
   if (pluginDir && !fs.existsSync(path.resolve(pluginDir))) {
@@ -131,7 +137,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   // Isolation mode: full isolation uses writeIsolationSettings,
   // pluginDir uses semi-isolation (no claudeMdExcludes)
   if (pluginDir) {
-    const semiSettings = isolationSettings || buildIsolationSettings({ excludeClaudeMd: false });
+    const semiSettings = isolationSettings || buildIsolationSettings({ forPluginDir: true });
     writeIsolationSettings(trialDir, semiSettings);
   } else if (isolated) {
     writeIsolationSettings(trialDir, isolationSettings);
@@ -233,8 +239,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     transcript,
     trialDir,
     ...(actions.length > 0 ? { actions } : {}),
-    model: model || 'default',
-    effort: effort || 'default',
+    ...ranWith(),
     ...(runId ? { runId } : {}),
   };
   // A tree too large to snapshot was not checked, so the trial may have changed

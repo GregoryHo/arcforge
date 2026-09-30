@@ -750,7 +750,10 @@ Do something.
     it('should disable all plugins and auto-memory', () => {
       const settings = JSON.parse(buildPluginDirSettings());
       expect(settings.autoMemoryEnabled).toBe(false);
-      expect(settings).not.toHaveProperty('claudeMdExcludes');
+      // Same CLAUDE.md/rules excludes as the isolated baseline (arm parity);
+      // only disableAllHooks is left off, so the plugin keeps its hooks.
+      expect(settings.claudeMdExcludes).toContain('**/CLAUDE.md');
+      expect(settings).not.toHaveProperty('disableAllHooks');
     });
 
     it('should include enabledPlugins all set to false', () => {
@@ -772,7 +775,10 @@ Do something.
       expect(() => JSON.parse(result)).not.toThrow();
       const settings = JSON.parse(result);
       expect(settings.autoMemoryEnabled).toBe(false);
-      expect(settings).not.toHaveProperty('claudeMdExcludes');
+      // Same CLAUDE.md/rules excludes as the isolated baseline (arm parity);
+      // only disableAllHooks is left off, so the plugin keeps its hooks.
+      expect(settings.claudeMdExcludes).toContain('**/CLAUDE.md');
+      expect(settings).not.toHaveProperty('disableAllHooks');
     });
   });
 
@@ -1893,6 +1899,31 @@ Do something.
       expect(data.by_model.sonnet.pass_rate).toBe(1.0);
       expect(data.by_model.opus.trials).toBe(1);
       expect(data.by_model.opus.pass_rate).toBe(0);
+    });
+
+    it('should keep default and user-settings rows in separate by_model groups', () => {
+      writeScenario(
+        tempDir,
+        'unpinned-eval.md',
+        '# Eval: unpinned-eval\n\n## Scope\nagent\n\n## Scenario\nTest.\n',
+      );
+      // 'default' = contained trial, Claude Code's own default model;
+      // 'user-settings' = a trial that read the operator's settings file. They
+      // may be different models and must not pool as one.
+      for (const [trial, model] of [
+        [1, 'default'],
+        [2, 'user-settings'],
+        [3, 'user-settings'],
+      ]) {
+        appendResult(
+          makeResult({ eval: 'unpinned-eval', trial, passed: true, score: 1.0, model }),
+          tempDir,
+        );
+      }
+
+      const data = generateBenchmark(tempDir).evals['unpinned-eval'];
+      expect(data.by_model.default.trials).toBe(1);
+      expect(data.by_model['user-settings'].trials).toBe(2);
     });
 
     it('should not include by_model when no model field in results', () => {

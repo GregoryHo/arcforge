@@ -110,16 +110,20 @@ user settings file (`~/.claude/settings.json`) is not read at all, so nothing
 set there reaches the trial: not your hooks, output style, `model` or effort
 level, `env`, permissions, or an `apiKeyHelper`. Credentials stored in your
 keychain still work, and environment variables from your shell are passed
-through. A `--plugin-dir` trial is contained the same way, except that it loads
-the plugin under test with the plugin's own hooks and keeps the fixture's
-`CLAUDE.md` files.
+through. A `--plugin-dir` trial is contained the same way, `CLAUDE.md` excludes
+included, except that it loads the plugin under test and leaves hooks on so the
+plugin's own hooks run.
 
 In a comparison, both arms run `claude` with the same flags apart from the
 injection itself. They share the settings sources, the turn budget, the
 permission mode (neither arm stops for permission prompts when a plugin is
-loaded) and `--model` / `--effort`. Every result row records the `model` and
-`effort` it ran with, or `default` when no flag was given, meaning Claude
-Code's own default, since your settings are not read. A `workflow` A/B with no
+loaded) and `--model` / `--effort`. Their settings files differ only in that
+the baseline switches every hook off: it loads no plugin, so that costs it
+nothing. Every result row records the `model` and `effort` it ran with, the flag
+value when one was given. Otherwise it says `default` for a contained trial,
+meaning Claude Code's own default since your settings are not read. It says
+`user-settings` for a trial that reads your settings file, such as `eval run
+--no-isolate`. A `workflow` A/B with no
 plugin directory is the exception. Its treatment runs on your full configuration,
 so it refuses to start unless you pass both `--model` and `--effort`.
 
@@ -171,7 +175,7 @@ like `ab`, plus `--no-isolate`. What that flag readmits depends on the scenario.
 - **With `## Plugin Dir`:** only that plugin comes back. The trial runs as a
   `--plugin-dir` trial: the named plugin loads with its hooks, every other
   installed plugin stays disabled, MCP servers stay stripped and your user
-  settings file is still not read. The fixture's `CLAUDE.md` files are kept.
+  settings file is still not read. `CLAUDE.md` files and rules stay excluded.
 
 Either way the trial runs in its own fixture directory with arcforge's state
 redirected, so your real learning state stays out of it.

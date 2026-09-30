@@ -246,7 +246,7 @@ function runSkillEval(scenario, k, options = {}) {
     onTrialComplete,
     // A plugin-dir treatment needs the plugin's hooks, which full isolation turns off.
     isolationSettings: pluginDir
-      ? buildIsolationSettings({ excludeClaudeMd: false })
+      ? buildIsolationSettings({ forPluginDir: true })
       : isolationSettings,
     model,
     effort,
@@ -293,7 +293,7 @@ function runWorkflowEval(scenario, k, options = {}) {
   const isolationSettings = buildIsolationSettings();
   // Cache semi-isolation settings once (avoids spawning `claude plugin list` per trial)
   const semiSettings = resolvedPluginDir
-    ? buildIsolationSettings({ excludeClaudeMd: false })
+    ? buildIsolationSettings({ forPluginDir: true })
     : undefined;
 
   const shared = sharedArmOptions(scenario, { maxTurns, pluginDir: resolvedPluginDir });
@@ -451,7 +451,7 @@ module.exports = {
   runSetup,
   writeIsolationSettings,
   buildIsolationSettings,
-  buildPluginDirSettings: () => buildIsolationSettings({ excludeClaudeMd: false }),
+  buildPluginDirSettings: () => buildIsolationSettings({ forPluginDir: true }),
   parseStreamJsonOutput,
   parseActionsFromTranscript,
   resolveMaxTurns,
