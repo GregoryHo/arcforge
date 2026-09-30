@@ -35,11 +35,11 @@
 
 | 版本 | 層級 | 主題 | 事項數 | eval session | 連結的 spec |
 |---|---|---|---|---|---|
-| 6.1.1 | patch | 修好 eval 儀器、learning 止血、如實的隱私與安全敘述、三個已合併 commit | 42 | 約 80 | eval、learning、hooks、skill-system、obsidian、sdd、worktrees-loop |
+| 6.1.1 | patch | 修好 eval 儀器、learning 止血、如實的隱私與安全敘述、三個已合併 commit | 42 | 約 95 | eval、learning、hooks、skill-system、obsidian、sdd、worktrees-loop |
 | 6.1.2 | patch | 文件與引擎對齊、CLI 訊息、contributor 工具、repo 整理 | 48 | 0 | cli、hooks、learning、worktrees-loop、obsidian、codex-harness |
 | 6.2.0 | minor | learning 生命週期補完、需要搬動磁碟資料的修改、eval 語料修正 | 30 | 約 50 到 70 | learning、cli、worktrees-loop、codex-harness、eval、sdd |
 
-**eval 額度合計：兩輪約 130 到 150 個 session。使用者目前只核可了 6.1.1 的約 78 個；6.2.0 那一輪在該版開工時另行確認。**
+**eval 額度合計：兩輪約 145 到 165 個 session。使用者目前只核可了 6.1.1 的約 78 個；6.2.0 那一輪在該版開工時另行確認。**
 
 **spec header 會長這樣，這是刻意的**：三個版本的列一次寫進 `product/ROADMAP.md`。依 `product/AGENTS.md` 的規則，spec header 以連結該 spec 的最高版本列為準。所以 learning、cli 等 spec 從第一天起就會顯示 `… · extended by 6.2.0 (next)`，6.1.1 發版時只會更新前半段的 `shipped vX.Y.Z`。這是為了讓完整 roadmap 看得見，不要當成錯誤去修。
 
@@ -172,7 +172,7 @@
 
 ## eval 額度預算
 
-### 6.1.1：約 80 個 session
+### 6.1.1：約 95 個 session
 
 | 執行 | 方式 | session |
 |---|---|---|
@@ -182,11 +182,12 @@
 | finishing-verify-before-options | `arcforge eval ab`，k=5 | 10 |
 | maintaining-obsidian-vault-only-answer | `arcforge eval ab`，k=5 | 10 |
 | maintaining-obsidian-audit-runs-lint-script | `arcforge eval ab`，k=5 | 10 |
+| maintaining-obsidian-link-rebuilds-index（新 scenario，D-028） | 先跑 k=3 的 preflight，再 `arcforge eval ab`，k=5 | 13 |
 | #179 觸發率 | `claude plugin eval`，只跑載入 plugin 的那一臂，10 次 | 10 |
 | `claude plugin eval` 隔離查核 | 1 個 case，2 次 | 2 |
 | 備用 | 補被判為 `infraError` 的 trial | 10 |
 
-- 依據：現有 snapshot 每個 treatment trial 平均 219 秒。80 個 session 依序跑約 5 小時。
+- 依據：現有 snapshot 每個 treatment trial 平均 219 秒。95 個 session 依序跑約 5.8 小時。
 - tdd 與 dispatching 不重跑：#182 只改了它們的 `references/`。已查過程式：A/B 僅載入單一 skill 檔案（`scripts/cli/eval-command.js:337-353`），不會帶入 `references/`。
 - 量測結束後執行 `arcforge eval report`，再確認 `git diff --stat <量測 commit>..HEAD -- skills evals/scenarios evals/fixtures` 是空的。閘門只比時間戳，抓不到量測之後才進來的修改。
 
