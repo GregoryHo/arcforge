@@ -208,7 +208,6 @@ analyze_project() {
   # structured payload under the `structured_output` field.
   #
   # Response file: transient, cleaned in EXIT trap and after ingestion.
-  # Note: Layer 4 spec says tool_access=false — no --tools flag.
   local response_file="${INSTINCTS_DIR}/.curator-response.${batch_id}.json"
   local analysis_success=false
   local retry_count=0
@@ -223,6 +222,19 @@ analyze_project() {
   # Read schema once per analyze_project call so the inner loop reuses it.
   local schema_json
   schema_json=$(cat "$schema_path")
+
+  # The curator run gets no tools at all (learning B-9, D-023): `--tools ""`
+  # empties the built-in set, and the strict, empty MCP config loads no server,
+  # so the run can read the batch it is handed and return a proposal, and can
+  # touch nothing on the machine. The same argv goes to ingest-proposal, which
+  # derives the run manifest's tool_access from it rather than asserting one.
+  local -a claude_args=(--model haiku --tools ""
+    --max-turns 15
+    --print
+    --output-format json
+    --json-schema "$schema_json"
+    --disable-slash-commands
+    --strict-mcp-config --mcp-config '{"mcpServers":{}}')
 
   # Ensure INSTINCTS_DIR exists for the response file
   mkdir -p "$INSTINCTS_DIR"
@@ -246,13 +258,7 @@ analyze_project() {
       # --output-format json + --json-schema forces structured output (no
       # markdown wrap possible). The payload lives at .structured_output in
       # the envelope; ingest-proposal extracts it.
-      (claude --model haiku \
-        --max-turns 15 \
-        --print \
-        --output-format json \
-        --json-schema "$schema_json" \
-        --disable-slash-commands \
-        --strict-mcp-config --mcp-config '{"mcpServers":{}}' \
+      (claude "${claude_args[@]}" \
         < "$prompt_path" \
         > "$response_file" 2>"$tmp_out") &
       claude_pid=$!
@@ -332,7 +338,8 @@ analyze_project() {
   local ingest_err_file="${INSTINCTS_DIR}/.ingest-proposal.err"
   if ! ingest_result=$(node "$CURATOR_CLI" ingest-proposal \
       --batch-id "$batch_id" \
-      --response-file "$response_file" 2>"$ingest_err_file"); then
+      --response-file "$response_file" \
+      -- "${claude_args[@]}" 2>"$ingest_err_file"); then
     log_msg "ERROR: ingest-proposal failed for batch ${batch_id}: $(cat "$ingest_err_file" 2>/dev/null || true)"
     rm -f "$ingest_err_file" "$response_file"
     echo $((fail_count + 1)) > "$fail_count_file"

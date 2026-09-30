@@ -36,6 +36,7 @@ const {
 const { isLegalInsertionStatus, LIFECYCLE_STATUS } = require('./lifecycle');
 const { SANITIZER_POLICY_VERSION } = require('../sanitize-observation');
 const { atomicWriteFile, sha256Truncated, getArcforgeHome } = require('../utils');
+const { toolAccessFromArgv } = require('./curator-invocation');
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -231,9 +232,18 @@ function buildCandidateRecord(proposal, batchManifest, now) {
  * @param {string} options.responseFile — path to the LLM JSON response file
  * @param {string} [options.homeDir] — override home directory (tests)
  * @param {number} [options.durationMs] — elapsed time for run manifest
+ * @param {string[]} [options.curatorArgv] — the argv the curator's `claude` run
+ *   used; the manifest's `invocation.tool_access` is derived from it (null when
+ *   absent, so the manifest never claims an access level nobody recorded)
  * @returns {{ run_id, parse_status, accepted, rejected }}
  */
-function ingestProposal({ batchId, responseFile, homeDir: homeOverride, durationMs } = {}) {
+function ingestProposal({
+  batchId,
+  responseFile,
+  homeDir: homeOverride,
+  durationMs,
+  curatorArgv,
+} = {}) {
   if (typeof batchId !== 'string' || !batchId.trim()) {
     throw new Error('ingestProposal: batchId must be a non-empty string');
   }
@@ -243,6 +253,7 @@ function ingestProposal({ batchId, responseFile, homeDir: homeOverride, duration
   if (!fs.existsSync(responseFile)) {
     throw new Error(`ingestProposal: responseFile does not exist: ${responseFile}`);
   }
+  const toolAccess = toolAccessFromArgv(curatorArgv);
 
   const homeDir = homeOverride;
   const now = new Date();
@@ -312,7 +323,7 @@ function ingestProposal({ batchId, responseFile, homeDir: homeOverride, duration
     model: null,
     provider: null,
     invocation: {
-      tool_access: false,
+      tool_access: toolAccess,
       duration_ms: durationMs || null,
       transport_status: 'completed',
     },

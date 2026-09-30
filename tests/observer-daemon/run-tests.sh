@@ -393,8 +393,11 @@ done
 # so the response file is a CLI envelope whose .structured_output holds the payload.
 # The stub reads the latest batch manifest to get the real batch_hash and evidence_ids,
 # then emits a valid CandidateProposalPayload with ≥2 evidence_refs (MIN_EVIDENCE_REFS=2).
+G3_ARGV_FILE="${TMPDIR_G3}/claude-argv.txt"
 cat > "${STUB_BIN_G3}/claude" << STUB_EOF
 #!/usr/bin/env bash
+# Record the argv, one bracketed arg per line, so an empty arg stays visible
+printf '<%s>\n' "\$@" > "${G3_ARGV_FILE}"
 # Consume stdin (prompt file piped in)
 cat > /dev/null
 # Find the most recent batch manifest in TEST_HOME_G3
@@ -532,6 +535,40 @@ else
   FAIL=$((FAIL + 1))
   ERRORS+=('E2-G3: curator run manifests created')
 fi
+
+# ─────────────────────────────────────────────
+# B9-T1: the curator run is tool-less, and its manifest says so
+# learning B-9 / D-023: the argv carries `--tools ""` plus a strict, empty MCP
+# config, and the run manifest's tool_access is derived from that argv.
+# Reuses the E2-G3 run above, whose stub recorded the argv it was given.
+# ─────────────────────────────────────────────
+
+echo ""
+echo "=== B9-T1: Curator run is tool-less ==="
+
+G3_ARGV=$(cat "$G3_ARGV_FILE" 2>/dev/null || true)
+G3_TOOLS_VALUE=$(printf '%s\n' "$G3_ARGV" | grep -A1 -x '<--tools>' | sed -n 2p)
+assert_eq \
+  'B9-T1: claude argv carries --tools with an empty value' \
+  '<>' \
+  "$G3_TOOLS_VALUE"
+assert_match \
+  'B9-T1: claude argv carries --strict-mcp-config' \
+  '^<--strict-mcp-config>$' \
+  "$G3_ARGV"
+
+G3_TOOL_ACCESS=""
+G3_RUN_MANIFEST=$(find "$G3_RUNS_DIR" -name '*.manifest.json' 2>/dev/null | head -1 || true)
+if [ -n "$G3_RUN_MANIFEST" ]; then
+  G3_TOOL_ACCESS=$(node -e '
+    const m = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+    process.stdout.write(String(m.invocation && m.invocation.tool_access));
+  ' "$G3_RUN_MANIFEST" 2>/dev/null || true)
+fi
+assert_eq \
+  'B9-T1: run manifest records tool_access false, derived from the argv' \
+  'false' \
+  "$G3_TOOL_ACCESS"
 
 # ─────────────────────────────────────────────
 # Results

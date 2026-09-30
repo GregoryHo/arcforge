@@ -313,15 +313,25 @@ the dashboard.
 ## What is stored, and where
 
 All state stays on your own machine — arcforge has no telemetry and no server of
-its own to report to. The one thing that leaves is diary enrichment, and it only
-happens once you have turned learning on: it runs `claude` locally over a parsed
-summary of the session, so that summary reaches the model exactly the way
-anything you type in a session does. That run used to skip every permission
-check; it no longer does. It gets two tools, `Read` and `Write`, and the diary
-directory is added to the places it is allowed to work in. It is not sealed off,
-though: it still starts in your project directory, and edits inside those places
-are approved automatically, because a background run has nobody to ask. What it
-no longer has is a blanket pass over your whole machine.
+its own to report to. Two things send content to a model, and both happen only
+once you have turned learning on.
+
+The first is diary enrichment: it runs `claude` locally over a parsed summary of
+the session, so that summary reaches the model exactly the way anything you type
+in a session does. That run used to skip every permission check; it no longer
+does. It gets two tools, `Read` and `Write`, and the diary directory is added to
+the places it is allowed to work in. It is not sealed off, though: it still
+starts in your project directory, and edits inside those places are approved
+automatically, because a background run has nobody to ask. What it no longer
+has is a blanket pass over your whole machine.
+
+The second is the curator's analysis, which turns your observations into
+candidates: a background process sends a batch of sanitized observations to
+`claude` and reads back a proposal. That run gets no tools at all — no built-in
+tool and no MCP server — so it can read the batch it was handed and answer, and
+can touch nothing on your machine. Each run leaves a manifest under
+`learning/curator-runs/`, and its `tool_access` field records the access that
+run actually had, read from the command it was started with.
 
 Turn learning off and the enrichment stops: diary drafts are still written from
 your session record — the counts and the files you touched — but their

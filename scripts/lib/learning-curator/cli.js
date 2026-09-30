@@ -7,8 +7,10 @@
  *     Layer 3: read observations, build CuratorBatch, write manifest + prompt file.
  *     Prints a single JSON line to stdout.
  *
- *   ingest-proposal --batch-id <batch_id> --response-file <path>
+ *   ingest-proposal --batch-id <batch_id> --response-file <path> [-- <claude argv...>]
  *     Layer 4→5: parse LLM JSON output, validate, hand off to queue-writer.
+ *     Everything after `--` is the argv the curator's `claude` run used; the
+ *     run manifest's tool_access is derived from it.
  *     Prints a single JSON line to stdout.
  *
  *   help
@@ -85,7 +87,9 @@ function cmdAssembleBatch(argv) {
 }
 
 function cmdIngestProposal(argv) {
-  const args = parseArgs(argv);
+  const separator = argv.indexOf('--');
+  const curatorArgv = separator === -1 ? undefined : argv.slice(separator + 1);
+  const args = parseArgs(separator === -1 ? argv : argv.slice(0, separator));
   const batchId = args['batch-id'];
   const responseFile = args['response-file'];
 
@@ -100,7 +104,7 @@ function cmdIngestProposal(argv) {
 
   let result;
   try {
-    result = ingestProposal({ batchId, responseFile });
+    result = ingestProposal({ batchId, responseFile, curatorArgv });
   } catch (err) {
     console.error(`Error: ingest-proposal failed: ${err.message}`);
     process.exit(1);
@@ -166,8 +170,9 @@ function cmdHelp() {
       '    Layer 3: assemble a CuratorBatch from recent observations.',
       '    Prints JSON: { batch_id, batch_hash, manifest_path, prompt_path, project }',
       '',
-      '  ingest-proposal --batch-id <batch_id> --response-file <path>',
+      '  ingest-proposal --batch-id <batch_id> --response-file <path> [-- <claude argv...>]',
       '    Layer 4→5: parse LLM response and ingest proposals into candidate queue.',
+      "    The argv after -- is the curator run's; it decides the manifest's tool_access.",
       '    Prints JSON: { run_id, parse_status, accepted, rejected }',
       '',
       '  record-run-failure --batch-id <batch_id> --parse-status <transport_error|timeout> [--detail <msg>]',

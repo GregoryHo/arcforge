@@ -263,7 +263,94 @@ describe('ingestProposal — valid path', () => {
     expect(runManifest.handed_to_layer5).toBe(true);
     expect(runManifest.raw_prompt_saved).toBe(false);
     expect(runManifest.raw_response_saved).toBe(false);
-    expect(runManifest.invocation.tool_access).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B-9 / D-023: the manifest records the tool access the run actually had,
+// derived from the argv the daemon ran `claude` with — never a constant.
+// ---------------------------------------------------------------------------
+
+// The daemon's curator argv, minus the schema value (irrelevant to tool access).
+const TOOL_LESS_ARGV = [
+  '--model',
+  'haiku',
+  '--tools',
+  '',
+  '--max-turns',
+  '15',
+  '--print',
+  '--output-format',
+  'json',
+  '--disable-slash-commands',
+  '--strict-mcp-config',
+  '--mcp-config',
+  '{"mcpServers":{}}',
+];
+
+describe('ingestProposal — invocation.tool_access derived from the curator argv', () => {
+  function runManifestFor(curatorArgv) {
+    const { ingestProposal } = getIngestor();
+    const { manifest, batchId } = makeBatchManifest();
+    const payload = makeValidProposalPayload(batchId, manifest.batch_hash);
+    const responsePath = makeResponseFile(payload);
+    const result = ingestProposal({ batchId, responseFile: responsePath, curatorArgv });
+    const runsDir = path.join(tmpDir, '.arcforge', 'learning', 'curator-runs');
+    return JSON.parse(
+      fs.readFileSync(path.join(runsDir, `${result.run_id}.manifest.json`), 'utf8'),
+    );
+  }
+
+  test('a tool-less argv records tool_access false', () => {
+    expect(runManifestFor(TOOL_LESS_ARGV).invocation.tool_access).toBe(false);
+  });
+
+  test('an argv without --tools records tool_access true', () => {
+    const argv = TOOL_LESS_ARGV.filter(
+      (a, i) => a !== '--tools' && TOOL_LESS_ARGV[i - 1] !== '--tools',
+    );
+    expect(runManifestFor(argv).invocation.tool_access).toBe(true);
+  });
+
+  test('no recorded argv records tool_access null, not a guess', () => {
+    expect(runManifestFor(undefined).invocation.tool_access).toBeNull();
+  });
+});
+
+describe('toolAccessFromArgv', () => {
+  function toolAccess(argv) {
+    return require('../../scripts/lib/learning-curator/curator-invocation').toolAccessFromArgv(
+      argv,
+    );
+  }
+
+  test('empty --tools with MCP cleared is tool-less', () => {
+    expect(toolAccess(TOOL_LESS_ARGV)).toBe(false);
+    expect(
+      toolAccess(['--tools=', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}']),
+    ).toBe(false);
+  });
+
+  test('a named or default tool set is tool access', () => {
+    expect(toolAccess(['--tools', 'Read', '--strict-mcp-config'])).toBe(true);
+    expect(toolAccess(['--tools', 'default', '--strict-mcp-config'])).toBe(true);
+    expect(toolAccess(['--print'])).toBe(true);
+  });
+
+  test('empty built-ins still count as tool access while MCP servers may load', () => {
+    expect(toolAccess(['--tools', ''])).toBe(true);
+    expect(
+      toolAccess(['--tools', '', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{"x":{}}}']),
+    ).toBe(true);
+  });
+
+  test('the last --tools wins, as in the CLI', () => {
+    expect(toolAccess(['--tools', 'Read', '--tools', '', '--strict-mcp-config'])).toBe(false);
+  });
+
+  test('rejects an argv that is not an array of strings', () => {
+    expect(() => toolAccess('--tools ""')).toThrow(/array of strings/);
+    expect(() => toolAccess([1])).toThrow(/array of strings/);
   });
 });
 
