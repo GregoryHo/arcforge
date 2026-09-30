@@ -3,14 +3,16 @@ name: speccing-trigger
 description: >-
   #179 / D-024 — does `speccing` fire on its own under real plugin routing when
   a user asks for a feature in a repo that keeps product state under product/?
-  Trigger rate only; the task is not expected to finish in 8 turns.
+  Trigger rate only; the task's outcome is not graded.
 tags: [routing, speccing, issue-179]
 # Paths resolve from this case directory: ../.. is the repo root, i.e. the
 # arcforge plugin (.claude-plugin/plugin.json, name "arcforge").
 plugins: [../..]
 runs: 10
-max_turns: 8
-timeout_seconds: 600
+# The scenario's limits (its `## Max Turns` 40, the harness's 900 s trial
+# timeout), so a late Skill call is not cut off before it can happen.
+max_turns: 40
+timeout_seconds: 900
 # Read/Glob/Grep/Skill need no grant. Bash/Write/Edit are gated: the run
 # command grants them with --allow-tools so the agent sees the same tool set the
 # scenario promised ("You may run shell commands and read, write, edit…").

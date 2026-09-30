@@ -17,6 +17,13 @@ is contributor-only and is not in `package.json` `files`, so it ships to nobody.
 
 Expected sessions: **10 + 2**.
 
+Cost: `speccing-trigger` runs with the scenario's own limits — 40 turns and a
+900 s timeout — so a late `Skill` call is not cut off. At those limits a run
+can do the whole task, so budget each of its 10 runs like a full harness
+trial, not like a short probe: up to 2.5 hours sequential at `-j 1`, and set
+`--max-cost-usd` for 10 full trials. `isolation-check` is 2 short runs
+(4 turns, 180 s).
+
 The `speccing-trigger` prompt is **verbatim** from
 `evals/scenarios/eval-speccing-spec-before-code.md`: its `## Context` and
 `## Scenario`, assembled as the arcforge harness sends them (`## Context`, then
@@ -71,8 +78,8 @@ add `--trust-plugin`.
 
 ## Reading the results
 
-**isolation-check** passes only if every grader passes, in both runs. The gate
-is what the agent reports:
+**isolation-check** passes only when the graders pass in both runs **and**
+the manual gate below holds. The graders check what each run reports:
 
 - `output-style-default` — `OUTPUT_STYLE: default`
 - `user-claude-md-none` — `USER_CLAUDE_MD: none`
@@ -84,21 +91,58 @@ is what the agent reports:
   operator's real home before running. A static grader cannot read the caller's
   environment, so they only rule out the common leak.
 
-Two extras back the gate up without replacing it: `no-user-claude-md` and
+Two extras back the graders up without replacing them: `no-user-claude-md` and
 `no-user-claude-md-in-trace` assert that the sentence opening this repo
 author's user `CLAUDE.md` ("Behavioral guidelines to reduce common LLM coding
 mistakes") is absent from the answer and from the whole trace. They are
 author-specific and catch a leak the agent misreports.
 
-Then read by hand, before trusting the routing run:
+### The manual gate
 
-- Compare the printed `HOME:` and `CLAUDE_CONFIG_DIR:` against your real ones
-  (`printenv HOME`, `printenv CLAUDE_CONFIG_DIR` in your own shell). They must
-  differ; the regexes cannot check that.
-- Read the `PLUGINS:` and `USER_HOOKS:` lines: any plugin other than arcforge,
-  or any hook, is a leak no regex can enumerate.
+No grader can do this part. Graders score each run on its own, and a
+`baseline` grader compares a run with a fixed reference file, not with another
+run. So these checks are the gate, not a courtesy. If any of them fails, the
+isolation check fails, whatever the score says.
+
+**Before the runs**, list your user-level hooks: `cat ~/.claude/settings.json`
+and read its `hooks` key. For each hook, note whether it puts text into a
+session or only has a side effect:
+
+- **Emits text:** it prints a `systemMessage` or `additionalContext`, or writes
+  to stderr and exits 2.
+- **Side effect only:** it writes a file, sends a notification, and so on.
+
+**After the runs:**
+
+1. **Paths differ.** The `HOME:` printed by run 1 and by run 2 must differ from
+   each other and from your real `printenv HOME`. The same goes for
+   `CLAUDE_CONFIG_DIR:` against your real config directory (`~/.claude` when
+   unset). **The two runs printing the same path fails the check**: it means
+   the directory was reused, not fresh.
+2. **No hook text in either trace.** For every hook that emits text, its marker
+   text must be absent from each run's `trace.jsonl` (the path is `trace_path`
+   in `aggregate-result.json`). To make this mechanical, add a grader per
+   marker: `type: regex`, `target: trace`, `match: not_contains`. arcforge's
+   own hooks (session-tracker's SessionStart context among them) are expected:
+   they are the plugin under test, not a leak.
+3. **No hook side effects for these runs.** For every side-effect hook, check
+   that it did not act for the runs' sessions. For example, a hook that appends
+   session events to a log must have no entry carrying a run's `session_id`.
+4. **Plugins.** Read the `PLUGINS:` lines. Any plugin other than arcforge is a
+   leak no regex can enumerate.
+
+Checks 2 and 3 only detect hooks that leave evidence. A hook that emits
+nothing and has no side effect you can inspect is covered only by check 1: a
+fresh `HOME` and config directory never load it. `USER_HOOKS: none` on its
+own is not evidence, because the model cannot see a hook that stays silent.
+
+At the time of writing, the author's user hooks are all side-effect-only (they
+append to a log under `~/.claude/`), except one PostToolUse gate on
+Write/Edit. isolation-check grants only Bash, so that gate cannot fire. This
+is why the case ships no marker grader, and why check 3 carries the hook
+evidence.
 
 **speccing-trigger** has one grader, `skill-fired`: a `Skill` call whose input
 names `speccing`, with or without the `arcforge:` namespace. The case score
-over 10 runs is the trigger rate. The task cannot finish in 8 turns and is not
-graded; the ledger edits are what the harness scenario scores.
+over 10 runs is the trigger rate. The task itself is not graded here; the
+ledger edits are what the harness scenario scores.
