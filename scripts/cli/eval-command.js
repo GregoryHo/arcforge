@@ -29,6 +29,26 @@ function refusePluginDirOutsideWorkflow(scenario, pluginDir, cmd) {
   process.exit(1);
 }
 
+/**
+ * A workflow A/B with no plugin dir runs its treatment on the user's full
+ * configuration, so it needs --model and --effort to keep both arms on one
+ * model and effort (runWorkflowEval refuses otherwise). Checked before the
+ * preflight gate and in preflight itself, so no remediation ever points at a
+ * preflight whose A/B could not run.
+ * @param {{ scope: string, pluginDir?: string }} scenario
+ * @param {Object} options - Parsed CLI options
+ * @param {string} cmd - Subcommand name for the message
+ */
+function requirePinnedToolkitFlags(scenario, options, cmd) {
+  if (scenario.scope !== 'workflow' || options['plugin-dir'] || scenario.pluginDir) return;
+  const missing = ['model', 'effort'].filter((flag) => !options[flag]).map((f) => `--${f}`);
+  if (missing.length === 0) return;
+  console.error(
+    `Error: eval ${cmd} on a workflow scenario with no plugin dir runs the treatment on your full user config, so both arms need --model and --effort pinned (missing: ${missing.join(', ')}).`,
+  );
+  process.exit(1);
+}
+
 function skillNameFromFile(file) {
   const base = path.basename(file, '.md');
   return base.toUpperCase() === 'SKILL' ? path.basename(path.dirname(file)) : base;
@@ -234,6 +254,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     }
 
     refusePluginDirOutsideWorkflow(scenario, args.options['plugin-dir'], 'preflight');
+    requirePinnedToolkitFlags(scenario, args.options, 'preflight');
     eval_.resolveTrialTimeoutMs(); // refuse a bad ceiling before any Setup or session (B-10)
     console.log(`Running preflight for "${scenarioName}"...`);
     const runId = generateRunId();
@@ -346,6 +367,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
   } else if (subcommand === 'ab') {
     const scenario = requireScenario(args.positional[1], 'ab');
     refusePluginDirOutsideWorkflow(scenario, args.options['plugin-dir'], 'ab');
+    requirePinnedToolkitFlags(scenario, args.options, 'ab');
     eval_.resolveTrialTimeoutMs(); // refuse a bad ceiling before any Setup or session (B-10)
     const model = args.options.model;
     const effort = args.options.effort;

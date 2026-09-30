@@ -226,6 +226,60 @@ describe('eval command', () => {
     });
   });
 
+  describe('a full-toolkit workflow A/B needs --model and --effort up front', () => {
+    let errors;
+
+    beforeEach(() => {
+      const dir = path.join(tempDir, evalLib.SCENARIOS_DIR);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, 'toolkit.md'),
+        SCENARIO('toolkit').replace('## Scope\nagent', '## Scope\nworkflow'),
+      );
+      errors = [];
+      jest.spyOn(console, 'error').mockImplementation((...a) => errors.push(a.join(' ')));
+      jest.spyOn(process, 'exit').mockImplementation((code) => {
+        throw new Error(`process.exit(${code})`);
+      });
+    });
+
+    it('eval ab refuses before the preflight gate, so it never sends the user to preflight', async () => {
+      await expect(
+        runEvalCommand(args(['ab', 'toolkit'], { model: 'opus' }), {
+          projectRoot: tempDir,
+          asJson: false,
+        }),
+      ).rejects.toThrow('process.exit(1)');
+      const message = errors.join('\n');
+      expect(message).toContain('--effort');
+      expect(message).not.toContain('No preflight record');
+      expect(evalLib.runWorkflowEval).not.toHaveBeenCalled();
+    });
+
+    it('eval preflight refuses the same invocation before spending a trial', async () => {
+      await expect(
+        runEvalCommand(args(['preflight', 'toolkit']), { projectRoot: tempDir, asJson: false }),
+      ).rejects.toThrow('process.exit(1)');
+      expect(errors.join('\n')).toMatch(/--model.*--effort|--effort.*--model/s);
+      expect(evalLib.runTrial).not.toHaveBeenCalled();
+    });
+
+    it('both proceed once model and effort are pinned', async () => {
+      evalLib.runTrial.mockImplementation((_s, t) => ({
+        trial: t,
+        infraError: true,
+        errorType: 'setup_failed',
+      }));
+      await expect(
+        runEvalCommand(args(['preflight', 'toolkit'], { model: 'opus', effort: 'high' }), {
+          projectRoot: tempDir,
+          asJson: false,
+        }),
+      ).rejects.toThrow('process.exit(1)'); // BLOCK on the infra rows, after running trials
+      expect(evalLib.runTrial).toHaveBeenCalledTimes(3);
+    });
+  });
+
   describe('eval run stops on a repository write', () => {
     it('aborts after the trial that wrote, keeping its row', async () => {
       writeScenario(tempDir, 'run-stop');
@@ -373,6 +427,7 @@ describe('eval command', () => {
       runPreflight('gated', tempDir, {
         runTrial: () => ({ passed: false, score: 0 }),
         gradeResult: (r) => r,
+        model: 'opus',
         conditions: { maxTurns: 10, pluginDir: tempDir },
       });
       evalLib.runWorkflowEval.mockReturnValue({ baseline: [], treatment: [], delta: 0 });
@@ -384,7 +439,7 @@ describe('eval command', () => {
     });
 
     it('runs when the A/B baseline matches the recorded conditions (hit)', async () => {
-      await runEvalCommand(args(['ab', 'gated'], { 'plugin-dir': tempDir }), {
+      await runEvalCommand(args(['ab', 'gated'], { 'plugin-dir': tempDir, model: 'opus' }), {
         projectRoot: tempDir,
         asJson: false,
       });
@@ -393,7 +448,11 @@ describe('eval command', () => {
 
     it('refuses, naming the mismatch and the command, when they differ (miss)', async () => {
       await expect(
-        runEvalCommand(args(['ab', 'gated']), { projectRoot: tempDir, asJson: false }),
+        // No plugin dir: a full-toolkit A/B, which must pin model and effort first.
+        runEvalCommand(args(['ab', 'gated'], { model: 'opus', effort: 'high' }), {
+          projectRoot: tempDir,
+          asJson: false,
+        }),
       ).rejects.toThrow('process.exit(1)');
       expect(evalLib.runWorkflowEval).not.toHaveBeenCalled();
       const message = errors.join('\n');

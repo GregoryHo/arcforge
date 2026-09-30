@@ -137,7 +137,9 @@ meaning Claude Code's own default since your settings are not read. It says
 `user-settings` for a trial that reads your settings file, such as `eval run
 --no-isolate`. A `workflow` A/B with no
 plugin directory is the exception. Its treatment runs on your full configuration,
-so it refuses to start unless you pass both `--model` and `--effort`.
+so it refuses to start unless you pass both `--model` and `--effort`. Both
+`eval ab` and `eval preflight` check this before anything else, so a missing flag
+is reported before any preflight lookup or trial.
 
 Isolation is not a sandbox. The agent runs with your filesystem permissions.
 Isolated and `--plugin-dir` trials are told to stay inside their directory, but

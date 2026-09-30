@@ -328,7 +328,7 @@ function missingPreflightMessage(name, projectRoot, { hash, model, conditions })
     `No preflight record found for scenario "${name}" (hash: ${hash}, model: ${modelLabel}, ${describeConditions(conditions)}).\n` +
     mismatch +
     `Run: arcforge eval preflight ${[name, ...flags].join(' ')}\n` +
-    `Preflight is per-(scenario, model, turn budget, plugin dir) — baseline pass rate depends ` +
+    `Preflight is per-(scenario, model, effort, turn budget, plugin dir) — baseline pass rate depends ` +
     `on each, so a PASS under one does not unblock A/B runs under another.`
   );
 }
