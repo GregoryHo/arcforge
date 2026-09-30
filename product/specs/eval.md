@@ -124,8 +124,9 @@ an A/B verdict. A result the runner killed before the agent finished carries
 `scripts/lib/eval-trial-outcome.js` owns the two predicates (killed, output
 complete) — and `scorableResults` in `eval-stats.js` drops every `infraError` /
 `gradeError` row from every scored pool (`eval run`, A/B, benchmark), while
-preflight fails closed on the same flags (B-10). No result field records the
-ceiling a trial ran under.
+preflight fails closed on the same flags (B-10). Every result row records
+`trialTimeoutMs`, the ceiling its trial ran under, so a pool that mixes ceilings
+can be seen from its rows.
 
 ## Decisions
 
