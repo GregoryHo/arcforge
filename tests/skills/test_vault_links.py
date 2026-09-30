@@ -178,6 +178,42 @@ def test_links_inside_obsidian_and_html_comments_are_not_edges(vault):
     assert links["notes"]["Wiki/alpha-note.md"]["inbound"] == 1
 
 
+def test_a_fence_inside_a_list_item_is_code_even_with_a_blank_line(vault):
+    # #186: an item's content starts at its marker's width, so a fence indented
+    # four spaces or more under an item is still a fence, not an indented code
+    # block whose blank line lets the `[[link]]` escape the inline-code mask.
+    (vault / "Wiki" / "gamma-orphan.md").write_text(
+        GAMMA
+        + "\n- Example:\n\n    ```md\n    [[alpha-note]]\n\n    ```\n"
+        + "\n1. Step\n   - Nested:\n\n       ```\n       [[alpha-note]]\n\n       ```\n"
+        + "\n- ```md\n  [[alpha-note]]\n\n  ```\n",
+        encoding="utf-8",
+    )
+    links = _run(vault)["links"]
+    assert "Wiki/gamma-orphan.md" in links["orphans"]
+    assert links["notes"]["Wiki/alpha-note.md"]["inbound"] == 1
+    # The fence closes, and text after the list is text again.
+    with (vault / "Wiki" / "gamma-orphan.md").open("a", encoding="utf-8") as note:
+        note.write("\nAfter the list: [[alpha-note-draft]].\n")
+    links = _run(vault)["links"]
+    assert links["notes"]["Wiki/gamma-orphan.md"]["outbound"] == 1
+    assert links["notes"]["Wiki/alpha-note.md"]["inbound"] == 1
+
+
+def test_a_fence_delimiter_inside_a_comment_opens_no_fence(vault):
+    # A ``` inside an HTML or Obsidian comment is comment text: it must not open
+    # a fence that swallows the real link after the comment.
+    (vault / "Wiki" / "gamma-orphan.md").write_text(
+        GAMMA
+        + "\n<!--\n```\n-->\nAfter the comment: [[alpha-note-draft]].\n"
+        + "\n%%\n~~~\n%%\nAnd after this one: [[alpha-note]].\n\n```\n[[alpha-note]]\n```\n",
+        encoding="utf-8",
+    )
+    links = _run(vault)["links"]
+    assert links["notes"]["Wiki/gamma-orphan.md"]["outbound"] == 2
+    assert links["notes"]["Wiki/alpha-note.md"]["inbound"] == 2
+
+
 def test_self_links_under_any_spelling_are_not_edges(vault):
     (vault / "Wiki" / "gamma-orphan.md").write_text(
         GAMMA + "\nSelf: [[gamma-orphan]] and [[Wiki/gamma-orphan]] and [[gamma-orphan#Heading|me]].\n",

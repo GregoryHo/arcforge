@@ -101,6 +101,25 @@ def test_fenced_examples_under_the_taxonomy_declare_nothing(vault):
     assert report["tags"]["ghost"] == {"count": 1, "declared": False, "exceeds": True}
 
 
+def test_fences_in_list_items_and_comments_declare_nothing(vault):
+    # #186: a fence under a list item is a fence at its item's offset, however
+    # far it sits from the margin, and a comment is not rendered: neither the
+    # example tag inside the one nor the retired tag and type inside the other
+    # are declarations.
+    schema = vault / "SCHEMA.md"
+    schema.write_text(
+        schema.read_text(encoding="utf-8").replace(
+            "LINT checks:\n",
+            "- `arcforge` again, with an example:\n\n    ```\n    - `ghost` — not a real tag\n    ```\n\n"
+            "<!--\n- `retired` — no longer used\n```yaml\ntype: phantom\n```\n-->\n\nLINT checks:\n",
+        ),
+        encoding="utf-8",
+    )
+    report = _run(vault)
+    assert report["schema"]["declared_tags"] == ["arcforge", "entity"]
+    assert report["schema"]["declared_types"] == ["entity", "source"]
+
+
 def test_log_path_tokens_are_not_satisfied_by_a_basename_elsewhere(vault):
     # `Wiki/deleted-note.md` stays missing when only `Archive/deleted-note.md`
     # exists; a bare basename in the log still matches any file of that name.
