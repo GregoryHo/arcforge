@@ -9,7 +9,7 @@
  * treatment edited a shipped template this way). So the runner snapshots the
  * repository around every trial and reports whatever changed.
  *
- * The snapshot is path → (mtime, size) for every file, taken with lstat and
+ * The snapshot is path → (mtime, size, mode) for every file, taken with lstat and
  * never following symlinks. Skipped: `.git`, `node_modules`, the trial dirs
  * under `.eval-trials/`, the results tree `evals/results/` (the runner's own
  * output), and any nested directory that holds its own `.git` entry (another
@@ -32,7 +32,7 @@ const MAX_ENTRIES = 50000;
  * Snapshot a directory tree.
  * @param {string} root - Absolute directory to walk
  * @param {number} [maxEntries=MAX_ENTRIES] - Files to record before giving up
- * @returns {{ files: Map<string, string>, complete: boolean }} rel path → "mtimeMs:size"
+ * @returns {{ files: Map<string, string>, complete: boolean }} rel path → "mtimeMs:size:mode"
  */
 function snapshotTree(root, maxEntries = MAX_ENTRIES) {
   const files = new Map();
@@ -60,7 +60,7 @@ function snapshotTree(root, maxEntries = MAX_ENTRIES) {
       }
       try {
         const st = fs.lstatSync(path.join(root, childRel));
-        files.set(childRel, `${st.mtimeMs}:${st.size}`);
+        files.set(childRel, `${st.mtimeMs}:${st.size}:${st.mode}`);
       } catch {
         /* vanished between readdir and lstat: absent from this snapshot */
       }

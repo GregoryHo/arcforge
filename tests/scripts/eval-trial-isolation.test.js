@@ -488,6 +488,15 @@ describe('eval-trial-guard snapshots', () => {
     }
   });
 
+  it('detects a permission-only change, which leaves size and mtime alone', () => {
+    const hook = path.join(root, 'hook.sh');
+    fs.writeFileSync(hook, 'echo hi\n');
+    fs.chmodSync(hook, 0o644);
+    const writes = watchForWrites([root]);
+    fs.chmodSync(hook, 0o755);
+    expect(writes().changed).toEqual([path.join(path.resolve(root), 'hook.sh')]);
+  });
+
   it('reports how many entries it saw when a root is past the budget', () => {
     for (const name of ['a', 'b', 'c']) fs.writeFileSync(path.join(root, name), 'x');
     const { incomplete } = watchForWrites([root], { maxEntries: 2 })();

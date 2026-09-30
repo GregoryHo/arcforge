@@ -146,7 +146,8 @@ the baseline of a plugin-dir comparison and its preflight, which load no plugin
 but could still edit it before the treatment loads it. The plugin directory is
 walked on its own even when it sits inside the project as a separate checkout.
 
-A trial that added, changed or removed anything the check covers is recorded as
+A trial that added, changed or removed anything the check covers, a change to a
+file's permissions included, is recorded as
 an infra error (`trial_wrote_repo`) naming the paths, and never scores. The
 run then stops before the next trial starts, because every later trial would
 run against the changed files. That applies to `eval run`, `eval ab` and
