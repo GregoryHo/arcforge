@@ -99,6 +99,49 @@ describe('error-only pools are instrument failures, never the measurement', () =
     expect(paired.unpaired.every((p) => p.instrumentFailure)).toBe(true);
   });
 
+  it('keeps a model whose rows are all errors out of by_model, without crashing', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'test-bymodel-errors-'));
+    try {
+      const dir = path.join(root, SCENARIOS_DIR);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, 'bm.md'),
+        '# Eval: bm\n\n## Scope\nagent\n\n## Scenario\nDo it.\n\n## Grader\ncode\n',
+      );
+      appendResult(row({ eval: 'bm', model: 'sonnet', runId: 'r1' }), root);
+      appendResult(refusal({ eval: 'bm', runId: 'r2' }), root); // newer, model opus, all errors
+      const entry = generateBenchmark(root).evals.bm;
+      expect(Object.keys(entry.by_model)).toEqual(['sonnet']);
+      expect(entry.other_pools).toEqual([
+        expect.objectContaining({
+          conditions: expect.objectContaining({ model: 'opus' }),
+          instrumentFailure: true,
+        }),
+      ]);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('reports a scenario whose every row errored without crashing or scoring it', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'test-all-errors-'));
+    try {
+      const dir = path.join(root, SCENARIOS_DIR);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, 'ae.md'),
+        '# Eval: ae\n\n## Scope\nagent\n\n## Scenario\nDo it.\n\n## Grader\ncode\n',
+      );
+      appendResult(refusal({ eval: 'ae', runId: 'r1' }), root);
+      const entry = generateBenchmark(root).evals.ae;
+      expect(entry.trials).toBe(0);
+      expect(entry.last_run).toBeNull();
+      expect(entry.other_pools[0].instrumentFailure).toBe(true);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('labels an error-only pool as an instrument failure when printed', () => {
     const { otherPoolLines } = require('../../scripts/lib/eval-pools');
     const [line] = otherPoolLines([{ conditions: {}, rows: 3, instrumentFailure: true }]);

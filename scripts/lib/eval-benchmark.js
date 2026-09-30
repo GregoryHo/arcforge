@@ -363,6 +363,9 @@ function generateBenchmark(projectRoot, options = {}) {
     for (const [m, modelRows] of Object.entries(modelGroups)) {
       // Per model, too, only that model's newest pool counts.
       const modelResults = splitPools(modelRows).current;
+      // A model with no scored trial is an instrument failure, already listed in
+      // other_pools; it has no numbers to report here.
+      if (modelResults.length === 0) continue;
       const ms = stats.statsFromResults(modelResults);
       byModel[m] = {
         trials: ms.count,
@@ -387,7 +390,7 @@ function generateBenchmark(projectRoot, options = {}) {
       ci95: s.ci95,
       pass_at_k: stats.passAtK(scorable),
       pass_all_k: stats.passAllK(scorable),
-      last_run: results[results.length - 1].timestamp,
+      last_run: results.length > 0 ? results[results.length - 1].timestamp : null,
       metrics,
       ...(comparison ? { compared: comparison } : {}),
       ...(warning ? { warning } : {}),
