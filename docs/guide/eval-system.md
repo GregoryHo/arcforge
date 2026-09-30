@@ -112,6 +112,22 @@ To run one condition on its own, without a comparison:
 arcforge eval run <name> --k 5
 ```
 
+`eval run` has no second arm, so its verdict is about the condition alone, not a
+change. It is judged over the last k **scored** trials — an infra or grade error
+is recorded and printed but never counted, and never shortens the pool:
+
+| Verdict | Meaning |
+|---------|---------|
+| `SHIP` | Every scored trial passed |
+| `NEEDS WORK` | At least 60% passed |
+| `BLOCKED` | Fewer than 60% passed, or nothing was scored |
+
+For a `model`-graded scenario with at least five scored trials, `SHIP` instead
+means the 95% confidence interval on the mean score sits at or above 0.8, which
+tolerates the grader's noise. `eval list`, `eval report` and the dashboard show
+the same vocabulary over the same scored pool (`eval list` always applies the
+pass-rate rule).
+
 ## Step 4 — read the verdict
 
 ```bash

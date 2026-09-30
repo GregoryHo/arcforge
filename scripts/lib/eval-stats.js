@@ -258,7 +258,9 @@ function verdictFromRate(rate) {
  * @param {number} [target] - CI lower bound target (default: SHIP_CI_TARGET)
  * @returns {'SHIP' | 'NEEDS WORK' | 'BLOCKED'} Verdict
  */
-function verdictFromCI(results, target) {
+function verdictFromCI(rawResults, target) {
+  // Error trials never move a verdict (B-10): judge the scored pool only.
+  const results = scorableResults(rawResults);
   if (results.length < 2) return 'BLOCKED';
   const t = target ?? SHIP_CI_TARGET;
   const interval = ci95(results);
@@ -276,7 +278,9 @@ function verdictFromCI(results, target) {
  * @param {boolean} [options.useCi=false] - Use CI-based SHIP threshold
  * @returns {'SHIP' | 'NEEDS WORK' | 'BLOCKED'} Verdict
  */
-function getVerdict(results, options = {}) {
+function getVerdict(rawResults, options = {}) {
+  // Error trials never move a verdict (B-10): judge the scored pool only.
+  const results = scorableResults(rawResults);
   if (results.length === 0) return 'BLOCKED';
   if (options.useCi && results.length >= 5) return verdictFromCI(results);
   return verdictFromRate(passRate(results));

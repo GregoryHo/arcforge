@@ -520,6 +520,36 @@ describe('getVerdict', () => {
   });
 });
 
+// ── verdicts drop error trials (B-10, #198) ───────────────────
+
+describe('verdicts over the scored pool only', () => {
+  const fivePasses = () =>
+    [1, 2, 3, 4, 5].map((t) => makeResult({ trial: t, passed: true, score: 1 }));
+  const errorRows = () => [
+    makeResult({ trial: 6, infraError: true, errorType: 'trial_killed_incomplete' }),
+    makeResult({ trial: 7, gradeError: true, errorType: 'model_grader_failed' }),
+  ];
+
+  test('getVerdict gives five passes plus error rows the verdict of five passes alone', () => {
+    expect(getVerdict([...fivePasses(), ...errorRows()])).toBe(getVerdict(fivePasses()));
+    expect(getVerdict([...fivePasses(), ...errorRows()])).toBe('SHIP');
+  });
+
+  test('getVerdict with useCi judges the scored pool too', () => {
+    const rows = [...fivePasses(), ...errorRows()];
+    expect(getVerdict(rows, { useCi: true })).toBe(getVerdict(fivePasses(), { useCi: true }));
+  });
+
+  test('verdictFromCI ignores error rows', () => {
+    expect(verdictFromCI([...fivePasses(), ...errorRows()])).toBe(verdictFromCI(fivePasses()));
+  });
+
+  test('a pool of nothing but error rows is BLOCKED, never SHIP', () => {
+    expect(getVerdict(errorRows())).toBe('BLOCKED');
+    expect(verdictFromCI(errorRows())).toBe('BLOCKED');
+  });
+});
+
 // ── fr-gr-002: meanOrNull ─────────────────────────────────────
 
 describe('meanOrNull', () => {

@@ -124,6 +124,33 @@ describe('dashboard', () => {
       expect(scenarios[0].status).toBe('SHIP');
       expect(scenarios[0].passRate).toBe(1);
     });
+
+    it('should compute status over the scored pool, as passRate already is (#198)', () => {
+      writeScenario(
+        tempDir,
+        'err-eval.md',
+        '# Eval: err-eval\n\n## Scope\nagent\n\n## Scenario\nDo something.\n\n## Grader\ncode\n',
+      );
+      const row = (trial, extra = {}) => ({
+        eval: 'err-eval',
+        trial,
+        k: 6,
+        passed: true,
+        score: 1.0,
+        grader: 'code',
+        timestamp: `2026-03-20T10:00:0${trial}Z`,
+        ...extra,
+      });
+      writeResult(tempDir, 'err-eval', '20260320-100000', 'results', [
+        ...[1, 2, 3, 4, 5].map((t) => row(t)),
+        row(6, { passed: false, score: 0, infraError: true, errorType: 'trial_killed_incomplete' }),
+      ]);
+
+      const { scenarios } = callRouter(createRouter(tempDir, ''), '/api/scenarios').json();
+
+      expect(scenarios[0].passRate).toBe(1);
+      expect(scenarios[0].status).toBe('SHIP');
+    });
   });
 
   // ── /api/runs/:name ──────────────────────────────────────────

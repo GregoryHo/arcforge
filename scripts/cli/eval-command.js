@@ -149,7 +149,10 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
           pluginDir,
           maxTurns,
         });
-        let graded = eval_.gradeTrialResult(result, scenario, projectRoot, result.actions);
+        // An infra error is recorded as it is: there is no agent turn to grade.
+        let graded = result.infraError
+          ? result
+          : eval_.gradeTrialResult(result, scenario, projectRoot, result.actions);
 
         if (graded.grader === 'human-pending') {
           console.log('HUMAN REVIEW');
@@ -168,11 +171,15 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
       if (rl) rl.close();
     }
 
+    // Filter before taking the last k, so an error trial neither moves the
+    // verdict nor shrinks the pool it is judged on (B-10).
     const results = eval_
-      .loadResults(scenario.name, projectRoot, {
-        version: scenario.version,
-        since: args.options.since,
-      })
+      .scorableResults(
+        eval_.loadResults(scenario.name, projectRoot, {
+          version: scenario.version,
+          since: args.options.since,
+        }),
+      )
       .slice(-k);
     const verdictOpts = scenario.grader === 'model' ? { useCi: true } : {};
     console.log(`Verdict: ${eval_.getVerdict(results, verdictOpts)}`);
@@ -519,7 +526,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
               ...(model ? { model } : {}),
             });
             verdict =
-              results.length >= 5
+              eval_.scorableResults(results).length >= 5
                 ? eval_.verdictFromCI(results)
                 : eval_.verdictFromRate(displayData.pass_rate);
           } else {
