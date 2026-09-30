@@ -42,7 +42,7 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   already passes ≥80% of the time — at a ceiling, a good change and a useless
   one produce the same numbers, so any delta measured there is noise. A BLOCK
   is a verdict about the scenario, not the change. Results are cached per
-  scenario content, model, turn budget and plugin-dir setting: baseline
+  scenario content, model, effort, turn budget and plugin-dir setting: baseline
   competence is not transferable, and an A/B run whose baseline conditions
   differ from the cached preflight is refused until preflight is rerun under
   them. Non-regression
