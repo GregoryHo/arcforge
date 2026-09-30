@@ -62,6 +62,8 @@ function resolveTrialTimeoutMs(env = process.env) {
  * @param {boolean} [options.isolated=true] - Whether to disable plugins and MCP
  * @param {string} [options.pluginDir] - Plugin directory for semi-isolated mode
  * @param {number} [options.maxTurns] - Max turns for Claude CLI
+ * @param {boolean} [options.skipPermissions] - Pass --dangerously-skip-permissions
+ *   (default: when a plugin dir is loaded). A comparison passes one value to both arms.
  * @returns {TrialResult} Trial result
  */
 function runTrial(scenario, trialNumber, totalTrials, options = {}) {
@@ -75,6 +77,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     runId,
     pluginDir: rawPluginDir,
     maxTurns: rawMaxTurns,
+    skipPermissions: rawSkipPermissions,
   } = options;
   // Resolved before anything else so a bad override is refused ahead of the
   // fixture Setup and the session (B-10), and recorded on every row it produces.
@@ -99,7 +102,8 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
       error,
       errorType,
       infraError: true,
-      ...(model ? { model } : {}),
+      model: model || 'default',
+      effort: effort || 'default',
       ...(runId ? { runId } : {}),
       ...extra,
     };
@@ -132,42 +136,19 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
 
   const prompt = buildTrialPrompt(scenario);
 
-  const claudeArgs = [
-    '-p',
-    '--output-format',
-    'stream-json',
-    '--verbose',
-    '--no-session-persistence',
-    '--disable-slash-commands',
-  ];
-  if (isolated && !pluginDir) claudeArgs.push('--strict-mcp-config');
-  // Advisory only — the trial is not a sandbox; watchForWrites() below catches
-  // the trials that ignore it. A plugin-dir trial gets it too (eval-10).
-  if (isolated || pluginDir) {
-    claudeArgs.push(
-      '--append-system-prompt',
-      `You are running in an isolated eval trial. Your working directory is ${trialDir}, and every file you need is already in it — do not read, search, or access files outside this directory.`,
-    );
-  }
-  if (pluginDir) {
-    claudeArgs.push('--plugin-dir', path.resolve(pluginDir));
-    // User-level settings (hooks, output style) never reach the trial; the
-    // plugin under test still brings its own hooks (B-7, #170).
-    claudeArgs.push('--setting-sources', 'project,local');
-    // Eval trials run unattended in ephemeral dirs — no human to approve permission prompts
-    claudeArgs.push('--dangerously-skip-permissions');
-  }
-
-  // Resolve max-turns: CLI > scenario > pluginDir default (10)
-  const resolvedMaxTurns = resolveMaxTurns({
-    maxTurns: rawMaxTurns,
-    scenarioMaxTurns: scenario.maxTurns,
+  const claudeArgs = buildClaudeArgs({
+    trialDir,
+    contained: isolated || Boolean(pluginDir),
     pluginDir,
+    skipPermissions: rawSkipPermissions ?? Boolean(pluginDir),
+    maxTurns: resolveMaxTurns({
+      maxTurns: rawMaxTurns,
+      scenarioMaxTurns: scenario.maxTurns,
+      pluginDir,
+    }),
+    model,
+    effort,
   });
-  if (resolvedMaxTurns != null) claudeArgs.push('--max-turns', String(resolvedMaxTurns));
-
-  if (model) claudeArgs.push('--model', model);
-  if (effort) claudeArgs.push('--effort', effort);
 
   // Debug: log command for troubleshooting
   if (process.env.EVAL_DEBUG) {
@@ -246,7 +227,8 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     transcript,
     trialDir,
     ...(actions.length > 0 ? { actions } : {}),
-    ...(model ? { model } : {}),
+    model: model || 'default',
+    effort: effort || 'default',
     ...(runId ? { runId } : {}),
   };
   // A trial that changed the repository it ran from measured a different
@@ -313,6 +295,60 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
 }
 
 /**
+ * Build the `claude -p` argv for one trial.
+ *
+ * Everything but `--plugin-dir` is a function of options a comparison passes to
+ * both arms alike, so the two arms' argv differ only by the plugin injection.
+ * A contained trial (isolated, or loading a plugin under test) drops the user
+ * settings file (`--setting-sources project,local`): that is what keeps the
+ * operator's hooks, output style, model and effort level out of both arms at
+ * once, while a plugin-dir arm still gets its plugin's hooks (B-7, #170).
+ * @param {Object} opts
+ * @param {string} opts.trialDir - Trial working directory (named in the advisory)
+ * @param {boolean} opts.contained - Isolated or plugin-dir trial (not --no-isolate)
+ * @param {string} [opts.pluginDir] - Plugin to load
+ * @param {boolean} [opts.skipPermissions] - Run without permission prompts
+ * @param {number} [opts.maxTurns] - Resolved turn budget
+ * @param {string} [opts.model] - Model flag value
+ * @param {string} [opts.effort] - Effort flag value
+ * @returns {string[]} argv after `claude`
+ */
+function buildClaudeArgs({
+  trialDir,
+  contained,
+  pluginDir,
+  skipPermissions,
+  maxTurns,
+  model,
+  effort,
+}) {
+  const args = [
+    '-p',
+    '--output-format',
+    'stream-json',
+    '--verbose',
+    '--no-session-persistence',
+    '--disable-slash-commands',
+  ];
+  if (contained) {
+    args.push('--strict-mcp-config', '--setting-sources', 'project,local');
+    // Advisory only — the trial is not a sandbox; watchForWrites() catches the
+    // trials that ignore it.
+    args.push(
+      '--append-system-prompt',
+      `You are running in an isolated eval trial. Your working directory is ${trialDir}, and every file you need is already in it — do not read, search, or access files outside this directory.`,
+    );
+  }
+  if (pluginDir) args.push('--plugin-dir', path.resolve(pluginDir));
+  // Eval trials run unattended in ephemeral dirs — no human to approve permission prompts
+  if (skipPermissions) args.push('--dangerously-skip-permissions');
+  if (maxTurns != null) args.push('--max-turns', String(maxTurns));
+  if (model) args.push('--model', model);
+  if (effort) args.push('--effort', effort);
+  return args;
+}
+
+/**
  * Save full trial output to a transcript file
  * @param {string} evalName - Eval name (may include label suffix)
  * @param {number} trialNumber - Trial number
@@ -356,6 +392,7 @@ module.exports = {
   DEFAULT_TRIAL_TIMEOUT_MS,
   resolveTrialTimeoutMs,
   runTrial,
+  buildClaudeArgs,
   saveTranscript,
   buildTrialPrompt,
 };

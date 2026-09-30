@@ -192,6 +192,96 @@ describe('runSkillEval with a plugin dir measures routing, not an injected body 
   });
 });
 
+describe('both arms of a comparison run the same claude argv but for the injection', () => {
+  const { runSkillEval, runWorkflowEval } = require('../../scripts/lib/eval');
+  let tempDir;
+  let pluginDir;
+  let argvs;
+  let rows;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-parity-'));
+    pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-parity-plugin-'));
+    mockUtils.execCommand.mockReset();
+    argvs = [];
+    stubExec((opts) => {
+      // The advisory names each trial's own directory; that is not an arm difference.
+      const args = mockUtils.execCommand.mock.calls.at(-1)[1];
+      argvs.push(args.map((a) => a.split(opts.cwd).join('<TRIAL_DIR>')));
+      return { stdout: DONE_STREAM, stderr: '', exitCode: 0 };
+    });
+    rows = [];
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.rmSync(pluginDir, { recursive: true, force: true });
+  });
+
+  /** The treatment's argv with the injection removed must equal the baseline's. */
+  function expectOnlyInjectionDiffers([baseline, treatment]) {
+    const at = treatment.indexOf('--plugin-dir');
+    expect(at).toBeGreaterThan(-1);
+    expect(treatment[at + 1]).toBe(path.resolve(pluginDir));
+    const withoutInjection = [...treatment.slice(0, at), ...treatment.slice(at + 2)];
+    expect(withoutInjection).toEqual(baseline);
+  }
+
+  const collect = (_label, _t, row) => rows.push(row);
+
+  it('skill scope with --plugin-dir, no model or effort given', () => {
+    runSkillEval(SCENARIO, 1, { projectRoot: tempDir, pluginDir, onTrialComplete: collect });
+    expect(argvs).toHaveLength(2);
+    expectOnlyInjectionDiffers(argvs);
+    expect(argvs[0]).toContain('--setting-sources');
+    expect(argvs[0]).toContain('--dangerously-skip-permissions');
+    expect(argvs[0][argvs[0].indexOf('--max-turns') + 1]).toBe('10');
+  });
+
+  it('skill scope with --plugin-dir, model, effort and max turns given', () => {
+    runSkillEval(SCENARIO, 1, {
+      projectRoot: tempDir,
+      pluginDir,
+      model: 'opus',
+      effort: 'high',
+      maxTurns: 7,
+    });
+    expectOnlyInjectionDiffers(argvs);
+    expect(argvs[0]).toEqual(expect.arrayContaining(['--model', 'opus', '--effort', 'high']));
+    expect(argvs[0][argvs[0].indexOf('--max-turns') + 1]).toBe('7');
+  });
+
+  it('workflow scope with a plugin dir', () => {
+    runWorkflowEval({ ...SCENARIO, scope: 'workflow', pluginDir }, 1, {
+      projectRoot: tempDir,
+      onTrialComplete: collect,
+    });
+    expectOnlyInjectionDiffers(argvs);
+  });
+
+  it('skill scope with an injected body: argv identical, the body is in the prompt', () => {
+    runSkillEval(SCENARIO, 1, { projectRoot: tempDir, skillInstruction: 'BODY' });
+    expect(argvs[0]).toEqual(argvs[1]);
+  });
+
+  it('records the model and effort every row ran with, default when none was passed', () => {
+    runSkillEval(SCENARIO, 1, { projectRoot: tempDir, pluginDir, onTrialComplete: collect });
+    expect(rows.map((r) => [r.model, r.effort])).toEqual([
+      ['default', 'default'],
+      ['default', 'default'],
+    ]);
+  });
+
+  it('refuses a full-toolkit workflow A/B that does not pin both model and effort', () => {
+    const scenario = { ...SCENARIO, scope: 'workflow' };
+    expect(() => runWorkflowEval(scenario, 1, { projectRoot: tempDir })).toThrow(/--model/);
+    expect(() => runWorkflowEval(scenario, 1, { projectRoot: tempDir, model: 'opus' })).toThrow(
+      /--effort/,
+    );
+    expect(argvs).toHaveLength(0);
+  });
+});
+
 describe('eval-trial-guard snapshots', () => {
   let root;
 

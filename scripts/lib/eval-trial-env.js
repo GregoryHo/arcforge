@@ -126,8 +126,10 @@ function writeIsolationSettings(trialDir, cachedSettings) {
  * settings, so the output style is pinned here. Hooks merge across scopes
  * instead of overriding, so full isolation turns every hook off
  * (disableAllHooks — no plugin is loaded, so nothing of the trial's own is
- * lost); a plugin-dir trial needs its plugin's hooks, so runTrial drops the
- * user settings source for it (--setting-sources) rather than setting this.
+ * lost); a plugin-dir trial needs its plugin's hooks, so it does not set this.
+ * Both kinds of trial also drop the user settings source entirely
+ * (--setting-sources, see buildClaudeArgs), which is what keeps the arms of a
+ * comparison on the same config; the pins here are the second line of defence.
  * @param {Object} [opts] - Options
  * @param {boolean} [opts.excludeClaudeMd=true] - Exclude CLAUDE.md/rules (full isolation).
  *   Set false for semi-isolation (plugin-dir mode) where the plugin needs project context.

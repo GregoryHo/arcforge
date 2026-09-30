@@ -104,13 +104,24 @@ as a regression.
 
 Every trial runs in a fresh fixture directory under `.eval-trials/`, with
 arcforge's own state redirected into it. By default the session is also
-isolated: plugins, MCP servers, `CLAUDE.md` files and rules are switched off. Your
-user-level Claude Code configuration is kept out as well. The output style is
-pinned to the default and hooks are disabled, so your own output style or hooks
-do not steer the agent in either arm. A `--plugin-dir` trial loads the plugin
-under test with its hooks, and skips your user-level settings file entirely.
-Credentials stored in your keychain still work. Anything that only lives in your
-user settings, such as an `apiKeyHelper`, is not available to such a trial.
+isolated. Plugins and MCP servers are stripped, `CLAUDE.md` files and rules are
+excluded, the output style is pinned to the default and hooks are disabled. Your
+user settings file (`~/.claude/settings.json`) is not read at all, so nothing
+set there reaches the trial: not your hooks, output style, `model` or effort
+level, `env`, permissions, or an `apiKeyHelper`. Credentials stored in your
+keychain still work, and environment variables from your shell are passed
+through. A `--plugin-dir` trial is contained the same way, except that it loads
+the plugin under test with the plugin's own hooks and keeps the fixture's
+`CLAUDE.md` files.
+
+In a comparison, both arms run `claude` with the same flags apart from the
+injection itself. They share the settings sources, the turn budget, the
+permission mode (neither arm stops for permission prompts when a plugin is
+loaded) and `--model` / `--effort`. Every result row records the `model` and
+`effort` it ran with, or `default` when no flag was given, meaning Claude
+Code's own default, since your settings are not read. A `workflow` A/B with no
+plugin directory is the exception. Its treatment runs on your full configuration,
+so it refuses to start unless you pass both `--model` and `--effort`.
 
 Isolation is not a sandbox. The agent runs with your filesystem permissions.
 Isolated and `--plugin-dir` trials are told to stay inside their directory, but

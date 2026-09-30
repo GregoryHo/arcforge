@@ -108,6 +108,7 @@ function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts
     runId,
     pluginDir,
     maxTurns,
+    skipPermissions,
   } = opts;
   const result = runTrial(trialScenario, trialNumber, k, {
     projectRoot,
@@ -119,6 +120,7 @@ function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts
     runId,
     pluginDir,
     maxTurns,
+    skipPermissions,
   });
   // Every row carries the scenario version — infraError rows too, or a
   // version-scoped read drops them and error_trials undercounts (B-8).
@@ -169,6 +171,23 @@ function runAbTrials(baseScenario, treatScenario, gradeScenario, k, bOpts, tOpts
 }
 
 /**
+ * Options both arms of a comparison must share so their claude argv differ only
+ * by the injection: one turn budget (resolved as if the plugin were loaded, so
+ * the baseline does not run unbounded beside a 10-turn treatment) and one
+ * permission mode.
+ * @param {EvalScenario} scenario
+ * @param {{ maxTurns?: number, pluginDir?: string }} opts
+ * @returns {{ maxTurns?: number, skipPermissions: boolean }}
+ */
+function sharedArmOptions(scenario, { maxTurns, pluginDir }) {
+  const resolved = resolveMaxTurns({ maxTurns, scenarioMaxTurns: scenario.maxTurns, pluginDir });
+  return {
+    ...(resolved != null ? { maxTurns: resolved } : {}),
+    skipPermissions: Boolean(pluginDir),
+  };
+}
+
+/**
  * Run a skill eval as A/B comparison: baseline (without skill) vs treatment (with skill).
  * The baseline always runs isolated. The treatment either prepends the skill body
  * (skillInstruction, isolated like the baseline) or loads a plugin that routes to
@@ -207,6 +226,7 @@ function runSkillEval(scenario, k, options = {}) {
     context: skillInstruction ? `${skillInstruction}\n\n${scenario.context}` : scenario.context,
   };
 
+  const shared = sharedArmOptions(scenario, { maxTurns, pluginDir });
   const bOpts = {
     projectRoot,
     label: 'baseline',
@@ -215,6 +235,7 @@ function runSkillEval(scenario, k, options = {}) {
     model,
     effort,
     runId,
+    ...shared,
   };
   const tOpts = {
     projectRoot,
@@ -228,7 +249,7 @@ function runSkillEval(scenario, k, options = {}) {
     effort,
     runId,
     ...(pluginDir ? { pluginDir, isolated: false } : {}),
-    ...(maxTurns != null ? { maxTurns } : {}),
+    ...shared,
   };
   return runAbTrials(scenario, treatmentScenario, scenario, k, bOpts, tOpts, interleave);
 }
@@ -257,13 +278,22 @@ function runWorkflowEval(scenario, k, options = {}) {
     maxTurns,
   } = options;
   resolveTrialTimeoutMs(); // refuse a bad ceiling before any trial spawns (B-10)
-  const isolationSettings = buildIsolationSettings();
   const resolvedPluginDir = pluginDir || scenario.pluginDir;
+  if (!resolvedPluginDir && (!model || !effort)) {
+    // A full-toolkit treatment reads the user settings file, which may set a
+    // model and effort level the isolated baseline never sees. Explicit flags
+    // outrank settings in both arms, so they are the only way to keep parity.
+    throw new Error(
+      `workflow A/B without a plugin dir runs the treatment on your full user config: pass both --model and --effort so both arms run the same model at the same effort (missing: ${[!model && '--model', !effort && '--effort'].filter(Boolean).join(', ')})`,
+    );
+  }
+  const isolationSettings = buildIsolationSettings();
   // Cache semi-isolation settings once (avoids spawning `claude plugin list` per trial)
   const semiSettings = resolvedPluginDir
     ? buildIsolationSettings({ excludeClaudeMd: false })
     : undefined;
 
+  const shared = sharedArmOptions(scenario, { maxTurns, pluginDir: resolvedPluginDir });
   const bOpts = {
     projectRoot,
     label: 'baseline',
@@ -273,6 +303,7 @@ function runWorkflowEval(scenario, k, options = {}) {
     model,
     effort,
     runId,
+    ...shared,
   };
 
   const tOpts = {
@@ -284,7 +315,7 @@ function runWorkflowEval(scenario, k, options = {}) {
     effort,
     runId,
     ...(resolvedPluginDir ? { pluginDir: resolvedPluginDir, isolationSettings: semiSettings } : {}),
-    ...(maxTurns != null ? { maxTurns } : {}),
+    ...shared,
   };
   return runAbTrials(scenario, scenario, scenario, k, bOpts, tOpts, interleave);
 }

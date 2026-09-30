@@ -2654,8 +2654,9 @@ Do something.
       expect(callArgs[0]).toBe('claude');
       expect(callArgs[1]).toContain('--plugin-dir');
       expect(callArgs[1]).toContain(tempDir);
-      // Should NOT add --strict-mcp-config when pluginDir is used
-      expect(callArgs[1]).not.toContain('--strict-mcp-config');
+      // A plugin-dir trial strips MCP servers like the isolated baseline it is
+      // compared against, so the arms differ only by --plugin-dir.
+      expect(callArgs[1]).toContain('--strict-mcp-config');
     });
 
     it('should return infraError when pluginDir path does not exist', () => {
@@ -3213,7 +3214,8 @@ Do something.
         }
       }
 
-      runWorkflowEval(scenario, 1, { projectRoot: tempDir });
+      // A full-toolkit treatment must pin model and effort (arm parity).
+      runWorkflowEval(scenario, 1, { projectRoot: tempDir, model: 'sonnet', effort: 'high' });
 
       const claudeCalls = mockUtils.execCommand.mock.calls.filter(
         (c) => c[0] === 'claude' && c[1].includes('-p'),
