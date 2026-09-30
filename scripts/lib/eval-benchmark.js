@@ -17,7 +17,7 @@ const path = require('node:path');
 const { ensureDir, getTimestamp } = require('./utils');
 const stats = require('./eval-stats');
 const graders = require('./eval-graders');
-const { splitPools } = require('./eval-pools');
+const { splitPools, pairArms } = require('./eval-pools');
 const {
   BENCHMARKS_DIR,
   loadResults,
@@ -242,17 +242,16 @@ function writeRawBenchmarkData(projectRoot, rawData) {
  * @returns {Object|null}
  */
 function comparisonFromAbResults(scenario, projectRoot, filterOpts) {
-  // Each arm is judged on its newest condition's pool (B-8); older pools are
-  // listed, never combined.
-  const bPools = splitPools(loadResults(`${scenario.name}-baseline`, projectRoot, filterOpts));
-  const tPools = splitPools(loadResults(`${scenario.name}-treatment`, projectRoot, filterOpts));
-  const baseline = bPools.current;
-  const treatment = tPools.current;
-  if (baseline.length === 0 || treatment.length === 0) return null;
-  const otherPools = [
-    ...bPools.others.map((p) => ({ arm: 'baseline', ...p })),
-    ...tPools.others.map((p) => ({ arm: 'treatment', ...p })),
-  ];
+  const bRows = loadResults(`${scenario.name}-baseline`, projectRoot, filterOpts);
+  const tRows = loadResults(`${scenario.name}-treatment`, projectRoot, filterOpts);
+  if (bRows.length === 0 || tRows.length === 0) return null;
+  // Both arms on the newest pool pair that shares its conditions (B-8); every
+  // other pool is listed, never combined. No common pair: no comparison.
+  const paired = pairArms(bRows, tRows);
+  const otherPools = paired.unpaired;
+  if (paired.error) return { verdict: null, refused: paired.error, other_pools: otherPools };
+  const baseline = paired.baseline;
+  const treatment = paired.treatment;
 
   const bStats = stats.statsFromResults(baseline);
   const tStats = stats.statsFromResults(treatment);

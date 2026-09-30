@@ -374,6 +374,15 @@ conditions, as a "Not combined" line in the terminal, `other_pools` in the
 benchmark, and `otherPools` in the dashboard. Rows written before these
 fields existed form a pool of their own, shown as "unrecorded".
 
+An A/B comparison (`compare`, the benchmark's `compared` entry, the dashboard's
+A/B view) pairs its arms rather than taking each arm's newest pool on its own.
+It uses the newest pair of pools, one per arm, that ran under the same model,
+effort, ceiling and turn budget; only the plugin dir may differ, since loading
+it is the treatment. When the newest runs of the two arms don't match, the
+older matching pair is judged and the rest are listed as "Not combined". When
+the arms share no conditions at all, the comparison is refused and every pool
+is listed; rerun `eval ab` so both arms run under the same conditions.
+
 ## Benchmarks
 
 ```bash

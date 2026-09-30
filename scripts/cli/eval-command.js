@@ -38,7 +38,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
   const eval_ = require('../lib/eval');
   const benchmark_ = require('../lib/eval-benchmark');
   const { generateRunId } = require('../lib/utils');
-  const { otherPoolLines } = require('../lib/eval-pools');
+  const { otherPoolLines, pairArms } = require('../lib/eval-pools');
   // A verdict is judged on the newest condition's pool (B-8); the others are
   // printed beside it, never combined.
   const currentPool = (evalName, opts) => eval_.loadResultPools(evalName, projectRoot, opts);
@@ -487,17 +487,24 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
       since: args.options.since,
       ...(model ? { model } : {}),
     };
-    const bPools = currentPool(`${name}-baseline`, filterOpts);
-    const tPools = currentPool(`${name}-treatment`, filterOpts);
-    const baseline = bPools.current;
-    const treatment = tPools.current;
-
-    if (baseline.length === 0 || treatment.length === 0) {
+    const bRows = eval_.loadResults(`${name}-baseline`, projectRoot, filterOpts);
+    const tRows = eval_.loadResults(`${name}-treatment`, projectRoot, filterOpts);
+    if (bRows.length === 0 || tRows.length === 0) {
       console.error(
         'Error: need both baseline and treatment results. Run: arcforge eval ab <name>',
       );
       process.exit(1);
     }
+    // Both arms on the newest pool pair that shares its conditions (B-8).
+    const paired = pairArms(bRows, tRows);
+    const unpairedLines = paired.unpaired.map((p) => otherPoolLines([p], p.arm)[0]);
+    if (paired.error) {
+      console.error(`Error: ${paired.error}`);
+      for (const line of unpairedLines) console.error(`  ${line}`);
+      process.exit(1);
+    }
+    const baseline = paired.baseline;
+    const treatment = paired.treatment;
 
     console.log(`A/B Comparison: ${name}`);
     if (scenario && scenario.grader !== 'code') {
@@ -520,12 +527,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
       tStats: comparison.treatment,
     });
     if (comparison.baselineWarning) console.log(`  ${comparison.baselineWarning}`);
-    for (const line of [
-      ...otherPoolLines(bPools.others, 'baseline'),
-      ...otherPoolLines(tPools.others, 'treatment'),
-    ]) {
-      console.log(`  ${line}`);
-    }
+    for (const line of unpairedLines) console.log(`  ${line}`);
     if (comparison.modelAnalysis) {
       console.log(`\n  Analysis: ${comparison.modelAnalysis.analysis || ''}`);
       if (comparison.modelAnalysis.delta_explanation) {

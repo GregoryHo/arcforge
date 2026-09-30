@@ -8,6 +8,9 @@
  * the others beside it (D-021: pools measured on another instrument stay on
  * record, reported as such).
  *
+ * A comparison pairs its arms on the same conditions (pairArms); the plugin
+ * dir alone may differ, since loading it is the treatment.
+ *
  * Pure functions, no I/O. Zero external dependencies — Node.js standard library only.
  */
 
@@ -55,6 +58,77 @@ function splitPools(rows) {
 }
 
 /**
+ * The conditions both arms of a comparison must share. pluginDir is left out:
+ * loading the plugin is the treatment itself, so it may differ between arms.
+ */
+const PAIR_FIELDS = CONDITION_FIELDS.filter((field) => field !== 'pluginDir');
+
+/** Identity of a row's conditions as far as arm pairing is concerned. */
+function pairKey(row) {
+  return JSON.stringify(PAIR_FIELDS.map((field) => row?.[field] ?? null));
+}
+
+/** Group rows by full condition key; returns [{ key, pair, rows, latest }]. */
+function poolsOf(rows) {
+  const pools = new Map();
+  for (const row of rows) {
+    const key = conditionKey(row);
+    if (!pools.has(key)) pools.set(key, { key, pair: pairKey(row), rows: [], latest: '' });
+    const pool = pools.get(key);
+    pool.rows.push(row);
+    if (row.timestamp > pool.latest) pool.latest = row.timestamp;
+  }
+  return [...pools.values()];
+}
+
+/**
+ * Choose the pools an A/B comparison is judged on: the newest pair of pools,
+ * one per arm, that ran under the same model, effort, ceiling and turn budget
+ * (B-8). Each arm's newest pool on its own is not enough: a fresh baseline
+ * paired with an older treatment run under other conditions compares two
+ * instruments, not two arms. A pair counts from when its later-starting arm
+ * existed (the older of the two pools' latest rows). Every pool not chosen is
+ * listed in `unpaired`; with no common pair at all, `error` says so.
+ * @param {Object[]} baselineRows
+ * @param {Object[]} treatmentRows
+ * @returns {{ baseline: Object[], treatment: Object[], conditions: Object|null, unpaired: Array<{ arm: string, conditions: Object, rows: number }>, error?: string }}
+ */
+function pairArms(baselineRows, treatmentRows) {
+  const bPools = poolsOf(baselineRows);
+  const tPools = poolsOf(treatmentRows);
+  let best = null;
+  for (const b of bPools) {
+    for (const t of tPools) {
+      if (b.pair !== t.pair) continue;
+      const since = b.latest < t.latest ? b.latest : t.latest;
+      if (!best || since > best.since) best = { b, t, since };
+    }
+  }
+  const list = (arm, pools) =>
+    pools
+      .filter((p) => p !== best?.b && p !== best?.t)
+      .sort((x, y) => y.latest.localeCompare(x.latest))
+      .map((p) => ({ arm, conditions: conditionOf(p.rows[0]), rows: p.rows.length }));
+  const unpaired = [...list('baseline', bPools), ...list('treatment', tPools)];
+  if (!best) {
+    return {
+      baseline: [],
+      treatment: [],
+      conditions: null,
+      unpaired,
+      error:
+        'The baseline and treatment arms have no run conditions in common (model, effort, ceiling, turn budget), so no comparison is valid. Rerun eval ab so both arms run under the same conditions.',
+    };
+  }
+  return {
+    baseline: best.b.rows,
+    treatment: best.t.rows,
+    conditions: conditionOf(best.t.rows[0]),
+    unpaired,
+  };
+}
+
+/**
  * One-line description of a pool's conditions.
  * @param {Object} conditions - From conditionOf
  * @returns {string}
@@ -94,6 +168,8 @@ module.exports = {
   conditionOf,
   conditionKey,
   splitPools,
+  pairKey,
+  pairArms,
   describeCondition,
   otherPoolLines,
 };

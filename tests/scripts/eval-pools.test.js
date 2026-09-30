@@ -135,3 +135,63 @@ describe('readers pool by condition', () => {
     ]);
   });
 });
+
+describe('pairArms', () => {
+  const { pairArms } = require('../../scripts/lib/eval-pools');
+  const at = (ts, overrides) => row({ timestamp: ts, ...overrides });
+
+  it('pairs pools that match on model, effort, ceiling and budget; plugin dir may differ', () => {
+    const baseline = [at('2026-09-30T10:00:00Z', { pluginDir: false, maxTurns: 10 })];
+    const treatment = [at('2026-09-30T10:00:01Z', { pluginDir: true, maxTurns: 10 })];
+    const paired = pairArms(baseline, treatment);
+    expect(paired.error).toBeUndefined();
+    expect(paired.baseline).toHaveLength(1);
+    expect(paired.treatment).toHaveLength(1);
+    expect(paired.unpaired).toEqual([]);
+  });
+
+  it('falls back to the newest pair both arms have, and reports the mismatch', () => {
+    const common = { trialTimeoutMs: 900000 };
+    const baseline = [
+      at('2026-09-29T10:00:00Z', common),
+      at('2026-09-30T10:00:00Z', { trialTimeoutMs: 1800000 }), // newest baseline, no partner
+    ];
+    const treatment = [at('2026-09-29T10:00:01Z', common)];
+    const paired = pairArms(baseline, treatment);
+    expect(paired.baseline.map((r) => r.trialTimeoutMs)).toEqual([900000]);
+    expect(paired.treatment).toHaveLength(1);
+    expect(paired.unpaired).toEqual([
+      {
+        arm: 'baseline',
+        conditions: expect.objectContaining({ trialTimeoutMs: 1800000 }),
+        rows: 1,
+      },
+    ]);
+  });
+
+  it('makes the benchmark refuse an A/B comparison with no common pair', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'test-pair-bench-'));
+    try {
+      const dir = path.join(root, SCENARIOS_DIR);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, 'ab.md'),
+        '# Eval: ab\n\n## Scope\nskill\n\n## Scenario\nDo it.\n\n## Grader\ncode\n',
+      );
+      appendResult(row({ eval: 'ab-baseline', model: 'opus', runId: 'r1' }), root);
+      appendResult(row({ eval: 'ab-treatment', model: 'sonnet', runId: 'r1' }), root);
+      const { compared } = generateBenchmark(root).evals.ab;
+      expect(compared.verdict).toBeNull();
+      expect(compared.refused).toMatch(/no run conditions in common/);
+      expect(compared.other_pools).toHaveLength(2);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses when the arms share no condition pair, listing every pool', () => {
+    const paired = pairArms([row({ model: 'opus' })], [row({ model: 'sonnet' })]);
+    expect(paired.error).toMatch(/no run conditions in common/);
+    expect(paired.unpaired).toHaveLength(2);
+  });
+});

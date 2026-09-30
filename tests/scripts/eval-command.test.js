@@ -160,6 +160,72 @@ describe('eval command', () => {
     });
   });
 
+  describe('eval compare pairs its arms on common conditions', () => {
+    const put = (condition, trial, overrides) =>
+      evalLib.appendResult(
+        {
+          eval: `paired-${condition}`,
+          trial,
+          k: 5,
+          grader: 'code',
+          model: 'default',
+          effort: 'default',
+          trialTimeoutMs: 900000,
+          maxTurns: null,
+          pluginDir: false,
+          passed: condition === 'treatment',
+          score: condition === 'treatment' ? 1 : 0,
+          timestamp: '2026-09-29T10:00:00.000Z',
+          runId: '20260929-100000',
+          ...overrides,
+        },
+        tempDir,
+      );
+
+    beforeEach(() => {
+      writeScenario(tempDir, 'paired');
+      jest.spyOn(process, 'exit').mockImplementation((code) => {
+        throw new Error(`process.exit(${code})`);
+      });
+    });
+
+    it('uses the older common pair when the newest pools do not match, and says so', async () => {
+      for (let t = 1; t <= 5; t++) {
+        put('baseline', t);
+        put('treatment', t);
+        // A newer baseline-only run under a different ceiling: no treatment partner.
+        put('baseline', t, {
+          trialTimeoutMs: 1800000,
+          timestamp: '2026-09-30T10:00:00.000Z',
+          runId: '20260930-100000',
+        });
+      }
+      await runEvalCommand(args(['compare', 'paired']), { projectRoot: tempDir, asJson: false });
+      const out = logs.join('\n');
+      expect(out).toMatch(/Baseline: {2}5 trials, avg 0\.00/);
+      expect(out).toContain('Verdict:   IMPROVED');
+      expect(out).toContain(
+        'Not combined (baseline): 5 row(s) under model default, effort default, ceiling 1800000 ms',
+      );
+    });
+
+    it('refuses when the arms share no conditions, listing the pools', async () => {
+      const errors = [];
+      jest.spyOn(console, 'error').mockImplementation((...a) => errors.push(a.join(' ')));
+      for (let t = 1; t <= 5; t++) {
+        put('baseline', t, { model: 'opus' });
+        put('treatment', t, { model: 'sonnet' });
+      }
+      await expect(
+        runEvalCommand(args(['compare', 'paired']), { projectRoot: tempDir, asJson: false }),
+      ).rejects.toThrow('process.exit(1)');
+      const message = errors.join('\n');
+      expect(message).toContain('no run conditions in common');
+      expect(message).toContain('Not combined (baseline): 5 row(s) under model opus');
+      expect(message).toContain('Not combined (treatment): 5 row(s) under model sonnet');
+    });
+  });
+
   describe('eval run stops on a repository write', () => {
     it('aborts after the trial that wrote, keeping its row', async () => {
       writeScenario(tempDir, 'run-stop');

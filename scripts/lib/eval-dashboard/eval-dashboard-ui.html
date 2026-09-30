@@ -773,7 +773,7 @@ function buildBenchmarkTable(rows) {
       h('td',null,s.grader),
       h('td',null,statusBadge(s.status)),
       h('td',null,entry ? fmtPct(entry.pass_rate)+' / '+fmtScore(entry.avg_score) : '-'),
-      h('td',null,entry?.compared ? h('span',null,entry.compared.verdict+' · '+(entry.compared.verdict_policy || '-')) : h('span',{className:'mono-muted'},'no A/B')),
+      h('td',null,entry?.compared ? (entry.compared.refused ? h('span',{className:'mono-muted'},'refused: arms share no run conditions') : h('span',null,entry.compared.verdict+' · '+(entry.compared.verdict_policy || '-'))) : h('span',{className:'mono-muted'},'no A/B')),
       h('td',null,entry?.compared ? fmtDelta(entry.compared.delta, (n)=>n.toFixed(2)) : '-'),
       h('td',null,metricDeltaText(duration, (n)=>(n/1000).toFixed(2)+'s')),
       h('td',null,metricDeltaText(output, (n)=>Math.round(n).toLocaleString())),

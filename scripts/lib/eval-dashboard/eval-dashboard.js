@@ -12,6 +12,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const eval_ = require('../eval');
 const stats = require('../eval-stats');
+const { pairArms } = require('../eval-pools');
 const { classifyAssertions } = require('../eval-graders');
 const { sanitizeFilename } = require('../utils');
 
@@ -324,15 +325,16 @@ function handleApiCompare(res, projectRoot, scenarioName, query) {
   const opts = filterOpts(query);
   const scenario = eval_.findScenario(scenarioName, projectRoot);
   if (scenario?.version) opts.version = scenario.version;
-  // Each arm on its newest condition pool (B-8); older pools listed, not combined.
-  const bPools = eval_.loadResultPools(`${scenarioName}-baseline`, projectRoot, opts);
-  const tPools = eval_.loadResultPools(`${scenarioName}-treatment`, projectRoot, opts);
-  const baseline = bPools.current;
-  const treatment = tPools.current;
-  const otherPools = [
-    ...bPools.others.map((p) => ({ arm: 'baseline', ...p })),
-    ...tPools.others.map((p) => ({ arm: 'treatment', ...p })),
-  ];
+  const bRows = eval_.loadResults(`${scenarioName}-baseline`, projectRoot, opts);
+  const tRows = eval_.loadResults(`${scenarioName}-treatment`, projectRoot, opts);
+  // Both arms on the newest pool pair that shares its conditions (B-8).
+  const paired = pairArms(bRows, tRows);
+  const otherPools = paired.unpaired;
+  if (bRows.length > 0 && tRows.length > 0 && paired.error) {
+    return sendJson(res, { error: paired.error, otherPools }, 409);
+  }
+  const baseline = bRows.length > 0 && tRows.length > 0 ? paired.baseline : bRows;
+  const treatment = bRows.length > 0 && tRows.length > 0 ? paired.treatment : tRows;
 
   if (baseline.length === 0 && treatment.length === 0) {
     return sendError(res, 404, 'No A/B results found');
