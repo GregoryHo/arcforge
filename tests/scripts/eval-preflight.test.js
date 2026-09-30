@@ -530,3 +530,43 @@ describe('preflight is keyed on the turn budget and plugin dir the baseline ran 
     expect(checkPreflightGate('test-scenario', tempDir)).toBeNull();
   });
 });
+
+describe('preflight is keyed on the effort the baseline ran at', () => {
+  let tempDir;
+
+  beforeEach(() => {
+    tempDir = makeTempDir();
+    writeScenario(tempDir, 'test-scenario', SCENARIO_CONTENT);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const preflightUnder = (conditions) =>
+    runPreflight('test-scenario', tempDir, {
+      runTrial: () => ({ passed: false, score: 0 }),
+      gradeResult: (r) => r,
+      conditions,
+    });
+  const gate = (conditions) => checkPreflightGate('test-scenario', tempDir, { conditions });
+
+  test('a PASS at one effort unlocks an A/B at that effort (hit)', () => {
+    expect(preflightUnder({ effort: 'high' }).effort).toBe('high');
+    expect(gate({ effort: 'high' })).toBeNull();
+  });
+
+  test('a PASS at one effort does not unlock another effort, or none (miss)', () => {
+    preflightUnder({ effort: 'high' });
+    const other = gate({ effort: 'low' });
+    expect(other).toMatch(/effort low/);
+    expect(other).toMatch(/recorded under: .*effort high/);
+    expect(other).toContain('Run: arcforge eval preflight test-scenario --effort low');
+    expect(gate({})).toMatch(/effort default/);
+  });
+
+  test('a plain PASS does not unlock a run that sets an effort (miss)', () => {
+    preflightUnder({});
+    expect(gate({ effort: 'high' })).toContain('--effort high');
+  });
+});

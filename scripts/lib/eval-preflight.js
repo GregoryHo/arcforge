@@ -63,21 +63,24 @@ function preflightFilename(hash, model, conditions = {}) {
 
 /**
  * The run conditions a baseline's competence depends on beyond scenario and
- * model: its turn budget, and whether a plugin dir was in play (which also sets
- * the permission mode). A PASS measured under one set does not unlock an A/B
- * run under another. Plain conditions (no budget, no plugin dir) add nothing to
- * the file name, so records written before this key existed still match them.
- * @param {{ maxTurns?: number, pluginDir?: string }} conditions
- * @returns {string} '' or e.g. '-t10-pd'
+ * model: its turn budget, whether a plugin dir was in play (which also sets
+ * the permission mode), and the --effort it ran at. A PASS measured under one
+ * set does not unlock an A/B run under another. Plain conditions (no budget,
+ * no plugin dir, no effort) add nothing to the file name, so records written
+ * before this key existed still match them.
+ * @param {{ maxTurns?: number, pluginDir?: string, effort?: string }} conditions
+ * @returns {string} '' or e.g. '-t10-pd', '-ehigh', '-t10-pd-ehigh'
  */
-function conditionsSuffix({ maxTurns, pluginDir } = {}) {
-  if (maxTurns == null && !pluginDir) return '';
-  return `-t${maxTurns ?? 'none'}${pluginDir ? '-pd' : ''}`;
+function conditionsSuffix({ maxTurns, pluginDir, effort } = {}) {
+  const budget =
+    maxTurns == null && !pluginDir ? '' : `-t${maxTurns ?? 'none'}${pluginDir ? '-pd' : ''}`;
+  const effortKey = effort ? `-e${String(effort).replace(/[^A-Za-z0-9._]/g, '_')}` : '';
+  return `${budget}${effortKey}`;
 }
 
 /** Human-readable conditions, as the gate names them. */
-function describeConditions({ maxTurns, pluginDir } = {}) {
-  return `max turns ${maxTurns ?? 'none'}, plugin dir ${pluginDir ? 'yes' : 'no'}`;
+function describeConditions({ maxTurns, pluginDir, effort } = {}) {
+  return `max turns ${maxTurns ?? 'none'}, plugin dir ${pluginDir ? 'yes' : 'no'}, effort ${effort || 'default'}`;
 }
 
 /**
@@ -143,6 +146,7 @@ function runPreflight(name, projectRoot, opts = {}) {
   const ranUnder = {
     max_turns: conditions.maxTurns ?? null,
     plugin_dir: Boolean(conditions.pluginDir),
+    effort: conditions.effort || null,
   };
 
   const results = [];
@@ -291,15 +295,24 @@ function missingPreflightMessage(name, projectRoot, { hash, model, conditions })
     model ? `--model ${model}` : '',
     conditions.maxTurns != null ? `--max-turns ${conditions.maxTurns}` : '',
     conditions.pluginDir ? `--plugin-dir ${conditions.pluginDir}` : '',
+    conditions.effort ? `--effort ${conditions.effort}` : '',
   ].filter(Boolean);
   const prefix = preflightFilename(hash, model).replace(/\.json$/, '');
   const dir = path.join(projectRoot, PREFLIGHT_DIR);
   const recorded = (fs.existsSync(dir) ? fs.readdirSync(dir) : [])
-    .filter((f) => f === `${prefix}.json` || (f.startsWith(`${prefix}-t`) && f.endsWith('.json')))
+    .filter(
+      (f) =>
+        f === `${prefix}.json` ||
+        ((f.startsWith(`${prefix}-t`) || f.startsWith(`${prefix}-e`)) && f.endsWith('.json')),
+    )
     .map((f) => {
       try {
         const r = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
-        return describeConditions({ maxTurns: r.max_turns ?? undefined, pluginDir: r.plugin_dir });
+        return describeConditions({
+          maxTurns: r.max_turns ?? undefined,
+          pluginDir: r.plugin_dir,
+          effort: r.effort,
+        });
       } catch {
         return null; // unreadable record: it cannot say what it ran under
       }
