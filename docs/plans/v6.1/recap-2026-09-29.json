@@ -162,7 +162,8 @@
       "title": "「上個 session 停在哪」的承接沒有實作，spec、guide 與 README 卻都承諾了",
       "why": "spec B-8、hooks-system guide、hooks/README 與 README.md 都說 SessionStart 會帶入上一個 session 的狀態。inject-context 實際只注入 instinct、待處理動作、stale-draft 警告、alias 與 promotion；session-tracker README 自己也寫 session JSON 不會被任何 hook 讀回。依 Docs Are the Contract，要先決定修文件還是補引擎",
       "evidence": "product/specs/hooks.md:127-130；docs/guide/hooks-system.md:15、55-57；hooks/README.md:53；README.md:128；hooks/session-tracker/inject-context.js:354-421；hooks/session-tracker/README.md:152-157",
-      "blockedOn": "維護者決定修文件還是補引擎"
+      "blockedOn": "維護者決定修文件還是補引擎",
+      "issue": 201
     },
     {
       "id": "hooks-2",
@@ -173,7 +174,8 @@
       "title": "secrets-guard 對 `git commit` 只掃指令字串，不掃被 commit 的內容",
       "why": "spec B-4、README 與 guide 都說 commit 前會掃內容，Bash 分支卻只對 command 字串跑 scanForSecrets，不讀 staged 檔案，使用者會以為 commit 前有一道防護。hooks/README.md:76 的措辭與程式一致；程式註解另記一項已接受的 generic pattern 漏洞",
       "evidence": "product/specs/hooks.md:50-56；README.md:130；docs/guide/hooks-system.md:31-36；hooks/secrets-guard/main.js:89-122（:96-99 為已記錄缺口）；hooks/README.md:76",
-      "blockedOn": ""
+      "blockedOn": "",
+      "issue": 199
     },
     {
       "id": "hooks-3",
@@ -250,7 +252,8 @@
       "title": "信心衰減在每次 SessionStart 重複扣除，會無聲封存 instinct（包含已啟用的 curator instinct）",
       "why": "runDecayCycle 每次都用 last_confirmed 到現在的完整週數計算，只寫回 confidence，不更新時間戳，所以同一段時間會被重複扣。以信心 0.50、四週前確認的檔案呼叫，第 5 次就被移進 archived/。封存後不再注入，佇列狀態卻仍是 activated，也沒有 audit，違反 B-4「不得無聲撤銷使用者已接受的東西」。只驗證到函式層級，影響專案範圍目錄；沒有 issue 追蹤",
       "evidence": "scripts/lib/confidence.js:124-132、185-232；hooks/session-tracker/start.js:110-139；scripts/lib/learning-curator/activate.js:146-157；hooks/session-tracker/inject-context.js:120-145；product/specs/learning.md:58-61、108-113",
-      "blockedOn": ""
+      "blockedOn": "",
+      "issue": 192
     },
     {
       "id": "learning-2",
@@ -261,7 +264,8 @@
       "title": "隱私敘述說 diary enrichment 是「唯一對外路徑」，但 curator daemon 也把觀察批次送給模型",
       "why": "spec B-9、D-009 與 learning-dashboard guide 都這樣承諾。observer-daemon.sh 另外用 `claude --model haiku --print` 送出 curator 批次，而且沒有 `--tools` 限制；proposal-ingestor 卻把 manifest 寫死成 tool_access:false。這是隱私承諾不實，使用者據此做的判斷會被誤導",
       "evidence": "product/specs/learning.md:34、125-129；product/ROADMAP.md:232；docs/guide/learning-dashboard.md:306-308；scripts/lib/learning-curator/observer-daemon.sh:211、249-257；scripts/lib/learning-curator/proposal-ingestor.js:315",
-      "blockedOn": "決定要修正隱私敘述，還是收斂 curator 的執行權限並讓 manifest 如實記錄"
+      "blockedOn": "決定要修正隱私敘述，還是收斂 curator 的執行權限並讓 manifest 如實記錄",
+      "issue": 193
     },
     {
       "id": "learning-3",
@@ -272,7 +276,8 @@
       "title": "關閉 learning 後 observer daemon 仍會啟動，分析路徑沒有 opt-in 檢查",
       "why": "checkDaemon 只看 ARCFORGE_OBSERVE_NO_SPAWN，每次 SessionStart 都會啟動 daemon；daemon 只要看到 10 筆以上 observations 就分析。收集端有 opt-in 閘門，所以實際違約（違反 B-1、B-6 與 guide）只發生在「opt-in 後又關閉、殘留未分析 observations」的使用者身上。這是從程式碼推論，沒有實跑，也沒有 issue",
       "evidence": "hooks/session-tracker/start.js:75-91、137；scripts/lib/learning-curator/observer-daemon.sh:105-120、377-407；hooks/observe/main.js:66、121；product/specs/learning.md:28-30；product/specs/hooks.md:62-65；docs/guide/learning-dashboard.md:300",
-      "blockedOn": ""
+      "blockedOn": "",
+      "issue": 194
     },
     {
       "id": "learning-4",
@@ -536,7 +541,8 @@
       "title": "provider 拒絕回應（session limit）被當成真實 trial 計分",
       "why": "只要 textResult 非空就算 trial 完成，所以額度用盡會被讀成行為退化。6.1.0 期間造成一次假的 REGRESSED，第一次 speccing k=10 整池作廢；spec 要求 infraError 不進計分池。沒有 issue",
       "evidence": "scripts/lib/eval-trial-outcome.js:47-50；scripts/lib/eval.js:306-313；product/specs/eval.md:118-124；product/BACKLOG.md:124-129；evals/skill-eval-coverage.md:376-392",
-      "blockedOn": ""
+      "blockedOn": "",
+      "issue": 195
     },
     {
       "id": "eval-3",
@@ -558,7 +564,8 @@
       "title": "model grader、analyzer、blind comparator 的 prompt 以使用者專案根目錄解析，離開 arcforge repo 就變成空字串",
       "why": "路徑用的是 projectRoot，而 loadAgentDef 的 catch 會回空字串；grader 在沒有方法論的情況下照樣評分。loop-verifier.js 用 __dirname 才是正確做法。沒有 issue",
       "evidence": "scripts/lib/eval-grader-model.js:36-38、149-152、321-323；scripts/lib/eval-grader-io.js:28-38；scripts/cli.js:88；scripts/lib/loop-verifier.js:38",
-      "blockedOn": ""
+      "blockedOn": "",
+      "issue": 196
     },
     {
       "id": "eval-5",
@@ -569,7 +576,8 @@
       "title": "eval ab --plugin-dir 在 skill scope 仍會注入 skill 本文，guide 卻寫成二選一",
       "why": "skill scope 下會同時注入本文並載入 plugin，所以沒辦法用 eval ab 做純 plugin 路由的兩臂比較，6.1.0 只好改用單臂 run；spec B-1 與 guide 都說兩者不得混用",
       "evidence": "scripts/cli/eval-command.js:336-364；scripts/lib/eval.js:458-482；product/specs/eval.md:27-34；docs/guide/eval-system.md:93-97；evals/skill-eval-coverage.md:1653-1655",
-      "blockedOn": ""
+      "blockedOn": "",
+      "issue": 197
     },
     {
       "id": "eval-6",
@@ -580,7 +588,8 @@
       "title": "eval run、list、report 與 dashboard 的 verdict 沒有套用 scorableResults",
       "why": "被殺掉的 trial 會把 SHIP 拉成 NEEDS WORK，spec 卻說每個計分池都會剔除 infraError 與 gradeError；A/B 與 benchmark 端有過濾",
       "evidence": "product/specs/eval.md:119-125；scripts/cli/eval-command.js:117、170-177、514-521；scripts/lib/eval-dashboard/eval-dashboard.js:224；scripts/lib/eval-stats.js:120-123、261-283；scripts/lib/eval-benchmark.js:312-317",
-      "blockedOn": ""
+      "blockedOn": "",
+      "issue": 198
     },
     {
       "id": "eval-7",
@@ -800,7 +809,8 @@
       "title": "index.md 全量重建在五個地方被承諾，但沒有任何地方定義做法",
       "why": "ingest、bootstrap 與 preset 都說 audit LINT 會重建 index.md，但 audit.md 沒有程序，lint_vault 也把它排除，spec B-5 說只有 LINK 會寫入。batch ingest 之後 index 會落後，而 query 會先讀它",
       "evidence": "skills/core/maintaining-obsidian/references/mode-ingest.md:40、70；references/bootstrap-workflow.md:84；presets/llm-wiki/AGENTS.md:44、88；references/lint_vault.py:99；SKILL.md:103；product/specs/obsidian.md:55-61",
-      "blockedOn": "維護者決定重建屬於 LINT（要改 spec B-5）還是另立步驟"
+      "blockedOn": "維護者決定重建屬於 LINT（要改 spec B-5）還是另立步驟",
+      "issue": 200
     },
     {
       "id": "obsidian-2",
@@ -910,7 +920,8 @@
       "title": "worktree 路徑以 cwd 推導，而不是 git repo 根目錄",
       "why": "從子目錄執行 add、之後從根目錄執行 remove，會找不到 worktree",
       "evidence": "scripts/cli.js:88；scripts/lib/worktree-generic.js:120-123、249-251；product/specs/worktrees-loop.md:29-34；docs/guide/worktree-workflow.md:83-85",
-      "blockedOn": ""
+      "blockedOn": "",
+      "issue": 202
     },
     {
       "id": "worktrees-loop-2",
