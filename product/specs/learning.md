@@ -119,7 +119,12 @@ was recorded about them.
   activated instinct — it leaves the injected set only through the user's
   deactivation (B-4) — and every archive decay does perform MUST write an
   audit record naming the instinct (D-022).
-- **B-7 One session, one record.** When a diary draft exists, it *is* the
+- **B-11 The way back from the archive is a command.** `learn instinct
+  restore` moves an instinct that decay archived back out of the archive and
+  records the restore in the audit log, naming the instinct and the file it
+  returned to. Hand-editing state stays out of contract (B-5), so this is the
+  only supported route back; like every change to what may be injected, it is
+  audited (D-040). When a diary draft exists, it *is* the
   entry — finalizing renames the draft rather than merging, and writing a
   second diary alongside a draft would orphan one of them. The `/learning`
   skill owns knowing when a session is worth recording at all.
@@ -216,6 +221,6 @@ data contracts live in `docs/decisions/learning-curator-schema/`.
 - **D-038** — *proposed*: manually saved instincts are not activatable, and the
   product says so (B-3, B-4).
 - **D-040** — `learn instinct restore` brings back a decay-archived instinct,
-  audited (B-4, B-5).
+  audited (B-5, B-11).
 - **D-041** — *proposed*: rejections rotate to an archive, never deleted (B-5).
 - **D-042** — *proposed*: reflection counts only enriched diaries (B-8).

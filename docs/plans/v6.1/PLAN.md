@@ -24,7 +24,8 @@
 - **Worker 模型**：只有主 session 用 Fable。`pm`、`qa` 的 frontmatter 是 `model: inherit`，派工時一律帶 `model: "opus"`；機械性查核用 `"sonnet"`。
 - **停用 advisor**：每個 worker prompt 都寫明不得呼叫 advisor 工具（背後是 Fable）。派工後檢查 transcript 的 `model` 欄位。
 - **不代跑 eval**：任何 live trial 都由使用者啟動。計畫只列要跑哪些、幾個 session。
-- **對外動作先確認**：push、開 PR、打 tag、建立或關閉 issue 之前都先問。
+- **對外動作**：push、開 PR、合併、建立或關閉 issue 由主 session 自行執行並回報，使用者已授權。打 tag 與啟動 eval 量測之前先回報：前者送達所有使用者，後者花額度。
+- **合併條件**：CI 全綠、Codex 自動審查完成且意見已處理、`qa` 審查無未處理的發現。三者缺一不合併。
 - **每個 commit 前**：`npm run lint:fix`、`npm test`（5 個 runner）、6 個 static check。
 - **spec 先行**：各工作包先寫 B-item。要實作的行為先進 spec，再寫測試；spec 已經承諾的行為不用重寫。
 - **測試先行**：每個引擎修正先寫會失敗的測試，再修，文件改動放同一個 commit。
@@ -149,7 +150,7 @@
 | WP-K loop | worktrees-loop-2、3、4、5 | 終止狀態不被覆寫；resume 重設 status；提示改指 `looping`；B-6 在沒有 floor 時的行為寫明並加啟動警告 |
 | WP-L obsidian | obsidian-7、8、9、10 | 四支 Python helper 加契約測試；spec B-4 改成有條件；其餘記為 Residual 或 backlog wish |
 | WP-M codex | codex-1、5、6、7、9 | spec 與 README 文字修正；fifteen 與 sixteen 的出入用 `codex debug prompt-input` 確認；`$` mention 實測一次 |
-| WP-N 工具與整理 | skill-system-1、2、4；sdd-2、3、4、8、9；release-1、2、5、6、8 到 13 | 測試註解節號；bucket 清單收斂到 `tests/scripts/skill-tree.js`；`check:product` 的 C3 與章節檢查；doc-refs R2 加驗子命令；`package.json` 的 `files` 收窄；兩支 Claude workflow 的成本寫進 contributor 文件；刪除 v5 殘留檔與兩個已關閉的 remote 分支；官網加 Codex 安裝區塊；#174 行數上限檢查 |
+| WP-N 工具與整理 | skill-system-1、2、4；sdd-2、3、4、8、9；release-1、2、5、6、8 到 13 | 測試註解節號；skill-system-2 只記為 Residual，不拆 `references/`（會動到 `skills/`）；bucket 清單收斂到 `tests/scripts/skill-tree.js`；`check:product` 的 C3 與章節檢查；doc-refs R2 加驗子命令；`package.json` 的 `files` 收窄；兩支 Claude workflow 的成本寫進 contributor 文件；刪除 v5 殘留檔與兩個已關閉的 remote 分支；官網加 Codex 安裝區塊；#174 行數上限檢查 |
 
 關鍵檔案：`scripts/cli/*.js`、`scripts/lib/cli-manifest.js`、`scripts/lib/doc-refs.js`、`scripts/check-product.js`、`scripts/lib/loop-state.js`、`scripts/lib/loop-session.js`、`scripts/lib/diary-capture.js`。
 
