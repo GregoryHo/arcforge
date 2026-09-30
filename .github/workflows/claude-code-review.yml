@@ -2,13 +2,21 @@ name: Claude Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review, reopened]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
+    # A full review per push spends the same usage the eval measurements need,
+    # so review once when the PR opens and once when it leaves draft.
+    types: [opened, ready_for_review]
+    # Only changes to what ships, or to what the benchmark measures.
+    paths:
+      - "scripts/**"
+      - "hooks/**"
+      - "skills/**"
+      - "bin/**"
+      - "tests/**"
+      - "evals/scenarios/**"
+      - "evals/fixtures/**"
+      - ".claude-plugin/**"
+      - ".codex-plugin/**"
+      - ".agents/**"
 
 jobs:
   claude-review:
