@@ -75,6 +75,9 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     pluginDir: rawPluginDir,
     maxTurns: rawMaxTurns,
   } = options;
+  // Resolved before anything else so a bad override is refused ahead of the
+  // fixture Setup and the session (B-10), and recorded on every row it produces.
+  const trialTimeoutMs = resolveTrialTimeoutMs();
   const timestamp = getTimestamp();
 
   const buildInfraError = (error, errorType, extra = {}) => {
@@ -91,6 +94,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
       api_duration_ms: null,
       input_tokens: null,
       output_tokens: null,
+      trialTimeoutMs,
       error,
       errorType,
       infraError: true,
@@ -177,7 +181,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     // instrument fix, not a rubric change (scenario hashes unaffected).
     // P4 history: 300s clipped four of five two-axis treatment trials.
     // ARCFORGE_EVAL_TRIAL_TIMEOUT_MS moves the ceiling for one run.
-    timeout: resolveTrialTimeoutMs(),
+    timeout: trialTimeoutMs,
     maxBuffer: CLAUDE_MAX_BUFFER,
     // Redirect ONLY the arcforge data home (not HOME) to the trial's isolated
     // fixture. getArcforgeHome() honors ARCFORGE_HOME before falling back to
@@ -225,6 +229,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     api_duration_ms,
     input_tokens: usage.input_tokens,
     output_tokens: usage.output_tokens,
+    trialTimeoutMs,
     transcript,
     trialDir,
     ...(actions.length > 0 ? { actions } : {}),

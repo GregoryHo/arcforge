@@ -3193,3 +3193,74 @@ describe('resolveTrialTimeoutMs — per-run ceiling override', () => {
     }
   });
 });
+
+describe('per-trial ceiling on the result row (B-10, #183)', () => {
+  let tempDir;
+  const saved = process.env.ARCFORGE_EVAL_TRIAL_TIMEOUT_MS;
+  const doneStream = [
+    JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'Done' }] } }),
+    JSON.stringify({ type: 'result', result: 'Done' }),
+  ].join('\n');
+  const scenarioWith = (overrides = {}) => ({
+    name: 'ceiling-row',
+    scenario: 'Test.',
+    context: '',
+    assertions: [],
+    grader: 'code',
+    graderConfig: 'true',
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    tempDir = makeTempDir();
+    // Drop return values an earlier suite queued but never consumed.
+    const actual = jest.requireActual('../../scripts/lib/utils');
+    mockUtils.execCommand.mockReset();
+    mockUtils.execCommand.mockImplementation((...args) => actual.execCommand(...args));
+  });
+  afterEach(() => {
+    if (saved === undefined) delete process.env.ARCFORGE_EVAL_TRIAL_TIMEOUT_MS;
+    else process.env.ARCFORGE_EVAL_TRIAL_TIMEOUT_MS = saved;
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('records the default ceiling on a completed trial', () => {
+    delete process.env.ARCFORGE_EVAL_TRIAL_TIMEOUT_MS;
+    mockUtils.execCommand.mockReturnValueOnce({ stdout: doneStream, stderr: '', exitCode: 0 });
+    const result = runTrial(scenarioWith(), 1, 1, { projectRoot: tempDir, isolated: false });
+    expect(result.trialTimeoutMs).toBe(900000);
+    expect(mockUtils.execCommand.mock.calls[0][2].timeout).toBe(900000);
+  });
+
+  it('records an overridden ceiling on an infraError row too', () => {
+    process.env.ARCFORGE_EVAL_TRIAL_TIMEOUT_MS = '1800000';
+    mockUtils.execCommand.mockReturnValueOnce({ stdout: '', stderr: 'boom', exitCode: 1 });
+    const result = runTrial(scenarioWith({ setup: 'exit 1' }), 1, 1, {
+      projectRoot: tempDir,
+      isolated: false,
+    });
+    expect(result.errorType).toBe('setup_failed');
+    expect(result.trialTimeoutMs).toBe(1800000);
+  });
+
+  it('refuses an invalid ceiling before the fixture Setup runs', () => {
+    process.env.ARCFORGE_EVAL_TRIAL_TIMEOUT_MS = '30m';
+    const scenario = scenarioWith({ setup: 'touch "$PROJECT_ROOT/setup-ran"' });
+    expect(() => runTrial(scenario, 1, 1, { projectRoot: tempDir, isolated: false })).toThrow(
+      /ARCFORGE_EVAL_TRIAL_TIMEOUT_MS/,
+    );
+    expect(fs.existsSync(path.join(tempDir, 'setup-ran'))).toBe(false);
+    expect(mockUtils.execCommand).not.toHaveBeenCalled();
+  });
+
+  it('refuses an invalid ceiling before an A/B run spawns anything', () => {
+    process.env.ARCFORGE_EVAL_TRIAL_TIMEOUT_MS = '0';
+    expect(() => runSkillEval(scenarioWith(), 1, { projectRoot: tempDir })).toThrow(
+      /ARCFORGE_EVAL_TRIAL_TIMEOUT_MS/,
+    );
+    expect(() => runWorkflowEval(scenarioWith(), 1, { projectRoot: tempDir })).toThrow(
+      /ARCFORGE_EVAL_TRIAL_TIMEOUT_MS/,
+    );
+    expect(mockUtils.execCommand).not.toHaveBeenCalled();
+  });
+});

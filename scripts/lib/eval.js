@@ -69,6 +69,7 @@ const {
  * @property {number|null} api_duration_ms - Duration the CLI reported in its stream-json result event (null if the trial produced no result event)
  * @property {number|null} input_tokens - Input tokens used by the trial agent (null if unavailable)
  * @property {number|null} output_tokens - Output tokens used by the trial agent (null if unavailable)
+ * @property {number} [trialTimeoutMs] - Per-trial ceiling (ms) the trial ran under; absent on rows written before 6.1.1
  * @property {string} [transcript] - Path to transcript file
  * @property {string} [trialDir] - Isolated temp directory used for this trial
  * @property {string} [error] - Error message if failed
@@ -197,6 +198,7 @@ function runSkillEval(scenario, k, options = {}) {
     pluginDir,
     maxTurns,
   } = options;
+  resolveTrialTimeoutMs(); // refuse a bad ceiling before any trial spawns (B-10)
   const isolationSettings = buildIsolationSettings();
 
   const treatmentScenario = {
@@ -250,6 +252,7 @@ function runWorkflowEval(scenario, k, options = {}) {
     pluginDir,
     maxTurns,
   } = options;
+  resolveTrialTimeoutMs(); // refuse a bad ceiling before any trial spawns (B-10)
   const isolationSettings = buildIsolationSettings();
   const resolvedPluginDir = pluginDir || scenario.pluginDir;
   // Cache semi-isolation settings once (avoids spawning `claude plugin list` per trial)

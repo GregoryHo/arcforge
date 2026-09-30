@@ -88,7 +88,11 @@ Runs both arms and stores every trial. Useful flags:
 Each trial's `claude -p` session is capped at 900 s; a trial killed at the cap is
 an infra error and never scores. Set `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=<milliseconds>`
 to move that ceiling for one run — for a treatment whose pipeline builds or
-renders and runs past the cap on a loaded machine.
+renders and runs past the cap on a loaded machine. Anything that is not a
+positive integer is refused before the run starts, ahead of any fixture
+`## Setup`. Every result row records the ceiling its trial ran under as
+`trialTimeoutMs`, so a pool that mixes ceilings can be told apart; report the
+value whenever a run moved it.
 
 `--skill-file` injects a skill body into the treatment prompt — that measures a
 **skill**. `--plugin-dir` loads a real plugin instead — that measures a

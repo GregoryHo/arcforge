@@ -121,6 +121,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     }
   } else if (subcommand === 'run') {
     const scenario = requireScenario(args.positional[1], 'run');
+    eval_.resolveTrialTimeoutMs(); // refuse a bad ceiling before any Setup or session (B-10)
     const k = parseK(scenario, false);
     const isolated = !args.flags['no-isolate'];
     const pluginDir = args.options['plugin-dir'];
@@ -192,6 +193,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
       process.exit(1);
     }
 
+    eval_.resolveTrialTimeoutMs(); // refuse a bad ceiling before any Setup or session (B-10)
     console.log(`Running preflight for "${scenarioName}"...`);
     const runId = generateRunId();
 
@@ -287,6 +289,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     }
   } else if (subcommand === 'ab') {
     const scenario = requireScenario(args.positional[1], 'ab');
+    eval_.resolveTrialTimeoutMs(); // refuse a bad ceiling before any Setup or session (B-10)
     const model = args.options.model;
     const effort = args.options.effort;
 
