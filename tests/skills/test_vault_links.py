@@ -168,6 +168,24 @@ def test_links_in_yaml_comments_are_not_edges_but_links_in_values_are(vault):
     assert links["notes"]["Wiki/alpha-note.md"]["inbound"] == 2
 
 
+def test_quoted_link_values_honour_yaml_escapes(vault):
+    # #187: a doubled quote inside single quotes and a backslash-escaped quote
+    # inside double quotes are part of the target, not where it ends.
+    (vault / "Wiki" / "O'Brien.md").write_text("---\ntype: entity\n---\nperson\n", encoding="utf-8")
+    (vault / "Wiki" / 'The "Quoted" Note.md').write_text("---\ntype: entity\n---\nnote\n", encoding="utf-8")
+    (vault / "Wiki" / "gamma-orphan.md").write_text(
+        GAMMA.replace(
+            "extra_field: yes\n",
+            "extra_field: yes\nrelated: ['[[O''Brien]]', \"[[The \\\"Quoted\\\" Note]]\"]\nsee_also: '[[O''Brien]]'\n",
+        ),
+        encoding="utf-8",
+    )
+    links = _run(vault)["links"]
+    assert links["notes"]["Wiki/O'Brien.md"]["inbound"] == 1
+    assert links["notes"]['Wiki/The "Quoted" Note.md']["inbound"] == 1
+    assert links["notes"]["Wiki/gamma-orphan.md"]["outbound"] == 2
+
+
 def test_links_inside_obsidian_and_html_comments_are_not_edges(vault):
     (vault / "Wiki" / "gamma-orphan.md").write_text(
         GAMMA + "\n%% draft: [[alpha-note]] %%\n\n<!-- todo: [[alpha-note-draft]]\nlater -->\n%%\nmulti-line [[alpha-note]]\n%%\n",

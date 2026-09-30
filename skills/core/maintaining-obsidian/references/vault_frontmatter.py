@@ -1,8 +1,9 @@
 """Frontmatter, fence, and code-span parsing for lint_vault.py.
 
 Reads a note as UTF-8 with line endings normalized, splits its frontmatter from
-its body, and parses the frontmatter as a block: inline values, inline lists,
-block lists (indented or at column 0), and one-level nested mappings. Also
+its body, and parses the frontmatter as a block: inline values (quoted ones with
+their YAML escapes), inline lists, block lists (indented or at column 0), and
+one-level nested mappings. Also
 extracts the top-level ```yaml fences of a SCHEMA.md, and masks fenced code
 blocks, inline code, and Obsidian / HTML comments so a literal `[[link]]` shown
 as an example or hidden in a comment is not a link. Stdlib only; imported by
@@ -15,6 +16,17 @@ import re
 from pathlib import Path
 
 KEY_RE = re.compile(r"^([A-Za-z0-9_-]+):(.*)$")
+# Quoted YAML scalars: `''` is the only escape inside single quotes; inside
+# double quotes a backslash escapes the next character.
+SINGLE_QUOTED_RE = re.compile(r"'((?:[^']|'')*)'?")
+DOUBLE_QUOTED_RE = re.compile(r'"((?:[^"\\]|\\.)*)"?', re.DOTALL)
+FLOW_ITEM_RE = re.compile(r"\"(?:[^\"\\]|\\.)*\"|'(?:[^']|'')*'|[^,]+")
+DOUBLE_ESCAPE_RE = re.compile(r"\\(x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}|.)", re.DOTALL)
+DOUBLE_ESCAPES = {
+    "0": "\0", "a": "\a", "b": "\b", "t": "\t", "\t": "\t", "n": "\n", "v": "\v",
+    "f": "\f", "r": "\r", "e": "\x1b", " ": " ", '"': '"', "/": "/", "\\": "\\",
+    "N": "\x85", "_": "\xa0", "L": " ", "P": " ",
+}
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*\S)")
 # A fence delimiter may be indented by at most three spaces (CommonMark); four
 # is an indented code block whose backticks are literal text. A fence inside a
@@ -52,17 +64,35 @@ def split_frontmatter(text: str) -> tuple[str | None, str]:
     return text[4:end], text[end + 5 :]
 
 
+def _unescape_double(match: re.Match) -> str:
+    code = match.group(1)
+    if code[0] in "xuU":
+        return chr(int(code[1:], 16))
+    return DOUBLE_ESCAPES.get(code, match.group(0))
+
+
+def _quoted(value: str) -> str:
+    """The text of a quoted YAML scalar, escapes honoured: `''` inside single
+    quotes is one quote; inside double quotes a backslash escapes (`\\"`, `\\\\`,
+    `\\n`, `\\t`, `\\xNN`, `\\uNNNN`, ...). An unclosed quote runs to the end."""
+    match = (SINGLE_QUOTED_RE if value[0] == "'" else DOUBLE_QUOTED_RE).match(value)
+    body = match.group(1)
+    if value[0] == "'":
+        return body.replace("''", "'")
+    return DOUBLE_ESCAPE_RE.sub(_unescape_double, body)
+
+
 def _scalar(raw: str):
     """Parse one inline YAML value: quoted string, inline list, empty, or bare."""
     value = raw.strip()
     if value[:1] in ("'", '"'):
-        close = value.find(value[0], 1)
-        return value[1:close] if close != -1 else value[1:]
+        return _quoted(value)
     value = re.split(r"\s+#", value, maxsplit=1)[0].strip()
     if value.startswith("[") and value.endswith("]"):
-        # Flow list: a quoted item keeps its commas (`["[[Smith, John]]", b]`).
+        # Flow list: a quoted item keeps its commas (`["[[Smith, John]]", b]`)
+        # and its escaped quotes (`['O''Brien', "a \"b\""]`).
         inner = value[1:-1].strip()
-        items = re.findall(r"\"[^\"]*\"|'[^']*'|[^,]+", inner)
+        items = FLOW_ITEM_RE.findall(inner)
         return [_scalar(item) for item in items if item.strip()] if inner else []
     if value in ("", "null", "~"):
         return ""

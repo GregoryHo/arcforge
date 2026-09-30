@@ -120,6 +120,20 @@ def test_fences_in_list_items_and_comments_declare_nothing(vault):
     assert report["schema"]["declared_types"] == ["entity", "source"]
 
 
+def test_quoted_list_items_honour_yaml_escapes(vault):
+    # #187: `''` inside single quotes; `\"`, `\\` and `\n` inside double quotes.
+    (vault / "Wiki" / "gamma-orphan.md").write_text(
+        GAMMA.replace(
+            "tags: [entity, entity/tool, tdd]",
+            "tags: ['it''s', \"say \\\"hi\\\"\", \"back\\\\slash\", \"two\\nlines\"]",
+        ),
+        encoding="utf-8",
+    )
+    tags = _run(vault)["tags"]
+    assert {"it's", 'say "hi"', "back\\slash", "two\nlines"} <= set(tags)
+    assert not {"it", "s", "say \\", "back\\\\slash", "two\\nlines"} & set(tags)
+
+
 def test_log_path_tokens_are_not_satisfied_by_a_basename_elsewhere(vault):
     # `Wiki/deleted-note.md` stays missing when only `Archive/deleted-note.md`
     # exists; a bare basename in the log still matches any file of that name.
