@@ -305,7 +305,10 @@ as `{"error": "..."}` and a non-zero exit.
 arcforge learn disable --project
 ```
 
-That stops new observations and analysis for the scope. Instincts you already
+That stops new observations and analysis for the scope. The background analysis
+checks the opt-in before each run, so observations recorded before you turned
+learning off stay where they are and are never sent for analysis; with learning
+off everywhere, the background process is not even started. Instincts you already
 activated stay active — disabling learning stops it accumulating more, it does
 not undo what you accepted. To retire an individual instinct, deactivate it from
 the dashboard.
@@ -333,10 +336,11 @@ can touch nothing on your machine. Each run leaves a manifest under
 `learning/curator-runs/`, and its `tool_access` field records the access that
 run actually had, read from the command it was started with.
 
-Turn learning off and the enrichment stops: diary drafts are still written from
-your session record — the counts and the files you touched — but their
-`TO BE ENRICHED` sections stay unfilled, which is what an un-enriched draft is
-supposed to look like. The same opt-in decides whether your recent message text
+Turn learning off and both stop. The curator's analysis sends nothing — not
+even observations left over from when learning was on. Diary drafts are still
+written from your session record — the counts and the files you touched — but
+their `TO BE ENRICHED` sections stay unfilled, which is what an un-enriched
+draft is supposed to look like. The same opt-in decides whether your recent message text
 is stored in the session record at all.
 
 Almost everything sits under `~/.arcforge/`: diaries in

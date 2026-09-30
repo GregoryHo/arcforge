@@ -4,7 +4,7 @@
  *
  * Runs ASYNCHRONOUSLY on SessionStart to:
  * 1. Initialize new session file
- * 2. Check/start observer daemon
+ * 2. Start the observer daemon when learning is enabled
  * 3. Run decay cycles on instincts
  *
  * Context injection to Claude lives in inject-context.js (sync); this file
@@ -36,6 +36,9 @@ const {
 const { getInstinctsDir, migrateInstinctsToNameKey } = require('../../scripts/lib/session-utils');
 
 const { runDecayCycle } = require('../../scripts/lib/confidence');
+const { isLearningEnabledAnyScope, recordProjectRoot } = require('../../scripts/lib/learning');
+
+const DAEMON_PATH = path.join(__dirname, '../../scripts/lib/learning-curator/observer-daemon.sh');
 
 /**
  * Initialize new session file
@@ -68,25 +71,33 @@ function initializeSession() {
 // ─────────────────────────────────────────────
 
 /**
- * Check if observer daemon is running, start if not.
- * The daemon uses mkdir-based locking for singleton enforcement,
- * so we can call 'start' unconditionally — it's a no-op if already running.
+ * Start the observer daemon when learning is enabled here (learning B-1).
+ *
+ * The daemon sends observation batches to a model, so it starts only when
+ * learning is enabled in some scope for the project this session is in, and
+ * that project's root is put on record so the machine-wide daemon can check
+ * the project-scope opt-in before it analyzes anything filed under its name.
+ * The daemon uses mkdir-based locking for singleton enforcement, so 'start' is
+ * a no-op if it is already running.
+ *
+ * @param {{ daemonPath?: string }} [options] - daemonPath overrides the script (tests)
+ * @returns {'no-spawn-env'|'learning-disabled'|'missing'|'started'|'error'}
  */
-function checkDaemon() {
+function checkDaemon({ daemonPath = DAEMON_PATH } = {}) {
   try {
     // Parity with observe/main.js: both spawn the same observer daemon, so
     // both must honor ARCFORGE_OBSERVE_NO_SPAWN. Without this, setting the
     // env still spawned a daemon here on every SessionStart.
-    if (process.env.ARCFORGE_OBSERVE_NO_SPAWN === '1') return;
-    const daemonPath = path.join(
-      __dirname,
-      '../../scripts/lib/learning-curator/observer-daemon.sh',
-    );
-    if (fs.existsSync(daemonPath)) {
-      execFileSync('bash', [daemonPath, 'start'], { stdio: 'ignore', timeout: 5000 });
-    }
+    if (process.env.ARCFORGE_OBSERVE_NO_SPAWN === '1') return 'no-spawn-env';
+    const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+    if (!isLearningEnabledAnyScope({ projectRoot })) return 'learning-disabled';
+    recordProjectRoot({ projectRoot });
+    if (!fs.existsSync(daemonPath)) return 'missing';
+    execFileSync('bash', [daemonPath, 'start'], { stdio: 'ignore', timeout: 5000 });
+    return 'started';
   } catch {
     // Non-blocking — daemon start is best-effort
+    return 'error';
   }
 }
 

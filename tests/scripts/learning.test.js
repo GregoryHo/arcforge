@@ -10,8 +10,10 @@ const {
   isLearningEnabled,
   isLearningEnabledAnyScope,
   isInjectActivatedInstinctsEnabled,
+  isLearningEnabledForProject,
   learningEnabledSince,
   readLearningConfig,
+  recordProjectRoot,
   setLearningEnabled,
 } = require('../../scripts/lib/learning');
 
@@ -85,6 +87,50 @@ describe('the learning opt-in', () => {
 
   // The stale-draft healthcheck needs "since when", not just "is it on":
   // drafts from a learning-off period are by-design stubs (D-009).
+  // B-1 / D-023: the machine-wide observer daemon knows a project only by the
+  // name its observations are filed under, so it asks this before analyzing.
+  describe('isLearningEnabledForProject', () => {
+    const project = () => path.basename(projectRoot);
+
+    it('is false with learning off everywhere, even with the project root on record', () => {
+      recordProjectRoot({ projectRoot, homeDir });
+      expect(isLearningEnabledForProject(project(), { homeDir })).toBe(false);
+    });
+
+    it('follows the project opt-in through the recorded root, including a later opt-out', () => {
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      recordProjectRoot({ projectRoot, homeDir });
+      expect(isLearningEnabledForProject(project(), { homeDir })).toBe(true);
+
+      setLearningEnabled({ scope: 'project', enabled: false, projectRoot, homeDir });
+      expect(isLearningEnabledForProject(project(), { homeDir })).toBe(false);
+    });
+
+    it('is true under the global opt-in whether or not a root is on record', () => {
+      setLearningEnabled({ scope: 'global', enabled: true, projectRoot, homeDir });
+      expect(isLearningEnabledForProject('never-seen', { homeDir })).toBe(true);
+    });
+
+    it('fails closed on a project-scope opt-in whose root was never recorded', () => {
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+      expect(isLearningEnabledForProject(project(), { homeDir })).toBe(false);
+    });
+
+    it('records the root under the name observations are filed under', () => {
+      const oddRoot = path.join(testDir, 'my project!');
+      fs.mkdirSync(oddRoot);
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot: oddRoot, homeDir });
+      const recorded = recordProjectRoot({ projectRoot: oddRoot, homeDir });
+      expect(recorded.project).toBe('my-project');
+      expect(isLearningEnabledForProject('my-project', { homeDir })).toBe(true);
+    });
+
+    it('rejects a project name that is not a plain directory name', () => {
+      expect(() => isLearningEnabledForProject('../escape', { homeDir })).toThrow(/project/);
+      expect(() => isLearningEnabledForProject('', { homeDir })).toThrow(/project/);
+    });
+  });
+
   describe('learningEnabledSince', () => {
     const EARLY = '2026-01-01T00:00:00.000Z';
     const LATE = '2026-06-01T00:00:00.000Z';

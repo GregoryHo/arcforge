@@ -13,6 +13,11 @@
  *     run manifest's tool_access is derived from it.
  *     Prints a single JSON line to stdout.
  *
+ *   learning-enabled --project <project>
+ *     Whether learning is enabled for the project whose observations are filed
+ *     under <project> (learning B-1). Prints JSON; exits 0 when enabled, 3 when
+ *     not, 1 on error. The observer daemon asks this before analyzing.
+ *
  *   help
  *     Print usage.
  *
@@ -23,6 +28,7 @@
 
 const { assembleBatch } = require('./batch-assembler');
 const { ingestProposal, recordRunFailure } = require('./proposal-ingestor');
+const { isLearningEnabledForProject } = require('../learning');
 
 // Spec layer-4 §parse_status enum for daemon-side failures.
 // CLI-binary-missing maps to transport_error with detail carrying the reason.
@@ -160,6 +166,26 @@ function cmdRecordRunFailure(argv) {
   );
 }
 
+function cmdLearningEnabled(argv) {
+  const args = parseArgs(argv);
+  const project = args.project;
+  if (!project || typeof project !== 'string') {
+    console.error('Error: --project <project> is required for learning-enabled');
+    process.exit(1);
+  }
+
+  let enabled;
+  try {
+    enabled = isLearningEnabledForProject(project);
+  } catch (err) {
+    console.error(`Error: learning-enabled failed: ${err.message}`);
+    process.exit(1);
+  }
+
+  console.log(JSON.stringify({ project, enabled }));
+  process.exit(enabled ? 0 : 3);
+}
+
 function cmdHelp() {
   console.log(
     [
@@ -178,6 +204,9 @@ function cmdHelp() {
       '  record-run-failure --batch-id <batch_id> --parse-status <transport_error|timeout> [--detail <msg>]',
       '    Layer 4: write a CuratorRunManifest for a daemon transport failure.',
       '    Prints JSON: { run_id, parse_status, accepted, rejected }',
+      '',
+      '  learning-enabled --project <project>',
+      '    Whether learning is enabled for <project>. Exits 0 enabled, 3 not, 1 on error.',
       '',
       '  help',
       '    Print this message.',
@@ -201,6 +230,9 @@ switch (subcommand) {
     break;
   case 'record-run-failure':
     cmdRecordRunFailure(remainingArgs);
+    break;
+  case 'learning-enabled':
+    cmdLearningEnabled(remainingArgs);
     break;
   case 'help':
   case '--help':

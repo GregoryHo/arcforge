@@ -118,6 +118,22 @@ analyze_project() {
     return
   fi
 
+  # Consent gate (learning B-1): analysis sends observations to a model, so it
+  # runs only where learning is enabled for this project. The engine answers —
+  # global opt-in, or the project-scope opt-in at the root SessionStart put on
+  # record — and anything other than a clear yes, errors included, skips.
+  # Observations left behind by an earlier opt-in stay unanalyzed.
+  if ! command -v node &>/dev/null; then
+    log_msg "WARNING: node not found, skipping analysis"
+    return
+  fi
+  local enabled_status=0
+  node "$CURATOR_CLI" learning-enabled --project "$project" > /dev/null 2>&1 || enabled_status=$?
+  if [ "$enabled_status" -ne 0 ]; then
+    log_msg "Skipping ${project}: learning is not enabled for it (learning-enabled exit ${enabled_status})"
+    return
+  fi
+
   # Circuit breaker — skip after 3 consecutive failures (TTL: 30 min)
   local fail_count_file="${OBS_DIR}/${project}/.fail_count"
   if [ -f "$fail_count_file" ]; then
@@ -136,11 +152,6 @@ analyze_project() {
 
   log_msg "Analyzing ${project}: ${obs_count} observations"
 
-  # Verify Node CLI is available
-  if ! command -v node &>/dev/null; then
-    log_msg "WARNING: node not found, skipping analysis"
-    return
-  fi
   if [ ! -f "$CURATOR_CLI" ]; then
     log_msg "ERROR: curator CLI not found at ${CURATOR_CLI}"
     return

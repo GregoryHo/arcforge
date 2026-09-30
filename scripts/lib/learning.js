@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { readJsonFile, writeJsonFile, getArcforgeHome } = require('./utils');
+const { readJsonFile, writeJsonFile, getArcforgeHome, sanitizeProjectName } = require('./utils');
 
 /**
  * learning.js — the learning opt-in and the paths that follow from it.
@@ -92,6 +92,52 @@ function isLearningEnabledAnyScope({ projectRoot = process.cwd(), homeDir } = {}
     isLearningEnabled({ scope: 'project', projectRoot, homeDir }) ||
     isLearningEnabled({ scope: 'global', projectRoot, homeDir })
   );
+}
+
+/**
+ * Where the root of the project whose observations are filed under `project`
+ * is on record. The observer daemon is machine-wide and knows a project only by
+ * that name, while the project-scope opt-in lives in the project's own tree.
+ */
+function getProjectRootRecordPath(project, { homeDir } = {}) {
+  if (typeof project !== 'string' || !project || sanitizeProjectName(project) !== project) {
+    throw new Error(`project must be a sanitized project directory name (got "${project}")`);
+  }
+  return path.join(arcforgeRoot(homeDir), 'learning', 'project-roots', `${project}.json`);
+}
+
+/**
+ * Put a project's root on record under the name its observations are filed
+ * under (the `getProjectName()` key), so `isLearningEnabledForProject` can find
+ * the project-scope opt-in. SessionStart records it while learning is on there.
+ *
+ * @returns {{ project: string, project_root: string }}
+ */
+function recordProjectRoot({ projectRoot = process.cwd(), homeDir } = {}) {
+  const resolved = path.resolve(projectRoot);
+  const record = { project: sanitizeProjectName(path.basename(resolved)), project_root: resolved };
+  writeJsonFile(getProjectRootRecordPath(record.project, { homeDir }), record);
+  return record;
+}
+
+/**
+ * True when learning is enabled for the project whose observations are filed
+ * under `project` — the question the observer daemon asks before analyzing
+ * (B-1). The global opt-in answers it for every project; otherwise it is
+ * `isLearningEnabledAnyScope` at the recorded root. No record means no known
+ * project-scope opt-in, so the answer fails closed.
+ *
+ * @param {string} project - sanitized project directory name
+ * @param {Object} [opts]
+ * @param {string} [opts.homeDir] - Override for the arcforge home's parent.
+ * @returns {boolean}
+ */
+function isLearningEnabledForProject(project, { homeDir } = {}) {
+  const recordPath = getProjectRootRecordPath(project, { homeDir });
+  if (isLearningEnabled({ scope: 'global', homeDir })) return true;
+  const record = readJsonFile(recordPath, null);
+  if (!record || typeof record.project_root !== 'string') return false;
+  return isLearningEnabledAnyScope({ projectRoot: record.project_root, homeDir });
 }
 
 /**
@@ -217,7 +263,9 @@ module.exports = {
   isInjectActivatedInstinctsEnabled,
   isLearningEnabled,
   isLearningEnabledAnyScope,
+  isLearningEnabledForProject,
   learningEnabledSince,
   readLearningConfig,
+  recordProjectRoot,
   setLearningEnabled,
 };

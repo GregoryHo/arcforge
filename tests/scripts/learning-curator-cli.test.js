@@ -240,3 +240,52 @@ describe('CLI record-run-failure', () => {
     expect(result.status).not.toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// learning B-1: learning-enabled — the observer daemon's consent gate
+// ---------------------------------------------------------------------------
+
+describe('CLI learning-enabled', () => {
+  const { spawnSync } = require('node:child_process');
+
+  function learningEnabled(project) {
+    const env = { ...process.env, HOME: tmpDir };
+    delete env.ARCFORGE_HOME;
+    return spawnSync('node', [CLI_PATH, 'learning-enabled', '--project', project], {
+      env,
+      encoding: 'utf8',
+    });
+  }
+
+  function writeJson(filePath, value) {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify(value));
+  }
+
+  test('exits 3 with learning off everywhere', () => {
+    const result = learningEnabled('demo');
+    expect(result.status).toBe(3);
+    expect(JSON.parse(result.stdout)).toEqual({ project: 'demo', enabled: false });
+  });
+
+  test('exits 0 under the project opt-in at the recorded root', () => {
+    const root = path.join(tmpDir, 'demo');
+    writeJson(path.join(root, '.arcforge', 'learning', 'config.json'), {
+      scope: 'project',
+      enabled: true,
+    });
+    writeJson(path.join(tmpDir, '.arcforge', 'learning', 'project-roots', 'demo.json'), {
+      project: 'demo',
+      project_root: root,
+    });
+    const result = learningEnabled('demo');
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout).enabled).toBe(true);
+  });
+
+  test('exits 1 on a project name that is not a plain directory name', () => {
+    const result = learningEnabled('../escape');
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/project/);
+  });
+});

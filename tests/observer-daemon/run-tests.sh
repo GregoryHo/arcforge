@@ -65,6 +65,14 @@ assert_not_match() {
   fi
 }
 
+# The daemon analyzes a project only where learning is enabled (learning B-1),
+# so every test that expects analysis opts in globally inside its temp home.
+enable_global_learning() {
+  local home="$1"
+  mkdir -p "${home}/.arcforge/learning"
+  printf '{"scope":"global","enabled":true}\n' > "${home}/.arcforge/learning/config.json"
+}
+
 # ─────────────────────────────────────────────
 # C5: --max-turns value is 15
 # ─────────────────────────────────────────────
@@ -166,6 +174,7 @@ trap 'rm -rf "$TMPDIR_C3" "$TMPDIR_C4"' EXIT
 TEST_HOME_C4="${TMPDIR_C4}/home"
 STUB_BIN="${TMPDIR_C4}/bin"
 mkdir -p "$TEST_HOME_C4" "$STUB_BIN"
+enable_global_learning "$TEST_HOME_C4"
 
 # Stub 'claude' that sleeps 10 seconds (longer than 3s test watchdog)
 cat > "${STUB_BIN}/claude" << 'STUB_EOF'
@@ -251,6 +260,7 @@ trap 'rm -rf "$TMPDIR_PRF"' EXIT
 TEST_HOME_PRF="${TMPDIR_PRF}/home"
 STUB_BIN_PRF="${TMPDIR_PRF}/bin"
 mkdir -p "$TEST_HOME_PRF" "$STUB_BIN_PRF"
+enable_global_learning "$TEST_HOME_PRF"
 
 # Stub 'claude' that exits 1 immediately (transport_error)
 cat > "${STUB_BIN_PRF}/claude" << 'STUB_EOF'
@@ -370,6 +380,7 @@ trap 'rm -rf "$TMPDIR_G3"' EXIT
 TEST_HOME_G3="${TMPDIR_G3}/home"
 STUB_BIN_G3="${TMPDIR_G3}/bin"
 mkdir -p "$TEST_HOME_G3" "$STUB_BIN_G3"
+enable_global_learning "$TEST_HOME_G3"
 
 # Seed 15 observations so the MIN_OBSERVATIONS gate passes
 G3_PROJECT="e2-test-proj"
@@ -569,6 +580,92 @@ assert_eq \
   'B9-T1: run manifest records tool_access false, derived from the argv' \
   'false' \
   "$G3_TOOL_ACCESS"
+
+# ─────────────────────────────────────────────
+# B1-T1: a project learning is not enabled for is never analyzed
+# learning B-1 / D-023: observations left behind by an earlier opt-in must not
+# reach the model. The stub claude leaves a marker if it is ever invoked.
+# B1-T2 is the positive control: the same setup under a project-scope opt-in,
+# found through the project root SessionStart records, does reach the model.
+# ─────────────────────────────────────────────
+
+echo ""
+echo "=== B1-T1: Disabled project is skipped ==="
+
+TMPDIR_B1=$(mktemp -d)
+trap 'rm -rf "$TMPDIR_G3" "$TMPDIR_B1"' EXIT
+STUB_BIN_B1="${TMPDIR_B1}/bin"
+mkdir -p "$STUB_BIN_B1"
+cat > "${STUB_BIN_B1}/claude" << STUB_EOF
+#!/usr/bin/env bash
+cat > /dev/null
+touch "\${CLAUDE_MARKER}"
+exit 1
+STUB_EOF
+chmod +x "${STUB_BIN_B1}/claude"
+
+seed_b1_home() {
+  local home="$1"
+  local obs_dir="${home}/.arcforge/observations/b1-proj"
+  mkdir -p "$obs_dir"
+  for i in $(seq 1 15); do
+    printf '{"ts":"2026-05-22T01:%02d:00.000Z","event":"tool_start","tool":"Read","session":"s1","project":"b1-proj","project_id":"proj_abc123456789ab","evidence_status":"present","input_summary":"file %d"}\n' \
+      "$i" "$i" >> "${obs_dir}/observations.jsonl"
+  done
+}
+
+run_b1_analysis() {
+  local home="$1"
+  (
+    HOME="$home"
+    PATH="${STUB_BIN_B1}:${PATH}"
+    CLAUDE_MARKER="${home}/claude-was-called"
+    export CLAUDE_MARKER
+    OBSERVER_DAEMON_WATCHDOG_SECS=10
+    set +e
+    # shellcheck source=/dev/null
+    source "$DAEMON_SCRIPT" 2>/dev/null
+    mkdir -p "$INSTINCTS_DIR"
+    analyze_project 'b1-proj' 2>/dev/null || true
+    cat "$LOG_FILE" 2>/dev/null || true
+  ) 2>/dev/null
+}
+
+B1_OFF_HOME="${TMPDIR_B1}/off"
+seed_b1_home "$B1_OFF_HOME"
+# An earlier opt-in that was since turned off: the project root is on record,
+# its project-scope config now says disabled.
+mkdir -p "${B1_OFF_HOME}/b1-proj/.arcforge/learning" "${B1_OFF_HOME}/.arcforge/learning/project-roots"
+printf '{"scope":"project","enabled":false}\n' > "${B1_OFF_HOME}/b1-proj/.arcforge/learning/config.json"
+printf '{"project":"b1-proj","project_root":"%s"}\n' "${B1_OFF_HOME}/b1-proj" \
+  > "${B1_OFF_HOME}/.arcforge/learning/project-roots/b1-proj.json"
+B1_OFF_LOG=$(run_b1_analysis "$B1_OFF_HOME")
+
+assert_match \
+  'B1-T1: logs that learning is not enabled for the project' \
+  'Skipping b1-proj: learning is not enabled' \
+  "$B1_OFF_LOG"
+assert_eq \
+  'B1-T1: claude is never invoked for a disabled project' \
+  'no' \
+  "$([ -f "${B1_OFF_HOME}/claude-was-called" ] && echo yes || echo no)"
+assert_eq \
+  'B1-T1: no curator batch is assembled for a disabled project' \
+  '0' \
+  "$(find "${B1_OFF_HOME}/.arcforge/learning/curator-batches" -name '*.manifest.json' 2>/dev/null | wc -l | tr -d ' ')"
+
+B1_ON_HOME="${TMPDIR_B1}/on"
+seed_b1_home "$B1_ON_HOME"
+mkdir -p "${B1_ON_HOME}/b1-proj/.arcforge/learning" "${B1_ON_HOME}/.arcforge/learning/project-roots"
+printf '{"scope":"project","enabled":true}\n' > "${B1_ON_HOME}/b1-proj/.arcforge/learning/config.json"
+printf '{"project":"b1-proj","project_root":"%s"}\n' "${B1_ON_HOME}/b1-proj" \
+  > "${B1_ON_HOME}/.arcforge/learning/project-roots/b1-proj.json"
+run_b1_analysis "$B1_ON_HOME" > /dev/null
+
+assert_eq \
+  'B1-T2: claude is invoked for a project under its project-scope opt-in' \
+  'yes' \
+  "$([ -f "${B1_ON_HOME}/claude-was-called" ] && echo yes || echo no)"
 
 # ─────────────────────────────────────────────
 # Results
