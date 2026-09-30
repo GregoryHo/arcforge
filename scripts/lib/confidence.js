@@ -199,12 +199,21 @@ function decayAnchor(frontmatter) {
   return Number.isNaN(charged) ? confirmed : Math.max(confirmed, charged);
 }
 
+/**
+ * Archive one decayed instinct, audit first. The archive copy is written, the
+ * audit entry appended, and only then is the source removed — so an audit that
+ * cannot be written rolls the copy back and leaves the instinct where it was,
+ * rather than committing the move with no record of it (B-10).
+ *
+ * @returns {null|string} null on success, else the audit failure's message
+ */
 function archiveByDecay(ctx, file, content, frontmatter, updates) {
   const archiveDir = path.join(ctx.dirPath, ctx.archiveSubdir);
   fs.mkdirSync(archiveDir, { recursive: true });
+  const archivePath = path.join(archiveDir, file);
   const archivedAt = ctx.now.toISOString();
   fs.writeFileSync(
-    path.join(archiveDir, file),
+    archivePath,
     updateConfidenceFrontmatter(content, {
       ...updates,
       archived_at: archivedAt.split('T')[0],
@@ -212,23 +221,29 @@ function archiveByDecay(ctx, file, content, frontmatter, updates) {
     }),
     'utf-8',
   );
+  try {
+    writeAuditEntry(
+      {
+        accepted: true,
+        action_id: `decay_${ctx.now.getTime()}_${crypto.randomBytes(6).toString('hex')}`,
+        requested_at: archivedAt,
+        action: 'decay_archive',
+        instinct_id: frontmatter.id || path.basename(file, '.md'),
+        instinct_dir: path.basename(ctx.dirPath),
+        archived_to: path.join(ctx.archiveSubdir, file),
+        actor: { actor_type: 'decay_cycle' },
+        reason: DECAY_ARCHIVE_REASON,
+        confidence_before: frontmatter.confidence,
+        confidence_after: Number(updates.confidence.toFixed(2)),
+      },
+      ctx.arcforgeRoot,
+    );
+  } catch (err) {
+    fs.unlinkSync(archivePath);
+    return `audit entry could not be written: ${err.message}`;
+  }
   fs.unlinkSync(path.join(ctx.dirPath, file));
-  writeAuditEntry(
-    {
-      accepted: true,
-      action_id: `decay_${ctx.now.getTime()}_${crypto.randomBytes(6).toString('hex')}`,
-      requested_at: archivedAt,
-      action: 'decay_archive',
-      instinct_id: frontmatter.id || path.basename(file, '.md'),
-      instinct_dir: path.basename(ctx.dirPath),
-      archived_to: path.join(ctx.archiveSubdir, file),
-      actor: { actor_type: 'decay_cycle' },
-      reason: DECAY_ARCHIVE_REASON,
-      confidence_before: frontmatter.confidence,
-      confidence_after: Number(updates.confidence.toFixed(2)),
-    },
-    ctx.arcforgeRoot,
-  );
+  return null;
 }
 
 /**
@@ -246,10 +261,13 @@ function archiveByDecay(ctx, file, content, frontmatter, updates) {
  *
  * @param {string} dirPath - Directory containing .md files
  * @param {{ now?: Date, arcforgeRoot?: string, archiveSubdir?: string }} [options]
- * @returns {{ decayed: string[], archived: string[] }}
+ * An archive whose audit entry cannot be written is not performed: the file
+ * stays in place unchanged and is listed in `archiveFailed` with the reason.
+ *
+ * @returns {{ decayed: string[], archived: string[], archiveFailed: {file: string, error: string}[] }}
  */
 function runDecayCycle(dirPath, options = {}) {
-  const result = { decayed: [], archived: [] };
+  const result = { decayed: [], archived: [], archiveFailed: [] };
 
   if (!fs.existsSync(dirPath)) return result;
 
@@ -290,8 +308,9 @@ function runDecayCycle(dirPath, options = {}) {
       if (activated === null) activated = listActivatedCandidateIds(ctx.arcforgeRoot);
       const id = frontmatter.id || path.basename(file, '.md');
       if (!activated.has(id) && !activated.has(path.basename(file, '.md'))) {
-        archiveByDecay(ctx, file, content, frontmatter, updates);
-        result.archived.push(file);
+        const error = archiveByDecay(ctx, file, content, frontmatter, updates);
+        if (error === null) result.archived.push(file);
+        else result.archiveFailed.push({ file, error });
         continue;
       }
     }

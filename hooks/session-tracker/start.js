@@ -122,17 +122,23 @@ function runDecayCycles(project) {
   try {
     const instResult = runDecayCycle(getInstinctsDir(project));
 
-    if (instResult.decayed.length > 0 || instResult.archived.length > 0) {
+    const failed = instResult.archiveFailed || [];
+    if (instResult.decayed.length > 0 || instResult.archived.length > 0 || failed.length > 0) {
+      const archivedNames =
+        instResult.archived.length > 0 ? ` (${instResult.archived.join(', ')})` : '';
+      // An archive whose audit entry could not be written was not performed.
+      const heldBack =
+        failed.length > 0
+          ? `; ${failed.length} not archived, audit log unwritable (${failed.map((f) => f.file).join(', ')})`
+          : '';
       output({
-        systemMessage: `Decay cycle: ${instResult.decayed.length} decayed, ${instResult.archived.length} archived${
-          instResult.archived.length > 0 ? ` (${instResult.archived.join(', ')})` : ''
-        }`,
+        systemMessage: `Decay cycle: ${instResult.decayed.length} decayed, ${instResult.archived.length} archived${archivedNames}${heldBack}`,
       });
     }
 
     return { instResult };
   } catch {
-    return { instResult: { decayed: [], archived: [] } };
+    return { instResult: { decayed: [], archived: [], archiveFailed: [] } };
   }
 }
 

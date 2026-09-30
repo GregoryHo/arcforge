@@ -520,6 +520,24 @@ Do the thing.
       expect(result.archived).toContain('cand_gone.md');
     });
 
+    it('holds the archive back, source in place, when the audit cannot be written', () => {
+      const dir = path.join(root, 'instincts', 'proj');
+      writeInstinct(dir, 'dying', '0.12', '2025-01-01');
+      const before = fs.readFileSync(path.join(dir, 'dying.md'), 'utf-8');
+      // The audit log's directory is a file, so the append must fail.
+      fs.mkdirSync(path.join(home, 'learning'), { recursive: true });
+      fs.writeFileSync(path.join(home, 'learning', 'dashboard'), 'not a directory');
+
+      const result = runDecayCycle(dir, { now: NOW });
+
+      expect(result.archived).toEqual([]);
+      expect(result.archiveFailed).toHaveLength(1);
+      expect(result.archiveFailed[0].file).toBe('dying.md');
+      expect(result.archiveFailed[0].error).toMatch(/\S/);
+      expect(fs.readFileSync(path.join(dir, 'dying.md'), 'utf-8')).toBe(before);
+      expect(fs.existsSync(path.join(dir, 'archived', 'dying.md'))).toBe(false);
+    });
+
     it('stamps the archived file with the decay reason and audits the instinct by name', () => {
       const dir = path.join(root, 'instincts', 'proj');
       writeInstinct(dir, 'dying', '0.12', '2025-01-01');
