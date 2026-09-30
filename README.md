@@ -127,7 +127,7 @@ Six components register on six Claude Code lifecycle events. They run in the bac
 |---|---|---|
 | `session-tracker` | SessionStart, Stop | Creates the session record, injects resume context, finalizes on stop |
 | `user-message-counter` | UserPromptSubmit | Counts user messages for the diary threshold |
-| `secrets-guard` | PreToolUse | Warn-only scan for hardcoded credentials in edits and commits |
+| `secrets-guard` | PreToolUse | Warn-only scan for hardcoded credentials in edits, writes, and `git commit` command text (not staged content) |
 | `observe` | PreToolUse, PostToolUse | Appends tool observations for the opt-in learning subsystem |
 | `compact-suggester` | PostToolUse | Suggests `/compact` once a session gets long |
 | `pre-compact` | PreCompact | Checkpoints state before compaction |

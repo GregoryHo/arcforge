@@ -5,10 +5,11 @@
  * Scans the new text of an Edit / the full content of a Write, and the string of
  * a `git commit` Bash command, for common key/token shapes (AWS access keys,
  * private-key PEM headers, provider tokens, hardcoded credential assignments). On a
- * hit it emits a user-facing WARNING (systemMessage) — NOT a deny in 5.0. A
- * test-credential
- * allowlist (lines/paths containing test/example/fixture/dummy/…) suppresses the
- * common false positives.
+ * hit it emits a user-facing WARNING (systemMessage) and never denies the tool
+ * call — the guard is warn-only by contract (hooks B-3). For `git commit` only the
+ * command string is scanned; the staged content is not read (hooks B-4). A
+ * test-credential allowlist (lines/paths containing test/example/fixture/dummy/…)
+ * suppresses the common false positives.
  *
  * The warning names the finding category but never echoes the matched secret,
  * so the message itself cannot leak the credential. Untrusted path fragments in

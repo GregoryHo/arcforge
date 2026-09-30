@@ -15,7 +15,7 @@ session stops. What follows is what each one actually does to your session.
 | SessionStart | `inject-context` | A short summary of what carried over — activated instincts, pending actions, recent sessions |
 | SessionStart | `session-start` | Nothing; it creates this session's record in the background |
 | UserPromptSubmit | `user-message-counter` | Nothing; it counts your messages |
-| PreToolUse | `secrets-guard` | A warning if an edit or a commit looks like it contains a credential |
+| PreToolUse | `secrets-guard` | A warning if an edit, a write, or a `git commit` command looks like it contains a credential |
 | PreToolUse | `observe-pre` | Nothing, unless you have enabled learning |
 | PostToolUse | `compact-suggester` | A suggestion to `/compact` once the session gets long |
 | PostToolUse | `observe-post` | Nothing, unless you have enabled learning |
@@ -30,9 +30,12 @@ Nine registrations, six hooks: session tracking accounts for three of them
 
 ### `secrets-guard` — a warning, never a block
 
-Before an `Edit` or `Write` lands, and before a `git commit` runs, this hook
-scans the content for credential shapes: AWS access keys, private-key headers,
-Slack and GitHub tokens, and hardcoded assignments like `api_key = "…"`.
+Before an `Edit` or `Write` lands, this hook scans the new content for credential
+shapes: AWS access keys, private-key headers, Slack and GitHub tokens, and
+hardcoded assignments like `api_key = "…"`. Before a `git commit` runs, it scans
+the command text itself — a credential typed into `-m`, for example — but not the
+content the commit stages. A credential that reached a file some other way (your
+editor, a script, a `Bash` command) and is then committed draws no warning.
 
 On a hit you get a warning that names the *category* of finding. It never echoes
 the matched string, so the warning itself cannot leak the secret, and it never
