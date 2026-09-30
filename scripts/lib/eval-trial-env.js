@@ -119,6 +119,15 @@ function writeIsolationSettings(trialDir, cachedSettings) {
 /**
  * Build isolation settings JSON string (cached for reuse across trials).
  * Queries installed plugins and generates settings to disable all of them.
+ *
+ * The trial keeps the real HOME so ~/.claude auth resolves, which also lets the
+ * operator's user-level settings reach the session (#170: a user output style
+ * steered every trial off Read/Edit/Write). Project settings outrank user
+ * settings, so the output style is pinned here. Hooks merge across scopes
+ * instead of overriding, so full isolation turns every hook off
+ * (disableAllHooks — no plugin is loaded, so nothing of the trial's own is
+ * lost); a plugin-dir trial needs its plugin's hooks, so runTrial drops the
+ * user settings source for it (--setting-sources) rather than setting this.
  * @param {Object} [opts] - Options
  * @param {boolean} [opts.excludeClaudeMd=true] - Exclude CLAUDE.md/rules (full isolation).
  *   Set false for semi-isolation (plugin-dir mode) where the plugin needs project context.
@@ -127,6 +136,8 @@ function writeIsolationSettings(trialDir, cachedSettings) {
 function buildIsolationSettings({ excludeClaudeMd = true } = {}) {
   const baseSettings = {
     autoMemoryEnabled: false,
+    outputStyle: 'default',
+    ...(excludeClaudeMd ? { disableAllHooks: true } : {}),
     ...(excludeClaudeMd
       ? { claudeMdExcludes: ['**/CLAUDE.md', '**/CLAUDE.local.md', '**/rules/**'] }
       : {}),

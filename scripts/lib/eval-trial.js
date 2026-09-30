@@ -148,6 +148,9 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   }
   if (pluginDir) {
     claudeArgs.push('--plugin-dir', path.resolve(pluginDir));
+    // User-level settings (hooks, output style) never reach the trial; the
+    // plugin under test still brings its own hooks (B-7, #170).
+    claudeArgs.push('--setting-sources', 'project,local');
     // Eval trials run unattended in ephemeral dirs — no human to approve permission prompts
     claudeArgs.push('--dangerously-skip-permissions');
   }

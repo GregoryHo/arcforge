@@ -100,6 +100,16 @@ an infra error (`provider_refusal`) and never scores either. Without that, the
 fixture's own files would pass some assertions and an exhausted quota would read
 as a regression.
 
+Every trial runs in a fresh fixture directory under `.eval-trials/`, with
+arcforge's own state redirected into it. By default the session is also
+isolated: plugins, MCP servers, `CLAUDE.md` files and rules are switched off. Your
+user-level Claude Code configuration is kept out as well. The output style is
+pinned to the default and hooks are disabled, so your own output style or hooks
+do not steer the agent in either arm. A `--plugin-dir` trial loads the plugin
+under test with its hooks, and skips your user-level settings file entirely.
+Credentials stored in your keychain still work. Anything that only lives in your
+user settings, such as an `apiKeyHelper`, is not available to such a trial.
+
 `--skill-file` injects a skill body into the treatment prompt — that measures a
 **skill**. `--plugin-dir` loads a real plugin instead — that measures a
 **workflow**, the whole environment. They answer different questions; using
