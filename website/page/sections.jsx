@@ -389,7 +389,7 @@ function Hooks({theme:t}) {
     ['SessionStart','session-tracker/inject-context','Injects the previous session summary and any activated instincts.'],
     ['SessionStart','session-tracker/start','Creates the session file; lazily starts the observer daemon.'],
     ['UserPromptSubmit','user-message-counter','Counts user messages toward the diary threshold.'],
-    ['PreToolUse','secrets-guard','Warn-only scan for hardcoded credentials in edits and git commits.'],
+    ['PreToolUse','secrets-guard','Warn-only scan for hardcoded credentials in edits, writes, and git commit command text (not staged content).'],
     ['PreToolUse','observe','Appends the pre-tool observation, async and off the blocking path.'],
     ['PostToolUse','observe','Appends the post-tool observation.'],
     ['PostToolUse','compact-suggester','Tracks the tool count and suggests /compact at the threshold.'],
