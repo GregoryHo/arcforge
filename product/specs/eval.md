@@ -75,11 +75,16 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   pinned to the default, hooks are disabled, and the user settings file is
   not read, so the operator's hooks, output style, model, effort level, env
   and permissions reach neither arm. A plugin-dir trial is contained the same
-  way but keeps the plugin under test with its own hooks and the fixture's
-  `CLAUDE.md` files; the user settings file is dropped there too, which costs
-  a credential that lives only in that file. Both arms of a comparison run
-  the same `claude` flags apart from the injection itself, and every row
-  records the `model` and `effort` it ran with. Opting out
+  way, `CLAUDE.md` excludes included, but keeps the plugin under test with its
+  own hooks; the user settings file is dropped there too, which costs a
+  credential that lives only in that file. Both arms of a comparison run the
+  same `claude` flags apart from the injection itself, and their settings
+  files differ only in that the baseline, which loads no plugin, switches every
+  hook off; every row records the `model` and `effort` it ran with. The
+  exception is a `workflow` A/B with no plugin dir, whose treatment runs on the
+  user's full configuration by definition: it refuses to start unless `--model`
+  and `--effort` are both given, which is all that keeps the arms on one model
+  and one effort. Opting out
   (`--no-isolate`) readmits the surrounding toolkit into the trial — never the
   user's real state. Isolation is not a sandbox, and that is a limit rather
   than a promise: the agent runs with the operator's filesystem permissions.
@@ -138,8 +143,8 @@ fails the bar rather than deferring. That `PASS` is a distinct token from the
 preflight `PASS` in B-3, which is a discriminability outcome (`PASS` / `BLOCK`), not
 an A/B verdict. A result the runner killed before the agent finished carries
 `errorType: trial_killed_incomplete` and `infraError: true` —
-`scripts/lib/eval-trial-outcome.js` owns the two predicates (killed, output
-complete) — and `scorableResults` in `eval-stats.js` drops every `infraError` /
+`scripts/lib/eval-trial-outcome.js` owns the three predicates (killed, output
+complete, provider refusal) — and `scorableResults` in `eval-stats.js` drops every `infraError` /
 `gradeError` row from every scored pool (`eval run`, A/B, benchmark), while
 preflight fails closed on the same flags (B-10). Every result row records
 `trialTimeoutMs`, the ceiling its trial ran under, so a pool that mixes ceilings
