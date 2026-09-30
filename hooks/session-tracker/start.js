@@ -113,7 +113,9 @@ function runDecayCycles(project) {
 
     if (instResult.decayed.length > 0 || instResult.archived.length > 0) {
       output({
-        systemMessage: `Decay cycle: ${instResult.decayed.length} decayed, ${instResult.archived.length} archived`,
+        systemMessage: `Decay cycle: ${instResult.decayed.length} decayed, ${instResult.archived.length} archived${
+          instResult.archived.length > 0 ? ` (${instResult.archived.join(', ')})` : ''
+        }`,
       });
     }
 

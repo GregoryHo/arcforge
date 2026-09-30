@@ -8,8 +8,13 @@
  * Lifecycle: create → confirm/contradict → decay → archive
  */
 
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+
+const { getArcforgeHome } = require('./utils');
+const { writeAuditEntry } = require('./learning-audit-log');
+const { listActivatedCandidateIds } = require('./learning-curator/activate');
 
 // ─────────────────────────────────────────────
 // Constants
@@ -173,22 +178,89 @@ function clampConfidence(confidence) {
 // Decay Cycle
 // ─────────────────────────────────────────────
 
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Frontmatter key recording the instant decay has been charged up to (B-10). */
+const DECAY_CHARGED_THROUGH_KEY = 'decay_charged_through';
+
+/** `archive_reason` stamped on a file the decay cycle archives (B-10). */
+const DECAY_ARCHIVE_REASON = 'decay';
+
 /**
- * Run decay cycle on all .md files in a directory.
- * Decreases confidence based on time since last_confirmed.
- * Archives files that drop below ARCHIVE_THRESHOLD.
+ * The instant decay is owed from: the later of the last confirmation and the
+ * point decay has already been charged through. A confirmation after a charge
+ * restarts the clock; a charge never counts the same weeks twice.
+ * @returns {number|null} epoch ms, or null when the file has no usable date
+ */
+function decayAnchor(frontmatter) {
+  const confirmed = Date.parse(frontmatter.last_confirmed);
+  if (Number.isNaN(confirmed)) return null;
+  const charged = Date.parse(frontmatter[DECAY_CHARGED_THROUGH_KEY]);
+  return Number.isNaN(charged) ? confirmed : Math.max(confirmed, charged);
+}
+
+function archiveByDecay(ctx, file, content, frontmatter, updates) {
+  const archiveDir = path.join(ctx.dirPath, ctx.archiveSubdir);
+  fs.mkdirSync(archiveDir, { recursive: true });
+  const archivedAt = ctx.now.toISOString();
+  fs.writeFileSync(
+    path.join(archiveDir, file),
+    updateConfidenceFrontmatter(content, {
+      ...updates,
+      archived_at: archivedAt.split('T')[0],
+      archive_reason: DECAY_ARCHIVE_REASON,
+    }),
+    'utf-8',
+  );
+  fs.unlinkSync(path.join(ctx.dirPath, file));
+  writeAuditEntry(
+    {
+      accepted: true,
+      action_id: `decay_${ctx.now.getTime()}_${crypto.randomBytes(6).toString('hex')}`,
+      requested_at: archivedAt,
+      action: 'decay_archive',
+      instinct_id: frontmatter.id || path.basename(file, '.md'),
+      instinct_dir: path.basename(ctx.dirPath),
+      archived_to: path.join(ctx.archiveSubdir, file),
+      actor: { actor_type: 'decay_cycle' },
+      reason: DECAY_ARCHIVE_REASON,
+      confidence_before: frontmatter.confidence,
+      confidence_after: Number(updates.confidence.toFixed(2)),
+    },
+    ctx.arcforgeRoot,
+  );
+}
+
+/**
+ * Run decay cycle on all .md files in a directory (B-10).
+ *
+ * Charges whole weeks since `decayAnchor`, and records the instant those weeks
+ * run through, so running the cycle any number of times over the same interval
+ * gives the result of running it once. Whole weeks keep every charge a
+ * multiple of 0.01, so the two-decimal confidence on disk loses nothing to
+ * rounding however often sessions start. A file that falls below
+ * ARCHIVE_THRESHOLD is archived — stamped `archive_reason: decay` and audited —
+ * unless it is an activated instinct (its id in the ActivationRecord fold the
+ * SessionStart injector gates on), which only the user's deactivation retires
+ * (B-4).
  *
  * @param {string} dirPath - Directory containing .md files
- * @param {string} [archiveSubdir='archived'] - Subdirectory for archived files
+ * @param {{ now?: Date, arcforgeRoot?: string, archiveSubdir?: string }} [options]
  * @returns {{ decayed: string[], archived: string[] }}
  */
-function runDecayCycle(dirPath, archiveSubdir = 'archived') {
+function runDecayCycle(dirPath, options = {}) {
   const result = { decayed: [], archived: [] };
 
   if (!fs.existsSync(dirPath)) return result;
 
+  const ctx = {
+    dirPath,
+    arcforgeRoot: options.arcforgeRoot || getArcforgeHome(),
+    now: options.now || new Date(),
+    archiveSubdir: options.archiveSubdir || 'archived',
+  };
   const files = fs.readdirSync(dirPath).filter((f) => f.endsWith('.md'));
-  const now = new Date();
+  let activated = null;
 
   for (const file of files) {
     const filePath = path.join(dirPath, file);
@@ -197,36 +269,35 @@ function runDecayCycle(dirPath, archiveSubdir = 'archived') {
 
     if (frontmatter.confidence === undefined) continue;
 
-    const baseDecay = calculateDecay(frontmatter.last_confirmed, now);
-    if (baseDecay <= 0) continue;
+    const anchor = decayAnchor(frontmatter);
+    if (anchor === null) continue;
+    const weeks = Math.floor((ctx.now.getTime() - anchor) / WEEK_MS);
+    if (weeks <= 0) continue;
 
     // Source-aware decay: resistant sources decay at half rate
-    const decay = RESISTANT_SOURCES.has(frontmatter.source)
-      ? baseDecay * RESISTANT_DECAY_RATIO
-      : baseDecay;
-    const newConfidence = clampConfidence(frontmatter.confidence - decay);
+    const perWeek = RESISTANT_SOURCES.has(frontmatter.source)
+      ? MANUAL_DECAY_PER_WEEK
+      : DECAY_PER_WEEK;
+    const newConfidence = clampConfidence(frontmatter.confidence - weeks * perWeek);
+    if (newConfidence >= frontmatter.confidence) continue;
+
+    const updates = {
+      confidence: newConfidence,
+      [DECAY_CHARGED_THROUGH_KEY]: new Date(anchor + weeks * WEEK_MS).toISOString(),
+    };
 
     if (shouldArchive(newConfidence)) {
-      // Move to archived subdirectory
-      const archiveDir = path.join(dirPath, archiveSubdir);
-      fs.mkdirSync(archiveDir, { recursive: true });
-
-      const updatedContent = updateConfidenceFrontmatter(content, {
-        confidence: newConfidence,
-        archived_at: now.toISOString().split('T')[0],
-      });
-
-      fs.writeFileSync(path.join(archiveDir, file), updatedContent, 'utf-8');
-      fs.unlinkSync(filePath);
-      result.archived.push(file);
-    } else if (newConfidence < frontmatter.confidence) {
-      // Update confidence in place
-      const updatedContent = updateConfidenceFrontmatter(content, {
-        confidence: newConfidence,
-      });
-      fs.writeFileSync(filePath, updatedContent, 'utf-8');
-      result.decayed.push(file);
+      if (activated === null) activated = listActivatedCandidateIds(ctx.arcforgeRoot);
+      const id = frontmatter.id || path.basename(file, '.md');
+      if (!activated.has(id) && !activated.has(path.basename(file, '.md'))) {
+        archiveByDecay(ctx, file, content, frontmatter, updates);
+        result.archived.push(file);
+        continue;
+      }
     }
+
+    fs.writeFileSync(filePath, updateConfidenceFrontmatter(content, updates), 'utf-8');
+    result.decayed.push(file);
   }
 
   return result;
@@ -243,6 +314,7 @@ module.exports = {
   MAX_CONFIDENCE,
   REFLECT_MAX_CONFIDENCE,
   MIN_CONFIDENCE,
+  DECAY_ARCHIVE_REASON,
   MANUAL_CONTRADICT_DELTA,
   MANUAL_DECAY_PER_WEEK,
   RESISTANT_SOURCES,

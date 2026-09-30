@@ -141,6 +141,14 @@ arcforge learn instinct contradict <id>
 
 Contradict it enough and it archives itself.
 
+Confidence also decays with the time since you last confirmed an instinct: a
+fixed amount for each full week, charged once no matter how many sessions you
+start in that week. An instinct that decays far enough is moved to the
+`archived` folder beside it, the file is stamped `archive_reason: decay` so you
+can tell it from one you contradicted away, and the move is written to the
+review audit log under the instinct's name. An instinct you activated is never
+archived by decay — it leaves the injected set only when you deactivate it.
+
 ## Review: from candidate to active
 
 Once learning is on, observations turn into **candidates** automatically. That is

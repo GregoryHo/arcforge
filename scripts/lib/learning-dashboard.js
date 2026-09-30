@@ -17,11 +17,10 @@
  * Layer 6 does NOT write active skill / instinct / command files. Layer 7/8 own those.
  */
 
-const fs = require('node:fs');
-const path = require('node:path');
 const crypto = require('node:crypto');
 
 const { getArcforgeHome } = require('./utils');
+const { writeAuditEntry } = require('./learning-audit-log');
 
 const { readCurrentCandidates, appendCandidate } = require('./learning-curator/queue-writer');
 const {
@@ -278,20 +277,6 @@ function createDashboardModel() {
     count: cards.length,
     candidates: cards,
   };
-}
-
-// ---------------------------------------------------------------------------
-// Audit log — ~/.arcforge/learning/dashboard/actions.jsonl
-// ---------------------------------------------------------------------------
-
-function getAuditLogPath() {
-  return path.join(getArcforgeHome(), 'learning', 'dashboard', 'actions.jsonl');
-}
-
-function writeAuditEntry(entry) {
-  const logPath = getAuditLogPath();
-  fs.mkdirSync(path.dirname(logPath), { recursive: true });
-  fs.appendFileSync(logPath, `${JSON.stringify(entry)}\n`, 'utf8');
 }
 
 // ---------------------------------------------------------------------------
