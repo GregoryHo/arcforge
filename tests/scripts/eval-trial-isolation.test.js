@@ -310,6 +310,37 @@ describe('eval-trial-guard snapshots', () => {
     expect([...files.keys()]).toEqual(['keep.txt']);
   });
 
+  it('marks a snapshot past the walk budget incomplete', () => {
+    for (const name of ['a', 'b', 'c']) fs.writeFileSync(path.join(root, name), 'x');
+    expect(snapshotTree(root, 2).complete).toBe(false);
+    expect(snapshotTree(root, 3).complete).toBe(true);
+  });
+
+  it('records on the row that the repository check was skipped', () => {
+    const errSpy = jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      jest.isolateModules(() => {
+        jest.doMock('../../scripts/lib/eval-trial-guard', () => ({
+          watchForWrites: () => () => ({ changed: [], incomplete: ['/huge/repo'] }),
+        }));
+        const { runTrial: isolatedRunTrial } = require('../../scripts/lib/eval-trial');
+        // This registry has its own copy of the mocked utils.
+        require('../../scripts/lib/utils').execCommand.mockReturnValue({
+          stdout: DONE_STREAM,
+          stderr: '',
+          exitCode: 0,
+        });
+        const result = isolatedRunTrial(SCENARIO, 1, 1, { projectRoot: root, isolated: false });
+        expect(result.repoCheck).toBe('skipped');
+        expect(result.infraError).toBeUndefined();
+      });
+      expect(errSpy.mock.calls.join('')).toContain('/huge/repo');
+    } finally {
+      jest.dontMock('../../scripts/lib/eval-trial-guard');
+      errSpy.mockRestore();
+    }
+  });
+
   it('reports added, changed and removed paths', () => {
     const before = new Map([
       ['same', '1:1'],

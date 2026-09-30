@@ -234,6 +234,9 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   // A trial that changed the repository it ran from measured a different
   // environment than its arm describes, and may have changed what the next
   // trial sees. It is an instrument failure whatever it scored (eval-10).
+  // A tree too large to snapshot was not checked; the row says so rather than
+  // passing for checked.
+  if (repoWrites.incomplete.length > 0) base.repoCheck = 'skipped';
   if (repoWrites.changed.length > 0) {
     const shown = repoWrites.changed.slice(0, 5).join(', ');
     const more = repoWrites.changed.length > 5 ? ` and ${repoWrites.changed.length - 5} more` : '';

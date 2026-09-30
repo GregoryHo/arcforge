@@ -127,10 +127,16 @@ Isolation is not a sandbox. The agent runs with your filesystem permissions.
 Isolated and `--plugin-dir` trials are told to stay inside their directory, but
 nothing enforces it. So the runner checks afterwards: it snapshots the project
 (and the plugin directory, when that lives elsewhere) before each trial and
-compares after. It skips `.git`, `node_modules`, `.eval-trials/`,
-`evals/results/` and nested repositories. A trial that added, changed or removed
-anything there is recorded as an infra error (`trial_wrote_repo`) naming the
-paths, and never scores. Check those paths with `git status`. An edit you make
+compares after. A trial that added, changed or removed anything it covers is
+recorded as an infra error (`trial_wrote_repo`) naming the paths, and never
+scores.
+
+The check has blind spots. Any folder named `.git`, `node_modules` or
+`.eval-trials` is skipped at any depth. So are the project's own
+`evals/results/` and every nested folder that is a repository of its own. A
+write into any of these goes unnoticed. Past 50,000 files the snapshot stops and
+the check is skipped for that trial. The runner says so on stderr and marks the
+row `repoCheck: "skipped"`, so a pool that was never checked can be told apart. Check those paths with `git status`. An edit you make
 to the same project while a trial runs looks identical, so a long run is best
 left alone.
 

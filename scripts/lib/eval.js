@@ -76,6 +76,9 @@ const {
  * @property {string} [errorType] - Machine-readable error category (e.g., 'model_grader_failed')
  * @property {boolean} [gradeError] - True if the grader failed to produce a score
  * @property {boolean} [infraError] - True if the trial runner failed to capture output
+ * @property {string} [repoCheck] - 'skipped' when the tree was too large for the repository-write check
+ * @property {string} [model] - Model flag the trial ran with ('default' when none was passed)
+ * @property {string} [effort] - Effort flag the trial ran with ('default' when none was passed)
  * @property {number[]} [assertionScores] - Per-assertion scores (0.0-1.0)
  * @property {string[]} [evidence] - Per-assertion evidence notes from grader
  * @property {number[][]} [blockRefs] - Per-assertion transcript block references (1-indexed)

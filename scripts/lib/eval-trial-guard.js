@@ -31,9 +31,10 @@ const MAX_ENTRIES = 50000;
 /**
  * Snapshot a directory tree.
  * @param {string} root - Absolute directory to walk
+ * @param {number} [maxEntries=MAX_ENTRIES] - Files to record before giving up
  * @returns {{ files: Map<string, string>, complete: boolean }} rel path → "mtimeMs:size"
  */
-function snapshotTree(root) {
+function snapshotTree(root, maxEntries = MAX_ENTRIES) {
   const files = new Map();
   const stack = [''];
   let complete = true;
@@ -53,7 +54,7 @@ function snapshotTree(root) {
         stack.push(childRel);
         continue;
       }
-      if (files.size >= MAX_ENTRIES) {
+      if (files.size >= maxEntries) {
         complete = false;
         return { files, complete };
       }
