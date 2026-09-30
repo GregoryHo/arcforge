@@ -159,10 +159,19 @@ arcforge eval run <name> --k 5
 ```
 
 `eval run` takes `--k`, `--model`, `--effort`, `--max-turns` and `--plugin-dir`
-like `ab`, plus `--no-isolate`. That flag lets the surrounding toolkit back into
-the trial: your plugins, MCP servers and `CLAUDE.md` files, and the scenario's
-`## Plugin Dir`. The trial still runs in its own fixture directory, with
-arcforge's state redirected, so your real learning state stays out of it.
+like `ab`, plus `--no-isolate`. What that flag readmits depends on the scenario.
+
+- **No `## Plugin Dir` (and no `--plugin-dir`):** the whole surrounding
+  configuration comes back. That means your installed plugins, MCP servers,
+  `CLAUDE.md` files and rules, and your user settings file with its hooks,
+  output style, model and effort level.
+- **With `## Plugin Dir`:** only that plugin comes back. The trial runs as a
+  `--plugin-dir` trial: the named plugin loads with its hooks, every other
+  installed plugin stays disabled, MCP servers stay stripped and your user
+  settings file is still not read. The fixture's `CLAUDE.md` files are kept.
+
+Either way the trial runs in its own fixture directory with arcforge's state
+redirected, so your real learning state stays out of it.
 
 `eval run` has no second arm, so its verdict is about the condition alone, not a
 change. It is judged over the last k **scored** trials — an infra or grade error
@@ -235,7 +244,7 @@ A scenario is one markdown file in `evals/scenarios/`. Sections the parser reads
 | `## Preflight` | `skip` to opt out of the discriminability gate |
 | `## Verdict Policy` | `non-regression` to judge pass/fail instead of delta |
 | `## Claim Type` | What a pass is evidence of: `discriminative-lift`, `non-regression`, `self-improvement-smoke`, or `infra`. Inferred from the name and target when absent. `eval list` shows it and `eval report` groups by it |
-| `## Plugin Dir` | Plugin to load when the scenario runs with the toolkit: the treatment of a `workflow` A/B, or `eval run --no-isolate`. `${PROJECT_ROOT}` expands to the project root |
+| `## Plugin Dir` | The one plugin to load in the treatment of a `workflow` A/B, or under `eval run --no-isolate`. Every other installed plugin stays disabled. `${PROJECT_ROOT}` expands to the project root |
 | `## Version` | Result-pooling generation — see below |
 
 Only `## Context` and `## Scenario` reach the agent. Everything else is
@@ -294,6 +303,17 @@ the analyzer behind `eval compare` and the blind comparator described under
 step 4. They load from the installed plugin, whichever project you run in. If one
 is missing or empty, the command stops with an error that names the file rather
 than grading without it.
+
+A "floor" assertion (a minimum the agent must always meet, such as "the tests
+still pass") is not a separate type, and it gets no extra weight:
+
+- **Behavioral and `mixed` scenarios:** a floor is one assertion among the
+  others, one equal share of the score. Missing it costs that share, and the
+  trial still passes if the score stays at or above 0.8.
+- **`code` graders:** the score is the share of `A<N>:` labels your script
+  prints as `PASS`. A floor checked outside those labels adds nothing to the
+  score. If it makes the script exit non-zero, though, the trial fails whatever
+  its labels say.
 
 An assertion that no run can satisfy is worse than no assertion — it scores zero
 in both arms and buries the signal you were looking for. When an assertion fails
