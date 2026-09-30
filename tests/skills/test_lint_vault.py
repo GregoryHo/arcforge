@@ -121,6 +121,22 @@ def test_fences_in_list_items_and_comments_declare_nothing(vault):
     assert report["schema"]["declared_types"] == ["entity", "source"]
 
 
+def test_a_yaml_fence_under_a_list_item_declares_no_type(vault):
+    # A fence nested in a list item is an illustration, like one in a callout:
+    # its `type:` declares nothing, even though the body parses once the item's
+    # indentation is removed.
+    schema = vault / "SCHEMA.md"
+    schema.write_text(
+        schema.read_text(encoding="utf-8").replace(
+            "## Tag Taxonomy\n",
+            "## Phantom\n\n- For example:\n\n  ```yaml\n  ---\n  type: phantom\n  mood: \"\"\n  ---\n  ```\n\n"
+            "## Tag Taxonomy\n",
+        ),
+        encoding="utf-8",
+    )
+    assert _run(vault)["schema"]["declared_types"] == ["entity", "source"]
+
+
 def test_quoted_list_items_honour_yaml_escapes(vault):
     # #187: `''` inside single quotes; `\"`, `\\` and `\n` inside double quotes.
     (vault / "Wiki" / "gamma-orphan.md").write_text(
