@@ -146,6 +146,57 @@ describe('the learning opt-in', () => {
       expect(learningEnabledSinceForProject(project(), { homeDir })).toBe(Date.parse(AGAIN));
     });
 
+    // The project-roots record's schema: owner is learning.js, and a reader
+    // trusts only a record of exactly this shape.
+    it('writes the record as exactly { project, project_root }', () => {
+      recordProjectRoot({ projectRoot, homeDir });
+      const recordPath = path.join(
+        homeDir,
+        '.arcforge',
+        'learning',
+        'project-roots',
+        'project.json',
+      );
+      const record = JSON.parse(fs.readFileSync(recordPath, 'utf8'));
+      expect(Object.keys(record).sort()).toEqual(['project', 'project_root']);
+      expect(typeof record.project).toBe('string');
+      expect(typeof record.project_root).toBe('string');
+      expect(record.project).toBe(path.basename(projectRoot));
+      expect(path.isAbsolute(record.project_root)).toBe(true);
+      expect(record.project_root).toBe(path.resolve(projectRoot));
+    });
+
+    describe('a record that fails the shape is refused, not trusted', () => {
+      const recordPath = () =>
+        path.join(homeDir, '.arcforge', 'learning', 'project-roots', 'project.json');
+      function writeRecord(content) {
+        fs.mkdirSync(path.dirname(recordPath()), { recursive: true });
+        fs.writeFileSync(recordPath(), content);
+      }
+      const cases = {
+        'not JSON': '{nope',
+        'an array': '[]',
+        'an extra key': () =>
+          JSON.stringify({ project: 'project', project_root: projectRoot, x: 1 }),
+        'a missing key': JSON.stringify({ project: 'project' }),
+        'a relative root': JSON.stringify({ project: 'project', project_root: 'rel/project' }),
+        'a non-string root': JSON.stringify({ project: 'project', project_root: 7 }),
+        'another project name': () =>
+          JSON.stringify({ project: 'other', project_root: path.join(testDir, 'other') }),
+        'a root filed under another name': () =>
+          JSON.stringify({ project: 'project', project_root: path.join(testDir, 'elsewhere') }),
+      };
+      for (const [label, content] of Object.entries(cases)) {
+        it(`refuses ${label}`, () => {
+          setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir });
+          writeRecord(typeof content === 'function' ? content() : content);
+          expect(() => learningEnabledSinceForProject('project', { homeDir })).toThrow(
+            /project-root record .*project\.json/,
+          );
+        });
+      }
+    });
+
     it('reports the global stamp for a project with no root on record', () => {
       const AT = '2026-05-04T00:00:00.000Z';
       setLearningEnabled({ scope: 'global', enabled: true, projectRoot, homeDir, now: AT });

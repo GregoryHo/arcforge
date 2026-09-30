@@ -121,6 +121,42 @@ function recordProjectRoot({ projectRoot = process.cwd(), homeDir } = {}) {
 }
 
 /**
+ * Read the project-root record filed under `project`, or null when there is
+ * none. The record is trusted only in exactly the shape `recordProjectRoot`
+ * writes — `{ project, project_root }`, both strings, `project` the name it is
+ * filed under, `project_root` an absolute path whose directory name files
+ * under that name. Anything else throws, so a caller asking whether it may
+ * analyze fails closed instead of following a root nobody recorded.
+ *
+ * @returns {{ project: string, project_root: string }|null}
+ */
+function readProjectRootRecord(project, { homeDir } = {}) {
+  const recordPath = getProjectRootRecordPath(project, { homeDir });
+  if (!fs.existsSync(recordPath)) return null;
+  const refuse = (why) => {
+    throw new Error(`project-root record ${recordPath} is not usable: ${why}`);
+  };
+  let record;
+  try {
+    record = JSON.parse(fs.readFileSync(recordPath, 'utf8'));
+  } catch (err) {
+    refuse(`not JSON (${err.message})`);
+  }
+  if (!record || typeof record !== 'object' || Array.isArray(record)) refuse('not an object');
+  const keys = Object.keys(record).sort().join(',');
+  if (keys !== 'project,project_root') refuse(`keys must be project, project_root (got ${keys})`);
+  if (record.project !== project) refuse(`project is "${record.project}", filed as "${project}"`);
+  const root = record.project_root;
+  if (typeof root !== 'string' || !path.isAbsolute(root)) {
+    refuse(`project_root must be an absolute path (got ${JSON.stringify(root)})`);
+  }
+  if (sanitizeProjectName(path.basename(root)) !== project) {
+    refuse(`project_root ${root} does not file under "${project}"`);
+  }
+  return record;
+}
+
+/**
  * When learning took effect for the project whose observations are filed under
  * `project`, in epoch ms, or null when it is not enabled for it (B-1).
  *
@@ -137,10 +173,8 @@ function recordProjectRoot({ projectRoot = process.cwd(), homeDir } = {}) {
  * @returns {number|null}
  */
 function learningEnabledSinceForProject(project, { homeDir } = {}) {
-  const record = readJsonFile(getProjectRootRecordPath(project, { homeDir }), null);
-  if (record && typeof record.project_root === 'string') {
-    return learningEnabledSince({ projectRoot: record.project_root, homeDir });
-  }
+  const record = readProjectRootRecord(project, { homeDir });
+  if (record) return learningEnabledSince({ projectRoot: record.project_root, homeDir });
   const global = readScopeConfig({ scope: 'global', homeDir });
   if (global.enabled !== true) return null;
   return scopeEnabledAt(global, getLearningConfigPath({ scope: 'global', homeDir }));
