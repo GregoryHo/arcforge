@@ -464,19 +464,38 @@ function deriveProjectId(records, projectName) {
  * @param {object} options
  * @param {string} options.project — project slug (directory name under observations/)
  * @param {string} [options.homeDir] — override home directory (tests use this)
+ * @param {string} [options.since] — ISO instant the opt-in took effect; only
+ *   observations whose `ts` is at or after it are read (learning B-1)
+ * @param {number} [options.minObservations] — with fewer eligible observations
+ *   nothing is written and `{ skipped: 'too_few_observations', ... }` returns
  * @returns {{ batch_id, batch_hash, manifest_path, prompt_path, project }}
  */
-function assembleBatch({ project, homeDir: homeOverride } = {}) {
+function assembleBatch({ project, homeDir: homeOverride, since, minObservations } = {}) {
   if (typeof project !== 'string' || !project.trim()) {
     throw new Error('assembleBatch: project must be a non-empty string');
+  }
+  const sinceMs = since === undefined ? null : Date.parse(since);
+  if (Number.isNaN(sinceMs)) {
+    throw new Error(`assembleBatch: since must be an ISO timestamp (got "${since}")`);
   }
 
   const homeDir = homeOverride;
   const now = new Date();
   const createdAt = now.toISOString();
 
-  // Read evidence
-  const allObs = readObservations(homeDir, project);
+  // Read evidence. Under a `since`, a row counts only when its own `ts` says it
+  // was recorded under the current opt-in; an unparseable `ts` does not.
+  const readObs = readObservations(homeDir, project);
+  const allObs =
+    sinceMs === null ? readObs : readObs.filter((rec) => Date.parse(rec.ts) >= sinceMs);
+  if (Number.isInteger(minObservations) && allObs.length < minObservations) {
+    return {
+      skipped: 'too_few_observations',
+      project,
+      eligible: allObs.length,
+      minimum: minObservations,
+    };
+  }
   const projectId = deriveProjectId(allObs, project);
   const {
     items: obsItems,

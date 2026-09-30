@@ -119,18 +119,25 @@ analyze_project() {
   fi
 
   # Consent gate (learning B-1): analysis sends observations to a model, so it
-  # runs only where learning is enabled for this project. The engine answers —
-  # global opt-in, or the project-scope opt-in at the root SessionStart put on
-  # record — and anything other than a clear yes, errors included, skips.
-  # Observations left behind by an earlier opt-in stay unanalyzed.
+  # runs only where learning is enabled for this project, and only over what was
+  # recorded under that opt-in. The engine answers both — global opt-in, or the
+  # project-scope opt-in at the recorded root, and the stamp it took effect —
+  # and anything other than a clear yes, errors included, skips. Observations
+  # recorded before the stamp (an earlier opt-in, since turned off) are never
+  # put in a batch; they stay on disk.
   if ! command -v node &>/dev/null; then
     log_msg "WARNING: node not found, skipping analysis"
     return
   fi
-  local enabled_status=0
-  node "$CURATOR_CLI" learning-enabled --project "$project" > /dev/null 2>&1 || enabled_status=$?
+  local enabled_json="" enabled_status=0 enabled_since=""
+  enabled_json=$(node "$CURATOR_CLI" learning-enabled --project "$project" 2>/dev/null) || enabled_status=$?
   if [ "$enabled_status" -ne 0 ]; then
     log_msg "Skipping ${project}: learning is not enabled for it (learning-enabled exit ${enabled_status})"
+    return
+  fi
+  enabled_since=$(printf '%s' "$enabled_json" | sed -n 's/.*"enabled_since":"\([^"]*\)".*/\1/p')
+  if [ -z "$enabled_since" ]; then
+    log_msg "Skipping ${project}: learning-enabled returned no enable stamp"
     return
   fi
 
@@ -159,12 +166,23 @@ analyze_project() {
 
   # ── Layer 3: Assemble batch via Node CLI ──────────────────────────────────
   # Bash 'set -e' aborts the function if `var=$(node ...)` non-zero, so the
-  # error check must use `if !` form (a failed assignment via `set -e` skips
-  # the next-line check entirely).
+  # exit status is captured with `|| status=$?` (a bare failed assignment under
+  # `set -e` would skip the next-line check entirely).
+  # --since keeps observations recorded before the opt-in stamp out of the
+  # batch; exit 3 means too few are left, and nothing was written.
   local batch_info=""
   local batch_err_file="${INSTINCTS_DIR}/.assemble-batch.err"
+  local assemble_status=0
   mkdir -p "$INSTINCTS_DIR"
-  if ! batch_info=$(node "$CURATOR_CLI" assemble-batch --project "$project" 2>"$batch_err_file"); then
+  batch_info=$(node "$CURATOR_CLI" assemble-batch --project "$project" \
+    --since "$enabled_since" --min-observations "$MIN_OBSERVATIONS" \
+    2>"$batch_err_file") || assemble_status=$?
+  if [ "$assemble_status" -eq 3 ]; then
+    log_msg "Skipping ${project}: fewer than ${MIN_OBSERVATIONS} observations recorded since learning was enabled (${enabled_since})"
+    rm -f "$batch_err_file"
+    return
+  fi
+  if [ "$assemble_status" -ne 0 ]; then
     log_msg "ERROR: assemble-batch failed for ${project}: $(cat "$batch_err_file" 2>/dev/null || true)"
     rm -f "$batch_err_file"
     echo $((fail_count + 1)) > "$fail_count_file"

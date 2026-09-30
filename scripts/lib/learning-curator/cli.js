@@ -3,9 +3,11 @@
  * cli.js — Learning Curator command dispatch.
  *
  * Subcommands:
- *   assemble-batch --project <project>
+ *   assemble-batch --project <project> [--since <iso>] [--min-observations <n>]
  *     Layer 3: read observations, build CuratorBatch, write manifest + prompt file.
- *     Prints a single JSON line to stdout.
+ *     Prints a single JSON line to stdout. With --since only observations whose
+ *     ts is at or after it are read; with fewer than --min-observations of them
+ *     nothing is written and it exits 3.
  *
  *   ingest-proposal --batch-id <batch_id> --response-file <path> -- <claude argv...>
  *     Layer 4→5: parse LLM JSON output, validate, hand off to queue-writer.
@@ -15,8 +17,10 @@
  *
  *   learning-enabled --project <project>
  *     Whether learning is enabled for the project whose observations are filed
- *     under <project> (learning B-1). Prints JSON; exits 0 when enabled, 3 when
- *     not, 1 on error. The observer daemon asks this before analyzing.
+ *     under <project> (learning B-1), and since when. Prints JSON
+ *     { project, enabled, enabled_since }; exits 0 when enabled, 3 when not, 1
+ *     on error. The observer daemon asks this before analyzing, and analyzes
+ *     only observations recorded at or after enabled_since.
  *
  *   help
  *     Print usage.
@@ -28,7 +32,7 @@
 
 const { assembleBatch } = require('./batch-assembler');
 const { ingestProposal, recordRunFailure } = require('./proposal-ingestor');
-const { isLearningEnabledForProject } = require('../learning');
+const { learningEnabledSinceForProject } = require('../learning');
 
 // Spec layer-4 §parse_status enum for daemon-side failures.
 // CLI-binary-missing maps to transport_error with detail carrying the reason.
@@ -72,12 +76,30 @@ function cmdAssembleBatch(argv) {
     process.exit(1);
   }
 
+  let minObservations;
+  if (args['min-observations'] !== undefined) {
+    minObservations = Number(args['min-observations']);
+    if (!Number.isInteger(minObservations) || minObservations < 0) {
+      console.error(
+        `Error: --min-observations must be a non-negative integer (got "${args['min-observations']}")`,
+      );
+      process.exit(1);
+    }
+  }
+  const since = typeof args.since === 'string' ? args.since : undefined;
+
   let result;
   try {
-    result = assembleBatch({ project });
+    result = assembleBatch({ project, since, minObservations });
   } catch (err) {
     console.error(`Error: assemble-batch failed: ${err.message}`);
     process.exit(1);
+  }
+
+  // Too few observations recorded since the opt-in: nothing was written.
+  if (result.skipped) {
+    console.log(JSON.stringify(result));
+    process.exit(3);
   }
 
   // Print exactly one JSON line to stdout
@@ -174,15 +196,17 @@ function cmdLearningEnabled(argv) {
     process.exit(1);
   }
 
-  let enabled;
+  let since;
   try {
-    enabled = isLearningEnabledForProject(project);
+    since = learningEnabledSinceForProject(project);
   } catch (err) {
     console.error(`Error: learning-enabled failed: ${err.message}`);
     process.exit(1);
   }
 
-  console.log(JSON.stringify({ project, enabled }));
+  const enabled = since !== null;
+  const enabledSince = enabled ? new Date(since).toISOString() : null;
+  console.log(JSON.stringify({ project, enabled, enabled_since: enabledSince }));
   process.exit(enabled ? 0 : 3);
 }
 
@@ -192,7 +216,7 @@ function cmdHelp() {
       'Usage: node scripts/lib/learning-curator/cli.js <subcommand> [options]',
       '',
       'Subcommands:',
-      '  assemble-batch --project <project>',
+      '  assemble-batch --project <project> [--since <iso>] [--min-observations <n>]',
       '    Layer 3: assemble a CuratorBatch from recent observations.',
       '    Prints JSON: { batch_id, batch_hash, manifest_path, prompt_path, project }',
       '',

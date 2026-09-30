@@ -66,11 +66,13 @@ assert_not_match() {
 }
 
 # The daemon analyzes a project only where learning is enabled (learning B-1),
-# so every test that expects analysis opts in globally inside its temp home.
+# and only observations recorded at or after the opt-in took effect, so every
+# test that expects analysis opts in globally, stamped before its fixture rows.
 enable_global_learning() {
   local home="$1"
   mkdir -p "${home}/.arcforge/learning"
-  printf '{"scope":"global","enabled":true}\n' > "${home}/.arcforge/learning/config.json"
+  printf '{"scope":"global","enabled":true,"updated_at":"2026-01-01T00:00:00.000Z"}\n' \
+    > "${home}/.arcforge/learning/config.json"
 }
 
 # ─────────────────────────────────────────────
@@ -187,7 +189,7 @@ chmod +x "${STUB_BIN}/claude"
 PROJ_DIR="${TEST_HOME_C4}/.arcforge/observations/test-proj"
 mkdir -p "$PROJ_DIR"
 for i in $(seq 1 15); do
-  echo '{"event":"tool_start","tool":"Read"}' >> "${PROJ_DIR}/observations.jsonl"
+  echo '{"ts":"2026-05-21T01:00:00.000Z","event":"tool_start","tool":"Read"}' >> "${PROJ_DIR}/observations.jsonl"
 done
 
 C4_LOG=$(
@@ -598,7 +600,7 @@ STUB_BIN_B1="${TMPDIR_B1}/bin"
 mkdir -p "$STUB_BIN_B1"
 cat > "${STUB_BIN_B1}/claude" << STUB_EOF
 #!/usr/bin/env bash
-cat > /dev/null
+cat > "\${CLAUDE_MARKER}.prompt"
 touch "\${CLAUDE_MARKER}"
 exit 1
 STUB_EOF
@@ -657,7 +659,8 @@ assert_eq \
 B1_ON_HOME="${TMPDIR_B1}/on"
 seed_b1_home "$B1_ON_HOME"
 mkdir -p "${B1_ON_HOME}/b1-proj/.arcforge/learning" "${B1_ON_HOME}/.arcforge/learning/project-roots"
-printf '{"scope":"project","enabled":true}\n' > "${B1_ON_HOME}/b1-proj/.arcforge/learning/config.json"
+printf '{"scope":"project","enabled":true,"updated_at":"2026-01-01T00:00:00.000Z"}\n' \
+  > "${B1_ON_HOME}/b1-proj/.arcforge/learning/config.json"
 printf '{"project":"b1-proj","project_root":"%s"}\n' "${B1_ON_HOME}/b1-proj" \
   > "${B1_ON_HOME}/.arcforge/learning/project-roots/b1-proj.json"
 run_b1_analysis "$B1_ON_HOME" > /dev/null
@@ -666,6 +669,64 @@ assert_eq \
   'B1-T2: claude is invoked for a project under its project-scope opt-in' \
   'yes' \
   "$([ -f "${B1_ON_HOME}/claude-was-called" ] && echo yes || echo no)"
+
+# B1-T3: disable, then enable again, then run. Observations recorded under the
+# first opt-in are older than the re-enable's stamp, so they are never
+# submitted — by their own timestamps, not by moving the file.
+REPO_CLI="$(cd "$(dirname "$0")/../.." && pwd)/scripts/cli.js"
+B1_RE_HOME="${TMPDIR_B1}/re"
+B1_RE_ROOT="${B1_RE_HOME}/b1-proj"
+mkdir -p "$B1_RE_ROOT" "${B1_RE_HOME}/.arcforge/learning/project-roots"
+printf '{"project":"b1-proj","project_root":"%s"}\n' "$B1_RE_ROOT" \
+  > "${B1_RE_HOME}/.arcforge/learning/project-roots/b1-proj.json"
+b1_learn() {
+  env -u ARCFORGE_HOME HOME="$B1_RE_HOME" CLAUDE_PROJECT_DIR="$B1_RE_ROOT" \
+    node "$REPO_CLI" learn "$1" --project > /dev/null 2>&1
+}
+b1_rows() {
+  local label="$1" count="$2" obs_dir="${B1_RE_HOME}/.arcforge/observations/b1-proj" ts
+  mkdir -p "$obs_dir"
+  for i in $(seq 1 "$count"); do
+    ts=$(node -e 'process.stdout.write(new Date().toISOString())')
+    printf '{"ts":"%s","event":"tool_start","tool":"Bash","session":"s1","project":"b1-proj","project_id":"proj_abc123456789ab","evidence_status":"present","input":"%s row %d"}\n' \
+      "$ts" "$label" "$i" >> "${obs_dir}/observations.jsonl"
+  done
+}
+
+b1_learn enable
+b1_rows pre-disable 15
+sleep 1
+b1_learn disable
+sleep 1
+b1_learn enable
+sleep 1
+B1_RE_LOG=$(run_b1_analysis "$B1_RE_HOME")
+
+assert_eq \
+  'B1-T3: after disable then enable, the earlier backlog alone is not submitted' \
+  'no' \
+  "$([ -f "${B1_RE_HOME}/claude-was-called" ] && echo yes || echo no)"
+assert_match \
+  'B1-T3: logs that too few observations were recorded since the re-enable' \
+  'fewer than 10 observations recorded since learning was enabled' \
+  "$B1_RE_LOG"
+assert_eq \
+  'B1-T3: the earlier observations stay on disk' \
+  '15' \
+  "$(wc -l < "${B1_RE_HOME}/.arcforge/observations/b1-proj/observations.jsonl" | tr -d ' ')"
+
+b1_rows post-enable 12
+run_b1_analysis "$B1_RE_HOME" > /dev/null
+B1_RE_PROMPT=$(cat "${B1_RE_HOME}/claude-was-called.prompt" 2>/dev/null || true)
+
+assert_match \
+  'B1-T3: rows recorded after the re-enable are submitted' \
+  'post-enable row 12' \
+  "$B1_RE_PROMPT"
+assert_not_match \
+  'B1-T3: rows recorded before the opt-out are not submitted' \
+  'pre-disable' \
+  "$B1_RE_PROMPT"
 
 # ─────────────────────────────────────────────
 # Results

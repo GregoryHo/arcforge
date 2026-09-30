@@ -265,7 +265,11 @@ describe('CLI learning-enabled', () => {
   test('exits 3 with learning off everywhere', () => {
     const result = learningEnabled('demo');
     expect(result.status).toBe(3);
-    expect(JSON.parse(result.stdout)).toEqual({ project: 'demo', enabled: false });
+    expect(JSON.parse(result.stdout)).toEqual({
+      project: 'demo',
+      enabled: false,
+      enabled_since: null,
+    });
   });
 
   test('exits 0 under the project opt-in at the recorded root', () => {
@@ -273,6 +277,7 @@ describe('CLI learning-enabled', () => {
     writeJson(path.join(root, '.arcforge', 'learning', 'config.json'), {
       scope: 'project',
       enabled: true,
+      updated_at: '2026-05-03T00:00:00.000Z',
     });
     writeJson(path.join(tmpDir, '.arcforge', 'learning', 'project-roots', 'demo.json'), {
       project: 'demo',
@@ -280,7 +285,11 @@ describe('CLI learning-enabled', () => {
     });
     const result = learningEnabled('demo');
     expect(result.status).toBe(0);
-    expect(JSON.parse(result.stdout).enabled).toBe(true);
+    expect(JSON.parse(result.stdout)).toEqual({
+      project: 'demo',
+      enabled: true,
+      enabled_since: '2026-05-03T00:00:00.000Z',
+    });
   });
 
   test('exits 1 on a project name that is not a plain directory name', () => {

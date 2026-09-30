@@ -463,3 +463,59 @@ describe('assembleBatch — typed evidence (criterion 2)', () => {
     expect(promptContent).toContain('grep extensively');
   });
 });
+
+// ---------------------------------------------------------------------------
+// learning B-1: only observations recorded under the current opt-in
+// ---------------------------------------------------------------------------
+
+describe('assembleBatch — since (the opt-in stamp)', () => {
+  const project = 'test-project';
+  const OLD = (i) => makeObservation({ ts: `2026-05-01T00:${String(i).padStart(2, '0')}:00.000Z` });
+  const NEW = (i) => makeObservation({ ts: `2026-05-03T00:${String(i).padStart(2, '0')}:00.000Z` });
+  const SINCE = '2026-05-02T00:00:00.000Z';
+
+  function batchPrompt(result) {
+    return fs.readFileSync(result.prompt_path, 'utf8');
+  }
+
+  test('leaves observations recorded before the stamp out of the batch', () => {
+    seedObservations(project, [...Array.from({ length: 3 }, (_, i) => OLD(i)), NEW(0), NEW(1)]);
+    const { assembleBatch } = getAssembler();
+
+    const result = assembleBatch({ project, since: SINCE });
+
+    const prompt = batchPrompt(result);
+    expect(prompt).not.toContain('2026-05-01T00:');
+    expect(prompt).toContain('2026-05-03T00:00');
+    expect(prompt).toContain('2026-05-03T00:01');
+    const manifest = JSON.parse(fs.readFileSync(result.manifest_path, 'utf8'));
+    expect(manifest.quality_inputs.project_observation_count).toBe(2);
+  });
+
+  test('a row with no parseable ts is not counted as recorded after the stamp', () => {
+    seedObservations(project, [makeObservation({ ts: 'garbage' }), NEW(0)]);
+    const { assembleBatch } = getAssembler();
+
+    const manifest = JSON.parse(
+      fs.readFileSync(assembleBatch({ project, since: SINCE }).manifest_path, 'utf8'),
+    );
+    expect(manifest.quality_inputs.project_observation_count).toBe(1);
+  });
+
+  test('with too few eligible observations it skips and writes nothing', () => {
+    seedObservations(project, [...Array.from({ length: 12 }, (_, i) => OLD(i)), NEW(0)]);
+    const { assembleBatch } = getAssembler();
+
+    const result = assembleBatch({ project, since: SINCE, minObservations: 10 });
+
+    expect(result).toEqual({ skipped: 'too_few_observations', project, eligible: 1, minimum: 10 });
+    const batchesDir = path.join(tmpDir, '.arcforge', 'learning', 'curator-batches');
+    expect(fs.existsSync(batchesDir) ? fs.readdirSync(batchesDir) : []).toEqual([]);
+  });
+
+  test('rejects a since that is not a timestamp', () => {
+    seedObservations(project, [NEW(0)]);
+    const { assembleBatch } = getAssembler();
+    expect(() => assembleBatch({ project, since: 'yesterday' })).toThrow(/since/);
+  });
+});

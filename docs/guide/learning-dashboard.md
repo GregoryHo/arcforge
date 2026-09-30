@@ -309,8 +309,11 @@ arcforge learn disable --project
 ```
 
 That stops new observations and analysis for the scope. The background analysis
-checks the opt-in before each run, so observations recorded before you turned
-learning off stay where they are and are never sent for analysis; with learning
+checks the opt-in before each run and only ever sends observations recorded
+since learning was last turned on, going by each observation's own timestamp.
+So observations recorded before you turned learning off are never sent for
+analysis — not now, and not if you turn learning back on later; they stay on
+disk, and only what is recorded after the new opt-in is analyzed. With learning
 off everywhere, the background process is not even started. Instincts you already
 activated stay active — disabling learning stops it accumulating more, it does
 not undo what you accepted. To retire an individual instinct, deactivate it from

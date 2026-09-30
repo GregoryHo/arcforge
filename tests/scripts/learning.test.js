@@ -12,6 +12,7 @@ const {
   isInjectActivatedInstinctsEnabled,
   isLearningEnabledForProject,
   learningEnabledSince,
+  learningEnabledSinceForProject,
   readLearningConfig,
   recordProjectRoot,
   setLearningEnabled,
@@ -128,6 +129,27 @@ describe('the learning opt-in', () => {
     it('rejects a project name that is not a plain directory name', () => {
       expect(() => isLearningEnabledForProject('../escape', { homeDir })).toThrow(/project/);
       expect(() => isLearningEnabledForProject('', { homeDir })).toThrow(/project/);
+    });
+
+    // B-1: only observations recorded under the current opt-in are analyzed,
+    // so the daemon filters on the stamp of the opt-in that authorizes them.
+    it('reports the stamp of the latest enable after an opt-out, not the first opt-in', () => {
+      const FIRST = '2026-05-01T00:00:00.000Z';
+      const OFF = '2026-05-02T00:00:00.000Z';
+      const AGAIN = '2026-05-03T00:00:00.000Z';
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir, now: FIRST });
+      recordProjectRoot({ projectRoot, homeDir });
+      setLearningEnabled({ scope: 'project', enabled: false, projectRoot, homeDir, now: OFF });
+      expect(learningEnabledSinceForProject(project(), { homeDir })).toBeNull();
+
+      setLearningEnabled({ scope: 'project', enabled: true, projectRoot, homeDir, now: AGAIN });
+      expect(learningEnabledSinceForProject(project(), { homeDir })).toBe(Date.parse(AGAIN));
+    });
+
+    it('reports the global stamp for a project with no root on record', () => {
+      const AT = '2026-05-04T00:00:00.000Z';
+      setLearningEnabled({ scope: 'global', enabled: true, projectRoot, homeDir, now: AT });
+      expect(learningEnabledSinceForProject('never-seen', { homeDir })).toBe(Date.parse(AT));
     });
   });
 

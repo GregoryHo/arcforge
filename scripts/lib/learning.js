@@ -121,11 +121,35 @@ function recordProjectRoot({ projectRoot = process.cwd(), homeDir } = {}) {
 }
 
 /**
+ * When learning took effect for the project whose observations are filed under
+ * `project`, in epoch ms, or null when it is not enabled for it (B-1).
+ *
+ * With the project's root on record this is `learningEnabledSince` at that root
+ * — the earliest enabled scope's stamp, which a disable overwrites, so a
+ * re-enable starts a new period. Without a record only the global opt-in can
+ * authorize the project, so it is the global scope's stamp, or null (fail
+ * closed). The observer daemon analyzes only observations recorded at or after
+ * this instant, so nothing captured under an earlier opt-in is analyzed later.
+ *
+ * @param {string} project - sanitized project directory name
+ * @param {Object} [opts]
+ * @param {string} [opts.homeDir] - Override for the arcforge home's parent.
+ * @returns {number|null}
+ */
+function learningEnabledSinceForProject(project, { homeDir } = {}) {
+  const record = readJsonFile(getProjectRootRecordPath(project, { homeDir }), null);
+  if (record && typeof record.project_root === 'string') {
+    return learningEnabledSince({ projectRoot: record.project_root, homeDir });
+  }
+  const global = readScopeConfig({ scope: 'global', homeDir });
+  if (global.enabled !== true) return null;
+  return scopeEnabledAt(global, getLearningConfigPath({ scope: 'global', homeDir }));
+}
+
+/**
  * True when learning is enabled for the project whose observations are filed
  * under `project` — the question the observer daemon asks before analyzing
- * (B-1). The global opt-in answers it for every project; otherwise it is
- * `isLearningEnabledAnyScope` at the recorded root. No record means no known
- * project-scope opt-in, so the answer fails closed.
+ * (B-1). See `learningEnabledSinceForProject`.
  *
  * @param {string} project - sanitized project directory name
  * @param {Object} [opts]
@@ -133,11 +157,7 @@ function recordProjectRoot({ projectRoot = process.cwd(), homeDir } = {}) {
  * @returns {boolean}
  */
 function isLearningEnabledForProject(project, { homeDir } = {}) {
-  const recordPath = getProjectRootRecordPath(project, { homeDir });
-  if (isLearningEnabled({ scope: 'global', homeDir })) return true;
-  const record = readJsonFile(recordPath, null);
-  if (!record || typeof record.project_root !== 'string') return false;
-  return isLearningEnabledAnyScope({ projectRoot: record.project_root, homeDir });
+  return learningEnabledSinceForProject(project, { homeDir }) !== null;
 }
 
 /**
@@ -270,6 +290,7 @@ module.exports = {
   isLearningEnabledAnyScope,
   isLearningEnabledForProject,
   learningEnabledSince,
+  learningEnabledSinceForProject,
   readLearningConfig,
   recordProjectRoot,
   setLearningEnabled,
