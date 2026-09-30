@@ -394,6 +394,13 @@ rates, average scores, 95% confidence intervals, and A/B comparisons where both
 arms exist. Snapshots are written under `evals/benchmarks/` as `latest.json` plus
 a date-stamped copy, so history is kept rather than overwritten.
 
+A per-trial export goes to `evals/benchmarks/raw/` the same way. Each raw row
+carries its run conditions (`model`, `effort`, `trialTimeoutMs`, `maxTurns`,
+`pluginDir`). Its baseline-relative fields (`baseline_score_avg`,
+`score_delta_vs_baseline_avg` and the rest) are computed against the baseline
+pool that ran under the same model, effort, ceiling and turn budget. A row with
+no such baseline gets `null` there.
+
 ```bash
 arcforge eval report --since 2026-08-01
 arcforge eval history

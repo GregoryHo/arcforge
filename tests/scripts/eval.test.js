@@ -1725,6 +1725,8 @@ Do something.
       );
 
       appendResult(
+        // Both arms on one model: a raw row is compared with the baseline pool of
+        // its own conditions (B-8), so the arms must share them.
         makeResult({
           eval: 'raw-eval-baseline',
           trial: 1,
@@ -1734,7 +1736,7 @@ Do something.
           duration_ms: 1000,
           input_tokens: 50,
           output_tokens: 80,
-          model: 'baseline-model',
+          model: 'shared-model',
           runId: '20260317-100000',
           version: '2',
           output: 'large transcript text should not be duplicated into dashboard raw metrics rows',
@@ -1754,7 +1756,7 @@ Do something.
           duration_ms: 1500,
           input_tokens: 60,
           output_tokens: 120,
-          model: 'treatment-model',
+          model: 'shared-model',
           runId: '20260317-100000',
           version: '2',
           assertionScores: [1],
@@ -1794,7 +1796,7 @@ Do something.
         input_tokens_delta_vs_baseline_avg: 0,
         output_tokens_delta_vs_baseline_avg: 0,
         total_tokens_delta_vs_baseline_avg: 0,
-        model: 'baseline-model',
+        model: 'shared-model',
         transcript_path: 'evals/results/raw-eval/20260317-100000/transcripts/baseline-trial-1.txt',
         assertion_count: 1,
         assertion_passed_count: 0,

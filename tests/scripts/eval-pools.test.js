@@ -189,6 +189,39 @@ describe('pairArms', () => {
     }
   });
 
+  it('exports every condition on raw rows and a baseline average per pool', () => {
+    const { generateRawBenchmarkData } = require('../../scripts/lib/eval-benchmark');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'test-raw-pools-'));
+    try {
+      const dir = path.join(root, SCENARIOS_DIR);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, 'raw.md'),
+        '# Eval: raw\n\n## Scope\nskill\n\n## Scenario\nDo it.\n\n## Grader\ncode\n',
+      );
+      const put = (arm, score, overrides) =>
+        appendResult(row({ eval: `raw-${arm}`, score, runId: 'r1', ...overrides }), root);
+      // Two conditions: 900 s (baseline scores 0.2) and 1800 s (baseline scores 0.8).
+      put('baseline', 0.2, { trialTimeoutMs: 900000, maxTurns: 10 });
+      put('baseline', 0.8, { trialTimeoutMs: 1800000, timestamp: '2026-09-30T11:00:00.000Z' });
+      put('treatment', 1, { trialTimeoutMs: 900000, pluginDir: true, maxTurns: 10 });
+      put('treatment', 1, { trialTimeoutMs: 1800000, timestamp: '2026-09-30T11:00:00.000Z' });
+
+      const { rows } = generateRawBenchmarkData(root, 'now');
+      const treatmentAt = (ceiling) =>
+        rows.find((r) => r.condition === 'treatment' && r.trialTimeoutMs === ceiling);
+      // Each treatment row is compared with the baseline pool of its own conditions.
+      expect(treatmentAt(900000).baseline_score_avg).toBe(0.2);
+      expect(treatmentAt(900000).score_delta_vs_baseline_avg).toBe(0.8);
+      expect(treatmentAt(1800000).baseline_score_avg).toBe(0.8);
+      expect(treatmentAt(900000)).toEqual(
+        expect.objectContaining({ effort: 'default', maxTurns: 10, pluginDir: true }),
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('refuses when the arms share no condition pair, listing every pool', () => {
     const paired = pairArms([row({ model: 'opus' })], [row({ model: 'sonnet' })]);
     expect(paired.error).toMatch(/no run conditions in common/);

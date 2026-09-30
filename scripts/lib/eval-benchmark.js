@@ -17,7 +17,7 @@ const path = require('node:path');
 const { ensureDir, getTimestamp } = require('./utils');
 const stats = require('./eval-stats');
 const graders = require('./eval-graders');
-const { splitPools, pairArms } = require('./eval-pools');
+const { splitPools, pairArms, pairKey } = require('./eval-pools');
 const {
   BENCHMARKS_DIR,
   loadResults,
@@ -117,17 +117,30 @@ function rawRowsForScenario(scenario, projectRoot, options = {}) {
     results: loadResults(evalName, projectRoot, filterOpts),
   }));
   const baselineResults = conditionResults.find((c) => c.condition === 'baseline')?.results || [];
-  const baseline = {
-    score: averageResultMetric(baselineResults, 'score'),
-    duration_ms: averageResultMetric(baselineResults, 'duration_ms'),
-    input_tokens: averageResultMetric(baselineResults, 'input_tokens'),
-    output_tokens: averageResultMetric(baselineResults, 'output_tokens'),
-    total_tokens: averageResultMetric(baselineResults, 'total_tokens'),
+  // One baseline average per pool (B-8): a row is compared with the baseline
+  // that ran under its own model, effort, ceiling and turn budget, the pairing
+  // eval compare uses. A row with no such baseline gets nulls.
+  const baselineByPair = new Map();
+  for (const r of baselineResults) {
+    const key = pairKey(r);
+    if (!baselineByPair.has(key)) baselineByPair.set(key, []);
+    baselineByPair.get(key).push(r);
+  }
+  const baselineFor = (result) => {
+    const pool = baselineByPair.get(pairKey(result)) || [];
+    return {
+      score: averageResultMetric(pool, 'score'),
+      duration_ms: averageResultMetric(pool, 'duration_ms'),
+      input_tokens: averageResultMetric(pool, 'input_tokens'),
+      output_tokens: averageResultMetric(pool, 'output_tokens'),
+      total_tokens: averageResultMetric(pool, 'total_tokens'),
+    };
   };
   const rows = [];
 
   for (const { condition, results } of conditionResults) {
     for (const result of results) {
+      const baseline = baselineFor(result);
       const { assertion_count, assertion_passed_count } = assertionSummary(result);
       const durationMs = resultMetricValue(result, 'duration_ms');
       const apiDurationMs = resultMetricValue(result, 'api_duration_ms');
@@ -146,6 +159,10 @@ function rawRowsForScenario(scenario, projectRoot, options = {}) {
         trial: result.trial,
         k: result.k,
         model: result.model || null,
+        effort: result.effort ?? null,
+        trialTimeoutMs: result.trialTimeoutMs ?? null,
+        maxTurns: result.maxTurns ?? null,
+        pluginDir: result.pluginDir ?? null,
         passed: result.passed,
         score: result.score,
         duration_ms: durationMs,
