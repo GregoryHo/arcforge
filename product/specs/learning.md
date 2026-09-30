@@ -118,13 +118,19 @@ was recorded about them.
   interval MUST give the result of running it once. Decay MUST NOT archive an
   activated instinct — it leaves the injected set only through the user's
   deactivation (B-4) — and every archive decay does perform MUST write an
-  audit record naming the instinct (D-022).
+  audit record naming the instinct and stamp the archived file with the
+  reason it was archived, so a later reader can tell a decay archive from a
+  contradiction archive (D-022).
 - **B-11 The way back from the archive is a command.** `learn instinct
-  restore` moves an instinct that decay archived back out of the archive and
-  records the restore in the audit log, naming the instinct and the file it
-  returned to. Hand-editing state stays out of contract (B-5), so this is the
-  only supported route back; like every change to what may be injected, it is
-  audited (D-040). When a diary draft exists, it *is* the
+  restore` moves an archived instinct back out of the archive, whatever
+  archived it — the user's explicit command outranks both decay and an earlier
+  contradiction — and records the restore in the audit log, naming the
+  instinct, the file it returned to, and the archive reason when the file
+  carries one; files archived before that stamp existed carry none and are
+  restorable all the same. Hand-editing state stays out of contract (B-5), so
+  this is the only supported route back; like every change to what may be
+  injected, it is audited (D-040).
+- **B-7 One session, one record.** When a diary draft exists, it *is* the
   entry — finalizing renames the draft rather than merging, and writing a
   second diary alongside a draft would orphan one of them. The `/learning`
   skill owns knowing when a session is worth recording at all.
