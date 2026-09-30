@@ -251,6 +251,39 @@ describe('pairArms', () => {
     expect(paired.error).toMatch(/no run conditions in common/);
   });
 
+  it('keeps a baseline error row in the raw export but out of the baseline average', () => {
+    const { generateRawBenchmarkData } = require('../../scripts/lib/eval-benchmark');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'test-raw-scorable-'));
+    try {
+      const dir = path.join(root, SCENARIOS_DIR);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, 'rs.md'),
+        '# Eval: rs\n\n## Scope\nskill\n\n## Scenario\nDo it.\n\n## Grader\ncode\n',
+      );
+      const put = (arm, trial, overrides) =>
+        appendResult(row({ eval: `rs-${arm}`, trial, runId: 'r1', ...overrides }), root);
+      put('baseline', 1, { score: 0.6 });
+      // A provider refusal: placeholder score 0, which must not drag the average.
+      put('baseline', 2, {
+        score: 0,
+        passed: false,
+        infraError: true,
+        errorType: 'provider_refusal',
+      });
+      put('treatment', 1, { score: 1 });
+
+      const { rows } = generateRawBenchmarkData(root, 'now');
+      expect(rows.filter((r) => r.condition === 'baseline')).toHaveLength(2);
+      expect(rows.find((r) => r.infra_error)).toBeDefined();
+      const treatment = rows.find((r) => r.condition === 'treatment');
+      expect(treatment.baseline_score_avg).toBe(0.6);
+      expect(treatment.score_delta_vs_baseline_avg).toBe(0.4);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('refuses when the arms share no condition pair, listing every pool', () => {
     const paired = pairArms([row({ model: 'opus' })], [row({ model: 'sonnet' })]);
     expect(paired.error).toMatch(/no run conditions in common/);

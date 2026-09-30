@@ -127,7 +127,9 @@ function rawRowsForScenario(scenario, projectRoot, options = {}) {
     baselineByPair.get(key).push(r);
   }
   const baselineFor = (result) => {
-    const pool = baselineByPair.get(pairKey(result)) || [];
+    // Error rows stay in the export but never in the average: their score is a
+    // placeholder, not behavior (B-10).
+    const pool = stats.scorableResults(baselineByPair.get(pairKey(result)) || []);
     return {
       score: averageResultMetric(pool, 'score'),
       duration_ms: averageResultMetric(pool, 'duration_ms'),
