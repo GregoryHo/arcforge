@@ -56,9 +56,28 @@ function computeScenarioHash(contents) {
  *   undefined if not specified (which means "harness default model")
  * @returns {string} Filename like `${hash}-${modelKey}.json`
  */
-function preflightFilename(hash, model) {
+function preflightFilename(hash, model, conditions = {}) {
   const modelKey = (model || 'default').replace(/[^A-Za-z0-9._-]/g, '_');
-  return `${hash}-${modelKey}.json`;
+  return `${hash}-${modelKey}${conditionsSuffix(conditions)}.json`;
+}
+
+/**
+ * The run conditions a baseline's competence depends on beyond scenario and
+ * model: its turn budget, and whether a plugin dir was in play (which also sets
+ * the permission mode). A PASS measured under one set does not unlock an A/B
+ * run under another. Plain conditions (no budget, no plugin dir) add nothing to
+ * the file name, so records written before this key existed still match them.
+ * @param {{ maxTurns?: number, pluginDir?: string }} conditions
+ * @returns {string} '' or e.g. '-t10-pd'
+ */
+function conditionsSuffix({ maxTurns, pluginDir } = {}) {
+  if (maxTurns == null && !pluginDir) return '';
+  return `-t${maxTurns ?? 'none'}${pluginDir ? '-pd' : ''}`;
+}
+
+/** Human-readable conditions, as the gate names them. */
+function describeConditions({ maxTurns, pluginDir } = {}) {
+  return `max turns ${maxTurns ?? 'none'}, plugin dir ${pluginDir ? 'yes' : 'no'}`;
 }
 
 /**
@@ -111,7 +130,7 @@ function resolveScenarioFile(name, projectRoot) {
  * @returns {{ scenario_hash: string, scenario_name: string, model: string|null, pass_rate: number|null, k: number, verdict: 'PASS'|'BLOCK', reason: string, timestamp: string }}
  */
 function runPreflight(name, projectRoot, opts = {}) {
-  const { runTrial, gradeResult, model } = opts;
+  const { runTrial, gradeResult, model, conditions = {} } = opts;
 
   const filePath = resolveScenarioFile(name, projectRoot);
   if (!filePath) {
@@ -120,7 +139,11 @@ function runPreflight(name, projectRoot, opts = {}) {
 
   const contents = fs.readFileSync(filePath, 'utf8');
   const hash = computeScenarioHash(contents);
-  const cacheFile = preflightFilename(hash, model);
+  const cacheFile = preflightFilename(hash, model, conditions);
+  const ranUnder = {
+    max_turns: conditions.maxTurns ?? null,
+    plugin_dir: Boolean(conditions.pluginDir),
+  };
 
   const results = [];
   for (let t = 1; t <= PREFLIGHT_K; t++) {
@@ -146,6 +169,7 @@ function runPreflight(name, projectRoot, opts = {}) {
       scenario_hash: hash,
       scenario_name: name,
       model: model || null,
+      ...ranUnder,
       pass_rate: null,
       k: PREFLIGHT_K,
       errored: errored.length,
@@ -172,6 +196,7 @@ function runPreflight(name, projectRoot, opts = {}) {
     scenario_hash: hash,
     scenario_name: name,
     model: model || null,
+    ...ranUnder,
     pass_rate,
     k: PREFLIGHT_K,
     verdict,
@@ -205,10 +230,12 @@ function runPreflight(name, projectRoot, opts = {}) {
  * @param {string} [opts.model] - Model identifier the A/B run will use; the
  *   gate verifies a preflight record exists for this exact model. Pass the
  *   same value `arcforge eval ab` will pass to its trials.
+ * @param {{ maxTurns?: number, pluginDir?: string }} [opts.conditions] - The turn
+ *   budget and plugin dir the A/B baseline will run under; the record must match.
  * @returns {null|string} null if cleared to proceed; error message string if blocked
  */
 function checkPreflightGate(name, projectRoot, opts = {}) {
-  const { model } = opts;
+  const { model, conditions = {} } = opts;
 
   const filePath = resolveScenarioFile(name, projectRoot);
   if (!filePath) {
@@ -217,18 +244,11 @@ function checkPreflightGate(name, projectRoot, opts = {}) {
 
   const contents = fs.readFileSync(filePath, 'utf8');
   const hash = computeScenarioHash(contents);
-  const cacheFile = preflightFilename(hash, model);
+  const cacheFile = preflightFilename(hash, model, conditions);
 
   const preflightFile = path.join(projectRoot, PREFLIGHT_DIR, cacheFile);
   if (!fs.existsSync(preflightFile)) {
-    const modelLabel = model || 'default';
-    const remediationFlag = model ? ` --model ${model}` : '';
-    return (
-      `No preflight record found for scenario "${name}" (hash: ${hash}, model: ${modelLabel}).\n` +
-      `Run: arcforge eval preflight ${name}${remediationFlag}\n` +
-      `Preflight is per-(scenario, model) — baseline pass rate is model-dependent, ` +
-      `so a PASS under one model does not unblock A/B runs on another.`
-    );
+    return missingPreflightMessage(name, projectRoot, { hash, model, conditions });
   }
 
   let record;
@@ -258,6 +278,44 @@ function checkPreflightGate(name, projectRoot, opts = {}) {
   }
 
   return null;
+}
+
+/**
+ * Explain a missing preflight record: name the conditions this run needs, any
+ * conditions the same scenario and model were preflighted under instead, and
+ * the exact command that produces the record the gate is looking for.
+ */
+function missingPreflightMessage(name, projectRoot, { hash, model, conditions }) {
+  const modelLabel = model || 'default';
+  const flags = [
+    model ? `--model ${model}` : '',
+    conditions.maxTurns != null ? `--max-turns ${conditions.maxTurns}` : '',
+    conditions.pluginDir ? `--plugin-dir ${conditions.pluginDir}` : '',
+  ].filter(Boolean);
+  const prefix = preflightFilename(hash, model).replace(/\.json$/, '');
+  const dir = path.join(projectRoot, PREFLIGHT_DIR);
+  const recorded = (fs.existsSync(dir) ? fs.readdirSync(dir) : [])
+    .filter((f) => f === `${prefix}.json` || (f.startsWith(`${prefix}-t`) && f.endsWith('.json')))
+    .map((f) => {
+      try {
+        const r = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
+        return describeConditions({ maxTurns: r.max_turns ?? undefined, pluginDir: r.plugin_dir });
+      } catch {
+        return null; // unreadable record: it cannot say what it ran under
+      }
+    })
+    .filter(Boolean);
+  const mismatch =
+    recorded.length > 0
+      ? `A preflight exists for this scenario and model, recorded under: ${recorded.join('; ')}.\n`
+      : '';
+  return (
+    `No preflight record found for scenario "${name}" (hash: ${hash}, model: ${modelLabel}, ${describeConditions(conditions)}).\n` +
+    mismatch +
+    `Run: arcforge eval preflight ${[name, ...flags].join(' ')}\n` +
+    `Preflight is per-(scenario, model, turn budget, plugin dir) — baseline pass rate depends ` +
+    `on each, so a PASS under one does not unblock A/B runs under another.`
+  );
 }
 
 module.exports = {

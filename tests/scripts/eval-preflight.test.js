@@ -469,3 +469,64 @@ describe('checkPreflightGate', () => {
     expect(sanitized).toMatch(/^abcd1234-[A-Za-z0-9._-]+\.json$/);
   });
 });
+
+// ── preflight keyed on the baseline's run conditions ─────────────────────────
+
+describe('preflight is keyed on the turn budget and plugin dir the baseline ran under', () => {
+  let tempDir;
+  const passTrial = () => ({ passed: false, score: 0 });
+
+  beforeEach(() => {
+    tempDir = makeTempDir();
+    writeScenario(tempDir, 'test-scenario', SCENARIO_CONTENT);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const preflightUnder = (conditions) =>
+    runPreflight('test-scenario', tempDir, {
+      runTrial: passTrial,
+      gradeResult: (r) => r,
+      conditions,
+    });
+
+  test('a PASS unlocks an A/B run under the same conditions (hit)', () => {
+    const conditions = { maxTurns: 10, pluginDir: '/some/plugin' };
+    expect(preflightUnder(conditions).verdict).toBe('PASS');
+    expect(checkPreflightGate('test-scenario', tempDir, { conditions })).toBeNull();
+  });
+
+  test('the record says what the baseline ran under', () => {
+    const record = preflightUnder({ maxTurns: 10, pluginDir: '/some/plugin' });
+    expect(record.max_turns).toBe(10);
+    expect(record.plugin_dir).toBe(true);
+  });
+
+  test('a PASS under no budget does not unlock a plugin-dir A/B (miss)', () => {
+    preflightUnder({});
+    const error = checkPreflightGate('test-scenario', tempDir, {
+      conditions: { maxTurns: 10, pluginDir: '/some/plugin' },
+    });
+    expect(error).toMatch(/max turns 10, plugin dir yes/);
+    expect(error).toMatch(/recorded under: max turns none, plugin dir no/);
+    expect(error).toContain(
+      'Run: arcforge eval preflight test-scenario --max-turns 10 --plugin-dir /some/plugin',
+    );
+  });
+
+  test('a PASS under one budget does not unlock another budget (miss)', () => {
+    preflightUnder({ maxTurns: 5 });
+    const error = checkPreflightGate('test-scenario', tempDir, { conditions: { maxTurns: 8 } });
+    expect(error).toMatch(/max turns 8, plugin dir no/);
+    expect(error).toContain('--max-turns 8');
+  });
+
+  test('plain conditions keep the pre-existing cache file name', () => {
+    const hash = computeScenarioHash(SCENARIO_CONTENT);
+    writePreflightFile(tempDir, hash, { verdict: 'PASS' });
+    expect(checkPreflightGate('test-scenario', tempDir, { conditions: {} })).toBeNull();
+    expect(checkPreflightGate('test-scenario', tempDir)).toBeNull();
+  });
+});

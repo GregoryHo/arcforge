@@ -196,6 +196,56 @@ describe('eval command', () => {
     });
   });
 
+  describe('eval ab preflight gate matches the baseline conditions', () => {
+    const { runPreflight } = require('../../scripts/lib/eval-preflight');
+    let errors;
+
+    beforeEach(() => {
+      fs.mkdirSync(path.join(tempDir, 'skills', 'demo'), { recursive: true });
+      fs.writeFileSync(path.join(tempDir, 'skills', 'demo', 'SKILL.md'), 'body');
+      const dir = path.join(tempDir, evalLib.SCENARIOS_DIR);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, 'gated.md'),
+        SCENARIO('gated', '\n## Target\nskills/demo/SKILL.md\n').replace(
+          '## Scope\nagent',
+          '## Scope\nskill',
+        ),
+      );
+      // A PASS recorded under a plugin-dir baseline: 10 turns, plugin dir in play.
+      runPreflight('gated', tempDir, {
+        runTrial: () => ({ passed: false, score: 0 }),
+        gradeResult: (r) => r,
+        conditions: { maxTurns: 10, pluginDir: tempDir },
+      });
+      evalLib.runSkillEval.mockReturnValue({ baseline: [], treatment: [], delta: 0 });
+      errors = [];
+      jest.spyOn(console, 'error').mockImplementation((...a) => errors.push(a.join(' ')));
+      jest.spyOn(process, 'exit').mockImplementation((code) => {
+        throw new Error(`process.exit(${code})`);
+      });
+    });
+
+    it('runs when the A/B baseline matches the recorded conditions (hit)', async () => {
+      await runEvalCommand(args(['ab', 'gated'], { 'plugin-dir': tempDir }), {
+        projectRoot: tempDir,
+        asJson: false,
+      });
+      expect(evalLib.runSkillEval).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses, naming the mismatch and the command, when they differ (miss)', async () => {
+      await expect(
+        runEvalCommand(args(['ab', 'gated']), { projectRoot: tempDir, asJson: false }),
+      ).rejects.toThrow('process.exit(1)');
+      expect(evalLib.runSkillEval).not.toHaveBeenCalled();
+      const message = errors.join('\n');
+      expect(message).toContain('max turns none, plugin dir no');
+      expect(message).toContain('recorded under: max turns 10, plugin dir yes');
+      expect(message).toContain('Run: arcforge eval preflight gated');
+    });
+  });
+
   describe('eval ab, skill scope (B-1, #197)', () => {
     const SKILL_BODY = 'SKILL BODY THAT MUST NOT REACH A PLUGIN-ROUTED TREATMENT';
 

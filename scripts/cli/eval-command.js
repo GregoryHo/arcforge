@@ -239,6 +239,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
       gradeResult: stubGrade,
       model,
       effort,
+      conditions: { maxTurns: baselineArm.maxTurns, pluginDir: abPluginDir },
     });
 
     console.log(`Verdict: ${outcome.verdict}`);
@@ -324,7 +325,20 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     if (shouldSkipPreflightGate(scenario)) {
       console.log(`Preflight: skipped by scenario policy (${scenario.name})`);
     } else {
-      const gateError = checkPreflightGate(scenario.name, projectRoot, { model });
+      // Keyed on the conditions this A/B's baseline will run under (the same
+      // resolution preflight used), so a PASS under another budget or without
+      // a plugin dir does not unlock it.
+      const abPluginDir =
+        args.options['plugin-dir'] ||
+        (scenario.scope === 'workflow' ? scenario.pluginDir : undefined);
+      const { maxTurns: abMaxTurns } = eval_.sharedArmOptions(scenario, {
+        maxTurns: args.options['max-turns'] ? parseInt(args.options['max-turns'], 10) : undefined,
+        pluginDir: abPluginDir,
+      });
+      const gateError = checkPreflightGate(scenario.name, projectRoot, {
+        model,
+        conditions: { maxTurns: abMaxTurns, pluginDir: abPluginDir },
+      });
       if (gateError) {
         console.error(`Error: ${gateError}`);
         process.exit(1);

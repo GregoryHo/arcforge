@@ -57,16 +57,19 @@ A BLOCK is a verdict about your *scenario*, not your change. Make the task
 harder, or find the failure mode you were actually worried about.
 
 Preflight runs its baseline the way the A/B will run it: with the same turn
-budget and permission mode. So give `preflight` the `--max-turns` and
+budget and permission mode. Give `preflight` the `--max-turns` and
 `--plugin-dir` you will give `ab`. There `--plugin-dir` only sets those two
 things; nothing is loaded into the baseline. A `workflow` scenario's
 `## Plugin Dir` counts on its own. With a plugin dir and no other limit, the
 budget is 10 turns.
 
 Preflight results are cached per scenario **and per model**, keyed on the
-scenario's content. Edit the scenario or switch models and you need a fresh one —
-baseline competence is not transferable between models, and a PASS earned under
-one does not unblock A/B runs under another.
+scenario's content, and per turn budget and plugin dir. Edit the scenario, switch
+models, or change the budget or plugin dir, and you need a fresh one: baseline
+competence is not transferable between conditions, and a PASS earned under one
+does not unblock A/B runs under another. When `ab` finds no record for its own
+conditions, it stops. It names the conditions it needed and any it found
+instead, and gives the exact `preflight` command to run.
 
 A scenario that measures "this must not get worse" rather than "this must
 improve" opts out by declaring `skip`:
