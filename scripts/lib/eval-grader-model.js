@@ -20,6 +20,10 @@ const {
   buildModelGraderError,
 } = require('./eval-grader-io');
 
+// The prompts ship with the engine: resolved relative to THIS file, never the
+// user's project root (the way loop-verifier.js resolves its prompt).
+const PROMPTS_DIR = path.join(__dirname, 'prompts');
+
 /**
  * Grade a trial result using the eval-grader agent (LLM-as-judge).
  * Spawns a Claude session with the rubric and trial output, then
@@ -33,16 +37,15 @@ const {
  * @returns {import('./eval').TrialResult} New result with grade
  */
 function gradeWithModel(result, scenario, projectRoot) {
-  const agentDef = loadAgentDef(
-    path.join(projectRoot, 'scripts', 'lib', 'prompts', 'eval-grader.md'),
-  );
+  const agentDef = loadAgentDef(path.join(PROMPTS_DIR, 'eval-grader.md'));
 
   const rubric = scenario.assertions.map((a, i) => `${i + 1}. ${a}`).join('\n');
   const artifacts = captureTrialArtifacts(result.trialDir);
   const rawOutput = result.output || result.error || '(no output)';
   const { numbered } = numberTranscriptBlocks(rawOutput);
   const prompt = [
-    ...(agentDef ? [agentDef, ''] : []),
+    agentDef,
+    '',
     '## This Trial',
     '',
     '### Assertions',
@@ -146,10 +149,7 @@ function gradeWithModel(result, scenario, projectRoot) {
  * @returns {{ analysis: string, delta_explanation?: string, weak_assertions_patterns?: string[], variance_notes?: string[], improvements?: string[], regressions?: string[], limitations?: string[] }|null}
  */
 function compareWithModel(scenario, baseline, treatment, projectRoot, metrics) {
-  const agentDef = loadAgentDef(
-    path.join(projectRoot, 'scripts', 'lib', 'prompts', 'eval-analyzer.md'),
-  );
-  if (!agentDef) return null;
+  const agentDef = loadAgentDef(path.join(PROMPTS_DIR, 'eval-analyzer.md'));
   const assertions = scenario.assertions.map((a, i) => `${i + 1}. ${a}`).join('\n');
   const fmtResults = (results) =>
     results
@@ -318,9 +318,7 @@ function scoreBlindRubric(rubric, scoresA, scoresB) {
  * @returns {{ winner_original_label: 'baseline'|'treatment'|'tie', reasoning: string, rubric: Array<{criterion: string, weight: number}>, score_baseline: number, score_treatment: number }|null}
  */
 function runBlindComparator(taskPrompt, baselineOutput, treatmentOutput, projectRoot, skillName) {
-  const agentDef = loadAgentDef(
-    path.join(projectRoot, 'scripts', 'lib', 'prompts', 'eval-blind-comparator.md'),
-  );
+  const agentDef = loadAgentDef(path.join(PROMPTS_DIR, 'eval-blind-comparator.md'));
 
   // Randomly assign baseline/treatment to A/B.
   const baselineIsA = Math.random() < 0.5;

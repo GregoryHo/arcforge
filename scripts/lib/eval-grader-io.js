@@ -16,23 +16,26 @@ const { round2 } = require('./eval-stats');
 const GRADING_RESULTS_DIR = path.join('evals', 'results');
 
 // Cache agent definitions to avoid repeated disk reads during batch grading.
-// Key: absolute path, Value: file content with frontmatter stripped (empty string if missing).
+// Key: absolute path, Value: file content with frontmatter stripped.
 const agentDefCache = new Map();
 
 /**
  * Load an agent definition file, caching the result to avoid repeated disk reads.
- * Strips YAML frontmatter if present. Returns empty string if file does not exist.
+ * Strips YAML frontmatter if present. A missing or empty definition throws: the
+ * prompt ships with the engine, so its absence is a broken install, and grading
+ * without the methodology would record scores that look normal (#196).
  * @param {string} agentPath - Absolute path to the agent markdown file
  * @returns {string} Agent definition content (cached)
  */
 function loadAgentDef(agentPath) {
   if (agentDefCache.has(agentPath)) return agentDefCache.get(agentPath);
-  let content = '';
+  let content;
   try {
     content = fs.readFileSync(agentPath, 'utf8').replace(/^---[\s\S]*?---\n*/m, '');
-  } catch {
-    /* file missing — return empty string */
+  } catch (err) {
+    throw new Error(`Cannot read eval prompt ${agentPath}: ${err.message}`);
   }
+  if (!content.trim()) throw new Error(`Eval prompt is empty: ${agentPath}`);
   agentDefCache.set(agentPath, content);
   return content;
 }

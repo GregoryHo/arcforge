@@ -145,6 +145,17 @@ arcforge eval compare eval-tdd-test-first-gate
 `INCONCLUSIVE` at k=5 usually means the effect is smaller than the noise. Raising
 k narrows the interval; it does not manufacture an effect that is not there.
 
+When every assertion in a scenario is model-graded, `eval ab` also runs a
+**blind comparator** on each baseline/treatment pair and prints a preference
+count (treatment / baseline / tie / errors). It is a supplementary signal, never
+a verdict. The two outputs are shuffled into A and B, and condition labels and the
+skill name are redacted. The comparator writes a rubric of weighted criteria
+derived from the task and scores each output from 0 to 1 per criterion. The
+harness then does the arithmetic: each output's total is its weighted mean
+score, and one output wins only when its total beats the other's by more than
+0.1. Anything closer is a tie. A malformed rubric or score counts as an error,
+not a tie.
+
 A scenario declaring `## Verdict Policy non-regression` is judged differently:
 there is no delta to interpret, and it passes only when **every** treatment trial
 that produced a score passes and at least one did — `PASS`, otherwise
@@ -223,6 +234,12 @@ collapse into that verdict depends on the grader. A `mixed` scenario — behavio
 assertions plus a model reading the transcript — passes at **0.8 or above**. A
 `code` grader, which runs your own script and reads its per-assertion labels, and
 a `model` grader both require **every** assertion to land.
+
+The model grader reads its method from a prompt that ships with arcforge, as do
+the analyzer behind `eval compare` and the blind comparator described under
+step 4. They load from the installed plugin, whichever project you run in. If one
+is missing or empty, the command stops with an error that names the file rather
+than grading without it.
 
 An assertion that no run can satisfy is worse than no assertion — it scores zero
 in both arms and buries the signal you were looking for. When an assertion fails
