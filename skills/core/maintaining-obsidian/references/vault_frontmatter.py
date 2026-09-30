@@ -40,7 +40,7 @@ INLINE_CODE_RE = re.compile(r"(?<!`)(`+)(?!`)((?:(?!\n\n)[\s\S])+?)(?<!`)\1(?!`)
 # Obsidian comments (`%% hidden %%`) and HTML comments are not rendered, so a
 # [[link]] inside one is not a link.
 COMMENT_RE = re.compile(r"%%.*?%%|<!--.*?-->", re.DOTALL)
-COMMENT_OPEN_RE = re.compile(r"<!--|%%")
+COMMENT_OR_SPAN_RE = re.compile(r"<!--|%%|`+")
 COMMENT_CLOSERS = {"<!--": "-->", "%%": "%%"}
 # A list item: up to three spaces, a bullet or an ordinal, then spaces or the
 # line's end. Its content column is the marker's end plus 1–4 spaces (CommonMark).
@@ -172,22 +172,51 @@ def is_raw_source(fm: dict | None) -> bool:
     return fm is not None and "sha256" in fm and note_type(fm) is None
 
 
-def _comment_after(line: str, closer: str | None) -> str | None:
-    """The comment closer still awaited at the end of `line` (`-->` or `%%`), or
-    None when the line leaves no comment open. `closer` is the one awaited at
-    its start. Openers inside the line's inline code are not openers."""
-    line = INLINE_CODE_RE.sub("", line)
-    pos = 0
+def _run_closer(run: str) -> re.Pattern:
+    """A backtick run of exactly this length — the only thing that closes a span it opened."""
+    return re.compile(rf"(?<!`){run}(?!`)")
+
+
+def _span_closes(lines: list[str], i: int, run: str, pos: int) -> bool:
+    """Whether a code span opened by `run` at `lines[i][pos:]` closes before the
+    paragraph ends (a blank line). An unclosed run is literal backticks."""
+    closer = _run_closer(run)
+    if closer.search(lines[i], pos):
+        return True
+    for line in lines[i + 1 :]:
+        if not line.strip():
+            return False
+        if closer.search(line):
+            return True
+    return False
+
+
+def _comment_after(lines: list[str], i: int, closer: str | None, span: str | None):
+    """(comment closer, code-span run) still awaited at the end of `lines[i]`.
+    `closer` (`-->` or `%%`) and `span` are what was awaited at its start. An
+    opener inside a code span is code, even when the span crosses a line
+    break, so it opens no comment."""
+    line, pos = lines[i], 0
     while True:
-        if closer is not None:
+        if span is not None:
+            end = _run_closer(span).search(line, pos)
+            if not end:
+                return None, span
+            pos, span = end.end(), None
+        elif closer is not None:
             end = line.find(closer, pos)
             if end == -1:
-                return closer
+                return closer, None
             pos, closer = end + len(closer), None
-        opener = COMMENT_OPEN_RE.search(line, pos)
-        if not opener:
-            return None
-        pos, closer = opener.end(), COMMENT_CLOSERS[opener.group(0)]
+        token = COMMENT_OR_SPAN_RE.search(line, pos)
+        if not token:
+            return None, None
+        pos = token.end()
+        if token.group(0).startswith("`"):
+            if _span_closes(lines, i, token.group(0), pos):
+                span = token.group(0)
+        else:
+            closer = COMMENT_CLOSERS[token.group(0)]
 
 
 def _list_content(line: str, offsets: list[int]) -> tuple[int, str]:
@@ -232,8 +261,10 @@ def _walk_fences(text: str):
     prefix = ""
     base = 0
     comment: str | None = None
+    span: str | None = None
     offsets: list[int] = []
-    for line in text.split("\n"):
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
         if marker is not None:
             # Inside a quoted fence each line carries its own `>` run; strip that
             # line's prefix, not the opener's (`> ```yaml` may close as `>```` `).
@@ -252,8 +283,13 @@ def _walk_fences(text: str):
                     yield "body", info, inner, bool(prefix or base)
                 continue
         if comment is not None:
-            comment = _comment_after(line, comment)
+            comment, span = _comment_after(lines, i, comment, None)
             yield ("comment" if comment else "text"), "", line, False
+            continue
+        if span is not None:
+            # Inside a code span that crosses lines: this line is span text.
+            comment, span = _comment_after(lines, i, None, span)
+            yield "text", "", line, False
             continue
         quoted = QUOTE_PREFIX_RE.match(line)
         prefix = quoted.group(0) if quoted else ""
@@ -269,7 +305,7 @@ def _walk_fences(text: str):
             marker, info = match.group(1), match.group(2).lower()
             yield "open", info, line, bool(prefix or base)
             continue
-        comment = _comment_after(line, None)
+        comment, span = _comment_after(lines, i, None, None)
         yield "text", "", line, False
 
 

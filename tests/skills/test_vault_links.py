@@ -232,6 +232,18 @@ def test_a_fence_delimiter_inside_a_comment_opens_no_fence(vault):
     assert links["notes"]["Wiki/alpha-note.md"]["inbound"] == 2
 
 
+def test_a_comment_opener_inside_a_code_span_crossing_a_line_opens_no_comment(vault):
+    # The span closes on the next line, so its `<!--` and `%%` are code, and the
+    # real link after it is still a link.
+    (vault / "Wiki" / "gamma-orphan.md").write_text(
+        GAMMA + "\nA span `crossing\n<!-- and %% here` ends.\n\nReal: [[alpha-note-draft]].\n",
+        encoding="utf-8",
+    )
+    links = _run(vault)["links"]
+    assert links["notes"]["Wiki/gamma-orphan.md"]["outbound"] == 1
+    assert links["notes"]["Wiki/alpha-note-draft.md"]["inbound"] == 2
+
+
 def test_self_links_under_any_spelling_are_not_edges(vault):
     (vault / "Wiki" / "gamma-orphan.md").write_text(
         GAMMA + "\nSelf: [[gamma-orphan]] and [[Wiki/gamma-orphan]] and [[gamma-orphan#Heading|me]].\n",
