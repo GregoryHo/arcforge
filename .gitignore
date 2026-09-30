@@ -1,6 +1,8 @@
 evals/results/*
 !evals/results/README.md
 evals/preflight/
+# `claude plugin eval` writes reports to <eval dir>/results/ by default (B-11: local only)
+plugin-evals/results/
 .eval-trials/
 # Project-local contributor skills — ignored by default (experimental/workspace).
 # Skills meant to ship in the repo are explicitly allowlisted below.
