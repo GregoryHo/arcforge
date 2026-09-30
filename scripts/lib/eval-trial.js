@@ -67,8 +67,6 @@ function resolveTrialTimeoutMs(env = process.env) {
  * @param {number} [options.maxTurns] - Max turns for Claude CLI
  * @param {string[]} [options.watchRoots] - Extra directories the write check watches;
  *   nothing is loaded from them (a comparison's baseline watches the plugin root)
- * @param {boolean} [options.skipPermissions] - Pass --dangerously-skip-permissions
- *   (default: when a plugin dir is loaded). A comparison passes one value to both arms.
  * @returns {TrialResult} Trial result
  */
 function runTrial(scenario, trialNumber, totalTrials, options = {}) {
@@ -82,7 +80,6 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     runId,
     pluginDir: rawPluginDir,
     maxTurns: rawMaxTurns,
-    skipPermissions: rawSkipPermissions,
     watchRoots = [],
   } = options;
   // Resolved before anything else so a bad override is refused ahead of the
@@ -165,7 +162,6 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     trialDir,
     contained: isolated || Boolean(pluginDir),
     pluginDir,
-    skipPermissions: rawSkipPermissions ?? Boolean(pluginDir),
     maxTurns: resolvedMaxTurns,
     model,
     effort,
@@ -358,26 +354,21 @@ function stopIfTrialWroteRepo(row, where) {
  * A contained trial (isolated, or loading a plugin under test) drops the user
  * settings file (`--setting-sources project,local`): that is what keeps the
  * operator's hooks, output style, model and effort level out of both arms at
- * once, while a plugin-dir arm still gets its plugin's hooks (B-7, #170).
+ * once, while a plugin-dir arm still gets its plugin's hooks (B-7, #170). The
+ * same file is where the operator's permission mode lived, so a contained trial
+ * also runs with `--dangerously-skip-permissions`: it is unattended, nobody can
+ * answer a prompt, and a `-p` session would otherwise be denied every Bash,
+ * Write and Edit. The write guard and the redirected state are the containment.
  * @param {Object} opts
  * @param {string} opts.trialDir - Trial working directory (named in the advisory)
  * @param {boolean} opts.contained - Isolated or plugin-dir trial (not --no-isolate)
  * @param {string} [opts.pluginDir] - Plugin to load
- * @param {boolean} [opts.skipPermissions] - Run without permission prompts
  * @param {number} [opts.maxTurns] - Resolved turn budget
  * @param {string} [opts.model] - Model flag value
  * @param {string} [opts.effort] - Effort flag value
  * @returns {string[]} argv after `claude`
  */
-function buildClaudeArgs({
-  trialDir,
-  contained,
-  pluginDir,
-  skipPermissions,
-  maxTurns,
-  model,
-  effort,
-}) {
+function buildClaudeArgs({ trialDir, contained, pluginDir, maxTurns, model, effort }) {
   const args = [
     '-p',
     '--output-format',
@@ -388,6 +379,7 @@ function buildClaudeArgs({
   ];
   if (contained) {
     args.push('--strict-mcp-config', '--setting-sources', 'project,local');
+    args.push('--dangerously-skip-permissions');
     // Advisory only — the trial is not a sandbox; watchForWrites() catches the
     // trials that ignore it.
     args.push(
@@ -396,8 +388,6 @@ function buildClaudeArgs({
     );
   }
   if (pluginDir) args.push('--plugin-dir', path.resolve(pluginDir));
-  // Eval trials run unattended in ephemeral dirs — no human to approve permission prompts
-  if (skipPermissions) args.push('--dangerously-skip-permissions');
   if (maxTurns != null) args.push('--max-turns', String(maxTurns));
   if (model) args.push('--model', model);
   if (effort) args.push('--effort', effort);

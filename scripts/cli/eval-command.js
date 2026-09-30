@@ -273,8 +273,9 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     const runId = generateRunId();
 
     // Preflight measures the baseline the A/B will run, so it takes the same
-    // turn budget and permission mode that baseline gets (sharedArmOptions).
-    // --plugin-dir only resolves those here; nothing is loaded.
+    // turn budget that baseline gets (sharedArmOptions), and runs contained like
+    // it, so without permission prompts. --plugin-dir only resolves the budget
+    // here; nothing is loaded.
     const abPluginDir =
       args.options['plugin-dir'] ||
       (scenario.scope === 'workflow' ? scenario.pluginDir : undefined);

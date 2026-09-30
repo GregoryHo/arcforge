@@ -65,7 +65,7 @@ function preflightFilename(hash, model, conditions = {}) {
 /**
  * The run conditions a baseline's competence depends on beyond scenario and
  * model: its turn budget, whether a plugin dir was in play (which also sets
- * the permission mode), and the --effort it ran at. A PASS measured under one
+ * the default budget), and the --effort it ran at. A PASS measured under one
  * set does not unlock an A/B run under another. Plain conditions (no budget,
  * no plugin dir, no effort) add nothing to the file name, so records written
  * before this key existed still match them.
