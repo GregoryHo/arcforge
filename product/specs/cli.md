@@ -1,6 +1,6 @@
 # cli — spec
 
-> Status: shipped v6.0.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.0.0 · extended by 6.2.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -92,6 +92,10 @@ command offers one (B-6).
   host.
 - **D-013** — 6.1.0 adds a second host that does *not* provide that mechanism,
   and accepts the loud `command not found` rather than bending B-1.
+- **D-019** — 6.1.2 repairs the CLI's message and contract drift as a patch that
+  touches no eval-backed path (B-4, B-6).
+- **D-020** — new commands wait for 6.2.0, a minor (B-3).
+- **D-040** — `learn instinct restore` is one of those commands (B-3).
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
 

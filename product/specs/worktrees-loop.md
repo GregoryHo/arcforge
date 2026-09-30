@@ -1,6 +1,6 @@
 # worktrees-loop — spec
 
-> Status: shipped v6.0.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.0.0 · extended by 6.2.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -83,3 +83,6 @@ The four-state marker set, stable ids, and no-nesting rules carry their own
 "decisions worth not re-litigating" section in
 `docs/decisions/task-list-format.md`. The isolation-outside-the-repo and
 verify-over-self-report choices predate this log; rationale inline above.
+
+- **D-032** — *proposed*: without a verify floor a task is done on exit 0, and
+  the loop warns at start (B-6).

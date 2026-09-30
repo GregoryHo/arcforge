@@ -1,6 +1,6 @@
 # obsidian — spec
 
-> Status: shipped v6.0.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.0.0 · extended by 6.1.2 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -94,3 +94,8 @@ itself insists on are the ingest provenance pair, `source_url` and `sha256` (B-4
 The vault-contract model (mechanism/domain split, contract-wins) and the
 verified-save bar predate this log; rationale inline above. Registry mechanics
 live behind the CLI per [cli](cli.md) B-8.
+
+- **D-028** — *proposed*: the `index.md` rebuild is a write step of LINK mode
+  (B-5).
+- **D-034** — *proposed*: the provenance pair applies where the vault adopts raw
+  sources (B-4).

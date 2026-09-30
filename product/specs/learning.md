@@ -1,6 +1,6 @@
 # learning — spec
 
-> Status: shipped v6.1.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.1.0 · extended by 6.2.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -31,9 +31,10 @@ was recorded about them.
   bookkeeping: the durable session record, and the diary draft an active enough
   session produces, are continuity features that run either way
   ([hooks](hooks.md) B-6). The line falls where content leaves the machine or
-  the user's own words are stored: **diary enrichment — the one outbound path
-  (B-9) — runs only under the opt-in**, so with learning off a draft keeps its
-  unfilled sections permanently, and that stub is the contract rather than a
+  the user's own words are stored: **the two outbound paths — diary
+  enrichment and the curator's analysis (B-9) — run only under the opt-in**,
+  so with learning off a draft keeps its unfilled sections permanently, no
+  observation left behind by an earlier opt-in is analyzed, and that stub is the contract rather than a
   failure to report. Nothing invites the user into the loop from that state
   either: the reflection nudge waits for the same opt-in, because a permanent
   offer to analyze diaries is itself a way of not taking "off" for an answer.
@@ -111,6 +112,26 @@ was recorded about them.
   higher than one inferred from reflection, because an inference about the
   user is weaker evidence than their own words. Users can `confirm` or
   `contradict` any instinct; enough contradiction archives it.
+- **B-10 Decay charges each period once, and never retires an activated
+  instinct.** Confidence decays with the time since an instinct was last
+  confirmed. Running the decay cycle any number of times over the same
+  interval MUST give the result of running it once. Decay MUST NOT archive an
+  activated instinct — it leaves the injected set only through the user's
+  deactivation (B-4) — and every archive decay does perform MUST write an
+  audit record naming the instinct and stamp the archived file with the
+  reason it was archived, so a later reader can tell a decay archive from a
+  contradiction archive (D-022).
+- **B-11 The way back from the archive is a command.** `learn instinct
+  restore` moves an archived instinct back out of the archive, whatever
+  archived it — the user's explicit command outranks both decay and an earlier
+  contradiction — and records the restore in the audit log, naming the
+  instinct, the file it returned to, and the archive reason when the file
+  carries one; files archived before that stamp existed carry none and are
+  restorable all the same. When an active instinct of the same name already
+  exists, restore MUST refuse and name both files rather than overwrite either.
+  Hand-editing state stays out of contract (B-5), so this is the only
+  supported route back; like every change to what may be
+  injected, it is audited (D-040).
 - **B-7 One session, one record.** When a diary draft exists, it *is* the
   entry — finalizing renames the draft rather than merging, and writing a
   second diary alongside a draft would orphan one of them. The `/learning`
@@ -123,11 +144,15 @@ was recorded about them.
 
 ### Privacy
 - **B-9 Local, legible, scoped.** All state stays on the user's machine:
-  arcforge has no telemetry and no service of its own to report to. The one
-  outbound path is diary enrichment, which runs the host tool over a parsed
-  summary of the session — so that summary reaches the model the way any turn
-  of the session does, and nowhere else. It is opt-in (B-1), and it no longer
-  runs with permissions switched off: it gets two tools, `Read` and `Write`,
+  arcforge has no telemetry and no service of its own to report to. Two
+  paths carry content to a model, both under the opt-in (B-1), and nothing
+  else does. Diary enrichment runs the host tool over a parsed summary of the
+  session — so that summary reaches the model the way any turn of the session
+  does, and nowhere else. The curator's analysis sends a batch of sanitized
+  observations to the host tool with no tools at all, so the run can read what
+  it was handed and return a proposal, and can touch nothing on the machine;
+  the manifest it writes records the tool access the run actually had (D-023).
+  Enrichment no longer runs with permissions switched off: it gets two tools, `Read` and `Write`,
   and the draft's own directory is added to the ones it may work in. It is not
   a sandbox, and the spec does not claim one — the run still inherits the
   directory it was started from, which is the project, and edits inside those
@@ -186,3 +211,24 @@ data contracts live in `docs/decisions/learning-curator-schema/`.
   (B-5, B-9).
 - **D-012** — the `learn` candidate commands are a front end onto the canonical
   queue; the project-scoped queue is gone (B-5, B-9).
+- **D-018** — 6.1.1 carries the learning repairs that undo a choice the user
+  already made: repeated decay, the daemon after an opt-out, the dashboard's
+  refused activation, and `learn enable` erasing config (B-1, B-3, B-4).
+- **D-022** — decay is idempotent and never archives an activated instinct
+  (B-4, B-6).
+- **D-023** — the curator is a second outbound path — tool-less,
+  under the opt-in, and named in B-9 (B-1, B-9).
+- **D-020** — 6.2.0 carries the new instinct commands and every change that
+  moves learning state on disk.
+- **D-035** — *proposed*: a candidate name Layer 7 cannot use is rejected at
+  ingestion (B-5).
+- **D-036** — *proposed*: `approved` may be dismissed and `materialized` may be
+  materialized again (B-3, B-5).
+- **D-037** — *proposed*: the keyspace stays the project directory's basename,
+  collision recorded as a Residual (B-5, B-9).
+- **D-038** — *proposed*: manually saved instincts are not activatable, and the
+  product says so (B-3, B-4).
+- **D-040** — `learn instinct restore` brings back a decay-archived instinct,
+  audited (B-5, B-11).
+- **D-041** — *proposed*: rejections rotate to an archive, never deleted (B-5).
+- **D-042** — *proposed*: reflection counts only enriched diaries (B-8).

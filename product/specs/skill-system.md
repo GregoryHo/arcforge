@@ -1,6 +1,6 @@
 # skill-system — spec
 
-> Status: shipped v6.1.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.1.0 · extended by 6.1.1 (building) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -110,6 +110,9 @@ asserted by test (B-3).
   harness cheap later.
 - **D-014** — the spec-driven method ships to users as a skill at 6.1.0, which
   is why the shipped set gains `speccing` (B-1).
+- **D-018** — every edit under `skills/` known when 6.1.1 was planned lands
+  there, so its benchmark is measured on a repaired instrument; skill text a
+  later decision changes is measured in 6.2.0's round (B-9).
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
 

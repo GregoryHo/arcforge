@@ -1,6 +1,6 @@
 # sdd — spec
 
-> Status: shipped v6.1.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.1.0 · extended by 6.2.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -109,5 +109,8 @@ roadmap row carries the marker.
 - **D-015** — `speccing` is model-invoked, and never bootstraps product state
   unasked (B-6).
 - **D-016** — no arcforge product CLI group at 6.1.0; the method is prose (B-8).
+- **D-024** — *proposed*: `speccing` is re-measured under plugin routing before
+  its description or its documented invocation changes; a reversal of D-015
+  would be its own entry (B-6).
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).

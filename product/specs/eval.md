@@ -1,6 +1,6 @@
 # eval — spec
 
-> Status: shipped v6.0.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.0.0 · extended by 6.2.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -82,17 +82,20 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   measurement.** Every trial's `claude -p` session runs under a per-trial
   ceiling: 900 s, unless `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS` moves it for one run —
   unset or empty means the default, and any value that is not a positive
-  integer of milliseconds is refused on the first trial, before any session is
-  spawned. A trial the runner killed before the agent finished its turn is
+  integer of milliseconds is refused before the run begins, ahead of any
+  fixture `Setup` and any session (D-018). A trial the runner killed before the agent finished its turn is
   recorded as `trial_killed_incomplete` and excluded from every scored pool —
   a preflight containing one BLOCKs outright rather than rating the rest —
   because its half transcript would otherwise grade as if the
   agent had chosen to stop there; it neither moves the delta against the arm
   nor counts as a scored trial under B-4's strict bar. A killed trial that had
-  already delivered its answer is a valid measurement and scores. The ceiling
-  is part of the measurement conditions, so a run that moved it MUST be
-  reported with the value it used, the way B-9 treats a `--since`-bounded
-  snapshot.
+  already delivered its answer is a valid measurement and scores. A provider
+  refusal — a session-limit or quota message returned in place of the agent's
+  turn — is an instrument failure of the same kind: its row carries
+  `infraError` and leaves every scored pool (D-018). The ceiling is part of
+  the measurement conditions, so a run that moved it MUST be reported with the
+  value it used, the way B-9 treats a `--since`-bounded snapshot, and every
+  result row records the ceiling its trial ran under (D-018).
 
 ### Benchmarks
 - **B-9 Snapshots keep history and gate releases.** `eval report` writes
@@ -132,3 +135,18 @@ Scenario mechanics are taught by the `evaluating` skill and specified in
 `docs/guide/eval-system.md`. D-017 pins the per-run override of the trial
 ceiling (B-10); the exclusion of killed-incomplete trials predates the log, and
 its rationale is inline at B-10.
+
+- **D-018** — 6.1.1 repairs the instrument before the release benchmark is
+  measured on it (B-7, B-9, B-10).
+- **D-021** — 6.1.1's benchmark reruns only the scenarios whose subject changed;
+  the pools not re-run are recorded as measured on the pre-repair instrument
+  (B-9).
+- **D-025** — *proposed*: `claude plugin eval` measures routing only and stays
+  out of the release gate (B-1, B-9).
+- **D-026** — *proposed*: the ledger records answering-feedback's REGRESSED, and
+  the cost flag is informational for an injected treatment (B-4).
+- **D-027** — *proposed*: floor assertions keep the weight the engine gives them
+  today, written down before 6.1.1's results are read (B-5).
+- **D-020** — 6.2.0 carries the scenario rubric fixes with their own
+  measurement round (B-8).
+- **D-043** — *proposed*: graders never execute trial output (B-6, B-7).

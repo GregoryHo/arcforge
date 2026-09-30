@@ -1,6 +1,6 @@
 # hooks — spec
 
-> Status: shipped v6.1.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.1.0 · extended by 6.1.2 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -50,8 +50,9 @@ down, never block the user, and never observe them uninvited.
   `secrets-guard` — is deliberately warn-only. The product position: a false
   positive should cost the user a sentence to read, not a blocked edit.
 - **B-4 The credential warning cannot itself leak.** `secrets-guard` scans
-  edits, writes, and `git commit` content for credential shapes and, on a hit,
-  names the *category* of finding — it MUST NOT echo the matched string.
+  edits, writes, and the text of a `git commit` command — not the content the
+  commit stages, which no hook reads (D-029) — for credential shapes and, on a
+  hit, names the *category* of finding — it MUST NOT echo the matched string.
   Test-, example-, and fixture-shaped lines are exempt so routine false
   positives stay quiet.
 - **B-5 Hook input is untrusted.** Tool names, paths, and prompts arriving in
@@ -167,3 +168,7 @@ implements fail-open is pinned in `.claude/rules/coding-standards.md`.
   under the opt-in (B-6).
 - **D-009** — the enrichment run that B-6 gates is also unprivileged
   ([learning](learning.md) B-9).
+- **D-029** — B-4 says the guard scans the commit command, not the
+  committed content; a staged-content scan waits as a wish (B-4).
+- **D-031** — *proposed*: B-8 stops promising where the last session left off
+  (B-8).

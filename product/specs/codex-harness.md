@@ -1,6 +1,6 @@
 # codex-harness — spec
 
-> Status: shipped v6.1.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.1.0 · extended by 6.2.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 > Tracks: `.codex-plugin/plugin.json`, `.agents/plugins/marketplace.json`,
@@ -190,5 +190,7 @@ Shapes worth knowing, all verified against codex-cli 0.151.0 rather than inferre
   6.0.0 and left unscheduled.
 - **D-013** — Codex packaging ships at 6.1.0, skills only, with the hook registry
   renamed out of Codex's discovery path.
+- **D-039** — *proposed*: the boundary stays where D-013 drew it for 6.2.0; each
+  open item is a Residual here and a wish in the backlog (B-2, B-3, B-7).
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
