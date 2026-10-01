@@ -436,19 +436,26 @@ function Install({theme:t}) {
       />
       <div data-af-reveal className="af-grid-2col" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:32}}>
         <div style={{background:t.card,border:`1.5px solid ${t.ember}`,padding:'36px 36px'}}>
-          <div style={{fontSize:10,letterSpacing:3,color:t.ember,fontFamily:'"JetBrains Mono",monospace',marginBottom:10,fontWeight:700}}>CLAUDE CODE · RECOMMENDED</div>
+          <div style={{fontSize:10,letterSpacing:3,color:t.ember,fontFamily:'"JetBrains Mono",monospace',marginBottom:10,fontWeight:700}}>CLAUDE CODE · THE WHOLE TOOLKIT</div>
           <h3 style={{fontFamily:'"Fraunces",serif',fontSize:26,color:t.ink,margin:'0 0 18px 0',fontStyle:'italic',fontWeight:400}}>Plugin marketplace</h3>
           <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:13,color:t.ink,lineHeight:2,background:t.bg,padding:'16px 20px',border:`1px dashed ${t.line}`}}>
             <div><span style={{color:t.dim}}>$ </span>/plugin marketplace add GregoryHo/arcforge</div>
             <div><span style={{color:t.dim}}>$ </span>/plugin install arcforge@arcforge-dev</div>
             <div><span style={{color:t.dim}}>$ </span>/arcforge:using</div>
           </div>
+          <div style={{color:t.mute,fontSize:13,lineHeight:1.7,marginTop:18}}>
+            Register the marketplace, install, then ask for the router: it prints a table mapping situations to skills. Every skill is invoked the same way, <span style={{color:t.brass,fontFamily:'monospace'}}>/arcforge:&lt;name&gt;</span>. Nothing to configure: skills, hooks, and the <span style={{color:t.brass,fontFamily:'monospace'}}>arcforge</span> CLI load together, and learning stays off until you enable it, per project or globally. Update with <span style={{color:t.brass,fontFamily:'monospace'}}>/plugin update arcforge</span>.
+          </div>
         </div>
         <div style={{background:t.card,border:`1px solid ${t.line}`,padding:'36px 36px'}}>
-          <div style={{fontSize:10,letterSpacing:3,color:t.brass,fontFamily:'"JetBrains Mono",monospace',marginBottom:10,fontWeight:700}}>WHAT YOU GET</div>
-          <h3 style={{fontFamily:'"Fraunces",serif',fontSize:26,color:t.ink,margin:'0 0 18px 0',fontStyle:'italic',fontWeight:400}}>Nothing you have to configure</h3>
-          <div style={{color:t.mute,fontSize:13,lineHeight:1.7}}>
-            <div>Skills, hooks, and the <span style={{color:t.brass,fontFamily:'monospace'}}>arcforge</span> CLI load together. Learning stays off until you enable it per project. Update with <span style={{color:t.brass,fontFamily:'monospace'}}>/plugin update arcforge</span>.</div>
+          <div style={{fontSize:10,letterSpacing:3,color:t.brass,fontFamily:'"JetBrains Mono",monospace',marginBottom:10,fontWeight:700}}>CODEX CLI · SKILLS ONLY</div>
+          <h3 style={{fontFamily:'"Fraunces",serif',fontSize:26,color:t.ink,margin:'0 0 18px 0',fontStyle:'italic',fontWeight:400}}>Same repo, second manifest</h3>
+          <div style={{fontFamily:'"JetBrains Mono",monospace',fontSize:13,color:t.ink,lineHeight:2,background:t.bg,padding:'16px 20px',border:`1px dashed ${t.line}`}}>
+            <div><span style={{color:t.dim}}>$ </span>codex plugin marketplace add GregoryHo/arcforge</div>
+            <div><span style={{color:t.dim}}>$ </span>codex plugin add arcforge@arcforge-dev</div>
+          </div>
+          <div style={{color:t.mute,fontSize:13,lineHeight:1.7,marginTop:18}}>
+            All 16 skills load, listed as <span style={{color:t.brass,fontFamily:'monospace'}}>arcforge:&lt;name&gt;</span>. Codex has no slash commands for skills: pick one from the composer{'\u2019'}s <span style={{color:t.brass,fontFamily:'monospace'}}>$</span> mention picker. The 7 skills that call the <span style={{color:t.brass,fontFamily:'monospace'}}>arcforge</span> CLI report command not found there, and hooks, learning, the eval harness and the loop do not run. For the whole toolkit, use Claude Code.
           </div>
         </div>
       </div>

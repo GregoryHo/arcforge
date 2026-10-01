@@ -52,6 +52,11 @@ Three consequences for a PR:
 
 Two project-local agents make this cheaper: `pm` is scoped to write `product/**` and nothing else, `qa` runs the gates and holds no editing tools. See `.claude/agents/README.md`.
 
+Two GitHub workflows run Claude on the repo, and both bill the maintainer's Claude subscription (`CLAUDE_CODE_OAUTH_TOKEN`) — the same usage the eval measurements draw on:
+
+- **`claude.yml`** runs when an issue, a PR comment, or a review mentions `@claude`, and acts on that comment. Mention it on purpose; each mention is a full session.
+- **`claude-code-review.yml`** reviews a PR once when it is opened and once when it leaves draft, and only when the PR touches shipped or measured paths (`scripts/`, `hooks/`, `skills/`, `bin/`, `tests/`, `evals/scenarios/`, `evals/fixtures/`, the manifests, `package.json`). There is no draft filter, so a PR opened as a draft is reviewed twice. Later pushes get no automated review (D-030); mention `@claude` if one needs it.
+
 Add one line to your pre-PR check, alongside the runners and the static checks:
 
 - [ ] relevant `product/specs/*.md` updated in this PR (+ `D-NNN` recorded when a choice was made)

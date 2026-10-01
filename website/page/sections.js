@@ -1091,7 +1091,7 @@ function Install({
       marginBottom: 10,
       fontWeight: 700
     }
-  }, "CLAUDE CODE \xB7 RECOMMENDED"), /*#__PURE__*/React.createElement("h3", {
+  }, "CLAUDE CODE \xB7 THE WHOLE TOOLKIT"), /*#__PURE__*/React.createElement("h3", {
     style: {
       fontFamily: '"Fraunces",serif',
       fontSize: 26,
@@ -1122,7 +1122,29 @@ function Install({
     style: {
       color: t.dim
     }
-  }, "$ "), "/arcforge:using"))), /*#__PURE__*/React.createElement("div", {
+  }, "$ "), "/arcforge:using")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: t.mute,
+      fontSize: 13,
+      lineHeight: 1.7,
+      marginTop: 18
+    }
+  }, "Register the marketplace, install, then ask for the router: it prints a table mapping situations to skills. Every skill is invoked the same way, ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: t.brass,
+      fontFamily: 'monospace'
+    }
+  }, "/arcforge:<name>"), ". Nothing to configure: skills, hooks, and the ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: t.brass,
+      fontFamily: 'monospace'
+    }
+  }, "arcforge"), " CLI load together, and learning stays off until you enable it, per project or globally. Update with ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: t.brass,
+      fontFamily: 'monospace'
+    }
+  }, "/plugin update arcforge"), ".")), /*#__PURE__*/React.createElement("div", {
     style: {
       background: t.card,
       border: `1px solid ${t.line}`,
@@ -1137,7 +1159,7 @@ function Install({
       marginBottom: 10,
       fontWeight: 700
     }
-  }, "WHAT YOU GET"), /*#__PURE__*/React.createElement("h3", {
+  }, "CODEX CLI \xB7 SKILLS ONLY"), /*#__PURE__*/React.createElement("h3", {
     style: {
       fontFamily: '"Fraunces",serif',
       fontSize: 26,
@@ -1146,23 +1168,47 @@ function Install({
       fontStyle: 'italic',
       fontWeight: 400
     }
-  }, "Nothing you have to configure"), /*#__PURE__*/React.createElement("div", {
+  }, "Same repo, second manifest"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: '"JetBrains Mono",monospace',
+      fontSize: 13,
+      color: t.ink,
+      lineHeight: 2,
+      background: t.bg,
+      padding: '16px 20px',
+      border: `1px dashed ${t.line}`
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: t.dim
+    }
+  }, "$ "), "codex plugin marketplace add GregoryHo/arcforge"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: t.dim
+    }
+  }, "$ "), "codex plugin add arcforge@arcforge-dev")), /*#__PURE__*/React.createElement("div", {
     style: {
       color: t.mute,
       fontSize: 13,
-      lineHeight: 1.7
+      lineHeight: 1.7,
+      marginTop: 18
     }
-  }, /*#__PURE__*/React.createElement("div", null, "Skills, hooks, and the ", /*#__PURE__*/React.createElement("span", {
+  }, "All 16 skills load, listed as ", /*#__PURE__*/React.createElement("span", {
     style: {
       color: t.brass,
       fontFamily: 'monospace'
     }
-  }, "arcforge"), " CLI load together. Learning stays off until you enable it per project. Update with ", /*#__PURE__*/React.createElement("span", {
+  }, "arcforge:<name>"), ". Codex has no slash commands for skills: pick one from the composer", '\u2019', "s ", /*#__PURE__*/React.createElement("span", {
     style: {
       color: t.brass,
       fontFamily: 'monospace'
     }
-  }, "/plugin update arcforge"), ".")))));
+  }, "$"), " mention picker. The 7 skills that call the ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: t.brass,
+      fontFamily: 'monospace'
+    }
+  }, "arcforge"), " CLI report command not found there, and hooks, learning, the eval harness and the loop do not run. For the whole toolkit, use Claude Code."))));
 }
 
 // ─── Footer ───
