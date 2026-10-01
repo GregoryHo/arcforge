@@ -195,9 +195,16 @@ output once before you build on a specific field.
 | Variable | Effect |
 |----------|--------|
 | `CLAUDE_PROJECT_DIR` | Project root the CLI operates on (defaults to the current directory) |
+| `CLAUDE_SESSION_ID` | Session a `learn diary` entry belongs to when `--session` is not given (Claude Code sets it) |
+| `ARCFORGE_HOME` | Where arcforge keeps its state (default: `~/.arcforge`) |
+| `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS` | Per-trial ceiling for `eval` runs, in milliseconds (default: 900000) |
+| `CLAUDE_PACKAGE_MANAGER` | Installer `worktree add --setup` runs, ahead of lock-file detection |
+| `EVAL_DEBUG` | When set, `eval` prints each trial's `claude` command and exit details to stderr |
+| `NO_COLOR` | When set, stderr output is never colored |
 
-Everything else the CLI needs it derives — you do not point it at its own
-installation, and there is no configuration file to create before first use.
+None of them is required: every one has a default, and everything else the CLI
+needs it derives — you do not point it at its own installation, and there is no
+configuration file to create before first use.
 
 ## Calling the CLI from a skill
 

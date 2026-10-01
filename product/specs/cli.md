@@ -35,9 +35,17 @@ underneath without breaking anything written against it.
   engine MUST shell out to the bare command and treat everything behind it as
   opaque — the answer to a host without the mechanism is a decision recorded
   here, never a skill that builds its own path.
-- **B-2 One environment input.** The CLI reads `CLAUDE_PROJECT_DIR` for the
-  project root (defaulting to the current directory) and derives everything
-  else. It MUST NOT require being pointed at its own installation.
+- **B-2 No required environment.** The CLI runs with no environment variable
+  set. It reads `CLAUDE_PROJECT_DIR` for the project root (defaulting to the
+  current directory) and derives everything else. It MUST NOT require being
+  pointed at its own installation. Every other variable it reads is an
+  optional override with a default: `CLAUDE_SESSION_ID` (the session a
+  `learn diary` entry belongs to), `ARCFORGE_HOME` (the state root, default
+  `~/.arcforge`), `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS` (the eval trial ceiling,
+  [eval](eval.md)), `CLAUDE_PACKAGE_MANAGER` (the installer
+  `worktree add --setup` runs), `EVAL_DEBUG` (eval trial diagnostics on
+  stderr), and `NO_COLOR` (plain stderr). The guide lists the same set, and a
+  test holds both to the variables the engine actually reads.
 
 ### Surface
 - **B-3 Five independent command groups.** `worktree`, `loop`, `eval`, `learn`,

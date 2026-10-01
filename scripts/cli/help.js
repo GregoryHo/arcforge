@@ -133,8 +133,14 @@ COMMANDS:
   obsidian set-default <name>        Set the default vault.
   obsidian list-vaults [--json]      List registered vaults.
 
-ENVIRONMENT:
-  CLAUDE_PROJECT_DIR    Project root directory (default: cwd)
+ENVIRONMENT (all optional):
+  CLAUDE_PROJECT_DIR              Project root directory (default: cwd)
+  CLAUDE_SESSION_ID               Default --session for learn diary
+  ARCFORGE_HOME                   State root (default: ~/.arcforge)
+  ARCFORGE_EVAL_TRIAL_TIMEOUT_MS  Eval per-trial ceiling in ms (default: 900000)
+  CLAUDE_PACKAGE_MANAGER          Installer for worktree add --setup
+  EVAL_DEBUG                      Print eval trial diagnostics to stderr
+  NO_COLOR                        Never color stderr output
 
 EXAMPLES:
   arcforge worktree list --json
