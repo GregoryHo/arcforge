@@ -438,14 +438,12 @@ function handleDashboardAction({
     return reject('candidate_not_found');
   }
 
-  // B-16: a transition reads the state its legality check judges inside the
-  // store lock that appends it, and holds that lock through Layer 7/8 (whose
-  // own appends reenter it), so a second writer waits and then sees this one's
-  // result. Promote and evolve change no status, and append a new candidate
-  // through queue-writer's lock, so they run outside it.
-  const producesCandidate =
-    action === LIFECYCLE_ACTION.PROMOTE || action === LIFECYCLE_ACTION.EVOLVE;
-  const dispatch = () =>
+  // B-16: every action reads the state its legality check judges inside the
+  // store lock that appends its result, and holds it through Layer 7/8 and
+  // through a promote's or evolve's derived-candidate and relationship appends
+  // (all of which reenter it), so a second writer waits and then sees this one's
+  // result.
+  return withStoreLock(() =>
     dispatchChecked({
       action,
       candidateId,
@@ -457,8 +455,8 @@ function handleDashboardAction({
       reject,
       accept,
       rejectInvalidCandidate,
-    });
-  return producesCandidate ? dispatch() : withStoreLock(dispatch);
+    }),
+  );
 }
 
 /** Steps 2-7 of the contract above, for one request. */

@@ -20,6 +20,7 @@ const { spawn, spawnSync } = require('node:child_process');
 const PROJECT_NAME = 'arcforge';
 const CANDIDATE_ID = 'cand_instinct_20261001T010000Z_a1b2c3d4e5f6';
 const CLI = path.join(__dirname, '../../scripts/cli.js');
+const DASHBOARD = path.join(__dirname, '../../scripts/lib/learning-dashboard.js');
 
 // Long enough for two node processes to start, read the queue and block on the
 // lock; short of the 5 s lock timeout either of them would give up at.
@@ -61,9 +62,29 @@ function seed() {
     domain: 'workflow',
     body: 'When editing files, first grep for existing patterns',
     body_source: 'llm_curator',
-    evidence: [],
+    // Schema-valid, so promote and evolve can derive a candidate from it.
+    evidence: [
+      { evidence_id: 'ev_1', evidence_type: 'observation', relevance: 'a', summary: 'a' },
+      { evidence_id: 'ev_2', evidence_type: 'observation', relevance: 'b', summary: 'b' },
+    ],
     evidence_quality: 'medium',
+    evidence_quality_metadata: { rule_version: 'v1', basis: { project_obs_count: 500 } },
     lifecycle: { status: 'pending_review', status_changed_at: '2026-10-01T01:00:00.000Z' },
+    safety: {
+      validator_version: 'v1',
+      sanitizer_policy_version: 'v1',
+      sanitizer_module: 'scripts/lib/sanitize-observation.js',
+      raw_prompt_included: false,
+      raw_response_included: false,
+      raw_hook_payloads_included: false,
+      raw_transcripts_included: false,
+      edit_bodies_included: false,
+      skill_args_included: false,
+      secret_scan: { status: 'passed', rule_version: 'v1' },
+      activation_claim_scan: { status: 'passed' },
+      file_write_claim_scan: { status: 'passed' },
+    },
+    dedupe: { dedupe_key: 'grep-before-editing-v1', dedupe_basis: { name_hash: 'abc' } },
   };
   fs.mkdirSync(candidatesDir(), { recursive: true });
   const event = {
@@ -180,4 +201,49 @@ describe('two writers on one candidate are serialized (B-16)', () => {
     const deactivations = transitions().filter((e) => e.next_status === 'deactivated');
     expect(deactivations.map((e) => e.event_id)).toEqual(['evt_winner']);
   }, 20000);
+
+  // Codex P1 on #236: promote and evolve read the source and append the derived
+  // candidate under the same lock as every transition, so one that waited
+  // behind a dismissal is refused rather than deriving from a dismissed
+  // candidate. (Promote before dismiss is a legal order — promote leaves the
+  // source's status alone — so the dismissal is made to land first.)
+  it.each(['promote', 'evolve'])('refuses a %s that waited behind a dismissal', async (action) => {
+    seed();
+    const lockPath = path.join(candidatesDir(), 'store.lock');
+    fs.writeFileSync(lockPath, JSON.stringify({ pid: 0, ts: new Date().toISOString() }));
+    const derive = run([
+      '-e',
+      `
+      const { handleDashboardAction } = require(${JSON.stringify(DASHBOARD)});
+      process.stdout.write(JSON.stringify(handleDashboardAction({
+        action: '${action}',
+        candidate_id: ${JSON.stringify(CANDIDATE_ID)},
+        expected_current_status: 'pending_review',
+      })));
+      `,
+    ]);
+    await new Promise((resolve) => setTimeout(resolve, HOLD_MS));
+    const dismissal = {
+      schema_version: 1,
+      event_id: 'evt_dismissal',
+      ts: new Date().toISOString(),
+      candidate_id: CANDIDATE_ID,
+      event_type: 'candidate.transitioned',
+      actor: { layer: 6, actor_type: 'dashboard' },
+      action: 'dismiss',
+      next_status: 'dismissed',
+    };
+    fs.appendFileSync(path.join(candidatesDir(), 'queue.jsonl'), `${JSON.stringify(dismissal)}\n`);
+    fs.unlinkSync(lockPath);
+    const result = JSON.parse((await derive).stdout);
+
+    expect(result).toMatchObject({ accepted: false, reason: 'stale_status' });
+    const events = fs
+      .readFileSync(path.join(candidatesDir(), 'queue.jsonl'), 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+    expect(events.filter((e) => e.event_type === 'candidate.created')).toHaveLength(1);
+    expect(events.filter((e) => e.event_type === 'candidate.related')).toEqual([]);
+  }, 15000);
 });
