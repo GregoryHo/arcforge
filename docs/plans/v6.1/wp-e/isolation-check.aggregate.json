@@ -1,0 +1,342 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.285",
+  "startedAt": "2026-09-30T10:41:08.118Z",
+  "durationSeconds": 16,
+  "costUsd": 0.18360520000000002,
+  "partial": false,
+  "suite": {
+    "root": "/Users/gregho/GitHub/AI/arcforge",
+    "ablation": "none",
+    "modelOverride": "opus",
+    "caseFilter": "isolation-check",
+    "threshold": 1,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "arcforge",
+        "version": "6.1.0",
+        "path": "/Users/gregho/GitHub/AI/arcforge"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "isolation-check",
+      "dir": "plugin-evals/isolation-check",
+      "source": "mixed",
+      "promptMarkdown": "Report what is actually in effect in this session. Answer from what is loaded\ninto your context; do not guess, and do not read any file to find out. The only\ncommands you may run are `printenv HOME` and `printenv CLAUDE_CONFIG_DIR`.\n\nReply with exactly these six lines and nothing else, each filled in verbatim:\n\nOUTPUT_STYLE: <the name of the output style in effect, or default if none is>\nUSER_CLAUDE_MD: <none, or the first line of any user-level CLAUDE.md instructions in your context, quoted exactly>\nUSER_HOOKS: <none, or each user-level hook you can see in effect>\nPLUGINS: <comma-separated names of every plugin you can see loaded>\nHOME: <the output of printenv HOME>\nCLAUDE_CONFIG_DIR: <the output of printenv CLAUDE_CONFIG_DIR, or unset>",
+      "runsPerCase": 2,
+      "timeoutSeconds": 180,
+      "maxTurns": 4,
+      "graders": [
+        {
+          "name": "arcforge-loaded",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "^[\\s*`>-]*PLUGINS:.*\\barcforge\\b",
+            "flags": "im",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "config-dir-sandboxed",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "^[\\s*`>-]*CLAUDE_CONFIG_DIR:[\\s*`\"]*/(?!Users/)\\S+",
+            "flags": "im",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "home-sandboxed",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "^[\\s*`>-]*HOME:[\\s*`\"]*/(?!Users/)\\S+",
+            "flags": "im",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "no-user-claude-md-in-trace",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "trace",
+            "pattern": "Behavioral guidelines to reduce common LLM coding mistakes",
+            "flags": "",
+            "match": "not_contains"
+          }
+        },
+        {
+          "name": "no-user-claude-md",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "Behavioral guidelines to reduce common LLM coding mistakes",
+            "flags": "",
+            "match": "not_contains"
+          }
+        },
+        {
+          "name": "output-style-default",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "^[\\s*`>-]*OUTPUT_STYLE:[\\s*`\"]*default[\\s*`\".]*$",
+            "flags": "im",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "printenv-config-dir-called",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Bash",
+            "input_match": "printenv\\b[^\\n\"]*\\bCLAUDE_CONFIG_DIR\\b"
+          }
+        },
+        {
+          "name": "printenv-home-called",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Bash",
+            "input_match": "printenv\\b[^\\n\"]*\\bHOME\\b"
+          }
+        },
+        {
+          "name": "user-claude-md-none",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "^[\\s*`>-]*USER_CLAUDE_MD:[\\s*`\"]*none[\\s*`\".]*$",
+            "flags": "im",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "user-hooks-none",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "^[\\s*`>-]*USER_HOOKS:[\\s*`\"]*none[\\s*`\".]*$",
+            "flags": "im",
+            "match": "contains"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 2,
+            "costUsd": 0.0914644,
+            "judgeCostUsd": 0,
+            "durationSeconds": 8,
+            "startedAt": "2026-09-30T10:41:08.143Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "arcforge-loaded",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^[\\s*`>-]*PLUGINS:.*\\barcforge\\b",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "config-dir-sandboxed",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^[\\s*`>-]*CLAUDE_CONFIG_DIR:[\\s*`\"]*/(?!Users/)\\S+",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "home-sandboxed",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^[\\s*`>-]*HOME:[\\s*`\"]*/(?!Users/)\\S+",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-user-claude-md-in-trace",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-user-claude-md",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "output-style-default",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^[\\s*`>-]*OUTPUT_STYLE:[\\s*`\"]*default[\\s*`\".]*$",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "printenv-config-dir-called",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 1x (expected 1..\u221e)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "printenv-home-called",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 1x (expected 1..\u221e)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "user-claude-md-none",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^[\\s*`>-]*USER_CLAUDE_MD:[\\s*`\"]*none[\\s*`\".]*$",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "user-hooks-none",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^[\\s*`>-]*USER_HOOKS:[\\s*`\"]*none[\\s*`\".]*$",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 2,
+            "costUsd": 0.09214080000000001,
+            "judgeCostUsd": 0,
+            "durationSeconds": 8,
+            "startedAt": "2026-09-30T10:41:16.115Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "arcforge-loaded",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^[\\s*`>-]*PLUGINS:.*\\barcforge\\b",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "config-dir-sandboxed",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^[\\s*`>-]*CLAUDE_CONFIG_DIR:[\\s*`\"]*/(?!Users/)\\S+",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "home-sandboxed",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^[\\s*`>-]*HOME:[\\s*`\"]*/(?!Users/)\\S+",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-user-claude-md-in-trace",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-user-claude-md",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "output-style-default",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^[\\s*`>-]*OUTPUT_STYLE:[\\s*`\"]*default[\\s*`\".]*$",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "printenv-config-dir-called",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 1x (expected 1..\u221e)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "printenv-home-called",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 1x (expected 1..\u221e)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "user-claude-md-none",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^[\\s*`>-]*USER_CLAUDE_MD:[\\s*`\"]*none[\\s*`\".]*$",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "user-hooks-none",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^[\\s*`>-]*USER_HOOKS:[\\s*`\"]*none[\\s*`\".]*$",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 1,
+        "passRate": 1
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 1,
+    "overallScore": 1,
+    "overallPassRate": 1
+  }
+}
