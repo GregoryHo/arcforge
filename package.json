@@ -19,6 +19,7 @@
     "hooks/",
     "!hooks/__tests__/",
     "!hooks/.claude/",
+    "!**/__pycache__/",
     "scripts/cli.js",
     "scripts/cli/",
     "scripts/lib/",
