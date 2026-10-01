@@ -211,6 +211,17 @@ than guessed at. `<project>` is the same sanitized directory basename as the
 rest of the keyspace, so the record shares the collision D-037 records: two
 same-named projects share one record.
 
+One daemon runs per machine, held by `~/.arcforge/instincts/.observer.lock`; it
+stops itself after 30 idle minutes or 2 hours. The lock records the directory
+of the daemon script that took it, and starting the daemon replaces a live one
+started from a different directory — after a plugin upgrade, the previous
+version's — instead of leaving that version's behavior running until it stops
+on its own. A lock written before the lock recorded its script counts as
+different. Residual: a daemon that does not exit within about 2 s of being
+stopped — one waiting on a curator model call — is left running, and the next
+start tries again; and two installed copies of the plugin used in alternation
+replace each other at each session start.
+
 The invariants: state is only ever advanced through the engine (B-5), scope decides
 location (B-9), and one session yields one diary (B-7).
 

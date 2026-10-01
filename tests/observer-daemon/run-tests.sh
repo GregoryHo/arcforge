@@ -906,6 +906,65 @@ assert_eq \
   "$([ -n "$B5_CANCELLED" ] && echo yes || echo no)"
 
 # ─────────────────────────────────────────────
+# UP-T1: start replaces a daemon started from another copy of the script
+# ─────────────────────────────────────────────
+# After a plugin upgrade the previous version's daemon can hold the singleton
+# lock for up to MAX_AGE, running that version's code. `start` must replace a
+# daemon whose lock names a different script directory — or none, as every
+# lock written before the lock recorded it does — and leave its own alone.
+# daemon_loop is stubbed so no real analysis loop starts.
+
+echo ""
+echo "=== UP-T1: start replaces a daemon from another plugin version ==="
+
+TMPDIR_UP=$(mktemp -d)
+trap 'rm -rf "$TMPDIR_UP"' EXIT
+
+# Runs `cmd_start` against a lock held by a live stand-in daemon. $1 is what the
+# lock's script file says (empty = no file). Prints: old-alive|new-pid|script.
+up_start_against() {
+  local home="${TMPDIR_UP}/$2"
+  local lock="${home}/.arcforge/instincts/.observer.lock"
+  mkdir -p "$lock"
+  sleep 30 &
+  local old=$!
+  echo "$old" > "${lock}/pid"
+  [ -n "$1" ] && echo "$1" > "${lock}/script"
+  (
+    # shellcheck disable=SC1090
+    env -u ARCFORGE_HOME HOME="$home" bash -c '
+      source "$1"
+      daemon_loop() { exec sleep 30; }
+      cmd_start > /dev/null
+    ' _ "$DAEMON_SCRIPT"
+  )
+  local alive=no
+  kill -0 "$old" 2>/dev/null && alive=yes
+  local new script
+  new=$(cat "${lock}/pid" 2>/dev/null || true)
+  script=$(cat "${lock}/script" 2>/dev/null || true)
+  kill "$old" "$new" 2>/dev/null || true
+  echo "${alive}|$([ "$new" != "$old" ] && echo replaced || echo kept)|${script}"
+}
+
+DAEMON_DIR="$(dirname "$DAEMON_SCRIPT")"
+UP_LEGACY=$(up_start_against '' legacy)
+assert_eq \
+  'UP-T1: a lock with no recorded script (pre-check daemon) is replaced' \
+  "no|replaced|${DAEMON_DIR}" \
+  "$UP_LEGACY"
+UP_OTHER=$(up_start_against '/old/plugins/cache/arcforge/6.1.0/scripts/lib/learning-curator' other)
+assert_eq \
+  'UP-T1: a lock naming another script directory is replaced' \
+  "no|replaced|${DAEMON_DIR}" \
+  "$UP_OTHER"
+UP_SAME=$(up_start_against "$DAEMON_DIR" same)
+assert_eq \
+  'UP-T1: a lock naming this script directory is left running' \
+  "yes|kept|${DAEMON_DIR}" \
+  "$UP_SAME"
+
+# ─────────────────────────────────────────────
 # Results
 # ─────────────────────────────────────────────
 
