@@ -11,6 +11,8 @@
  *   - the run stops with status `complete` when nothing is runnable
  *   - --max-runs and --max-cost stop the loop with their own status
  *   - a task's own `verify:` line is the floor for that task
+ *   - a task with no floor is done on exit 0, and the loop warns at start,
+ *     naming each such task (spec worktrees-loop B-6, D-032)
  */
 
 jest.mock('../../scripts/lib/loop-session', () => ({
@@ -240,5 +242,70 @@ describe('runLoop over a task list', () => {
 
     expect(state.tasks_file).toBe('tasks.md');
     expect(state.pattern).toBe('tasks');
+  });
+});
+
+describe('start-up warning for tasks without a verify floor (B-6)', () => {
+  const warnings = () =>
+    console.error.mock.calls.map((args) => args.join(' ')).filter((l) => /no verify floor/.test(l));
+
+  it('names every runnable task with no verify: line when --verify-cmd is absent', () => {
+    writeTasks(
+      [
+        '- [x] T0 — Already done',
+        '- [ ] T1 — No floor',
+        '- [ ] T2 — Has floor',
+        '  - verify: `node -e "process.exit(0)"`',
+        '- [~] T3 — Interrupted, no floor',
+        '',
+      ].join('\n'),
+    );
+
+    runLoop(options());
+
+    expect(warnings()).toHaveLength(1);
+    const [line] = warnings();
+    expect(line).toMatch(/\bT1\b/);
+    expect(line).toMatch(/\bT3\b/);
+    expect(line).not.toMatch(/\bT0\b/);
+    expect(line).not.toMatch(/\bT2\b/);
+  });
+
+  it('warns before the first session is spawned', () => {
+    writeTasks('- [ ] T1 — No floor\n');
+    let warnedBeforeSpawn = null;
+    spawnSession.mockImplementation(() => {
+      warnedBeforeSpawn = warnings().length > 0;
+      return { exitCode: 0, stdout: '', stderr: '', costUsd: 0 };
+    });
+
+    runLoop(options());
+
+    expect(warnedBeforeSpawn).toBe(true);
+  });
+
+  it('a task with no floor is still done on a clean session exit', () => {
+    writeTasks('- [ ] T1 — No floor\n');
+
+    const state = runLoop(options());
+
+    expect(readTasks()).toContain('- [x] T1 — No floor');
+    expect(state.status).toBe('complete');
+  });
+
+  it('stays silent when --verify-cmd covers every task', () => {
+    writeTasks('- [ ] T1 — No own floor\n');
+
+    runLoop(options({ verifyCommand: ['node', '-e', 'process.exit(0)'] }));
+
+    expect(warnings()).toEqual([]);
+  });
+
+  it('stays silent when every runnable task has its own verify: line', () => {
+    writeTasks('- [ ] T1 — Has floor\n  - verify: `node -e "process.exit(0)"`\n');
+
+    runLoop(options());
+
+    expect(warnings()).toEqual([]);
   });
 });

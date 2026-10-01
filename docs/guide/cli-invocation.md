@@ -88,6 +88,13 @@ task per session, restartable, with a cost and iteration ceiling.
 | `--max-retries` | Verifier feedback retries before blocking (default: 2) |
 | `--reset` | Archive prior loop state and start fresh |
 
+A task's `verify:` line, or `--verify-cmd` for a task without one, is that
+task's floor: it runs after the session exits 0, and a failing floor sends the
+task to its retry and then to blocked, never to done. A task with neither has no
+floor and is done when its session exits 0 — a clean exit says the session
+ended, not that the work happened. The loop prints a warning at start naming
+every such task, so you can add a floor before it runs.
+
 The loop keeps its own bookkeeping next to your project so an interrupted run
 picks up where it stopped. Nothing carries between iterations except files: the
 task list holds what is left and git holds the work.
