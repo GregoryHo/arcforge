@@ -50,7 +50,7 @@ fails if either the declaration or the emptiness goes away.
 
 | Event | Registration | Kind | What runs |
 |-------|--------------|------|-----------|
-| SessionStart | `inject-context` | sync | Loads previous session context / activated instincts |
+| SessionStart | `inject-context` | sync | Injects activated instincts and pending-action notices (never the previous session's record) |
 | SessionStart | `session-start` | async | Initializes the session file, starts the observer daemon when learning is on |
 | UserPromptSubmit | `user-message-counter` | sync | Counts user messages (stdin passthrough) |
 | PreToolUse | `secrets-guard` | sync | Warn-only credential scan (never denies) |
