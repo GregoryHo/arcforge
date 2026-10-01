@@ -110,3 +110,14 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 - **diagramming-headless-fallback** — give the diagramming references a headless
   fallback for when no renderer can run, the gap left open since 6.0.0 alongside
   the A4 hunting incentive; a skill edit, so it needs eval evidence.
+
+## Skill system
+
+- **skill-body-trim** — seven SKILL.md bodies sit over the 150-line soft cap:
+  `learning` 189, `diagramming-obsidian` 179, `evaluating` 171, `speccing` 168,
+  `dispatching` 158, `code-review` 155, `sessions` 155 (body lines, as
+  `test_line_budget` counts them; it only warns). The p6 remedy is to move
+  reference material into each skill's `references/`, never to cut behavioral
+  instructions. The risk is the 250-line hard cap, which fails the build —
+  `learning` is 61 lines from it. A skill edit, so it needs eval evidence and
+  cannot ride a no-skills patch (D-019).
