@@ -139,14 +139,22 @@ Product-level rationale — why Codex gets skills and nothing else — is
 - **Residual:** that manifest key is now the ONLY thing loading the registry. If
   a future Claude Code stops honouring it, every hook goes silent and no static
   check can tell — `check:hooks` proves the wiring is self-consistent, not that
-  the host reads it. A live session is the only proof. Two are on record: the
-  source tree via `--plugin-dir` (2.1.258), and, on 2026-09-30 with 2.1.285, the
-  6.1.0 copy installed from the `arcforge-dev` marketplace and resolved out of
-  the version-keyed cache — enabled at local scope in an empty directory, one
-  `-p` session wrote its record under `~/.arcforge/sessions/<dir>/`, which only
-  `session-tracker` does. That marketplace's source is a local directory, so a
-  GitHub-sourced install is still unverified; check it on the first install
-  from the published marketplace
+  the host reads it. A live session is the only proof. Three are on record: the
+  source tree via `--plugin-dir` (2.1.258); on 2026-09-30 with 2.1.285, the
+  6.1.0 copy installed from the directory-sourced `arcforge-dev` marketplace;
+  and on 2026-10-01 with 2.1.286, 6.1.1 installed from the **GitHub-sourced**
+  marketplace (`claude plugin marketplace add GregoryHo/arcforge`) into a fresh
+  `CLAUDE_CONFIG_DIR` — the payload is a copy under
+  `plugins/cache/arcforge-dev/arcforge/6.1.1/`, no git checkout, and one `-p`
+  session in an empty directory wrote its record under
+  `~/.arcforge/sessions/<dir>/`, which only `session-tracker` does. The same
+  session's `--debug` log carries no `unknown keys` line for arcforge, where
+  the cached 6.1.0 copy still logs one (#188). Caveat for the directory-sourced
+  marketplace: its components resolve from the **source directory**, not the
+  cache — the debug log loads skills from `<repo>/skills/core` and the
+  observer daemon runs from `<repo>/scripts/`, with `installPath` pointing at
+  the cache all the same — so the 2026-09-30 reading proved the manifest key,
+  not the cache path. Only the GitHub-sourced install exercises the cache
 - Use `${CLAUDE_PLUGIN_ROOT}` (with braces) for all path references in hooks
 - Handler types: `command` (shell), `prompt` (LLM evaluation), `agent` (multi-turn subagent)
 - Supported events: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure, PreCompact, Stop, SubagentStop, SubagentStart, SessionEnd, PermissionRequest, Notification, TeammateIdle, TaskCompleted
