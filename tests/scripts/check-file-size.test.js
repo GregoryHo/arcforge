@@ -25,8 +25,16 @@ describe('check:file-size', () => {
       expect(v[0]).toMatch(/tests\/scripts\/a\.test\.js has 701 lines.*700-line hard limit/);
     });
 
-    it('lets a listed file shrink', () => {
-      expect(findViolations({ 'scripts/lib/big.js': 850 }, allow)).toEqual([]);
+    it('passes a listed file exactly at its recorded count', () => {
+      expect(findViolations({ 'scripts/lib/big.js': 900 }, allow)).toEqual([]);
+    });
+
+    it('fails a listed file that shrank without lowering its recorded count', () => {
+      const v = findViolations({ 'scripts/lib/big.js': 850 }, allow);
+      expect(v).toHaveLength(1);
+      expect(v[0]).toMatch(
+        /scripts\/lib\/big\.js has 850 lines.*lower its allowlist entry from 900 to 850/,
+      );
     });
 
     it('fails a listed file that grew past its recorded count', () => {

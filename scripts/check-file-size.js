@@ -5,10 +5,11 @@
  * `.claude/rules/coding-standards.md`, made mechanical (#174).
  *
  * Scans every `.js` file under scripts/, hooks/, and tests/. A file over the
- * limit fails unless ALLOWLIST grandfathers it, and an allowlisted file may
- * shrink but never grow past its recorded count. The allowlist only shrinks:
- * an entry whose file is gone or back under the limit fails too, so it gets
- * removed rather than left as headroom to regrow into.
+ * limit fails unless ALLOWLIST grandfathers it. An allowlisted file must sit
+ * exactly at its recorded count: growing past it fails, and so does shrinking
+ * below it until the count is lowered to match, so the baseline moves down with
+ * the file and never leaves headroom to regrow into. An entry whose file is gone
+ * or back under the limit fails too, so it gets removed.
  *
  * CLI tier: prints a human-readable report and exits 0/1.
  */
@@ -87,6 +88,11 @@ function findViolations(counts, allowlist) {
       violations.push(
         `${file} has ${lines} lines, within the ${HARD_LIMIT}-line limit — remove it from the allowlist`,
       );
+    } else if (lines < recorded) {
+      // The ratchet is exact: a stale-high baseline would be headroom to regrow into.
+      violations.push(
+        `${file} has ${lines} lines — lower its allowlist entry from ${recorded} to ${lines}`,
+      );
     }
   }
   for (const file of Object.keys(allowlist)) {
@@ -110,7 +116,9 @@ function main() {
     console.error('\nSplit the file (see .claude/rules/coding-standards.md), or shrink it back.');
     process.exit(1);
   }
-  console.log(`No file over ${HARD_LIMIT} lines outside the allowlist; no allowlisted file grew.`);
+  console.log(
+    `No file over ${HARD_LIMIT} lines outside the allowlist; every allowlisted file sits at its recorded count.`,
+  );
   process.exit(0);
 }
 

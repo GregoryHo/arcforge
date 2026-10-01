@@ -319,7 +319,7 @@ Seven static checks run in CI and are **not** part of `npm test`:
 | `npm run check:hooks` | `hooks/claude-code.json` schema + the manifests’ `hooks` declarations |
 | `npm run check:eval-targets` | Eval scenarios don't target things that no longer exist |
 | `npm run check:product` | `product/` roadmap, Decision Log, and spec headers stay consistent |
-| `npm run check:file-size` | No `.js` file under `scripts/`, `hooks/`, `tests/` exceeds 700 lines; the grandfathered files in `scripts/check-file-size.js` may shrink, never grow |
+| `npm run check:file-size` | No `.js` file under `scripts/`, `hooks/`, `tests/` exceeds 700 lines; the grandfathered files in `scripts/check-file-size.js` may shrink, never grow, and their recorded counts move down with them |
 
 ---
 
