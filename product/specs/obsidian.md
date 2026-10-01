@@ -1,6 +1,6 @@
 # obsidian — spec
 
-> Status: shipped v6.1.1 · extended by 6.1.2 (next) · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.1.1 · extended by 6.1.2 (building) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -46,12 +46,15 @@ work carries provenance a reader can check.
   comparisons, and commentary come from notes too; where the vault is thin the
   skill names the gap rather than smuggling in general knowledge, and the
   named gap feeds the audit's growth pass. Key claims cite their source notes.
-- **B-4 Sources keep provenance.** Ingesting an external source is two writes:
-  the immutable original, then the typed note carrying `source_url` and a
-  `sha256` of what was captured — so what the source said and what was
-  understood from it never conflate, and audits can detect source drift by
-  hash. Contradictions with existing notes are surfaced to the user, never
-  silently overwritten.
+- **B-4 Sources keep provenance where the vault adopts raw sources.** In a
+  vault whose `AGENTS.md` declares `raw_source: adopted`, ingesting an
+  external source is two writes: the immutable original, then the typed note
+  carrying `source_url` and a `sha256` of what was captured — so what the
+  source said and what was understood from it never conflate, and audits can
+  detect source drift by hash. A vault that declares otherwise — the
+  project-tracker preset's `raw_source: not-adopted` — gets the typed note
+  alone, because under B-1 its contract decides (D-034). Contradictions with
+  existing notes are surfaced to the user, never silently overwritten.
 - **B-5 Audit reports; it barely writes.** Of the three audit passes only link
   resolution modifies notes — lint and growth report and propose. The full
   `index.md` rebuild is a write step of that link pass (LINK mode), its
@@ -94,7 +97,9 @@ entry per vault plus a default — is engine state owned by
 The note schema is the vault's own: each vault declares its types, frontmatter
 fields, taxonomy, and thresholds in its `AGENTS.md` + `SCHEMA.md`, and that
 declaration wins wherever it overlaps the skill (B-1). The only fields arcforge
-itself insists on are the ingest provenance pair, `source_url` and `sha256` (B-4).
+itself insists on are the ingest provenance pair, `source_url` and `sha256`, and
+it insists on them only where the vault's `AGENTS.md` sets the contract key
+`raw_source` to `adopted` (B-4).
 
 ## Decisions
 
@@ -105,5 +110,5 @@ live behind the CLI per [cli](cli.md) B-8.
 - **D-028** — the `index.md` rebuild is a write step of LINK mode (B-5).
 - **D-045** — that rebuild ships without harness evidence: its scenario's
   baseline is at ceiling (B-5).
-- **D-034** — *proposed*: the provenance pair applies where the vault adopts raw
+- **D-034** — the provenance pair applies where the vault adopts raw
   sources (B-4).

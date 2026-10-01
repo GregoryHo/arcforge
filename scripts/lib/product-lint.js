@@ -44,10 +44,13 @@
  *         clause-scoped form ⇒ `partially superseded by D-NNN`. The pairing is
  *         checked from both ends, so a flip clause with no superseding entry
  *         behind it, or one naming a decision the log does not carry, is
- *         rejected too. A superseded entry's whole `Status:` is then read clause
- *         by clause against the closed vocabulary, so a totally superseded entry
- *         is no longer `Accepted`, no entry dies twice, and no decision both
- *         replaces an entry whole and reverses one of its clauses. An entry
+ *         rejected too. Every entry's whole `Status:` is read clause by clause
+ *         against the closed vocabulary — an unknown clause or an empty one left
+ *         by a stray `·` is reported — and a superseded entry's is then held
+ *         coherent, so a totally superseded entry is no longer `Accepted`, no
+ *         entry dies twice, and no decision both replaces an entry whole and
+ *         reverses one of its clauses. A clause has one claimant: two decisions
+ *         naming the same `(clause N)` of one entry are reported. An entry
  *         carries exactly one `Status:` line, counted structurally rather than
  *         only on a victim: a second one is reported rather than silently
  *         overwriting the first — otherwise the same self-contradiction is
@@ -97,7 +100,12 @@
  *         a paragraph of literal pipes while every row rule reads it as product
  *         state;
  *   - C7  a roadmap row's `Tag` cell matches its Status — a `shipped` row
- *         carries `vX.Y.Z` for its own version, any other row carries `—`.
+ *         carries `vX.Y.Z` for its own version, any other row carries `—`;
+ *   - C8  every spec carries the template's five section headings — `## Purpose`,
+ *         `## Scope`, `## Behavior`, `## Data / domain model`, `## Decisions` —
+ *         each exactly once at column 1 outside fences and comments, so no
+ *         spec escapes C5 by losing the section C5 reads or by hiding it
+ *         behind an empty duplicate.
  *
  * Three siblings hold what this file is not about, cut one per format. The
  * markdown primitives every rule reads with — the fence-aware `section()`,
@@ -110,7 +118,7 @@
  * `product-decisions.js`, and the rules about the log's own shape travel with it
  * too: C2's numbering invariants and C3's relation and status coherence. This
  * file holds the rules that read the parsed state — C1, C4's row↔spec pairing,
- * C5, C6's sanity floor and C7 — plus `validateProduct`, which runs them all.
+ * C5, C6's sanity floor, C7 and C8 — plus `validateProduct`, which runs them all.
  *
  * Library tier: pure — no I/O of its own; every rule reads the corpus strings
  * its caller hands it, and a violation is an error string rather than a throw.
@@ -128,10 +136,19 @@ const {
 // The `Tag` cell an unshipped row carries.
 const NO_TAG = '—';
 // The one `##` section of a spec this linter reads, sliced the way the two
-// sections of `ROADMAP.md` are by their own owners — but no
-// rule asserts a spec's headings, so an indented or renamed one empties the slice
-// silently, where C6 catches the same read on `ROADMAP.md`.
+// sections of `ROADMAP.md` are by their own owners. An indented or renamed one
+// empties the slice, and C8 reports the missing heading the way C6 catches the
+// same read on `ROADMAP.md`.
 const SPEC_DECISIONS_HEADING_RE = /^##\s+Decisions\s*$/;
+// C8 — the template's five section headings, each read at column 1 the way a
+// section-opening heading is everywhere else in this linter.
+const SPEC_SECTION_HEADINGS = [
+  ['## Purpose', /^##\s+Purpose\s*$/],
+  ['## Scope', /^##\s+Scope\s*$/],
+  ['## Behavior', /^##\s+Behavior\s*$/],
+  ['## Data / domain model', /^##\s+Data \/ domain model\s*$/],
+  ['## Decisions', SPEC_DECISIONS_HEADING_RE],
+];
 // The spec header line, matched per line rather than against the whole file, so
 // the scope in `specStatusHeaders` is what decides which line is the header. Read at
 // the ` {0,3}` bound the rest of the linter reads structure at: CommonMark opens a
@@ -221,9 +238,8 @@ function checkRoadmapTags(rows, errors) {
  * `DECISION_ANY_RE` in `product-decisions.js` also takes and for the same reason
  * — every boundary a heading *ends* fails open when it is read at column 1. The
  * one column-1 *boundary* read left is the heading that *opens* a section, which
- * fails closed — and C6 rejects the empty slice that read yields for `ROADMAP.md`'s
- * two sections, though not for a spec's `## Decisions`, which has no such backstop
- * and is then checked for nothing (`product/AGENTS.md` states that exception).
+ * fails closed — C6 rejects the empty slice that read yields for `ROADMAP.md`'s
+ * two sections, and C8 the missing heading behind an empty `## Decisions` slice.
  *
  * A *form* stays anchored at column 1 where a wider probe covers the band above it
  * and reports what it catches there instead of dropping it: `DECISION_HEADING_RE`
@@ -393,6 +409,32 @@ function checkSpecCitations(entries, specs, errors) {
 }
 
 /**
+ * C8 — every spec carries the template's five section headings, each exactly
+ * once. Read through `unfenced`, so a heading inside a fence or an HTML comment
+ * — or swallowed by an unclosed one — is not a heading, and read at column 1, so
+ * an indented one opens nothing. Without this a spec that lost `## Decisions`
+ * gave C5 an empty slice and was checked for nothing — and so did one with an
+ * empty `## Decisions` ahead of the real one, since the slice takes the first.
+ */
+function checkSpecSections(specs, errors) {
+  for (const spec of specs) {
+    const lines = unfenced(spec.content.split('\n'));
+    for (const [heading, re] of SPEC_SECTION_HEADINGS) {
+      const count = lines.filter((line) => re.test(line)).length;
+      if (count === 0) {
+        errors.push(
+          `C8 specs/${spec.name}.md: missing the "${heading}" section heading — a spec carries the template's five, each at column 1 outside a fence or comment`,
+        );
+      } else if (count > 1) {
+        errors.push(
+          `C8 specs/${spec.name}.md: the "${heading}" section heading appears ${count} times — a spec carries each of the template's five exactly once`,
+        );
+      }
+    }
+  }
+}
+
+/**
  * Validate the product state. Pure — takes the file contents, returns a list of
  * error strings (empty = valid). Never throws on malformed input.
  *
@@ -417,6 +459,7 @@ function validateProduct({ roadmap = '', specs = [] } = {}) {
   checkSpecHeaders(rows, specs, errors);
   checkSpecCitations(entries, specs, errors);
   checkRoadmapTags(rows, errors);
+  checkSpecSections(specs, errors);
 
   if (rows.length === 0) errors.push('C6 sanity floor: the roadmap table has no rows');
   if (entries.length === 0) errors.push('C6 sanity floor: the Decision Log has no entries');

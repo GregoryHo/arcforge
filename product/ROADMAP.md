@@ -11,7 +11,7 @@ decision *and* every reversal. How to maintain this file: [`product/AGENTS.md`](
 | 6.0.0 | `v6.0.0` | v6 toolkit | **shipped** | Ground-up rebuild: 15 self-contained skills behind a prose router, a 5-group CLI reached as bare `arcforge`, 6 hooks, and the retained learning / eval / obsidian systems — Claude Code single-harness, zero runtime deps. | [skill-system](specs/skill-system.md) · [cli](specs/cli.md) · [hooks](specs/hooks.md) · [learning](specs/learning.md) · [eval](specs/eval.md) · [obsidian](specs/obsidian.md) · [worktrees-loop](specs/worktrees-loop.md) |
 | 6.1.0 | `v6.1.0` | learning trust · spec-driven method · Codex packaging | **shipped** | Diary enrichment and user-message capture move behind the learning opt-in and the enricher loses blanket permissions; the CLI's candidate commands become a front end onto the canonical queue; the lightweight spec-driven method arcforge runs itself on ships as the `speccing` skill; arcforge installs on Codex as a skills-only plugin over the same tree. | [skill-system](specs/skill-system.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) · [codex-harness](specs/codex-harness.md) · [sdd](specs/sdd.md) |
 | 6.1.1 | `v6.1.1` | eval instrument · learning trust repairs · truthful safety claims | **shipped** | The three fixes merged after `v6.1.0` — the prompt audit's engine and skill findings (#181, #182) and the hook registry's non-schema keys (#188) — plus the repairs the release benchmark depends on: trials isolated from the operator's output style and user hooks (#170), a provider refusal scored as an error trial rather than behavior, grader prompts that no longer resolve empty outside the arcforge repo, and error trials excluded from every verdict. Learning stops undoing what the user accepted: decay no longer re-applies at every SessionStart and archives instincts, the curator daemon — a second outbound path the spec never named — no longer starts after an opt-out, the dashboard's Activate and Deactivate pass their own gate, and `learn enable` stops erasing config. The secrets-guard claim is corrected to what it scans, and every edit under `skills/` lands here, so the benchmark is measured once, on a repaired instrument. | [eval](specs/eval.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) · [skill-system](specs/skill-system.md) · [obsidian](specs/obsidian.md) · [sdd](specs/sdd.md) · [worktrees-loop](specs/worktrees-loop.md) |
-| 6.1.2 | — | docs-are-the-contract sweep | **next ← we are here** | Where the docs promise what the engine does not do: CLI messages and contract drift, hooks promises the engine never kept, loop state bugs, contributor tooling and repo hygiene. It touches no eval-backed path — nothing under `skills/`, `evals/scenarios/` or `evals/fixtures/` — so it ships without a benchmark regeneration. | [cli](specs/cli.md) · [hooks](specs/hooks.md) · [learning](specs/learning.md) · [worktrees-loop](specs/worktrees-loop.md) · [obsidian](specs/obsidian.md) · [codex-harness](specs/codex-harness.md) |
+| 6.1.2 | — | docs-are-the-contract sweep | **building ← we are here** | Where the docs promise what the engine does not do: CLI messages and contract drift, hooks promises the engine never kept, loop state bugs, contributor tooling and repo hygiene. It touches no eval-backed path — nothing under `skills/`, `evals/scenarios/` or `evals/fixtures/` — so it ships without a benchmark regeneration. | [cli](specs/cli.md) · [hooks](specs/hooks.md) · [learning](specs/learning.md) · [worktrees-loop](specs/worktrees-loop.md) · [obsidian](specs/obsidian.md) · [codex-harness](specs/codex-harness.md) |
 | 6.2.0 | — | learning lifecycle · eval corpus repairs | **next** | Exits for candidates stuck at `approved` or `materialized`, `learn instinct deactivate` and `learn instinct restore`, a policy for candidate names, and worktree paths derived from the repo root; plus the scenario rubric fixes, measured in their own, smaller round. A minor because it adds CLI commands. | [learning](specs/learning.md) · [cli](specs/cli.md) · [worktrees-loop](specs/worktrees-loop.md) · [codex-harness](specs/codex-harness.md) · [eval](specs/eval.md) · [sdd](specs/sdd.md) |
 
 > Un-scheduled ideas live in the [Backlog](BACKLOG.md); a wish graduates into a
@@ -821,7 +821,7 @@ reverse one, append a superseding entry (see AGENTS.md).
 ### D-031 — hooks B-8 stops promising where the last session left off
 - Date: 2026-09-30
 - Version: 6.1.2
-- Status: Proposed
+- Status: Accepted
 - Decision: Proposed: remove "where the last session left off" from hooks B-8,
   the hooks guide, `hooks/README.md` and the README, so SessionStart promises
   what `inject-context` injects; building the carry-over becomes the
@@ -839,7 +839,7 @@ reverse one, append a superseding entry (see AGENTS.md).
 ### D-032 — Without a verify floor, a loop task is done on exit 0, and the loop says so
 - Date: 2026-09-30
 - Version: 6.1.2
-- Status: Proposed
+- Status: Accepted
 - Decision: Proposed: worktrees-loop B-6 states that a task with no `verify:`
   line, run without a run-level verify command, is done when its session exits
   0, and the loop warns at start when any task will run without a floor. Until
@@ -856,7 +856,7 @@ reverse one, append a superseding entry (see AGENTS.md).
 - Date: 2026-09-30
 - Version: 6.1.2
 - Refines: D-006
-- Status: Proposed
+- Status: Accepted
 - Decision: Proposed: fix one convention for numbering a decision's clauses;
   then have C3 read the closed status vocabulary on every entry, reject a
   trailing `·`, and hold a clause number to one claimant; and add an eighth
@@ -878,7 +878,7 @@ reverse one, append a superseding entry (see AGENTS.md).
 ### D-034 — obsidian B-4's provenance pair is conditional on the vault adopting raw sources
 - Date: 2026-09-30
 - Version: 6.1.2
-- Status: Proposed
+- Status: Accepted
 - Decision: Proposed: obsidian B-4 follows the skill — the two-write ingest
   (the immutable original, then the typed note with `source_url` and
   `sha256`) applies in a vault whose contract declares `raw_source: adopted`,
