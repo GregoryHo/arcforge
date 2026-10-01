@@ -314,8 +314,12 @@ function tryGenerateAutoDiary(project, date, sessionId) {
  * which bypasses every check in the child. It now carries the narrowest set
  * that still enriches, verified by spike against the real CLI:
  *   --tools Read,Write        the only tools that exist in the child at all.
- *   --add-dir <draft dir>     the draft lives outside the spawning cwd, so
- *                             without this the write is refused outright.
+ *   --add-dir <draft dir>     the draft lived outside the spawning cwd, so
+ *                             without this the write was refused outright. Now
+ *                             that the child starts in the draft dir (below)
+ *                             it names the same directory; it stays because the
+ *                             spike verified the argv with it, and dropping it
+ *                             would need a new live run to prove harmless.
  *   --permission-mode acceptEdits
  *                             auto-approves file edits inside those
  *                             directories, replacing the blanket bypass. It is
@@ -328,11 +332,15 @@ function tryGenerateAutoDiary(project, date, sessionId) {
  * pre-approves, it does not deny, so it changed nothing here and would have
  * read like a confinement it does not provide.
  *
- * What this is NOT, so no caller or doc overstates it: no `cwd` is passed, so
- * the child inherits this process's working directory — the user's project —
- * and --add-dir ADDS the draft's directory alongside it rather than restricting
- * the run to it. Together with acceptEdits that means edits are auto-approved
- * across both. This is a narrowing of the old blanket bypass, not a sandbox.
+ * Working directory: the child starts in the draft's directory. It used to
+ * inherit this process's cwd — the user's project — so acceptEdits
+ * auto-approved edits there as well as in the draft dir.
+ *
+ * What this is NOT, so no caller or doc overstates it: a sandbox. Edits inside
+ * the draft dir — which also holds the same day's other diaries — are still
+ * auto-approved, and what keeps the run out of everything else is the host
+ * CLI's own permission check, not an OS boundary; the child runs as the user.
+ * This is a narrowing of the old blanket bypass (learning B-9 Residual).
  *
  * @param {string} draftPath - Path to the draft to enrich.
  * @param {Object} transcriptData - { userMessages, toolsUsed, filesModified, stats }.
@@ -385,6 +393,7 @@ function spawnDiaryEnricher(draftPath, transcriptData, project) {
         '{"mcpServers":{}}',
       ],
       {
+        cwd: path.dirname(draftPath),
         detached: true,
         stdio: ['pipe', 'ignore', stderrFd],
         env: { ...process.env, ARCFORGE_SPAWNED: 'enricher' },

@@ -440,7 +440,7 @@ describe('diary-capture', () => {
       const argvFile = path.join(binDir, 'argv.txt');
       fs.writeFileSync(
         path.join(binDir, 'claude'),
-        `#!/bin/sh\ncat > /dev/null\nfor a in "$@"; do printf '%s\\n' "$a"; done > "${argvFile}.tmp"\nmv "${argvFile}.tmp" "${argvFile}"\n`,
+        `#!/bin/sh\ncat > /dev/null\npwd -P > "${binDir}/cwd.txt"\nfor a in "$@"; do printf '%s\\n' "$a"; done > "${argvFile}.tmp"\nmv "${argvFile}.tmp" "${argvFile}"\n`,
         { mode: 0o755 },
       );
     });
@@ -477,6 +477,23 @@ describe('diary-capture', () => {
       expect(argv[argv.indexOf('--add-dir') + 1]).toBe(path.dirname(draftPath));
       expect(argv[argv.indexOf('--permission-mode') + 1]).toBe('acceptEdits');
       expect(argv[argv.indexOf('--tools') + 1]).toBe('Read,Write');
+    });
+
+    // learning-10: the child used to inherit this process's cwd — the user's
+    // project — so acceptEdits auto-approved edits there too. It now starts in
+    // the draft's directory instead.
+    it('starts the child in the draft directory, not the spawning cwd', async () => {
+      const { spawnDiaryEnricher } = require('../../scripts/lib/diary-capture');
+      const draftPath = path.join(homeDir, '.arcforge', 'diaries', 'demo', '2026-06-14', 'd.md');
+      fs.mkdirSync(path.dirname(draftPath), { recursive: true });
+
+      spawnDiaryEnricher(draftPath, { userMessages: [] }, 'demo');
+      const argv = await recordedArgv(5000);
+      expect(argv).not.toBeNull();
+
+      const childCwd = fs.readFileSync(path.join(binDir, 'cwd.txt'), 'utf-8').trim();
+      expect(childCwd).not.toBe(fs.realpathSync(process.cwd()));
+      expect(childCwd).toBe(fs.realpathSync(path.dirname(draftPath)));
     });
   });
 });

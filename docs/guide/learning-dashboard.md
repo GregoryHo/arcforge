@@ -343,11 +343,13 @@ once you have turned learning on.
 The first is diary enrichment: it runs `claude` locally over a parsed summary of
 the session, so that summary reaches the model exactly the way anything you type
 in a session does. That run used to skip every permission check; it no longer
-does. It gets two tools, `Read` and `Write`, and the diary directory is added to
-the places it is allowed to work in. It is not sealed off, though: it still
-starts in your project directory, and edits inside those places are approved
-automatically, because a background run has nobody to ask. What it no longer
-has is a blanket pass over your whole machine.
+does. It gets two tools, `Read` and `Write`, and it starts in the diary's own
+directory rather than in your project. It is not sealed off, though: edits
+inside that directory — which also holds the same day's other diaries — are
+approved automatically, because a background run has nobody to ask, and what
+keeps it out of the rest of your machine is `claude`'s own permission check, not
+an operating-system boundary. What it no longer has is a blanket pass over your
+whole machine, or your project as its working directory.
 
 The second is the curator's analysis, which turns your observations into
 candidates: a background process sends a batch of sanitized observations to

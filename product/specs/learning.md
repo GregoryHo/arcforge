@@ -155,12 +155,18 @@ was recorded about them.
   it was handed and return a proposal, and can touch nothing on the machine;
   the manifest it writes records the tool access the run actually had (D-023).
   Enrichment no longer runs with permissions switched off: it gets two tools, `Read` and `Write`,
-  and the draft's own directory is added to the ones it may work in. It is not
-  a sandbox, and the spec does not claim one — the run still inherits the
-  directory it was started from, which is the project, and edits inside those
-  directories are auto-approved rather than prompted, because a detached run
-  has nobody to answer a prompt. What it no longer carries is the blanket
-  bypass of every check. State
+  and it starts in the draft's own directory — also added explicitly to the
+  ones it may work in — rather than inheriting the project it was spawned
+  from. What it no longer carries is the blanket bypass of every check, or the
+  user's project as its working directory. Residual: it is not a sandbox, and
+  the spec does not claim one. Edits inside the draft's directory are
+  auto-approved rather than prompted, because a detached run has nobody to
+  answer a prompt, and that directory also holds the same day's other diaries,
+  so a prompt-injected draft can rewrite them. What keeps the run out of
+  everything else is the host tool's own permission check on a run nobody can
+  answer, not an operating-system boundary — the child runs as the user. The
+  working directory is verified against a stub of the host CLI, not a live
+  run. State
   follows its scope: the candidate queue, the audit log, the drafts
   materialization writes and the activated instincts are all home-global under
   `~/.arcforge/`, and the project's own `.arcforge/learning/` holds that
