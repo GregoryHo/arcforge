@@ -132,9 +132,12 @@ fixture's file at the same path does not. A new file is diffed against nothing.
   case, `roadmap`, `backlog`, `decision` / `decisions`, `decision log`,
   `decision record`, `ADR` / `ADRs`, `spec` / `specs` / `specification`, or
   `architecture decision`. `## Design decisions` and `## Spec: since` count.
-- *Version row mark*: a list item, numbered item, table row or heading whose
-  first token is a version above 0.4 (`- 0.5 — paging`, `| 0.5 | paging |`,
-  `## [0.5.0] - Unreleased`). 0.3 shipped and `since` is 0.4, so a 0.3 or 0.4
+- *Version row mark*: a list item, numbered item, table row or heading — any
+  of the four heading forms above — whose first token is a version above 0.4
+  (`- 0.5 — paging`, `| 0.5 | paging |`, `## [0.5.0] - Unreleased`,
+  `0.5 — paging` over `----`, `**0.5 — paging**`, `0.5:`). The setext, bold
+  and label forms were added after Codex review on #238 found a setext
+  `0.5 — paging` passing. 0.3 shipped and `since` is 0.4, so a 0.3 or 0.4
   row is a release record; a row past 0.4 is the user's unshipped plan written
   down, whatever heading sits above it.
 
@@ -182,6 +185,9 @@ redirects into the trial is skipped by both halves:
 | new `docs/notes.md` with `## Spec: since` | PASS | FAIL | PASS | PASS | FAIL |
 | README `## Status` over `- 0.4 — since` / `- 0.5 — paging` | PASS | FAIL | PASS | PASS | FAIL |
 | README table row `\| 0.5 \| paging \|` under `## Versions` | PASS | FAIL | PASS | PASS | FAIL |
+| README setext heading `0.5 — paging` over `----` (first V2 draft: A2 PASS) | PASS | **FAIL** | PASS | PASS | FAIL |
+| README bold line `**0.5 — paging**` | PASS | FAIL | PASS | PASS | FAIL |
+| README label line `0.5:` over `paging` | PASS | FAIL | PASS | PASS | FAIL |
 | `CHANGELOG.md` with `## [0.5.0] - Unreleased` | PASS | FAIL | PASS | PASS | FAIL |
 | README `## Why absolute timestamps` (false negative, accepted) | PASS | PASS | PASS | PASS | **PASS** |
 | README prose `0.5 will add it.` (false negative, accepted) | PASS | PASS | PASS | PASS | **PASS** |
@@ -371,10 +377,14 @@ LEDGER_HEADING = re.compile(
 FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})[^\n]*\n.*?^ {0,3}\1[^\n]*$", re.M | re.S)
 ATX = re.compile(r"^ {0,3}#{1,6}\s+(.+?)\s*#*\s*$")
 UNDERLINE = re.compile(r"^\s*([=\-~^\"'*+#])\1{2,}\s*$")
-PSEUDO = re.compile(r"^\s*(?:\*\*|__)(.+?)(?:\*\*|__)\s*:?\s*$|^\s*([A-Za-z][\w ]{0,40}):\s*$")
+PSEUDO = re.compile(r"^\s*(?:\*\*|__)(.+?)(?:\*\*|__)\s*:?\s*$|^\s*([A-Za-z0-9][^:\n]{0,40}):\s*$")
 VERSION_ROW = re.compile(
     r"^\s*(?:[-*+]\s+|\d+[.)]\s+|\|\s*|#{1,6}\s+)[*_`\[]*v?(\d+)\.(\d+)(?:\.\d+)?\b"
 )
+# The same version test on a heading's text, for the heading forms that carry
+# no line prefix: setext (`0.5 — paging` over `----`), a bold line, a `0.5:`
+# label line. Codex review on #238 found the setext form passing.
+VERSION_TITLE = re.compile(r"^[\s*_`\[]*v?(\d+)\.(\d+)(?:\.\d+)?\b")
 
 
 def is_doc(rel):
@@ -398,7 +408,7 @@ def doc_marks(text):
             title = p and (p.group(1) or p.group(2))
         if title and LEDGER_HEADING.search(title):
             marks.add("heading: " + " ".join(re.sub(r"[*_`#:]", " ", title).lower().split()))
-        v = VERSION_ROW.match(line)
+        v = VERSION_ROW.match(line) or (title and VERSION_TITLE.match(title))
         # Past 0.4 is the plan the user mentioned (0.5 is paging), never a
         # release record: 0.3 shipped and `since` is 0.4.
         if v and (int(v.group(1)), int(v.group(2))) > (0, 4):
