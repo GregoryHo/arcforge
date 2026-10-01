@@ -171,6 +171,42 @@ describe('learning-workflow reflection scan', () => {
     expect(result.diaries).toHaveLength(REFLECT_READY_MIN_DIARIES);
   });
 
+  // B-8 / D-042 (#169): only an enriched diary counts. A draft still carrying
+  // the TO BE ENRICHED placeholders — learning off, or enrichment that never
+  // ran — counts toward neither the threshold nor the diaries scanned.
+  const STUB = '## Decisions Made\n\n<!-- TO BE ENRICHED — Fill from conversation memory -->\n- \n';
+  const writeStubDrafts = (count) => {
+    const dir = path.join(home, 'diaries', project, '2026-08-14');
+    fs.mkdirSync(dir, { recursive: true });
+    for (let i = 0; i < count; i++) {
+      fs.writeFileSync(path.join(dir, `diary-stub-${i}-draft.md`), STUB);
+    }
+  };
+
+  it('reports not-ready when the only diaries are unenriched stubs', () => {
+    writeStubDrafts(REFLECT_READY_MIN_DIARIES + 3);
+    const result = scanForReflection(project);
+    expect(result.count).toBe(0);
+    expect(result.diaries).toEqual([]);
+    expect(result.ready).toBe(false);
+  });
+
+  it('counts enriched diaries and drafts, never the stubs beside them', () => {
+    writeDiaries(REFLECT_READY_MIN_DIARIES - 1);
+    writeStubDrafts(5);
+    const dir = path.join(home, 'diaries', project, '2026-08-14');
+    fs.writeFileSync(path.join(dir, 'diary-enriched-draft.md'), '## Decisions Made\n\n- chose X\n');
+    const result = scanForReflection(project);
+    expect(result.count).toBe(REFLECT_READY_MIN_DIARIES);
+    expect(result.ready).toBe(true);
+    expect(result.diaries.some((d) => d.includes('diary-stub-'))).toBe(false);
+  });
+
+  it('stubs do not move the strategy picker past the enriched count', () => {
+    writeStubDrafts(6);
+    expect(scanForReflection(project).strategy).toBe('recent_window');
+  });
+
   it('checkReflectReady agrees with scanForReflection', () => {
     writeDiaries(REFLECT_READY_MIN_DIARIES);
     const scan = scanForReflection(project);

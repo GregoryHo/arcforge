@@ -10,6 +10,7 @@ const {
   sanitizeSessionId,
   sanitizeProjectName,
 } = require('./utils');
+const { draftIsStale } = require('./diary-capture');
 
 function getDiaryPath(project, date, sessionId) {
   return path.join(getDateDiariesDir(project, date), `diary-${sanitizeSessionId(sessionId)}.md`);
@@ -53,6 +54,17 @@ function parseProcessedLog(logPath) {
 }
 
 /**
+ * Whether a file in a diary date directory counts toward reflection (B-8,
+ * D-042): a diary, enriched — not a draft still carrying the TO BE ENRICHED
+ * placeholders. scanDiaries and determineReflectStrategy share this so the
+ * strategy picker and the scan agree about the same directory (#169).
+ */
+function isCountableDiary(dirPath, fileName) {
+  if (!fileName.startsWith('diary-') || !fileName.endsWith('.md')) return false;
+  return !draftIsStale(path.join(dirPath, fileName));
+}
+
+/**
  * Scan for diary files based on strategy.
  */
 function scanDiaries(project, strategy, processedLogPath) {
@@ -71,7 +83,7 @@ function scanDiaries(project, strategy, processedLogPath) {
     const dirPath = path.join(diariesDir, dateDir);
     const diaries = fs
       .readdirSync(dirPath)
-      .filter((f) => f.startsWith('diary-') && f.endsWith('.md'))
+      .filter((f) => isCountableDiary(dirPath, f))
       .map((f) => path.join(dirPath, f))
       .sort();
     allDiaries.push(...diaries);
@@ -99,9 +111,7 @@ function determineReflectStrategy(project, processedLogPath) {
     .filter((d) => fs.statSync(path.join(diariesDir, d)).isDirectory());
   for (const dateDir of dateDirs) {
     const dirPath = path.join(diariesDir, dateDir);
-    const diaries = fs
-      .readdirSync(dirPath)
-      .filter((f) => f.startsWith('diary-') && f.endsWith('.md'));
+    const diaries = fs.readdirSync(dirPath).filter((f) => isCountableDiary(dirPath, f));
     allDiaries.push(...diaries);
   }
 

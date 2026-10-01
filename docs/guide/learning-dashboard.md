@@ -89,6 +89,10 @@ ready: false
 ```
 
 Under three diaries there is nothing to generalize from, and the scan says so.
+Only an enriched diary counts: a draft whose sections still carry the
+`TO BE ENRICHED` placeholders — written while learning was off, or one whose
+enrichment never ran — is left out of the count, of the diaries the scan lists,
+and of the end-of-session nudge that tells you reflection is ready.
 When there is enough, the `/arcforge:learning` skill reads them and separates
 **patterns** (three or more diaries showing the same thing) from
 **observations** (one or two, and labelled as such). Everything cites the diaries
