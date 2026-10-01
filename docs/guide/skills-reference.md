@@ -12,9 +12,9 @@ to be fixed and `debugging` applies itself; say a branch is finished and
 `finishing` takes over.
 
 One of the thirteen does not hold up in measurement: `speccing` does not fire on
-its own under plugin routing — 0 of 10 isolated runs, while a control prompt
-routed to `brainstorming` in 5 of 5, so routing itself works. Invoke it as
-`/arcforge:speccing` (on Codex, from the `$` picker).
+its own under plugin routing (0 of 10 isolated runs, while a control prompt
+routed to `brainstorming` in 5 of 5). Invoke it as `/arcforge:speccing` (on
+Codex, from the `$` picker).
 
 Three are **user-invoked** — they load only when you ask for them by name,
 because starting them is a deliberate act rather than something to infer:
