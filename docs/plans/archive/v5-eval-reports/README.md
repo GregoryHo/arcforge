@@ -1,0 +1,1 @@
+History, not guidance: v5 eval reports (2026-05-05, formerly `evals/reports/`) kept as written — their `skills/arc-*` paths and the `arc eval report` command no longer exist; today's command is `arcforge eval report`.
