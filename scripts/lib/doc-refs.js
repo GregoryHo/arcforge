@@ -13,7 +13,8 @@
  *                 cli-manifest.js, and every `--flag` it uses must be declared
  *                 for that command (or a subcommand) in the manifest. In
  *                 reverse, a `## \`<cmd>\`` section must name every manifest
- *                 flag of that command (doc-flag-coverage.js).
+ *                 flag of that command (doc-flag-coverage.js). An `npm run <script>`
+ *                 must name a package.json script (doc-command-refs.js).
  *   R3  fields  — a `--json` output field promise (jq path or a doc `.field`
  *                 promise tied to a command) must exist in that command's
  *                 manifest `output` shape (only checked for commands whose
@@ -46,6 +47,7 @@
  */
 
 const { CLI_MANIFEST } = require('./cli-manifest');
+const { scanNpmScripts } = require('./doc-command-refs');
 const { scanFlagCoverage } = require('./doc-flag-coverage');
 
 // R4 is gating (WT-6 has merged; the finishing twin no longer dangles).
@@ -589,6 +591,8 @@ function scanR4Skills(file, spans, skillExists) {
  *   file's directory (relative to repo root) so the probe can also try
  *   doc-relative resolution (skill docs cite skill-local paths).
  * @param {(skillName: string) => boolean} probes.skillExists - skill dir exists
+ * @param {(name: string) => boolean} [probes.npmScriptExists] - package.json
+ *   declares that script
  * @returns {{ findings: Object[], stats: { r4: { legacy: number, slash: number,
  *   total: number } } }} — `stats.r4` counts references PROBED (not findings);
  *   a caller aggregating across the doc surface must fail on a zero total.
@@ -601,6 +605,7 @@ function lintDoc(file, content, probes = {}) {
   const rawPathExists = probes.pathExists || (() => true);
   const pathExists = (relPath) => rawPathExists(relPath, docDir);
   const skillExists = probes.skillExists || (() => true);
+  const npmScriptExists = probes.npmScriptExists || (() => true);
 
   const spans = extractCodeSpans(content);
   const lines = content.split('\n');
@@ -610,6 +615,7 @@ function lintDoc(file, content, probes = {}) {
     ...scanR1Paths(file, spans, pathExists),
     ...scanR2AndR3Cli(file, spans, CLI_MANIFEST),
     ...scanFlagCoverage(file, content, spans),
+    ...scanNpmScripts(file, spans, npmScriptExists),
     ...r4.findings,
   ];
 

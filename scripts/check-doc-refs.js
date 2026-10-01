@@ -27,8 +27,17 @@ const repoRoot = path.resolve(__dirname, '..');
 
 // Shipped doc surface to lint. Markdown only — code files are checked by their
 // own contract tests, not prose linting.
-const SCAN_DIRS = ['skills', 'docs/guide', 'hooks', 'product'];
-const SCAN_ROOT_FILES = ['README.md', 'CONTRIBUTING.md', 'CLAUDE.md', 'docs/README.md'];
+// The contributor surfaces that quote commands and paths — the releasing skill
+// and the contributor agents — are scanned too: they don't ship, but a renamed
+// command in a release checklist fails just as quietly.
+const SCAN_DIRS = ['skills', 'docs/guide', 'hooks', 'product', '.claude/agents'];
+const SCAN_ROOT_FILES = [
+  'README.md',
+  'CONTRIBUTING.md',
+  'CLAUDE.md',
+  'docs/README.md',
+  '.claude/skills/releasing/SKILL.md',
+];
 
 /** Recursively collect *.md files under a directory (skips node_modules). */
 function collectMarkdown(dir, acc) {
@@ -71,6 +80,11 @@ function skillExists(name) {
   );
 }
 
+const NPM_SCRIPTS = new Set(
+  Object.keys(JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).scripts),
+);
+const npmScriptExists = (name) => NPM_SCRIPTS.has(name);
+
 function gatherFiles() {
   const files = [];
   for (const dir of SCAN_DIRS) {
@@ -91,7 +105,7 @@ function main() {
   for (const abs of files) {
     const rel = path.relative(repoRoot, abs);
     const content = fs.readFileSync(abs, 'utf8');
-    const { findings, stats } = lintDoc(rel, content, { pathExists, skillExists });
+    const { findings, stats } = lintDoc(rel, content, { pathExists, skillExists, npmScriptExists });
     allFindings.push(...findings);
     r4Probed += stats.r4.total;
   }
@@ -129,4 +143,6 @@ function main() {
   process.exit(0);
 }
 
-main();
+if (require.main === module) main();
+
+module.exports = { gatherFiles };

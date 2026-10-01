@@ -4,7 +4,7 @@ Two project-local subagents for working on arcforge itself. They are the
 **contributor** surface, exactly like `.claude/skills/releasing/` — not part of the
 plugin, not installed by anyone, never loaded in a user's session. `package.json`'s
 `files` array does not ship `.claude/`, and `.claude/rules/plugin.md`'s "there is no
-`agents/` directory" is about the *plugin root*: adding a shipped component type is
+`agents/` directory" is about the *plugin root*: adding a shipped component type is <!-- doc-ref-lint: ignore R1 quotes the rule that no plugin-root agents/ dir exists -->
 still a design decision, and this directory is not one.
 
 | Agent | Writes? | For |
