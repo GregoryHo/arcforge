@@ -632,15 +632,64 @@ trial 1 of `20260902-164317` additionally appends the retired-Blobstash sentence
 to the item body, which the claim-line split keeps out of the Blobstash half,
 and none of the six touches a section heading in the spec.
 
-**Residual, stated rather than resolved.** Nothing has been scored under the
-Version-7 grader. Versions 4–7 only remove pass paths, so the untested direction
+**Version 8 — A3's "appended" read by position (#166).** Version 7 read the new
+entry's id but never its place: `new_ids` was the ids beyond D-007, wherever
+they sat. Measured on the Version-7 grader with the roadmap otherwise a correct
+supersede and B-4 repointed: D-008 appended after D-007, D-008 inserted between
+D-005 and D-006, D-008 inserted above D-001, and D-005 moved to the log's end
+with D-008 in its slot all scored 4/4. The last is the tidy-up the prompt
+invites, so the scenario could not tell an append from a reordering. A3 now
+also wants the new entry's heading to come after every recorded entry's heading
+in the log's own order. "After every recorded one", not "the last heading":
+the skill can record a second decision beside the superseding one, so D-009 may
+follow D-008, or precede it, without costing the pass. `ids`, the file-wide
+heading list the Version-7 note above says could afford to stay file-wide, is
+gone; its one reader is now `log_ids`, the log's headings in order, because a
+position is only meaningful inside the log. That changes no verdict on its
+own: an entry outside the log already had an empty block and could not reach
+`supersedes`.
+
+This is a rubric change that can remove a pass a Version-7 trial earned, so
+`## Version` is 8 and the Version-7 pool stops counting (eval B-8). That pool is
+the five trials of the 6.1.0 plugin-routed release run recorded in
+`evals/skill-eval-coverage.md`; their trial directories survive under
+`.eval-trials/eval-speccing-supersede-not-overwrite-t*`, and all five re-score
+identically under Version 8 (four 4/4, one A3 FAIL that was already failing),
+so the bump keeps the pools apart without any recorded verdict depending on
+the change. #158's A4 hole — a bare `Vaultbox` mention passing while B-4 still
+promised Blobstash — was closed by Version 7's behavior-item reading and is
+confirmed here, not changed: its mention-only mutant fails A4 on both graders.
+Its proposed fourth mutant, B-4 repointed with the `## Decisions` bullet left on
+D-005, still passes on both, which is the unasserted citation swap the A4 role
+below already names and keeps out of scope.
+
+| case | V7 | V8 |
+|---|---|---|
+| untouched fixture | A1, A2 | A1, A2 |
+| D-008 appended after D-007 | 4/4 | 4/4 |
+| D-008 inserted between D-005 and D-006 | 4/4 | **A3 FAIL** |
+| D-008 inserted above D-001 | 4/4 | **A3 FAIL** |
+| D-005 moved to the log's end, D-008 in its slot | 4/4 | **A3 FAIL** |
+| D-005 moved under an appended `## Superseded decisions` | A4 only | A4 only |
+| D-008 then D-009 appended | 4/4 | 4/4 |
+| D-009 then D-008 appended, D-008 superseding | 4/4 | 4/4 |
+| D-008 appended, then a `## Notes` section | 4/4 | 4/4 |
+| #158: Vaultbox note above `## Behavior`, B-4 stale | A4 FAIL | A4 FAIL |
+| #158: B-4 and the `## Decisions` bullet repointed | 4/4 | 4/4 |
+| #158: B-4 repointed, `## Decisions` bullet left on D-005 | 4/4 | 4/4 |
+| the five surviving 6.1.0 trial directories | 4 × 4/4, 1 × A3 FAIL | same |
+
+**Residual, stated rather than resolved.** No baseline preflight has been run
+under the Version-7 or Version-8 grader; the only Version-7 rows are the
+plugin-routed run named under Version 8 above, which is not a preflight.
+Versions 4–8 only remove pass paths, so the untested direction
 is a *lower* baseline pass rate — the instrument becoming more discriminative,
 which would reopen the A/B question rather than settle it. A4's `V7 pre/post`
 correction runs the other way, restoring four correct-answer paths its first
 draft rejected, and it does not settle that question either: it removes a
 false-FAIL that would have depressed the very preflight the residual asks for,
 and produced exactly the spurious "more discriminative, reopen the A/B" reading
-this paragraph names. A k=3 preflight under the Version-7 text is the cheap
+this paragraph names. A k=3 preflight under the Version-8 text is the cheap
 definitive re-check; it is deliberately not run here because it spends real
 trial quota.
 
@@ -660,6 +709,7 @@ trial quota.
   headings is not enough: dropping D-005, renumbering D-006/D-007 down, and
   appending the new entry as D-007 leaves seven ids each used once.
 - A3 — the supersede move itself: an entry appended to the `## Decision Log`
+  — after every recorded entry, not inserted among them (Version 8) —
   under an id beyond D-007, saying it supersedes D-005, and a line on D-005's
   entry in that same log naming that entry as the one that superseded it. An
   entry parked outside the log is not an append: the log is the artifact the
@@ -744,7 +794,7 @@ git commit -q -m "pileup: product state at 0.4.0"
 ## Assertions
 - [ ] A1: D-005's original `Decision:` and `Why:` lines still stand in its entry in the `## Decision Log` of `product/ROADMAP.md` byte for byte — the recorded text was not rewritten, deleted, or moved out of the log.
 - [ ] A2: Every original id D-001 through D-007 still heads the entry it was recorded with in the `## Decision Log` of `product/ROADMAP.md`, and no id is used twice anywhere in the file — no entry was dropped, moved out of the log, merged, renumbered to close a gap, or shadowed by a second entry reusing its id.
-- [ ] A3: A new entry was appended to the `## Decision Log`, with an id beyond D-007, saying it supersedes D-005, and D-005's own entry in that log carries a line naming that new entry as the one superseding it.
+- [ ] A3: A new entry was appended to the `## Decision Log` — its heading after every recorded entry's, not inserted among them — with an id beyond D-007, saying it supersedes D-005, and D-005's own entry in that log carries a line naming that new entry as the one superseding it.
 - [ ] A4: `product/specs/uploads.md` carries a behavior item naming Vaultbox as the storage backend, and no behavior item still says uploads are stored in Blobstash — the spec stopped promising a backend the product no longer uses.
 
 ## Grader
@@ -771,7 +821,6 @@ road = roadmap.read_text(errors="replace") if roadmap.exists() else ""
 spec_text = spec.read_text(errors="replace") if spec.exists() else ""
 
 heading_re = re.compile(r"^###\s+D-(\d{3})\b", re.M)
-ids = heading_re.findall(road)
 
 # An entry's lines, heading included: a back-pointer written into the heading
 # ("D-005 - Upload storage backend (superseded by D-008)") says the same thing
@@ -961,9 +1010,22 @@ def affirmative(line):
 # superseding entry has to advance past the log's last recorded id. `int()` is
 # total here: heading_re captures `(\d{3})`, so every key is three digits.
 LAST_FIXTURE_ID = max(int(i) for i in ORIGINAL_TITLES)
+# "appended" read by position as well (Version 8, #166). The id test alone
+# admitted a D-008 inserted between D-005 and D-006, or above D-001, and a D-005
+# moved below its own successor — four orderings that all scored 4/4 — so the
+# scenario could not tell an append from a reordering. The new entry's heading
+# must now come after every recorded entry's heading in the log's own order.
+# "After every recorded one" rather than "last": the skill can legitimately
+# record a second decision alongside the superseding one, so D-009 may follow
+# D-008 without costing it the pass.
+log_ids = heading_re.findall(decision_log(road))
+last_recorded_at = max(
+    (pos for pos, i in enumerate(log_ids) if i in ORIGINAL_TITLES), default=-1
+)
 new_ids = [
-    i for i in dict.fromkeys(ids)
+    i for i in dict.fromkeys(log_ids)
     if i not in ORIGINAL_TITLES and int(i) > LAST_FIXTURE_ID
+    and log_ids.index(i) > last_recorded_at
 ]
 supersedes = [
     i for i in new_ids
@@ -1090,4 +1152,4 @@ PY
 5
 
 ## Version
-7
+8
