@@ -7,7 +7,10 @@
  *
  * Uses the same store.lock and queue.jsonl path as queue-writer.js.
  * Callers must ensure they have already validated the action is legal
- * (via lifecycle.isLegalAction) before calling appendTransitionEvent.
+ * (via lifecycle.isLegalAction) before calling appendTransitionEvent — and
+ * must have read the state they validated inside `withStoreLock`, so the check
+ * and the append are one critical section (B-16). The lock is reentrant within
+ * a process, so the appenders below can run inside a caller's section.
  */
 
 const fs = require('node:fs');
@@ -96,11 +99,24 @@ function releaseStoreLock(lockPath) {
   }
 }
 
+// The lock this process holds, while it holds one. Everything here is
+// synchronous, so a nested `withStoreLock` can only be the same critical
+// section asking again — it runs inside the held lock instead of waiting on it.
+let heldLockPath = null;
+
+/**
+ * Run `fn` holding the candidate store lock. Reentrant: a caller that read the
+ * queue and checked a transition inside it can append that transition — or
+ * hand off to Layer 7/8, which append their own — without releasing it (B-16).
+ */
 function withStoreLock(fn) {
+  if (heldLockPath !== null) return fn();
   const lockPath = acquireStoreLock();
+  heldLockPath = lockPath;
   try {
     return fn();
   } finally {
+    heldLockPath = null;
     releaseStoreLock(lockPath);
   }
 }
@@ -201,4 +217,4 @@ function appendUpdateEvent(candidateId, patch, actor) {
   });
 }
 
-module.exports = { appendTransitionEvent, appendRelatedEvent, appendUpdateEvent };
+module.exports = { withStoreLock, appendTransitionEvent, appendRelatedEvent, appendUpdateEvent };

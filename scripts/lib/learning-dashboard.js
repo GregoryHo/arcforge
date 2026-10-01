@@ -24,6 +24,7 @@ const { writeAuditEntry } = require('./learning-audit-log');
 
 const { readCurrentCandidates, appendCandidate } = require('./learning-curator/queue-writer');
 const {
+  withStoreLock,
   appendTransitionEvent,
   appendRelatedEvent,
 } = require('./learning-curator/dashboard-events');
@@ -384,6 +385,42 @@ function handleDashboardAction({
     return reject('candidate_not_found');
   }
 
+  // B-16: a transition reads the state its legality check judges inside the
+  // store lock that appends it, and holds that lock through Layer 7/8 (whose
+  // own appends reenter it), so a second writer waits and then sees this one's
+  // result. Promote and evolve change no status, and append a new candidate
+  // through queue-writer's lock, so they run outside it.
+  const producesCandidate =
+    action === LIFECYCLE_ACTION.PROMOTE || action === LIFECYCLE_ACTION.EVOLVE;
+  const dispatch = () =>
+    dispatchChecked({
+      action,
+      candidateId,
+      expectedStatus,
+      safetyAck,
+      actor,
+      actionId,
+      requestedAt,
+      reject,
+      accept,
+      rejectInvalidCandidate,
+    });
+  return producesCandidate ? dispatch() : withStoreLock(dispatch);
+}
+
+/** Steps 2-7 of the contract above, for one request. */
+function dispatchChecked({
+  action,
+  candidateId,
+  expectedStatus,
+  safetyAck,
+  actor,
+  actionId,
+  requestedAt,
+  reject,
+  accept,
+  rejectInvalidCandidate,
+}) {
   // Step 2: read current state
   const candidates = readCurrentCandidates();
 

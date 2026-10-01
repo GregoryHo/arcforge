@@ -31,7 +31,11 @@ const {
 } = require('./session-utils');
 const { sanitizeFilename } = require('./utils');
 const { readCurrentCandidates } = require('./learning-curator/queue-writer');
-const { appendTransitionEvent, appendUpdateEvent } = require('./learning-curator/dashboard-events');
+const {
+  withStoreLock,
+  appendTransitionEvent,
+  appendUpdateEvent,
+} = require('./learning-curator/dashboard-events');
 const {
   isLegalAction,
   LIFECYCLE_STATUS,
@@ -191,6 +195,10 @@ function renderInstinctStatus(status) {
  * `isLegalAction`. This stays inside the curator event log; it does NOT run the
  * physical move-to-`.disabled/` or the reviewer_ack consent model.
  *
+ * The status it checks is read inside the store lock that appends the
+ * transition (B-16), so a deactivation that landed while this waited — the
+ * dashboard's button, say — is seen and not repeated.
+ *
  * A non-curator instinct simply has no matching candidate: no event, no crash.
  *
  * @param {string} instinctId
@@ -199,40 +207,41 @@ function renderInstinctStatus(status) {
  */
 function syncCuratorCandidate(instinctId, feedback, archived) {
   try {
-    const candidates = readCurrentCandidates();
-    const candidate = candidates[instinctId];
-    if (!candidate) return;
-
-    const actor = { layer: 6, actor_type: 'instinct_cli' };
-
-    appendUpdateEvent(
-      instinctId,
-      {
-        feedback: {
-          confirmations: feedback.confirmations,
-          contradictions: feedback.contradictions,
-        },
-      },
-      actor,
-    );
-
-    if (!archived) return;
-
-    const status = candidate.lifecycle ? candidate.lifecycle.status : undefined;
-    if (
-      status === LIFECYCLE_STATUS.ACTIVATED &&
-      isLegalAction(status, LIFECYCLE_ACTION.DEACTIVATE)
-    ) {
-      appendTransitionEvent(
-        instinctId,
-        LIFECYCLE_ACTION.DEACTIVATE,
-        LIFECYCLE_STATUS.DEACTIVATED,
-        actor,
-      );
-    }
+    withStoreLock(() => syncUnderLock(instinctId, feedback, archived));
   } catch {
     // Curator store unavailable or locked — the instinct file write already
     // succeeded; do not fail the operation over best-effort lifecycle alignment.
+  }
+}
+
+function syncUnderLock(instinctId, feedback, archived) {
+  const candidates = readCurrentCandidates();
+  const candidate = candidates[instinctId];
+  if (!candidate) return;
+
+  const actor = { layer: 6, actor_type: 'instinct_cli' };
+
+  appendUpdateEvent(
+    instinctId,
+    {
+      feedback: {
+        confirmations: feedback.confirmations,
+        contradictions: feedback.contradictions,
+      },
+    },
+    actor,
+  );
+
+  if (!archived) return;
+
+  const status = candidate.lifecycle ? candidate.lifecycle.status : undefined;
+  if (status === LIFECYCLE_STATUS.ACTIVATED && isLegalAction(status, LIFECYCLE_ACTION.DEACTIVATE)) {
+    appendTransitionEvent(
+      instinctId,
+      LIFECYCLE_ACTION.DEACTIVATE,
+      LIFECYCLE_STATUS.DEACTIVATED,
+      actor,
+    );
   }
 }
 

@@ -263,7 +263,10 @@ straight from the matrix, and a transition outside them is refused with the
 list of what is allowed instead. So `reject` works on a pending candidate and
 on one you approved — an approval that cannot go further, such as a candidate of
 a type the engine cannot build, is retired that way — but not on one already
-materialized or activated: those are retired by deactivating.
+materialized or activated: those are retired by deactivating. Two moves on the
+same candidate at once — a command and a dashboard click, say — are taken one at
+a time: the second sees the first's result and is refused with `stale_status`
+when its move is no longer legal, and both outcomes are in the audit log.
 
 **`materialize` and `activate` handle instinct candidates.** That is what the
 engine can build today. A candidate of any other artifact type stays in the
