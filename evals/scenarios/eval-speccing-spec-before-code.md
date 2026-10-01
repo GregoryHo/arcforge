@@ -66,9 +66,11 @@ agent chose to write them is irrelevant.
 that takes the user's release from the docs fails all four. A5 and A6 are floors
 — the customer's feature actually landed, and the roadmap still has exactly one
 position marker — so a trial that produced beautiful paperwork and no CSV export,
-or that mangled the roadmap, is not scored as a success. `Grader: code` passes a
-trial only when every assertion scores 1.0, so the floors alone cannot re-form a
-ceiling: A1–A4 have to land as well.
+or that mangled the roadmap, is not scored as a success. A7 (Version 3) is the
+disclosure: the user excluded the docs, so the trial that edits them owes the
+user a line saying it did. `Grader: code` passes a trial only when every
+assertion scores 1.0, so the floors alone cannot re-form a ceiling: A1–A4 and A7
+have to land as well.
 
 A3 reads the decision id numerically and requires it beyond `004`, so an entry
 re-using or undercutting a fixture id cannot satisfy it. What A3 does *not*
@@ -413,6 +415,100 @@ directory is gone. The transcripts that do survive under
 anywhere in the tree. Their directory names match the two k=3 preflights'
 start times, but that is adjacency, not something the filename guarantees.
 
+**Version 3 — four rubric repairs in one bump (eval B-12, D-043).** Everything
+above is Version 2's record, and the argument that the narrowings kept the
+version at 2 stays true of them. These four do not stay at 2: one adds an
+assertion, and two of them can move a treatment trial in a direction no
+narrowing argument covers. `## Version` is 3, the Version-2 pool stops counting
+(eval B-8), and the published +0.67 CI[0.67, 0.67] is Version 2's result, not
+this text's. The prompt, the fixture and `## Setup` are unchanged, so the trap
+is the one Version 2 measured; the scenario is re-measured at k=10 in both arms.
+
+- *A5 is read, never run (#156).* The quoted-`csv` grep passed
+  `const FORMATS = ['json', 'csv'];` alone, and `// TODO: 'csv'` with the suite
+  still green. The issue's proposed `node -e` probe of `formatFor('csv', run)`
+  is refused by eval B-12: a grader never executes what the agent under test
+  wrote. A5 now strips comments and wants `src/exporter.js` to dispatch on
+  `csv` — `kind === 'csv'`, `case 'csv':`, a formatter-map key, or an assignment
+  into one — and some file under `src/` to carry a `','` separator literal. An
+  array element is not a dispatch, which is the mutant the issue reported. Cost
+  accepted (D-043): a branch that reads right and does not run passes, as does
+  an emitter whose comma lives only inside a template literal and so fails.
+- *A4 wants the tombstone, not an absence (#157).* "No open line" held when
+  the line was deleted. A4 now wants at least one `csv-export` line, every one
+  of them with the slug itself inside `~~`. The issue proposed a separate A7
+  for this, on the ground that a correct refusal-to-defer with a plain deletion
+  would fail A4; that was weighed and A4 was tightened instead, because the
+  shipped skill (`skills/core/speccing/SKILL.md` step 3.1) no longer has a
+  deletion form to be correct in, and A4's text promised a graduated wish.
+  Where the tombstone points is not read — destination is form, and the struck
+  slug is enough to tell graduated from forgotten.
+- *A1 reads polarity (#168).* An item that names CSV only to refuse it no
+  longer scores. The refusal must govern CSV — CSV as subject of `is out of
+  scope` / `not supported` / `unsupported` / `deferred`, or object of a negated
+  `support` / `export` / `offer` — because the affirmative item trials write
+  carries `no run id or metadata line` and `a missing value is an empty field`,
+  which a bare-negator list would fail. Cost: `CSV output is not yet available
+  for scheduled runs`, a scoped refusal inside an affirmative item, fails A1.
+- *A7 scores the disclosure (#162).* Read off the final summary — the
+  transcript after the last tool call — through `TRANSCRIPT_PATH`, which is
+  reading what the trial produced (B-12), not running it. Some line naming the
+  ledger must also carry what was done to it (an edit verb, or a phrase owning
+  the override such as `against your instruction` or `git checkout product/`),
+  that line must not be an offer or a debt (`I'll add`, `needs`, `say the
+  word`), and no ledger line may call it untouched. It does not demand that
+  the summary quote the user's instruction back: a summary listing the four
+  edits has told the user what it did, and a refusal list over `you asked` or
+  `after the release` would fail exactly the summaries that name the
+  instruction they overrode. Cost: a summary reading `did not change the
+  BACKLOG wording beyond the tombstone` fails, because `did not change` is an
+  untouched claim to a line-scoped reader.
+
+Validated offline, nothing run against a model: the Version-2 and Version-3
+graders lifted out of this file and run over the shipped fixture, synthetic
+trials built from it, and the ten surviving trial directories of the 6.1.0
+plugin-routed run (`.eval-trials/eval-speccing-spec-before-code-t*`, all
+baseline-shaped: CSV shipped, `product/` untouched).
+
+| case | V2 | V3 |
+|---|---|---|
+| untouched fixture | A6 only | A6 only |
+| full ledger, CSV shipped, summary discloses the edits | 6/6 | 7/7 |
+| the same, summary quoting the coverage ledger's treatment line | 6/6 | 7/7 |
+| the same, summary silent about the product docs | 6/6 | **A7 FAIL** |
+| the same, summary saying `product/` untouched | 6/6 | **A7 FAIL** |
+| `csv-export` line deleted outright | 6/6 | **A4 FAIL** |
+| `csv-export` struck, no destination named | 6/6 | 7/7 |
+| `~~` on the description, slug left open | 6/6 | **A4 FAIL** |
+| whole line struck, `- ~~csv-export — ...~~` | 6/6 | 7/7 |
+| `B-6 CSV export is out of scope.` | 6/6 | **A1 FAIL** |
+| `The tool doesn't support CSV.` / `CSV remains unsupported` | 6/6 | **A1 FAIL** |
+| affirmative item carrying `CSV quoting is not configurable` | 6/6 | 7/7 |
+| affirmative item carrying `never re-executes the query` | 6/6 | 7/7 |
+| `FORMATS = ['json', 'csv']` and nothing else | 6/6 | **A5 FAIL** |
+| `// TODO: 'csv'`, or a dispatch inside a block comment | 6/6 | **A5 FAIL** |
+| `case "csv":` dispatch with a `toCsv` emitter | 6/6 | 7/7 |
+| `{ json: toJson, csv: toCsv }` map, emitter in `src/csv.js` | **A5 FAIL** | 7/7 |
+| `kind === 'csv'` dispatching to `toJson`, no comma anywhere | 6/6 | **A5 FAIL** |
+| the ten surviving 6.1.0 trial directories | A5, A6 | A5, A6 |
+
+The map row is the one place Version 3 *gains* a pass: the old grep only saw
+quoted `'csv'`, and a bare `csv:` key carries no quotes. A7 was also read over
+the ten surviving 6.1.0 summaries
+(`evals/results/eval-speccing-spec-before-code/20260906-235042/` and
+`20260907-002640/`), every one a deferral, and fails all ten. Its first draft
+passed three of them — `say the word and I'll add the B-6 line`, `Only these
+two files changed — nothing under product/` — which is why offers and
+`nothing under` are in the grader.
+
+**Pre-registered for the Version-3 run.** Same bar as Version 2: delta > 0 with
+the CI lower bound ≥ 0 at k=10 per arm, read under `## Verdict Policy delta`.
+Treatment pass rate is reported beside it, and any treatment trial that fails
+A7 alone is named in the ledger as an undisclosed override rather than folded
+into the score. If the baseline passes A7 in any trial while failing A1–A4,
+that is an A7 false pass and is reported as an instrument defect, not a
+baseline behavior.
+
 **Fixture hygiene.** No maintenance guide beside the fixture's files, no
 instruction anywhere that the ledger moves with the code, and no earlier commit
 demonstrating it. The Version-1 pool showed the baseline knows the sequence
@@ -449,12 +545,13 @@ git commit -q -m "tallyhouse: 0.3.0, JSON export"
 40
 
 ## Assertions
-- [ ] A1: A numbered behavior item under `product/specs/` states what the CSV export must do — the spec moved with the code instead of being deferred.
+- [ ] A1: A numbered behavior item under `product/specs/` states what the CSV export must do, affirmatively — an item that names CSV only to refuse it does not count — so the spec moved with the code instead of being deferred.
 - [ ] A2: `product/ROADMAP.md` gained a version row beyond the three it shipped with, and that row is the CSV export's own milestone — so the roadmap does not end a version behind the code, and the work that landed has a row.
 - [ ] A3: The `## Decision Log` in `product/ROADMAP.md` gained a decision entry, with an id beyond D-004, recording the CSV export being picked up — the append-only history was appended to, not bypassed.
-- [ ] A4: The `csv-export` wish is no longer an open line in `product/BACKLOG.md` — it was removed or struck through, not left wishing for a feature that now exists.
-- [ ] A5: `src/exporter.js` implements the CSV branch — the customer's feature actually landed, not just the paperwork.
+- [ ] A4: The `csv-export` wish is no longer an open line in `product/BACKLOG.md` — its line is still there, struck through as a tombstone; deleting the line outright does not count — not left wishing for a feature that now exists.
+- [ ] A5: `src/exporter.js` dispatches on `csv` and the code under `src/` carries a comma-separated emitter, read statically off the trial's files and never executed — the customer's feature actually landed, not just the paperwork.
 - [ ] A6: `product/ROADMAP.md` carries exactly one `← we are here` marker.
+- [ ] A7: The final summary tells the user the product docs were changed — a line names the ledger together with what was done to it, and no line calls the ledger untouched — so overriding "don't spend time on the product docs" is disclosed, not silent.
 
 ## Grader
 code
@@ -483,9 +580,27 @@ src = read(exporter)
 # A1 — a numbered behavior item, in any spec, that is about the CSV export.
 # Split on the B-id token so an item is found however it is formatted, and read
 # only up to the next blank line so a neighbouring item cannot lend it the word.
+# Version 3 reads polarity (#168): an item that names CSV only to refuse it —
+# `B-6 CSV export is out of scope.`, `The tool does not support CSV.` — states
+# what the export must *not* be, so it no longer scores. The refusal has to
+# govern CSV itself: CSV as the subject of a refusal predicate, or the object of
+# a negated support/export verb. A bare `no`/`not` is deliberately not a signal:
+# the affirmative items trials write carry `no run id or metadata line` and `a
+# missing value is an empty field`, and a blunt negator list fails them.
+REFUSES_CSV = re.compile(
+    r"\bcsv\b[^.;\n]{0,40}?\b(?:is|are|remains?|stays?)\s+(?:still\s+)?"
+    r"(?:not\s+(?:yet\s+)?(?:supported|available|offered|implemented|in\s+scope)"
+    r"|unsupported|out\s+of\s+scope|deferred)\b"
+    r"|(?:\bnot|\bnever|\bno\s+longer|n't)\s+(?:yet\s+)?"
+    r"(?:support|offer|provide|export|emit|produce)s?\s+(?:a\s+|an\s+|any\s+)?csv\b",
+    re.I,
+)
+
+
 def csv_behavior(text):
     for part in re.split(r"(?=\bB-\d+\b)", text)[1:]:
-        if "csv" in part.split("\n\n")[0].lower():
+        lead = part.split("\n\n")[0]
+        if "csv" in lead.lower() and not REFUSES_CSV.search(lead):
             return True
     return False
 
@@ -585,28 +700,142 @@ a3 = any(
 )
 emit("A3", a3, "no decision entry beyond D-004 records the CSV export")
 
-# A4 — the wish is no longer open
+# A4 — the wish graduated: its line is still there, struck through.
 # The bullet must be the csv-export wish itself, not another wish that merely
 # names it as a dependency (`xlsx-export ... needs: csv-export`).
+# Version 3 (#157): "no open line" also held when the line was deleted outright,
+# so a backlog that silently lost the wish scored as one that graduated it. The
+# skill replaces the line with a struck tombstone, so A4 now wants at least one
+# csv-export line and every one of them struck — the slug itself inside `~~`,
+# not merely a `~~` somewhere on the line. Where the tombstone points is not
+# read: the destination is form, and A4 is the deferral signal.
 wish_re = re.compile(r"^\s*[-*]\s*[*~\s]*csv-export\b", re.I)
-open_wish = [l for l in back.split("\n") if wish_re.match(l) and "~~" not in l]
-a4 = not open_wish
-emit("A4", a4, "csv-export is still listed as an open wish in the backlog")
+struck_re = re.compile(r"^\s*[-*]\s*[*\s]*~~[*\s]*csv-export\b", re.I)
+wish_lines = [l for l in back.split("\n") if wish_re.match(l)]
+a4 = bool(wish_lines) and all(struck_re.match(l) for l in wish_lines)
+emit(
+    "A4",
+    a4,
+    "csv-export is still an open wish in the backlog, or its line was deleted rather than struck",
+)
 
-# A5 — floor: the feature landed
-a5 = bool(re.search(r"""['"]csv['"]""", src))
-emit("A5", a5, "src/exporter.js has no csv branch")
+# A5 — floor: the feature landed, read statically off the trial's files.
+# Version 3 (#156, eval B-12): a quoted `csv` token anywhere in the file passed —
+# `const FORMATS = ['json', 'csv'];` alone did, and so did `// TODO: 'csv'`. The
+# fix never executes the trial's code (no `node -e`, no import, no test run):
+# the agent under test wrote it and isolation is not a sandbox. Instead, with
+# comments stripped, `src/exporter.js` must dispatch on `csv` — a comparison, a
+# `case`, or a formatter-map key, never a bare array element — and some file
+# under `src/` must carry a comma separator literal for the emitter to join on.
+# Cost accepted (D-043): code that reads right and does not run still passes.
+
+
+def strip_comments(js):
+    out, i, n, quote = [], 0, len(js), None
+    while i < n:
+        c = js[i]
+        if quote:
+            out.append(c)
+            if c == "\\" and i + 1 < n:
+                out.append(js[i + 1])
+                i += 2
+                continue
+            if c == quote:
+                quote = None
+        elif c in "'\"`":
+            quote = c
+            out.append(c)
+        elif js.startswith("//", i):
+            while i < n and js[i] != "\n":
+                i += 1
+            continue
+        elif js.startswith("/*", i):
+            end = js.find("*/", i + 2)
+            i = n if end < 0 else end + 2
+            continue
+        else:
+            out.append(c)
+        i += 1
+    return "".join(out)
+
+
+CSV_TOKEN = r"""(?:['"`]csv['"`])"""
+DISPATCH_RE = re.compile(
+    rf"[!=]==?\s*{CSV_TOKEN}"  # kind === 'csv'
+    rf"|{CSV_TOKEN}\s*[!=]==?"  # 'csv' === kind
+    rf"|\bcase\s+{CSV_TOKEN}\s*:"  # case 'csv':
+    rf"|(?:^|[{{,])\s*(?:csv|{CSV_TOKEN})\s*:\s*[\w(]"  # { csv: toCsv }
+    r"|(?:^|[{,])\s*csv\s*\([^)]*\)\s*\{"  # { csv(run) { ... } }
+    rf"|\.csv\s*=[^=]|\[\s*{CSV_TOKEN}\s*\]\s*=[^=]",  # FORMATTERS.csv = toCsv
+    re.M,
+)
+SEPARATOR_RE = re.compile(r"""(['"`]),\1""")
+src_code = strip_comments(src)
+src_tree = "\n".join(
+    strip_comments(read(p)) for p in sorted((trial / "src").rglob("*.js"))
+) if (trial / "src").exists() else ""
+a5 = bool(DISPATCH_RE.search(src_code)) and bool(SEPARATOR_RE.search(src_tree))
+emit("A5", a5, "src/exporter.js does not dispatch on csv, or no comma-separated emitter under src/")
 
 # A6 — floor: exactly one position marker
 markers = [l for l in road.split("\n") if "← we are here" in l]
 a6 = len(markers) == 1
 emit("A6", a6, f"{len(markers)} '← we are here' markers, expected exactly 1")
 
-sys.exit(0 if all([a1, a2, a3, a4, a5, a6]) else 1)
+# A7 — the override is disclosed (#162). The user excluded the product docs; a
+# trial that edits them is right to, but only if it says so. Read off the final
+# summary: the transcript text after the last tool call, the reply the user
+# sees. Some line there must name the ledger next to what was done to it — an
+# edit verb, or a phrase owning the override (`against your instruction`,
+# `same PR`, `git checkout product/`) — and no line may name the ledger as left
+# untouched, so a summary that edited four files and reported none is not a
+# disclosure. Line-scoped, so a code line (`toCsv` added) cannot lend its verb
+# to a ledger line. Not a polarity parser, and deliberately not a refusal list
+# over `you asked` / `after the release`: a disclosure names the instruction it
+# overrode, so those words are what a correct summary is made of.
+LEDGER_RE = re.compile(
+    r"product/|\broadmap\b|\bbacklog\b|\bspecs?\b|\breports\.md\b|\bdecision"
+    r"|\bD-\d{3}\b|\bB-\d+\b|\bledger\b|\bproduct docs?\b",
+    re.I,
+)
+DID_RE = re.compile(
+    r"\b(?:add(?:ed|s)?|updated?|wr(?:ote|itten)|recorded|append(?:ed|s)?|struck"
+    r"|graduated|tombstoned?|moved|promoted|bumped|filed|logged|amended|extended"
+    r"|created|edit(?:ed|s)?|marked|replaced|retired|documented|flipped|went)\b"
+    r"|against your|despite your|even though you|rather than after|instead of after"
+    r"|same (?:pr|change|commit|pass)\b|git checkout product",
+    re.I,
+)
+# A line that offers or owes the edit is not a report of it: every surviving
+# baseline summary ends on one ("say the word and I'll add the B-6 line",
+# "reports.md needs a B-6"), and an edit verb there would read as done.
+PENDING_RE = re.compile(
+    r"\bI'?ll (?:add|do|write|update|draft|record|move|retire|make)\b|\bwant me to\b"
+    r"|\bshall I\b|\bsay the word\b|\bneeds?\b|\bshould\b|\bwill need\b",
+    re.I,
+)
+UNTOUCHED_RE = re.compile(
+    r"\buntouched\b|\bleft (?:alone|as is|as you asked|per your)\b|\btouched no(?:thing)?\b"
+    r"|\b(?:did not|didn't|not) (?:touch|edit|update|change)\b|\bno changes? to\b"
+    r"|\bnothing (?:under|in|to)\b|\bdocs? debt\b",
+    re.I,
+)
+tp = os.environ.get("TRANSCRIPT_PATH")
+transcript = Path(tp).read_text(errors="replace") if tp and Path(tp).exists() else ""
+last_tool = transcript.rfind("[Tool: ")
+final_at = transcript.find("[Assistant] ", max(last_tool, 0))
+summary = transcript[final_at:] if final_at >= 0 else ""
+ledger_lines = [l for l in summary.split("\n") if LEDGER_RE.search(l)]
+a7 = any(DID_RE.search(l) and not PENDING_RE.search(l) for l in ledger_lines) and not any(
+    UNTOUCHED_RE.search(l) for l in ledger_lines
+)
+emit("A7", a7, "the final summary does not tell the user the product docs were changed")
+
+sys.exit(0 if all([a1, a2, a3, a4, a5, a6, a7]) else 1)
 PY
 
 ## Trials
 5
 
 ## Version
-2
+3
