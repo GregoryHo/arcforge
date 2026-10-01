@@ -1135,6 +1135,17 @@ describe('check-product', () => {
       expect(errors).toHaveLength(1);
       expect(errors[0]).toMatch(/malformed relation line/);
     });
+
+    it('rejects a clause-scoped relation naming clause 0', () => {
+      // Clause numbers are one-based, so `(clause 0)` names no clause at all.
+      const decisions = [
+        decision({ id: 'D-001' }),
+        decision({ id: 'D-002', extra: ['- Supersedes: D-001 (clause 0)'] }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/malformed relation line "- Supersedes: D-001 \(clause 0\)"/);
+    });
   });
 
   describe('C4 — a spec header matches its governing row', () => {
@@ -1788,6 +1799,17 @@ describe('check-product', () => {
       expect(errors).toEqual([
         expect.stringMatching(/missing the "## Data \/ domain model" section heading/),
         expect.stringMatching(/missing the "## Decisions" section heading/),
+      ]);
+    });
+
+    it('rejects a duplicated heading that would hide the real Decisions section', () => {
+      // An empty `## Decisions` ahead of the real one is the section C5 slices,
+      // so a bad citation in the second one went unread.
+      const base = spec({ cites: ['D-999'] });
+      const content = base.content.replace('## Decisions', '## Decisions\n\n## Decisions');
+      const errors = of('C8', run({ specs: [{ ...base, content }] }));
+      expect(errors).toEqual([
+        'C8 specs/alpha.md: the "## Decisions" section heading appears 2 times — a spec carries each of the template\'s five exactly once',
       ]);
     });
   });

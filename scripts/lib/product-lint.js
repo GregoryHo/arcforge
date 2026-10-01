@@ -103,8 +103,9 @@
  *         carries `vX.Y.Z` for its own version, any other row carries `—`;
  *   - C8  every spec carries the template's five section headings — `## Purpose`,
  *         `## Scope`, `## Behavior`, `## Data / domain model`, `## Decisions` —
- *         at column 1 outside fences and comments, so no spec escapes C5 by
- *         losing the section C5 reads.
+ *         each exactly once at column 1 outside fences and comments, so no
+ *         spec escapes C5 by losing the section C5 reads or by hiding it
+ *         behind an empty duplicate.
  *
  * Three siblings hold what this file is not about, cut one per format. The
  * markdown primitives every rule reads with — the fence-aware `section()`,
@@ -408,20 +409,27 @@ function checkSpecCitations(entries, specs, errors) {
 }
 
 /**
- * C8 — every spec carries the template's five section headings. Read through
- * `unfenced`, so a heading inside a fence or an HTML comment — or swallowed by
- * an unclosed one — is not a heading, and read at column 1, so an indented one
- * opens nothing. Without this a spec that lost `## Decisions` gave C5 an empty
- * slice and was checked for nothing.
+ * C8 — every spec carries the template's five section headings, each exactly
+ * once. Read through `unfenced`, so a heading inside a fence or an HTML comment
+ * — or swallowed by an unclosed one — is not a heading, and read at column 1, so
+ * an indented one opens nothing. Without this a spec that lost `## Decisions`
+ * gave C5 an empty slice and was checked for nothing — and so did one with an
+ * empty `## Decisions` ahead of the real one, since the slice takes the first.
  */
 function checkSpecSections(specs, errors) {
   for (const spec of specs) {
     const lines = unfenced(spec.content.split('\n'));
     for (const [heading, re] of SPEC_SECTION_HEADINGS) {
-      if (lines.some((line) => re.test(line))) continue;
-      errors.push(
-        `C8 specs/${spec.name}.md: missing the "${heading}" section heading — a spec carries the template's five, each at column 1 outside a fence or comment`,
-      );
+      const count = lines.filter((line) => re.test(line)).length;
+      if (count === 0) {
+        errors.push(
+          `C8 specs/${spec.name}.md: missing the "${heading}" section heading — a spec carries the template's five, each at column 1 outside a fence or comment`,
+        );
+      } else if (count > 1) {
+        errors.push(
+          `C8 specs/${spec.name}.md: the "${heading}" section heading appears ${count} times — a spec carries each of the template's five exactly once`,
+        );
+      }
     }
   }
 }

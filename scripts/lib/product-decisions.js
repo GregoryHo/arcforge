@@ -47,9 +47,10 @@ const DECISION_INDENT_RE = /^ {1,3}###/;
 const STATUS_FIELD_RE = /^ {0,3}-\s+Status:\s*(.*?)\s*$/;
 // The clause number is captured, not just its presence, because a clause has
 // one claimant: two `(clause N)` edges naming the same N of one victim are the
-// second reversing a clause the first already killed.
+// second reversing a clause the first already killed. Clause numbers are
+// one-based, so `(clause 0)` is malformed rather than a clause no one can hold.
 const RELATION_FIELD_RE =
-  /^-\s+(Supersedes|Refines|Extends):\s+D-(\d{3})(?:\s*\(clause\s+(\d+)\))?\s*$/;
+  /^-\s+(Supersedes|Refines|Extends):\s+D-(\d{3})(?:\s*\(clause\s+([1-9]\d*)\))?\s*$/;
 // Candidate-shaped: any markdown bullet whose field label is one of the three
 // relation labels, however it is cased or spaced around the colon. Wider than
 // RELATION_FIELD_RE on purpose — the strict form is what reports these, so a
