@@ -1,6 +1,6 @@
 # learning — spec
 
-> Status: shipped v6.1.0 · extended by 6.2.0 (next) · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.1.1 · extended by 6.2.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
