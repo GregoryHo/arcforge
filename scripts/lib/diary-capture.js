@@ -89,34 +89,26 @@ function getSuggesterStatePath() {
 // Stale-draft probe — shared by inject-context and batch-assembler
 // ---------------------------------------------------------------------------
 
-// The TO BE ENRICHED markers always appear in the template-stub header
-// region (Decisions/Challenges/etc.) within the first ~2KB of any draft.
-// Bounded read keeps the SessionStart healthcheck and curator scan cheap.
-const STALE_DRAFT_PROBE_BYTES = 2048;
-
 /**
  * Probe whether a diary draft still carries the enricher's TO BE ENRICHED
- * placeholders (i.e. enrichment never ran / failed). Bounded read.
+ * placeholders (i.e. enrichment never ran / failed).
+ *
+ * Reads the whole draft and looks for the marker wherever it sits. A fixed
+ * leading byte window used to stand in for this and missed the marker once a
+ * long "Files modified" line pushed it past the window (#177) — that line has
+ * no length bound, so no window size is safe. Drafts are a few KB of
+ * markdown, so the full read stays cheap for the SessionStart healthcheck and
+ * the curator scan.
+ *
  * @param {string} filePath - Absolute path to the draft.
- * @returns {boolean} True if the stub marker is present.
+ * @returns {boolean} True if the stub marker is present; false when the draft
+ *   cannot be read.
  */
 function draftIsStale(filePath) {
-  let fd;
   try {
-    fd = fs.openSync(filePath, 'r');
-    const buf = Buffer.alloc(STALE_DRAFT_PROBE_BYTES);
-    const n = fs.readSync(fd, buf, 0, STALE_DRAFT_PROBE_BYTES, 0);
-    return buf.subarray(0, n).includes('TO BE ENRICHED');
+    return fs.readFileSync(filePath, 'utf-8').includes('TO BE ENRICHED');
   } catch {
     return false;
-  } finally {
-    if (fd !== undefined) {
-      try {
-        fs.closeSync(fd);
-      } catch {
-        /* already closed */
-      }
-    }
   }
 }
 
@@ -463,7 +455,6 @@ function runDiaryCapture(opts) {
 }
 
 module.exports = {
-  STALE_DRAFT_PROBE_BYTES,
   readCounts,
   resetCounters,
   incrementSharedToolCount,

@@ -91,6 +91,42 @@ describe('diary-capture', () => {
       expect(draftIsStale(stub)).toBe(true);
       expect(draftIsStale(enriched)).toBe(false);
     });
+
+    // #177: a long "Files modified" line pushes the first marker past any fixed
+    // byte window. The probe must find the marker wherever it sits.
+    it('finds a marker that sits past the first 2 KB of the draft', () => {
+      const { draftIsStale } = require('../../scripts/lib/diary-capture');
+      const paths = Array.from(
+        { length: 30 },
+        (_, i) =>
+          `/Users/someone/work/monorepo/packages/service-${i}/src/handlers/${'x'.repeat(40)}.js`,
+      );
+      const draft = path.join(tmpDir, 'long-draft.md');
+      const body = [
+        '# Session Diary: proj',
+        '',
+        '## Session Metrics',
+        '',
+        `- **Files modified**: ${paths.join(', ')}`,
+        '',
+        '## Decisions Made',
+        '',
+        '<!-- TO BE ENRICHED — Fill from conversation memory -->',
+        '- ',
+        '',
+      ].join('\n');
+      fs.writeFileSync(draft, body);
+
+      expect(Buffer.byteLength(body.slice(0, body.indexOf('TO BE ENRICHED')))).toBeGreaterThan(
+        2048,
+      );
+      expect(draftIsStale(draft)).toBe(true);
+    });
+
+    it('returns false for a missing file', () => {
+      const { draftIsStale } = require('../../scripts/lib/diary-capture');
+      expect(draftIsStale(path.join(tmpDir, 'nope.md'))).toBe(false);
+    });
   });
 
   // D-010's retention half: the opt-in decides how long verbatim prose may stay
