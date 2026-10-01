@@ -357,7 +357,7 @@ A PR template is provided at `.github/PULL_REQUEST_TEMPLATE.md`. Fill it out com
 
 ### Doc-reference gate (`npm run check:docs`)
 
-CI runs a doc-reference linter (`scripts/check-doc-refs.js`, engine in `scripts/lib/doc-refs.js`) over the user-facing markdown surface (`skills/`, `docs/guide/`, `hooks/`, `product/`, `README.md`, `CONTRIBUTING.md`, `CLAUDE.md`) plus the contributor surfaces that quote commands (`.claude/skills/releasing/SKILL.md`, `.claude/agents/`). It fails the build when a doc makes a promise the engine does not keep:
+CI runs a doc-reference linter (`scripts/check-doc-refs.js`, engine in `scripts/lib/doc-refs.js`) over the user-facing markdown surface (`skills/`, `docs/guide/`, `hooks/`, `product/`, `README.md`, `CONTRIBUTING.md`, `CLAUDE.md`) plus the website page copy (`website/page/sections.jsx`, `website/page/hero.jsx`: string literals and JSX text) and the contributor surfaces that quote commands (`.claude/skills/releasing/SKILL.md`, `.claude/agents/`). It fails the build when a doc makes a promise the engine does not keep:
 
 | Rule | Catches |
 |------|---------|

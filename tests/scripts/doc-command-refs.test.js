@@ -48,6 +48,44 @@ describe('R2 — npm run <script> against package.json', () => {
   });
 });
 
+describe('website page copy (.jsx)', () => {
+  const probes = {
+    ...PROBES,
+    skillExists: (name) => name === 'using',
+    scenarioExists: (id) => id === 'eval-tdd-test-first-gate',
+  };
+  const findings = (jsx) => lintDoc('website/page/sections.jsx', jsx, probes).findings;
+
+  it('reads JSX text and string literals as spans', () => {
+    const jsx = [
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: literal JSX source the linter must parse
+      '<div style={{border:`1px solid ${t.line}`}}>$ arcforge eval run eval-made-up --k 3</div>',
+      "{name:'x',cmd:'arcforge learn instinct restore x'}",
+      '<div><span>$ </span>/arcforge:ghost</div>',
+    ].join('\n');
+    expect(
+      findings(jsx)
+        .map((f) => `${f.rule}:${f.line}`)
+        .sort(),
+    ).toEqual(['R2:1', 'R2:2', 'R4:3']);
+  });
+
+  it('passes the real shapes: a known scenario, a known slash skill, prose naming the CLI', () => {
+    const jsx = [
+      '<div>$ arcforge eval run eval-tdd-test-first-gate --k 3</div>',
+      '<div><span>$ </span>/arcforge:using</div>',
+      "{note:'The other 7 shell out to the arcforge CLI, and those steps fail.'}",
+    ].join('\n');
+    expect(findings(jsx)).toEqual([]);
+  });
+
+  it('does not read a codex plugin command naming arcforge@… as an arcforge invocation', () => {
+    const jsx =
+      "{cmd:['codex plugin marketplace add GregoryHo/arcforge','codex plugin add arcforge@arcforge-dev']}";
+    expect(findings(jsx)).toEqual([]);
+  });
+});
+
 describe('R2 — subcommands against cli-manifest.js', () => {
   it.each([
     '`arcforge eval report --json`',

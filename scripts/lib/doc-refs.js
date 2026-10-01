@@ -106,6 +106,30 @@ const INLINE_CODE_RE = /`([^`\n]+)`/g;
 // Ignore directive: `<!-- doc-ref-lint: ignore <rule> <reason> -->`
 const IGNORE_RE = /<!--\s*doc-ref-lint:\s*ignore\b([^>]*)-->/i;
 
+// Page copy in a .jsx file: a quoted string literal, or JSX text between a `>`
+// and the next `<`. Template literals are skipped — on the website they carry
+// styles (`1px solid ${t.line}`), never copy.
+const JSX_COPY_RE = /'([^'\\\n]*)'|"([^"\\\n]*)"|>([^<>{}\n]+)</g;
+
+/**
+ * Parse a .jsx page into the spans its copy shows, with 1-based line numbers.
+ * Each string literal and each run of JSX text is one span, so the rules see
+ * `$ arcforge eval run …` or `/arcforge:using` the way a reader does.
+ *
+ * @param {string} content
+ * @returns {{ text: string, line: number }[]}
+ */
+function extractJsxSpans(content) {
+  const spans = [];
+  content.split('\n').forEach((line, i) => {
+    for (const m of line.matchAll(JSX_COPY_RE)) {
+      const text = (m[1] ?? m[2] ?? m[3]).replace(/^\s*\$\s+/, '').trim();
+      if (text) spans.push({ text, line: i + 1 });
+    }
+  });
+  return spans;
+}
+
 /**
  * Parse a doc into code spans with their 1-based line numbers. Both fenced
  * code blocks (line-by-line) and inline code spans are returned so the rules
@@ -523,7 +547,7 @@ function lintDoc(file, content, probes = {}) {
   const npmScriptExists = probes.npmScriptExists || (() => true);
   const scenarioExists = probes.scenarioExists || (() => true);
 
-  const spans = extractCodeSpans(content);
+  const spans = file.endsWith('.jsx') ? extractJsxSpans(content) : extractCodeSpans(content);
   const lines = content.split('\n');
 
   const r4 = scanR4Skills(file, spans, skillExists);
@@ -596,6 +620,7 @@ function lintDoc(file, content, probes = {}) {
 module.exports = {
   lintDoc,
   extractCodeSpans,
+  extractJsxSpans,
   parseIgnore,
   fieldExists,
   fieldSegments,

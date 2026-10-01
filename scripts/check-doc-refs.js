@@ -42,6 +42,10 @@ const SCAN_ROOT_FILES = [
   'CLAUDE.md',
   'docs/README.md',
   '.claude/skills/releasing/SKILL.md',
+  // The website's page copy (the .jsx source; the compiled .js beside it is
+  // generated). A made-up scenario id or subcommand shipped there once (P8).
+  'website/page/sections.jsx',
+  'website/page/hero.jsx',
 ];
 
 /** Recursively collect *.md files under a directory (skips node_modules). */

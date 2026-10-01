@@ -15,8 +15,14 @@ describe('check:docs scan set', () => {
     '.claude/agents/qa.md',
     '.claude/agents/pm.md',
     '.claude/agents/README.md',
+    'website/page/sections.jsx',
+    'website/page/hero.jsx',
   ])('scans %s', (rel) => {
     expect(scanned).toContain(rel);
+  });
+
+  it('leaves the compiled website .js out (generated from the .jsx)', () => {
+    expect(scanned.filter((rel) => rel.startsWith('website/') && rel.endsWith('.js'))).toEqual([]);
   });
 });
 
