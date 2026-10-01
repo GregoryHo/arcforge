@@ -204,9 +204,10 @@ into the `<details>` index is unaffected — the rule compares `D-id`s, not posi
   for nothing — keep the heading as the template writes it.
 - **Spec sections (C8).** Every spec carries the template's five section headings —
   `## Purpose`, `## Scope`, `## Behavior`, `## Data / domain model`, `## Decisions` —
-  each opening at column 1 as a scope does. A heading dropped, renamed, indented or
-  swallowed by an unclosed fence or comment is reported, so no spec escapes C5 by
-  losing the section C5 reads.
+  each exactly once, opening at column 1 as a scope does. A heading dropped, renamed,
+  indented, duplicated or swallowed by an unclosed fence or comment is reported, so no
+  spec escapes C5 by losing the section C5 reads — or by putting an empty one in
+  front of it.
 - **Indent bounds.** Only the `##` that *opens* a scope is read at column 1; indented,
   it opens nothing and the scope is empty. Everything else — `### D-NNN`, `- Status:`,
   `> Status:`, roadmap rows, relation bullets, the `<details>` opener, the `<!--`
