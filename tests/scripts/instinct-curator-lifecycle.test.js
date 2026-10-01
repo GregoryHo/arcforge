@@ -194,10 +194,20 @@ describe('ICL-6: contradiction-archive deactivates a curator-activated candidate
       cmdContradict(CANDIDATE_ID, PROJECT);
     }
 
-    // Active file moved to the instinct's own archived/ dir (NOT .disabled/).
+    // Active file moved to the instinct's own archived/ dir. Layer 8 records the
+    // deactivation (so the SessionStart gate agrees with the queue) and finds
+    // the file already gone, so .disabled/ holds only its placeholder.
     expect(fs.existsSync(path.join(instinctsDir(), `${CANDIDATE_ID}.md`))).toBe(false);
     expect(fs.existsSync(path.join(instinctsDir(), 'archived', `${CANDIDATE_ID}.md`))).toBe(true);
-    expect(fs.existsSync(path.join(instinctsDir(), '.disabled'))).toBe(false);
+    const disabled = fs.readdirSync(path.join(instinctsDir(), '.disabled'));
+    expect(disabled).toHaveLength(1);
+    expect(fs.readFileSync(path.join(instinctsDir(), '.disabled', disabled[0]), 'utf8')).toMatch(
+      /original file was missing/,
+    );
+    const { listActivatedCandidateIds } = require('../../scripts/lib/learning-curator/activate');
+    expect(listActivatedCandidateIds(path.join(os.homedir(), '.arcforge')).has(CANDIDATE_ID)).toBe(
+      false,
+    );
 
     const events = readQueueEvents();
     const deactivateEvents = events.filter(

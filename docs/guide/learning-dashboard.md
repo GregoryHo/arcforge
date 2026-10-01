@@ -187,6 +187,13 @@ rather than overwrite either; nothing moves. Like the other commands that change
 what may reach a session, it works on the project you run it in, so `--project`
 takes no value here and `--global` is refused.
 
+Restoring moves a file; it never activates anything. A curator instinct you
+contradicted away was deactivated when it was archived, so after a restore it
+stays out of your sessions — the command says so — until you run
+`arcforge learn activate <id> --project`. One that decay archived was never
+deactivated (decay leaves activated instincts alone), so it is back in sessions
+as soon as the file is.
+
 ## Review: from candidate to active
 
 Once learning is on, observations turn into **candidates** automatically. That is

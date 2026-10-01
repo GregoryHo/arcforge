@@ -84,6 +84,12 @@ function runInstinctRestore(args, name, asJson) {
   console.log(
     `  from ${result.from}${result.archive_reason ? ` (archived by ${result.archive_reason})` : ''}`,
   );
+  if (!result.injected) {
+    console.log(
+      '  It is not an activated instinct, so sessions do not receive it. A curator instinct ' +
+        `comes back into sessions with: arcforge learn activate ${result.id} --project`,
+    );
+  }
 }
 
 module.exports = { runInstinctDeactivate, runInstinctRestore };

@@ -17,9 +17,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { parseConfidenceFrontmatter } = require('./confidence');
+const { readActivationState } = require('./learning-curator/activation-state');
 const { writeAuditEntry } = require('./learning-audit-log');
 const { getInstinctsDir, getInstinctsArchivedDir } = require('./session-utils');
-const { atomicWriteFile, sanitizeFilename } = require('./utils');
+const { atomicWriteFile, getArcforgeHome, sanitizeFilename } = require('./utils');
 
 /** The suffix the decay cycle gives an archive when the plain name is taken. */
 const DATED_SUFFIX = /\.\d{4}-\d{2}-\d{2}(?:\.\d+)?$/;
@@ -63,7 +64,7 @@ function withoutArchiveStamps(content) {
  * @param {{ name: string, project: string, actor: object }} opts
  *   `name` is the instinct's name, or the exact name of one archive file
  *   (without `.md`) when several archives of that instinct exist.
- * @returns {{ id: string, path: string, from: string, archive_reason?: string }}
+ * @returns {{ id: string, path: string, from: string, injected: boolean, archive_reason?: string }}
  * @throws {Error} on a refusal (already audited) or an invalid name
  */
 function restoreInstinct({ name, project, actor }) {
@@ -138,10 +139,14 @@ function restoreInstinct({ name, project, actor }) {
     throw new Error(`restore not performed — audit entry could not be written: ${err.message}`);
   }
   fs.unlinkSync(fromPath);
+  // Restore moves a file; it never activates anything. Whether sessions receive
+  // the instinct is the activation gate's answer, reported as it stands.
+  const injected = readActivationState(getArcforgeHome()).activated.has(id);
   return {
     id,
     path: toPath,
     from: fromPath,
+    injected,
     ...(reason ? { archive_reason: String(reason) } : {}),
   };
 }

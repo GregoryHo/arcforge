@@ -17,6 +17,7 @@ const CANDIDATE_ID = 'cand_instinct_20261001T010000Z_a1b2c3d4e5f6';
 const OTHER_ID = 'cand_instinct_20261001T020000Z_b2c3d4e5f6a1';
 const CLI = path.join(__dirname, '../../scripts/cli.js');
 const DASHBOARD = path.join(__dirname, '../../scripts/lib/learning-dashboard.js');
+const INJECT = path.join(__dirname, '../../hooks/session-tracker/inject-context.js');
 
 let testDir;
 let arcforgeHome;
@@ -324,5 +325,46 @@ describe('learn instinct restore (B-11)', () => {
 
   it('refuses --global', () => {
     expect(refusal(['instinct', 'restore', 'grep-first', '--global'])).toMatch(/--global/);
+  });
+
+  // Codex P1 on #236: what the SessionStart injector would put in a session,
+  // read through the hook's own loader in a child process on this home.
+  function injectedIds() {
+    const script = `
+      const { loadAutoInstincts } = require(${JSON.stringify(INJECT)});
+      process.stdout.write(loadAutoInstincts(${JSON.stringify(PROJECT_NAME)}).text || '');
+    `;
+    const out = spawnSync('node', ['-e', script], { env, encoding: 'utf8' }).stdout;
+    return [CANDIDATE_ID].filter((id) => out.includes(id));
+  }
+
+  it('keeps a contradicted curator instinct out of sessions after restore, until activated', () => {
+    const activePath = activated();
+    expect(injectedIds()).toEqual([CANDIDATE_ID]);
+    const content = fs.readFileSync(activePath, 'utf8');
+    fs.writeFileSync(activePath, content.replace(/^confidence: .*$/m, 'confidence: 0.20'));
+    expect(runJson(['instinct', 'contradict', CANDIDATE_ID]).archived).toBe(true);
+    expect(statusOf()).toBe('deactivated');
+
+    const out = runJson(['instinct', 'restore', CANDIDATE_ID, '--project']);
+
+    expect(fs.existsSync(activePath)).toBe(true);
+    expect(out.injected).toBe(false);
+    expect(injectedIds()).toEqual([]);
+    expect(runJson(['activate', CANDIDATE_ID, '--project']).next_status).toBe('activated');
+    expect(injectedIds()).toEqual([CANDIDATE_ID]);
+  });
+
+  it('returns an archived instinct whose candidate is still activated to sessions', () => {
+    const activePath = activated();
+    const archiveDir = path.join(instinctsDir(), 'archived');
+    fs.mkdirSync(archiveDir, { recursive: true });
+    fs.renameSync(activePath, path.join(archiveDir, `${CANDIDATE_ID}.md`));
+    expect(injectedIds()).toEqual([]);
+
+    const out = runJson(['instinct', 'restore', CANDIDATE_ID, '--project']);
+
+    expect(out.injected).toBe(true);
+    expect(injectedIds()).toEqual([CANDIDATE_ID]);
   });
 });
