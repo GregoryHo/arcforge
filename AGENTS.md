@@ -41,7 +41,8 @@ host loads is `.claude/rules/plugin.md` (the manifest pair) and
 ```bash
 npm test                      # 5 runners, all must pass
 npm run check:versions && npm run check:docs && npm run check:cli-consumers \
-  && npm run check:hooks && npm run check:eval-targets && npm run check:product
+  && npm run check:hooks && npm run check:eval-targets && npm run check:product \
+  && npm run check:file-size
 npm run lint
 ```
 

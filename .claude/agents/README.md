@@ -22,7 +22,7 @@ creep: a product agent that can run and edit code will "just fix" the engine ins
 of recording what the engine should do. With no Bash it can only describe — which is
 also why running `npm run check:product` is something `pm` hands off rather than does.
 
-`qa` gets read, search, and **Bash**, because running `npm test` and the six static
+`qa` gets read, search, and **Bash**, because running `npm test` and the seven static
 checks is its entire job — and no editing tools, because a reviewer that fixes what
 it finds has stopped being evidence. It reports; a human or `pm` acts. The explicit
 `disallowedTools:` line states that intent a second time. That restriction is

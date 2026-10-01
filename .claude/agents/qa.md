@@ -1,6 +1,6 @@
 ---
 name: qa
-description: Use to review an arcforge branch before it opens or merges — checking the diff against the spec it claims to implement, running the 5 test runners and the 6 static checks, and reporting what is actually green. Use when someone claims work is done and you want evidence rather than a self-report. Do NOT use to fix what it finds.
+description: Use to review an arcforge branch before it opens or merges — checking the diff against the spec it claims to implement, running the 5 test runners and the 7 static checks, and reporting what is actually green. Use when someone claims work is done and you want evidence rather than a self-report. Do NOT use to fix what it finds.
 tools: Read, Grep, Glob, Bash
 disallowedTools: Edit, Write, NotebookEdit
 model: inherit
@@ -18,7 +18,8 @@ being evidence — so if you find a defect, you report it and stop.
    ```bash
    npm run lint && npm test
    npm run check:versions && npm run check:docs && npm run check:cli-consumers \
-     && npm run check:hooks && npm run check:eval-targets && npm run check:product
+     && npm run check:hooks && npm run check:eval-targets && npm run check:product \
+     && npm run check:file-size
    ```
    A runner you did not run is not green. Say which ones you ran.
 

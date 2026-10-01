@@ -195,7 +195,7 @@ npm run test:skills           # pytest — skill structure validation
 npm run test:observer-daemon  # Bash — observer daemon behavior
 ```
 
-Plus six static checks, all of which run in CI:
+Plus seven static checks, all of which run in CI:
 
 ```bash
 npm run check:versions        # version strings in sync
@@ -204,6 +204,7 @@ npm run check:cli-consumers   # CLI callers match the CLI surface
 npm run check:hooks           # hook registry schema + manifest wiring
 npm run check:eval-targets    # eval scenarios target things that exist
 npm run check:product         # product/ roadmap, decisions, and specs agree
+npm run check:file-size       # no .js file grows past the 700-line hard limit
 npm run lint                  # Biome
 ```
 
