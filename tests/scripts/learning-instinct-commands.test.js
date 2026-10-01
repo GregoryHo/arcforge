@@ -310,6 +310,53 @@ describe('learn instinct restore (B-11)', () => {
     expect(fs.existsSync(path.join(instinctsDir(), 'archived', 'grep-first.md'))).toBe(true);
   });
 
+  // Codex P2 on #236: an id may itself end in something date-shaped. The id
+  // comes from the archived file, and only the suffix decay itself adds — the
+  // archive day, optionally `.<n>` — is ever taken off a file name.
+  it('keeps an id that ends in a date-like suffix', () => {
+    archived('release.2026-09-20.md', {
+      id: 'release.2026-09-20',
+      confidence: '0.12',
+      archived_at: '2026-09-25',
+    });
+
+    refusal(['instinct', 'restore', 'release', '--project']);
+    runJson(['instinct', 'restore', 'release.2026-09-20', '--project']);
+
+    expect(fs.existsSync(path.join(instinctsDir(), 'release.2026-09-20.md'))).toBe(true);
+    expect(fs.existsSync(path.join(instinctsDir(), 'release.md'))).toBe(false);
+  });
+
+  it('takes off a numbered collision suffix decay added', () => {
+    archived('grep-first.2026-09-20.2.md', DECAYED);
+
+    runJson(['instinct', 'restore', 'grep-first', '--project']);
+
+    expect(fs.existsSync(path.join(instinctsDir(), 'grep-first.md'))).toBe(true);
+  });
+
+  it('keeps a date-like suffix that is not the archive day, when the file has no id', () => {
+    const { id: _id, ...noId } = DECAYED;
+    archived('release.2026-01-01.md', noId);
+
+    runJson(['instinct', 'restore', 'release.2026-01-01', '--project']);
+
+    expect(fs.existsSync(path.join(instinctsDir(), 'release.2026-01-01.md'))).toBe(true);
+  });
+
+  // D-046: restore strips exactly archived_at and archive_reason. The decay
+  // bookkeeping stays, or the next cycle charges the same weeks again and can
+  // archive the instinct the user just restored.
+  it('keeps decay_charged_through', () => {
+    archived('grep-first.md', { ...DECAYED, decay_charged_through: '2026-09-19T00:00:00.000Z' });
+
+    runJson(['instinct', 'restore', 'grep-first', '--project']);
+
+    const restored = fs.readFileSync(path.join(instinctsDir(), 'grep-first.md'), 'utf8');
+    expect(restored).toContain('decay_charged_through: 2026-09-19T00:00:00.000Z');
+    expect(restored).not.toMatch(/archived_at|archive_reason/);
+  });
+
   it('restores what the contradict command archived', () => {
     fs.mkdirSync(instinctsDir(), { recursive: true });
     fs.writeFileSync(

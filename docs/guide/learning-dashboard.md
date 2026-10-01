@@ -181,7 +181,11 @@ It moves the file out of `archived` and back beside the others, whether decay
 or a contradiction put it there — your command outranks both — and writes the
 restore to the audit log with the reason the file was archived for, when it
 carries one. When decay archived the same instinct more than once, the archives
-carry a date and restore asks you to name the one you mean. If an active
+carry a date and restore asks you to name the one you mean; the restored file
+takes the instinct's own id back, never a name cut down from the archive's. The
+restore removes only the two archive stamps, `archived_at` and `archive_reason`,
+and keeps the record of how much decay has already been charged, so the next
+decay cycle does not charge those weeks again. If an active
 instinct of that name already exists, restore refuses and names both files
 rather than overwrite either; nothing moves. Like the other commands that change
 what may reach a session, it works on the project you run it in, so `--project`

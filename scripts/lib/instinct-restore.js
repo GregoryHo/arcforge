@@ -22,27 +22,57 @@ const { writeAuditEntry } = require('./learning-audit-log');
 const { getInstinctsDir, getInstinctsArchivedDir } = require('./session-utils');
 const { atomicWriteFile, getArcforgeHome, sanitizeFilename } = require('./utils');
 
-/** The suffix the decay cycle gives an archive when the plain name is taken. */
-const DATED_SUFFIX = /\.\d{4}-\d{2}-\d{2}(?:\.\d+)?$/;
+/**
+ * The instinct id an archive file holds. The file's own `id` wins. Without one,
+ * the file name is the id, less the one suffix the decay cycle adds when the
+ * plain name is taken — `.<archived_at>` or `.<archived_at>.<n>`, the archive
+ * day it stamped into this same file — so an id that merely ends in a date
+ * (`release.2026-09-20`) is never cut short.
+ */
+function archivedId(archiveDir, file) {
+  const stem = path.basename(file, '.md');
+  const { frontmatter } = parseConfidenceFrontmatter(
+    fs.readFileSync(path.join(archiveDir, file), 'utf8'),
+  );
+  if (typeof frontmatter.id === 'string' && isSafeName(frontmatter.id)) return frontmatter.id;
+  const day = typeof frontmatter.archived_at === 'string' ? frontmatter.archived_at : '';
+  if (!day) return stem;
+  // `<id>.<day>.<n>` (n >= 2) first, then `<id>.<day>` — plain string checks,
+  // since `archived_at` is file content, not a pattern.
+  const numbered = stem.match(/^(.+)\.(\d+)$/);
+  const unnumbered = numbered && numbered[2] !== '1' ? numbered[1] : stem;
+  const suffix = `.${day}`;
+  if (unnumbered.endsWith(suffix) && unnumbered.length > suffix.length) {
+    return unnumbered.slice(0, -suffix.length);
+  }
+  return stem;
+}
+
+function isSafeName(name) {
+  try {
+    sanitizeFilename(name);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /** Frontmatter keys that describe the archive, and are false of an active file. */
 const ARCHIVE_STAMPS = new Set(['archived_at', 'archive_reason']);
 
 /**
- * The archive files `name` can mean: the archive named exactly that, or an
- * archive of the instinct `name` that decay gave a dated name to.
- * @returns {string[]} file names under the archive directory
+ * The archives `name` can mean: the archive file named exactly that, or an
+ * archive whose instinct id is `name`.
+ * @returns {Array<{file: string, id: string}>}
  */
 function archiveMatches(archiveDir, name) {
   if (!fs.existsSync(archiveDir)) return [];
   return fs
     .readdirSync(archiveDir)
     .filter((file) => file.endsWith('.md'))
-    .filter((file) => {
-      const stem = path.basename(file, '.md');
-      return stem === name || stem.replace(DATED_SUFFIX, '') === name;
-    })
-    .sort();
+    .sort()
+    .map((file) => ({ file, id: archivedId(archiveDir, file) }))
+    .filter(({ file, id }) => path.basename(file, '.md') === name || id === name);
 }
 
 /** The archived content with the archive's own stamps removed from its frontmatter. */
@@ -97,7 +127,7 @@ function restoreInstinct({ name, project, actor }) {
   // An exact archive name matches only itself, so several matches means the
   // plain instinct name was given and decay archived it more than once.
   if (matches.length > 1) {
-    const stems = matches.map((file) => path.basename(file, '.md'));
+    const stems = matches.map(({ file }) => path.basename(file, '.md'));
     refuse(
       'ambiguous_archive',
       `${matches.length} archives of "${name}" in ${archiveDir}: ${stems.join(', ')} — ` +
@@ -107,9 +137,8 @@ function restoreInstinct({ name, project, actor }) {
     );
   }
 
-  const archiveFile = matches[0];
+  const { file: archiveFile, id } = matches[0];
   const fromPath = path.join(archiveDir, archiveFile);
-  const id = path.basename(archiveFile, '.md').replace(DATED_SUFFIX, '');
   const toPath = path.join(instinctsDir, `${id}.md`);
   const content = fs.readFileSync(fromPath, 'utf8');
   const reason = parseConfidenceFrontmatter(content).frontmatter.archive_reason;
