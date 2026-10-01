@@ -153,7 +153,9 @@ was recorded about them.
   carries one; files archived before that stamp existed carry none and are
   restorable all the same. When an active instinct of the same name already
   exists, restore MUST refuse and name both files rather than overwrite either.
-  Hand-editing state stays out of contract (B-5), so this is the only
+  The restored file carries no archive stamp — restore strips `archive_reason`
+  and its companions — so a later archive is never labelled with the old
+  reason. Hand-editing state stays out of contract (B-5), so this is the only
   supported route back; like every change to what may be
   injected, it is audited (D-040).
 - **B-14 A candidate name is checked at the door, once.** Layer 5 ingestion
