@@ -56,7 +56,8 @@ All 16 skills load, listed as `arcforge:<name>`. Codex has no slash commands for
 
 | On Codex | Status |
 |---|---|
-| The 9 skills that need no engine — `using`, `brainstorming`, `speccing`, `executing`, `tdd`, `debugging`, `code-review`, `sessions`, `diagramming-obsidian` | Work fully |
+| 8 of the 9 skills that need no engine — `using`, `brainstorming`, `speccing`, `executing`, `tdd`, `debugging`, `code-review`, `diagramming-obsidian` | Work fully |
+| `sessions`, the ninth | Handovers, resuming from a handover, and the when-to-compact table work. The compaction indicator it describes does not appear: that line comes from a Claude Code hook, so on Codex you decide when to run the table yourself |
 | The 7 skills that shell out to the `arcforge` CLI — `dispatching`, `looping`, `finishing`, `evaluating`, `learning`, `writing-skills`, `maintaining-obsidian` | Load and read correctly, but their CLI steps report `command not found`: Codex does not put a plugin's `bin/` on `PATH` |
 | Hooks, the learning subsystem, the eval harness, the unattended loop | Do not run — they are built on Claude Code's hook protocol and on spawning `claude` |
 

@@ -47,7 +47,12 @@ whole and fails halfway through a workflow.
   skills load on Codex from a single `"skills": "./skills/core/"` entry and
   appear namespaced `arcforge:<name>`. Hooks, the learning subsystem, the eval
   harness and the unattended loop do not run there: they are built on Claude
-  Code's hook protocol and on spawning `claude`.
+  Code's hook protocol and on spawning `claude`. Re-verified 2026-10-01 on
+  codex-cli 0.156.1 against a local-directory install of 6.1.1: all sixteen
+  skill directories were installed, `codex debug prompt-input` listed thirteen
+  `arcforge:<name>` entries with the three user-invoked ones absent (B-2a), and
+  the same command with those three skills' Codex metadata files moved aside
+  listed all sixteen.
 
   Not running is not enough, though — Codex *auto-discovers* plugin hooks at
   `hooks/hooks.json` <!-- doc-ref-lint: ignore R1 names the path that must NOT exist; its absence is the guard (check:hooks) --> whether or not a manifest names them, so
@@ -66,14 +71,16 @@ whole and fails halfway through a workflow.
   to hold a security boundary that one careless grant defeats.
 - **B-2a The explicit-intent gate is re-declared in Codex's own vocabulary.**
   `disable-model-invocation: true` is Claude Code's mechanism and buys nothing on
-  Codex — verified against codex-cli 0.152.1, where `codex debug prompt-input`
-  listed all fifteen skills, the three user-invoked ones included, in the
+  Codex — verified against codex-cli 0.152.1, when the shipped set was fifteen
+  skills, where `codex debug prompt-input` listed all fifteen, the three
+  user-invoked ones included, in the
   `<skills_instructions>` block the model selects from. Codex's bundled validator
   goes further and rejects the key outright — "frontmatter field
   `disable-model-invocation` must be false". Codex spells the same intent
   `policy.allow_implicit_invocation: false` in a skill-local
   `skills/core/<name>/agents/openai.yaml`; with those three files in place the
-  same command listed twelve skills, the three gated ones absent, while staying
+  same command listed twelve skills (thirteen of sixteen once `speccing` joined,
+  re-verified 2026-10-01 on codex-cli 0.156.1), the three gated ones absent, while staying
   explicitly reachable — that is what `allow_implicit_invocation` gates, per
   Codex's own field docs: "not injected into the model context by default, but can
   still be invoked explicitly".
@@ -116,7 +123,7 @@ whole and fails halfway through a workflow.
   `command not found`, which subsystems do not run at all, and how a skill is
   actually reached on each host — a `/arcforge:<name>` slash command on Claude
   Code, the composer's `$` mention picker on Codex, which has no slash commands for
-  skills. The router carries that same per-host note above its Skill Map, whose
+  skills. The router carries that same per-host note below its Skill Map, whose
   rows are written in the Claude Code spelling; without it the index reads as a
   list of commands a Codex user cannot run. A Codex user
   should be able to decide whether to install without running anything — and
@@ -171,7 +178,9 @@ Shapes worth knowing, all verified against codex-cli 0.151.0 rather than inferre
   with per-skill entries written relative to it. arcforge's root is
   `<codex-home>/plugins/cache/arcforge-dev/arcforge/<version>/skills/core`. A
   verification that counts absolute per-skill paths will read zero; count the
-  sixteen `arcforge:<name>` entries instead.
+  `arcforge:<name>` entries instead — thirteen, because the three gated skills
+  (B-2a) are kept out of the listing; sixteen with their Codex metadata files
+  moved aside.
 - **`.codex-plugin/plugin.json` wins outright.** A fixture whose Codex manifest
   declared no components, while its `.claude-plugin/plugin.json` declared both a
   skills directory and a `hooks` path, loaded neither — the Claude Code manifest

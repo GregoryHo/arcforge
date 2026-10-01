@@ -82,7 +82,10 @@ Differences that are deliberate, not oversights:
   `<skills_instructions>` blocks — so the string is the documented shape and the
   array buys nothing.
 - **Skills are namespaced `arcforge:<name>`** on Codex, same as Claude Code's
-  `/arcforge:<name>`. All 16 load from one directory entry. Codex has no
+  `/arcforge:<name>`. All 16 load from one directory entry — re-verified
+  2026-10-01 on codex-cli 0.156.1: `codex debug prompt-input` listed 13
+  `arcforge:` entries (the 3 user-invoked ones withheld, see below) and 16 with
+  their `agents/openai.yaml` moved aside. Codex has no
   slash commands for skills — the user reaches one through the composer's `$`
   mention picker — so the router and the README label the `/` rows as Claude
   Code's. Whether that mention token carries the `arcforge:` namespace was NOT
