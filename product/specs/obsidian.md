@@ -1,6 +1,6 @@
 # obsidian — spec
 
-> Status: shipped v6.0.0 · extended by 6.1.2 (next) · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.1.1 · extended by 6.1.2 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
