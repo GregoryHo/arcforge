@@ -72,7 +72,9 @@ across sessions until the threshold is met; reset is owned exclusively by
 - Queues the `reflect-ready` nudge **only when learning is enabled in some
   scope** — reflection is the learning loop, and with learning off the diaries
   it counts never get processed, so the nudge would re-queue at every threshold
-  hit forever
+  hit forever. The count is of enriched diaries only — a draft still carrying
+  its `TO BE ENRICHED` placeholders does not count, so three stubs never
+  trigger it (the same answer `arcforge learn reflect scan` gives)
 - Outputs session summary
 
 ## Triggers

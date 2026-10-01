@@ -147,7 +147,8 @@ For "remember this" — one insight, from the session in front of you.
    from this session. Ask if the trigger or action is ambiguous rather than
    guessing.
 2. Run `arcforge learn instinct check <id>` before writing anything.
-3. Show the complete instinct and wait for the user to confirm it.
+3. Show the complete instinct, say that a saved instinct is a note that never
+   reaches future sessions, and wait for the user to confirm it.
 4. Save with `arcforge learn instinct save <id> --trigger "..." --action "..."
    --domain <d>`, then run `arcforge learn recall record recall-<id>
    --query "..." --instinct-ids "<id>"`.

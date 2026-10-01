@@ -171,6 +171,60 @@ describe('learning-workflow reflection scan', () => {
     expect(result.diaries).toHaveLength(REFLECT_READY_MIN_DIARIES);
   });
 
+  // B-8 / D-042 (#169): only an enriched diary counts. A draft still carrying
+  // the TO BE ENRICHED placeholders — learning off, or enrichment that never
+  // ran — counts toward neither the threshold nor the diaries scanned.
+  const STUB = '## Decisions Made\n\n<!-- TO BE ENRICHED — Fill from conversation memory -->\n- \n';
+  const writeStubDrafts = (count) => {
+    const dir = path.join(home, 'diaries', project, '2026-08-14');
+    fs.mkdirSync(dir, { recursive: true });
+    for (let i = 0; i < count; i++) {
+      fs.writeFileSync(path.join(dir, `diary-stub-${i}-draft.md`), STUB);
+    }
+  };
+
+  it('reports not-ready when the only diaries are unenriched stubs', () => {
+    writeStubDrafts(REFLECT_READY_MIN_DIARIES + 3);
+    const result = scanForReflection(project);
+    expect(result.count).toBe(0);
+    expect(result.diaries).toEqual([]);
+    expect(result.ready).toBe(false);
+  });
+
+  it('counts enriched diaries and drafts, never the stubs beside them', () => {
+    writeDiaries(REFLECT_READY_MIN_DIARIES - 1);
+    writeStubDrafts(5);
+    const dir = path.join(home, 'diaries', project, '2026-08-14');
+    fs.writeFileSync(path.join(dir, 'diary-enriched-draft.md'), '## Decisions Made\n\n- chose X\n');
+    const result = scanForReflection(project);
+    expect(result.count).toBe(REFLECT_READY_MIN_DIARIES);
+    expect(result.ready).toBe(true);
+    expect(result.diaries.some((d) => d.includes('diary-stub-'))).toBe(false);
+  });
+
+  it('an unreadable diary is not counted as enriched', () => {
+    writeDiaries(REFLECT_READY_MIN_DIARIES - 1);
+    const dir = path.join(home, 'diaries', project, '2026-08-14');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.symlinkSync(path.join(dir, 'missing-target.md'), path.join(dir, 'diary-dangling.md'));
+    const locked = path.join(dir, 'diary-locked.md');
+    fs.writeFileSync(locked, '## Decisions Made\n\n- chose X\n');
+    fs.chmodSync(locked, 0o000);
+    try {
+      const result = scanForReflection(project);
+      expect(result.count).toBe(REFLECT_READY_MIN_DIARIES - 1);
+      expect(result.ready).toBe(false);
+      expect(checkReflectReady(project).ready).toBe(false);
+    } finally {
+      fs.chmodSync(locked, 0o644);
+    }
+  });
+
+  it('stubs do not move the strategy picker past the enriched count', () => {
+    writeStubDrafts(6);
+    expect(scanForReflection(project).strategy).toBe('recent_window');
+  });
+
   it('checkReflectReady agrees with scanForReflection', () => {
     writeDiaries(REFLECT_READY_MIN_DIARIES);
     const scan = scanForReflection(project);
@@ -463,6 +517,25 @@ describe('learn workflow CLI surface', () => {
     expect(runCli(['learn', 'instinct', 'check', 'cli-saved', '--project', 'p'], home)).toContain(
       'duplicate|project|',
     );
+  });
+
+  // B-13 / D-038: a saved instinct creates no candidate, so it is never
+  // activatable and never injected — and the save says so, for either source.
+  it.each([
+    'manual',
+    'reflection',
+  ])('a --source %s save says it will not reach future sessions', (source) => {
+    const out = runCli(
+      ['learn', 'instinct', 'save', `note-${source}`, '--project', 'p', '--source', source].concat([
+        '--trigger',
+        't',
+        '--action',
+        'a',
+      ]),
+      home,
+    );
+    expect(out).toMatch(/not injected into future sessions/);
+    expect(out).toMatch(/cannot be activated/);
   });
 
   it('caps a reflection-sourced instinct below the manual cap', () => {

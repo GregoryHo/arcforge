@@ -22,7 +22,11 @@ const crypto = require('node:crypto');
 const { getArcforgeHome } = require('./utils');
 const { writeAuditEntry } = require('./learning-audit-log');
 
-const { readCurrentCandidates, appendCandidate } = require('./learning-curator/queue-writer');
+const {
+  readCurrentCandidates,
+  readRejections,
+  appendCandidate,
+} = require('./learning-curator/queue-writer');
 const {
   appendTransitionEvent,
   appendRelatedEvent,
@@ -296,6 +300,55 @@ function createDashboardModel() {
   return {
     count: cards.length,
     candidates: cards,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Rejections view (B-17) — what the curator declined, why, and when.
+//
+// Layer 5's drilldown allowlist, through the same redaction and scope view a
+// card gets: no raw proposal body, no project_id, no source beyond its type.
+// Read for display only — a rejection is never learning evidence.
+// ---------------------------------------------------------------------------
+
+const REJECTIONS_SHOWN_MAX = 100;
+const REJECTION_DETAIL_MAX = 500;
+
+function sanitizeRejection(record) {
+  const reasons = Array.isArray(record.reasons) ? record.reasons : [];
+  return {
+    rejection_id: record.rejection_id,
+    rejected_at: record.rejected_at,
+    source_type: record.source?.source_type,
+    proposal_index: record.proposal_index,
+    artifact_type: record.artifact_type,
+    name: sanitizeText(record.normalized_name, CARD_NAME_MAX),
+    scope: record.scope ? buildCardScope(record.scope) : undefined,
+    reasons: reasons.map((reason) => ({
+      code: reason?.code,
+      ...(reason?.detail && { detail: sanitizeText(reason.detail, REJECTION_DETAIL_MAX) }),
+    })),
+  };
+}
+
+/**
+ * @returns {{ count: number, by_reason_code: object, rejections: object[] }}
+ *   count and by_reason_code cover the whole live rejections.jsonl; the list is
+ *   the newest REJECTIONS_SHOWN_MAX.
+ */
+function createRejectionsModel() {
+  const records = readRejections();
+  const byReasonCode = {};
+  for (const record of records) {
+    for (const reason of Array.isArray(record.reasons) ? record.reasons : []) {
+      const code = typeof reason?.code === 'string' ? reason.code : 'unknown';
+      byReasonCode[code] = (byReasonCode[code] || 0) + 1;
+    }
+  }
+  return {
+    count: records.length,
+    by_reason_code: byReasonCode,
+    rejections: records.slice(0, REJECTIONS_SHOWN_MAX).map(sanitizeRejection),
   };
 }
 
@@ -595,6 +648,7 @@ module.exports = {
   sanitizeDashboardCard,
   sanitizeDashboardDetail,
   createDashboardModel,
+  createRejectionsModel,
   handleDashboardAction,
 };
 

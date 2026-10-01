@@ -485,4 +485,23 @@ describe('Stop reflect-ready nudge gate (D-009)', () => {
       'reflect-ready is queued once learning is on',
     );
   });
+
+  it('learning on: unenriched stubs alone queue no nudge (B-8, #169)', () => {
+    const projectDir = path.join(homeDir, 'reflect-stubs');
+    fs.mkdirSync(projectDir, { recursive: true });
+    const dir = path.join(homeDir, '.arcforge', 'diaries', 'reflect-stubs', '2026-09-01');
+    fs.mkdirSync(dir, { recursive: true });
+    for (const name of ['a', 'b', 'c', 'd']) {
+      fs.writeFileSync(
+        path.join(dir, `diary-session-${name}-draft.md`),
+        '## Decisions Made\n\n<!-- TO BE ENRICHED — Fill from conversation memory -->\n',
+      );
+    }
+    enableLearning(projectDir);
+
+    const res = runStop(projectDir);
+    assert.strictEqual(res.status, 0, res.stderr);
+    assert.ok(res.stdout.includes('Session paused'), `expected a triggered Stop: ${res.stdout}`);
+    assert.deepStrictEqual(pendingReflectActions('reflect-stubs'), []);
+  });
 });

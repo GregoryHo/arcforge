@@ -26,7 +26,15 @@ arcforge learn enable --project
 ```
 
 `--project` scopes learning to the repository you are in; `--global` applies it
-everywhere. Check what is on at any time:
+everywhere.
+
+A project is known by its directory's name, not its full path. Two
+repositories in directories with the same name — `~/work/api` and `~/oss/api`,
+say — share one observation store, one set of instincts and one candidate list,
+and nothing in arcforge tells them apart, `learn --project` included. Keep that
+in mind before turning learning on in both.
+
+Check what is on at any time:
 
 ```bash
 arcforge learn status --json
@@ -89,6 +97,10 @@ ready: false
 ```
 
 Under three diaries there is nothing to generalize from, and the scan says so.
+Only an enriched diary counts: a draft whose sections still carry the
+`TO BE ENRICHED` placeholders — written while learning was off, or one whose
+enrichment never ran — is left out of the count, of the diaries the scan lists,
+and of the end-of-session nudge that tells you reflection is ready.
 When there is enough, the `/arcforge:learning` skill reads them and separates
 **patterns** (three or more diaries showing the same thing) from
 **observations** (one or two, and labelled as such). Everything cites the diaries
@@ -131,6 +143,14 @@ by hand can climb higher than one derived from a reflection, since the derived
 one is an inference about you rather than something you stated. Either way
 confidence only sorts and caps — it is never a threshold that activates
 anything.
+
+An instinct you save this way — by hand, or from a reflection with
+`--source reflection` — is a note, not a behavior change. Saving creates no
+candidate, so it never enters the review loop below: it cannot be activated and
+it is never injected into a future session, and the save command says so when it
+writes the file. Only an instinct activated from a reviewed candidate is
+injected. The cost is real: a rule you state outright does not reach your next
+session through this path.
 
 An auto-detected instinct is a proposal, not a fact, so you can push back on it:
 
@@ -197,6 +217,14 @@ dashboard's evolve action. That new candidate goes through the same validation
 as any other. If it fails — a source candidate written before a schema rule
 tightened, say — the action is refused with `candidate_invalid` and the
 validator's reasons, and nothing is created.
+
+Below the candidates, the dashboard lists **declined proposals**: what the
+curator proposed but the queue turned away before it became a candidate — a
+proposal citing evidence that does not exist, say, or one whose name could not
+be used as a filename — each with its reason and when. They are shown through
+the same redacted view as a card, never the raw proposal, and they are a record
+only: nothing here can be approved, and no declined proposal is ever read back as
+evidence for a new one.
 
 Every action is written to an audit log, accepted or rejected, with the reason.
 Do not route around the dashboard by editing state files by hand — that is the
@@ -368,10 +396,16 @@ is stored in the session record at all.
 
 Almost everything sits under `~/.arcforge/`: diaries in
 `diaries/<project>/<date>/`, raw observations in `observations/<project>/`, the
-candidate queue and the review audit log in `learning/`, the drafts
+candidate queue, the declined proposals and the review audit log in `learning/`, the drafts
 materialization writes in `learning/drafts/<candidate-id>/`, and activated
 instincts in `instincts/<project>/` (or `instincts/global/`). The project's own
 `.arcforge/learning/` holds one thing: that scope's opt-in.
+
+Declined proposals live in `learning/candidates/rejections.jsonl`. Once that
+file holds a record older than 30 days, 5,000 records, or 10 MB — whichever
+comes first — its records move to `rejections.archive.jsonl` beside it and the
+live file starts over. Nothing is deleted: the archive is yours to keep or
+remove, arcforge never prunes it, and the dashboard shows only the live file.
 
 Nothing in the loop writes into your repository. A materialized candidate is a
 draft under the arcforge home, and activating it writes an instinct there too —
@@ -380,3 +414,34 @@ is committed on your behalf.
 
 The commands above print the absolute path of anything they write, so you can
 always read exactly what was recorded and where it went.
+
+## Known limits, and what is not built yet
+
+These are deliberate edges of what learning does today, stated so you do not
+have to find them by surprise.
+
+- **The unenriched-draft warning can be wrong in a few cases.** At session
+  start, arcforge warns about diary drafts whose enrichment never ran — but only
+  drafts written after you turned learning on, judged by the file's creation and
+  last-write times. A copy that resets both (a sync re-download, a naive unzip),
+  or a filesystem that records no creation time, can make an older draft look
+  new and get reported. It also misses two cases: a draft first written before
+  you turned learning on and rewritten in place afterwards, and drafts written
+  between two opt-ins when you turn off the scope you enabled first — global on,
+  project on, global off moves the cutoff forward to the project's date.
+- **Only instincts are built.** The candidate format reserves other artifact
+  types — `skill`, `command`, `agent`, `eval` and a repository-convention patch
+  — but nothing can materialize or activate them yet, and nothing proposes them
+  today.
+- **Turning learning off does not erase stored messages at once.** The recent
+  message text kept in the session record while learning was on stays there
+  until the next time a session stops or compacts, which is when the record is
+  rewritten without it.
+- **The curator does not read session transcripts.** Its batches are built
+  from observations, diaries, reflections and recalls; each run's manifest
+  records transcript summaries as unavailable (`source_not_implemented`).
+- **Not on the dashboard yet:** rolling an activated instinct back to the
+  version it replaced (activation keeps that version under `.backups/`, but
+  nothing restores it for you); a preview of a materialized draft file (read it at the path `learn drafts`
+  prints); promoting several candidates to global at once; and the curator's run
+  manifests (they are under `learning/curator-runs/`).
