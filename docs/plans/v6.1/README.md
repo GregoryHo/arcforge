@@ -10,6 +10,7 @@
 | [`wp-f/`](wp-f/) | 6.1.1 量測回合的七份 preflight 讀數，從被 gitignore 的快取複製出來（D-021、D-045 的證據） |
 | [`wp-s/`](wp-s/) | 6.2.0 量測回合的五份 preflight 讀數（四支 scenario，no-bootstrap 分 V1、V2），從被 gitignore 的快取複製出來（D-047 的證據） |
 | [`wp-g-post-install.md`](wp-g-post-install.md) | 6.1.1 安裝後查核（release-4、hooks-8、GitHub 來源的 hook 驗證）與兩個 6.1.2 候選 |
+| [`post-release-6.2.0.md`](post-release-6.2.0.md) | 6.2.0 發版後查核與 6.1 roadmap 收尾 |
 
 ## 事項編號
 
