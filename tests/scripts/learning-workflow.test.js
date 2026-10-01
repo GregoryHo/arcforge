@@ -501,6 +501,25 @@ describe('learn workflow CLI surface', () => {
     );
   });
 
+  // B-13 / D-038: a saved instinct creates no candidate, so it is never
+  // activatable and never injected — and the save says so, for either source.
+  it.each([
+    'manual',
+    'reflection',
+  ])('a --source %s save says it will not reach future sessions', (source) => {
+    const out = runCli(
+      ['learn', 'instinct', 'save', `note-${source}`, '--project', 'p', '--source', source].concat([
+        '--trigger',
+        't',
+        '--action',
+        'a',
+      ]),
+      home,
+    );
+    expect(out).toMatch(/not injected into future sessions/);
+    expect(out).toMatch(/cannot be activated/);
+  });
+
   it('caps a reflection-sourced instinct below the manual cap', () => {
     const manual = runCli(
       [

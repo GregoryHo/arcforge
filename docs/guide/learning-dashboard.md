@@ -136,6 +136,14 @@ one is an inference about you rather than something you stated. Either way
 confidence only sorts and caps — it is never a threshold that activates
 anything.
 
+An instinct you save this way — by hand, or from a reflection with
+`--source reflection` — is a note, not a behavior change. Saving creates no
+candidate, so it never enters the review loop below: it cannot be activated and
+it is never injected into a future session, and the save command says so when it
+writes the file. Only an instinct activated from a reviewed candidate is
+injected. The cost is real: a rule you state outright does not reach your next
+session through this path.
+
 An auto-detected instinct is a proposal, not a fact, so you can push back on it:
 
 ```bash

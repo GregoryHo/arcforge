@@ -182,6 +182,12 @@ function runInstinct(action, args, project, asJson) {
       `${result.isNew ? 'Created' : 'Updated'} instinct: ${result.path} ` +
         `(confidence: ${result.confidence.toFixed(2)})`,
     );
+    // B-13 / D-038: a saved instinct creates no candidate, so nothing can
+    // activate it — say so, or the user believes a stated rule took effect.
+    console.log(
+      'A saved instinct is a note: it cannot be activated and is not injected into ' +
+        'future sessions. Only an instinct activated from a reviewed candidate is.',
+    );
     return;
   }
   if (action === 'confirm' || action === 'contradict') {
