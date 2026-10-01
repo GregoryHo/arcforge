@@ -222,7 +222,7 @@ After editing the two `.jsx` files, regenerate the `.js` artifacts:
 npm run build:website
 ```
 
-The babel output is committed to the repo and deployed as-is: the site is served by **Cloudflare Workers Builds** (`wrangler.jsonc`), which redeploys `website/` on every merge to `main` and runs no build of its own. So `.jsx` and `.js` must match in the same commit, and the release PR's merge is what puts the new version label live — verify it in the Workers Builds history, then on the page (see `.claude/rules/website.md`). Don't hand-edit the `.js` files — the babel transform also touches surrounding output and an out-of-band edit drifts from what `build:website` would produce next time.
+The babel output is committed to the repo and deployed as-is: the site is served by **Cloudflare Workers Builds** (`wrangler.jsonc`), which builds `website/` on every push (previews for branches, production for `main`) and runs no build of its own. So `.jsx` and `.js` must match in the same commit, and the release PR's merge is what puts the new version label live — verify it as the `Workers Builds: arcforge` check run on the merge commit, then on the page at `https://arcforge.greghojob.workers.dev/` (see `.claude/rules/website.md`). Don't hand-edit the `.js` files — the babel transform also touches surrounding output and an out-of-band edit drifts from what `build:website` would produce next time.
 
 Verify with a single grep after bumping + building:
 
