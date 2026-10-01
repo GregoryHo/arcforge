@@ -1668,7 +1668,7 @@ A/B, or compare was run.
 
 依 D-021，本輪只重跑主體在上次快照後有變動、或儀器修復本來就要讀的 scenario。快照
 `evals/benchmarks/2026-10-01.json`（= `latest.json`）於 **2026-10-01T01:16:02Z** 生成（該檔後來被同日的
-6.2.0 量測輪覆寫，此版留在 `v6.1.1` tag），
+6.2.0 量測輪覆寫，此版復原為 `2026-10-01-v6.1.1.json`），
 程式碼等同 main 合入 #206（儀器修復：#170 隔離漏洞、refusal-as-trial 計分等）與 #213
 （權限回歸修正）之後。本次快照未帶 `--since`（無 `result_filter`），每列依 scenario
 Version 與執行條件分池（eval B-8）。
@@ -1771,16 +1771,18 @@ README 與 `docs/guide/skills-reference.md` 已照此更新。spec-before-code �
 `skills/core/learning/SKILL.md` 加的一句話（#234）；scenario 修改來自 WP-S（#235、#238），
 其中 spec-before-code 的 A5 依 D-043（grader 不執行 trial 產出）改成靜態檢查。快照
 `evals/benchmarks/2026-10-01.json`（= `latest.json`）於 **2026-10-01T09:13:37Z** 生成，
-覆寫了同日稍早 6.1.1 量測輪的同名檔案；6.1.1 那一版留在 `v6.1.1` tag。本次快照同樣未帶
+覆寫了同日稍早 6.1.1 量測輪的同名檔案（引擎對同日快照只留一份）；6.1.1 那一版從 `v6.1.1`
+tag 復原為 `evals/benchmarks/2026-10-01-v6.1.1.json` 與 `raw/2026-10-01-v6.1.1.json`，
+`eval history` 只列日期檔名所以不會列出它，但 repo 裡兩份都在。本次快照同樣未帶
 `--since`，每列依 scenario Version 與執行條件分池（eval B-8）。本輪的發現由 D-047 記錄。
 
 **條件**：與 6.1.1 量測輪相同——`--model 'opus[1m]' --effort xhigh`、isolation
 `isolated`、`--setting-sources project,local`、`--dangerously-skip-permissions`、不帶
 `--plugin-dir`（skill 以 `--skill-file` 注入）、trial ceiling 900 s。每支先跑 k=3 的
 preflight。本輪共 **55 個 live session**（預算 70）：no-bootstrap V1 preflight 3、learning
-3 + 10、spec-before-code 3 + 20、no-bootstrap V2 3 + 10、supersede preflight 3。四支的
-preflight 讀數從被 gitignore 的快取複製到 `docs/plans/v6.1/wp-s/`；其中 no-bootstrap-unasked
-那一份是 V1 的 BLOCK，V2 的 PASS 讀數未複製。
+3 + 10、spec-before-code 3 + 20、no-bootstrap V2 3 + 10、supersede preflight 3。五份
+preflight 讀數從被 gitignore 的快取複製到 `docs/plans/v6.1/wp-s/`：四支各一份，
+no-bootstrap-unasked 另分 V1 的 BLOCK（`.v1.json`）與 V2 的 PASS（`.v2.json`）兩份。
 
 ### A/B 結果（皆先過 preflight k=3 PASS，baseline 0%）
 

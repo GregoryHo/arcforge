@@ -1,0 +1,1628 @@
+{
+  "generated": "2026-10-01T01:16:02.561Z",
+  "by_claim_type": {
+    "discriminative-lift": {
+      "scenarios": 17,
+      "trials": 125
+    },
+    "non-regression": {
+      "scenarios": 4,
+      "trials": 20
+    }
+  },
+  "evals": {
+    "eval-brainstorming-alternatives-before-build": {
+      "scope": "skill",
+      "claim_type": "discriminative-lift",
+      "grader": "code",
+      "trials": 10,
+      "error_trials": 0,
+      "pass_rate": 0.6,
+      "avg_score": 0.9,
+      "stddev": 0.13,
+      "ci95": {
+        "lower": 0.81,
+        "upper": 0.99,
+        "width": 0.18
+      },
+      "pass_at_k": true,
+      "pass_all_k": false,
+      "last_run": "2026-08-15T05:43:18.845Z",
+      "metrics": {
+        "duration_ms": {
+          "count": 10,
+          "avg": 148533.4,
+          "min": 110154,
+          "max": 287072,
+          "total": 1485334
+        },
+        "input_tokens": {
+          "count": 10,
+          "avg": 16.9,
+          "min": 10,
+          "max": 44,
+          "total": 169
+        },
+        "output_tokens": {
+          "count": 10,
+          "avg": 4692.9,
+          "min": 2682,
+          "max": 13491,
+          "total": 46929
+        }
+      },
+      "compared": {
+        "baseline": {
+          "count": 10,
+          "avg": 0.48,
+          "stddev": 0.18,
+          "min": 0.25,
+          "max": 0.75,
+          "ci95": {
+            "lower": 0.34,
+            "upper": 0.61,
+            "width": 0.26
+          },
+          "passRate": 0
+        },
+        "treatment": {
+          "count": 10,
+          "avg": 0.9,
+          "stddev": 0.13,
+          "min": 0.75,
+          "max": 1,
+          "ci95": {
+            "lower": 0.81,
+            "upper": 0.99,
+            "width": 0.18
+          },
+          "passRate": 0.6
+        },
+        "delta": 0.43,
+        "delta_ci": {
+          "lower": 0.27,
+          "upper": 0.58,
+          "width": 0.3
+        },
+        "verdict": "IMPROVED",
+        "verdict_policy": "delta",
+        "metrics": {
+          "duration_ms": {
+            "baseline_avg": 332266.3,
+            "treatment_avg": 148533.4,
+            "delta": -183732.9,
+            "regression": false
+          },
+          "input_tokens": {
+            "baseline_avg": 71.1,
+            "treatment_avg": 16.9,
+            "delta": -54.2,
+            "regression": false
+          },
+          "output_tokens": {
+            "baseline_avg": 13169.6,
+            "treatment_avg": 4692.9,
+            "delta": -8476.7,
+            "regression": false
+          }
+        }
+      }
+    },
+    "eval-code-review-answering-feedback": {
+      "scope": "skill",
+      "claim_type": "non-regression",
+      "grader": "code",
+      "trials": 5,
+      "error_trials": 0,
+      "pass_rate": 0.8,
+      "avg_score": 0.95,
+      "stddev": 0.11,
+      "ci95": {
+        "lower": 0.81,
+        "upper": 1,
+        "width": 0.28
+      },
+      "pass_at_k": true,
+      "pass_all_k": false,
+      "last_run": "2026-08-15T03:27:32.927Z",
+      "metrics": {
+        "duration_ms": {
+          "count": 5,
+          "avg": 78306.4,
+          "min": 49035,
+          "max": 130570,
+          "total": 391532
+        },
+        "input_tokens": {
+          "count": 5,
+          "avg": 570.6,
+          "min": 10,
+          "max": 1014,
+          "total": 2853
+        },
+        "output_tokens": {
+          "count": 5,
+          "avg": 3575.8,
+          "min": 2565,
+          "max": 5027,
+          "total": 17879
+        }
+      },
+      "compared": {
+        "baseline": {
+          "count": 5,
+          "avg": 0.9,
+          "stddev": 0.14,
+          "min": 0.75,
+          "max": 1,
+          "ci95": {
+            "lower": 0.73,
+            "upper": 1,
+            "width": 0.34
+          },
+          "passRate": 0.6
+        },
+        "treatment": {
+          "count": 5,
+          "avg": 0.95,
+          "stddev": 0.11,
+          "min": 0.75,
+          "max": 1,
+          "ci95": {
+            "lower": 0.81,
+            "upper": 1,
+            "width": 0.28
+          },
+          "passRate": 0.8
+        },
+        "delta": 0.05,
+        "delta_ci": {
+          "lower": -0.14,
+          "upper": 0.24,
+          "width": 0.37
+        },
+        "verdict": "REGRESSED",
+        "verdict_policy": "non-regression",
+        "metrics": {
+          "duration_ms": {
+            "baseline_avg": 82521.4,
+            "treatment_avg": 78306.4,
+            "delta": -4215,
+            "regression": false
+          },
+          "input_tokens": {
+            "baseline_avg": 8.8,
+            "treatment_avg": 570.6,
+            "delta": 561.8,
+            "regression": true
+          },
+          "output_tokens": {
+            "baseline_avg": 1984,
+            "treatment_avg": 3575.8,
+            "delta": 1591.8,
+            "regression": false
+          }
+        }
+      }
+    },
+    "eval-code-review-range-fidelity": {
+      "scope": "skill",
+      "claim_type": "non-regression",
+      "grader": "code",
+      "trials": 5,
+      "error_trials": 0,
+      "pass_rate": 1,
+      "avg_score": 1,
+      "stddev": 0,
+      "ci95": {
+        "lower": 1,
+        "upper": 1,
+        "width": 0
+      },
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-08-15T03:13:25.771Z",
+      "metrics": {
+        "duration_ms": {
+          "count": 5,
+          "avg": 88149.8,
+          "min": 73569,
+          "max": 99784,
+          "total": 440749
+        },
+        "input_tokens": {
+          "count": 5,
+          "avg": 7.6,
+          "min": 6,
+          "max": 8,
+          "total": 38
+        },
+        "output_tokens": {
+          "count": 5,
+          "avg": 2182.6,
+          "min": 1843,
+          "max": 2521,
+          "total": 10913
+        }
+      },
+      "compared": {
+        "baseline": {
+          "count": 5,
+          "avg": 0.73,
+          "stddev": 0.28,
+          "min": 0.33,
+          "max": 1,
+          "ci95": {
+            "lower": 0.39,
+            "upper": 1,
+            "width": 0.69
+          },
+          "passRate": 0.4
+        },
+        "treatment": {
+          "count": 5,
+          "avg": 1,
+          "stddev": 0,
+          "min": 1,
+          "max": 1,
+          "ci95": {
+            "lower": 1,
+            "upper": 1,
+            "width": 0
+          },
+          "passRate": 1
+        },
+        "delta": 0.27,
+        "delta_ci": {
+          "lower": -0.08,
+          "upper": 0.61,
+          "width": 0.69
+        },
+        "verdict": "PASS",
+        "verdict_policy": "non-regression",
+        "metrics": {
+          "duration_ms": {
+            "baseline_avg": 133424,
+            "treatment_avg": 88149.8,
+            "delta": -45274.2,
+            "regression": false
+          },
+          "input_tokens": {
+            "baseline_avg": 6,
+            "treatment_avg": 7.6,
+            "delta": 1.6,
+            "regression": false
+          },
+          "output_tokens": {
+            "baseline_avg": 1830,
+            "treatment_avg": 2182.6,
+            "delta": 352.6,
+            "regression": false
+          }
+        }
+      }
+    },
+    "eval-code-review-two-axis": {
+      "scope": "skill",
+      "claim_type": "discriminative-lift",
+      "grader": "mixed",
+      "trials": 10,
+      "error_trials": 0,
+      "pass_rate": 1,
+      "avg_score": 1,
+      "stddev": 0,
+      "ci95": {
+        "lower": 1,
+        "upper": 1,
+        "width": 0
+      },
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-08-15T06:04:16.941Z",
+      "metrics": {
+        "duration_ms": {
+          "count": 10,
+          "avg": 262442.1,
+          "min": 35943,
+          "max": 414138,
+          "total": 2624421
+        },
+        "input_tokens": {
+          "count": 10,
+          "avg": 14.7,
+          "min": 2,
+          "max": 32,
+          "total": 147
+        },
+        "output_tokens": {
+          "count": 10,
+          "avg": 6825.2,
+          "min": 2697,
+          "max": 11938,
+          "total": 68252
+        }
+      },
+      "compared": {
+        "baseline": {
+          "count": 10,
+          "avg": 0.6,
+          "stddev": 0,
+          "min": 0.6,
+          "max": 0.6,
+          "ci95": {
+            "lower": 0.6,
+            "upper": 0.6,
+            "width": 0
+          },
+          "passRate": 0
+        },
+        "treatment": {
+          "count": 10,
+          "avg": 1,
+          "stddev": 0,
+          "min": 1,
+          "max": 1,
+          "ci95": {
+            "lower": 1,
+            "upper": 1,
+            "width": 0
+          },
+          "passRate": 1
+        },
+        "delta": 0.4,
+        "delta_ci": {
+          "lower": 0.4,
+          "upper": 0.4,
+          "width": 0
+        },
+        "verdict": "IMPROVED",
+        "metrics": {
+          "duration_ms": {
+            "baseline_avg": 187425.3,
+            "treatment_avg": 262442.1,
+            "delta": 75016.8,
+            "regression": false
+          },
+          "input_tokens": {
+            "baseline_avg": 18.9,
+            "treatment_avg": 14.7,
+            "delta": -4.2,
+            "regression": false
+          },
+          "output_tokens": {
+            "baseline_avg": 7282.6,
+            "treatment_avg": 6825.2,
+            "delta": -457.4,
+            "regression": false
+          }
+        }
+      }
+    },
+    "eval-compacting-persist-before-compact": {
+      "scope": "skill",
+      "claim_type": "non-regression",
+      "grader": "mixed",
+      "trials": 5,
+      "error_trials": 0,
+      "pass_rate": 1,
+      "avg_score": 0.96,
+      "stddev": 0.09,
+      "ci95": {
+        "lower": 0.85,
+        "upper": 1,
+        "width": 0.22
+      },
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-08-15T04:48:00.661Z",
+      "metrics": {
+        "duration_ms": {
+          "count": 5,
+          "avg": 110764,
+          "min": 65571,
+          "max": 134555,
+          "total": 553820
+        },
+        "input_tokens": {
+          "count": 5,
+          "avg": 13.2,
+          "min": 12,
+          "max": 16,
+          "total": 66
+        },
+        "output_tokens": {
+          "count": 5,
+          "avg": 3859.8,
+          "min": 3244,
+          "max": 4200,
+          "total": 19299
+        }
+      }
+    },
+    "eval-d1-bare-cli-invocation": {
+      "scope": "workflow",
+      "claim_type": "non-regression",
+      "grader": "mixed",
+      "trials": 5,
+      "error_trials": 0,
+      "pass_rate": 0.8,
+      "avg_score": 0.93,
+      "stddev": 0.15,
+      "ci95": {
+        "lower": 0.75,
+        "upper": 1,
+        "width": 0.37
+      },
+      "pass_at_k": true,
+      "pass_all_k": false,
+      "last_run": "2026-08-15T04:58:43.268Z",
+      "metrics": {
+        "duration_ms": {
+          "count": 5,
+          "avg": 134065.4,
+          "min": 87195,
+          "max": 170447,
+          "total": 670327
+        },
+        "input_tokens": {
+          "count": 5,
+          "avg": 24,
+          "min": 20,
+          "max": 32,
+          "total": 120
+        },
+        "output_tokens": {
+          "count": 5,
+          "avg": 4577.4,
+          "min": 3379,
+          "max": 6000,
+          "total": 22887
+        }
+      }
+    },
+    "eval-debugging-root-cause-first": {
+      "scope": "skill",
+      "claim_type": "discriminative-lift",
+      "grader": "mixed",
+      "trials": 5,
+      "error_trials": 0,
+      "pass_rate": 1,
+      "avg_score": 1,
+      "stddev": 0,
+      "ci95": {
+        "lower": 1,
+        "upper": 1,
+        "width": 0
+      },
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-08-15T04:03:32.286Z",
+      "metrics": {
+        "duration_ms": {
+          "count": 5,
+          "avg": 174413.4,
+          "min": 158542,
+          "max": 195306,
+          "total": 872067
+        },
+        "input_tokens": {
+          "count": 5,
+          "avg": 25.6,
+          "min": 22,
+          "max": 28,
+          "total": 128
+        },
+        "output_tokens": {
+          "count": 5,
+          "avg": 5476,
+          "min": 4888,
+          "max": 6430,
+          "total": 27380
+        }
+      }
+    },
+    "eval-diagramming-obsidian-unverified-save-claim": {
+      "scope": "skill",
+      "claim_type": "discriminative-lift",
+      "grader": "code",
+      "trials": 5,
+      "error_trials": 0,
+      "pass_rate": 0.2,
+      "avg_score": 0.8,
+      "stddev": 0.11,
+      "ci95": {
+        "lower": 0.66,
+        "upper": 0.94,
+        "width": 0.28
+      },
+      "pass_at_k": true,
+      "pass_all_k": false,
+      "last_run": "2026-09-30T11:40:39.002Z",
+      "metrics": {
+        "duration_ms": {
+          "count": 5,
+          "avg": 362650.2,
+          "min": 308898,
+          "max": 432819,
+          "total": 1813251
+        },
+        "input_tokens": {
+          "count": 5,
+          "avg": 34.4,
+          "min": 26,
+          "max": 42,
+          "total": 172
+        },
+        "output_tokens": {
+          "count": 5,
+          "avg": 33285.6,
+          "min": 30743,
+          "max": 41032,
+          "total": 166428
+        }
+      },
+      "compared": {
+        "baseline": {
+          "count": 5,
+          "avg": 0.6,
+          "stddev": 0.14,
+          "min": 0.5,
+          "max": 0.75,
+          "ci95": {
+            "lower": 0.43,
+            "upper": 0.77,
+            "width": 0.34
+          },
+          "passRate": 0
+        },
+        "treatment": {
+          "count": 5,
+          "avg": 0.8,
+          "stddev": 0.11,
+          "min": 0.75,
+          "max": 1,
+          "ci95": {
+            "lower": 0.66,
+            "upper": 0.94,
+            "width": 0.28
+          },
+          "passRate": 0.2
+        },
+        "delta": 0.2,
+        "delta_ci": {
+          "lower": 0.01,
+          "upper": 0.39,
+          "width": 0.37
+        },
+        "verdict": "IMPROVED",
+        "verdict_policy": "delta",
+        "other_pools": [
+          {
+            "arm": "baseline",
+            "conditions": {
+              "model": null,
+              "effort": null,
+              "trialTimeoutMs": null,
+              "maxTurns": null,
+              "pluginDir": null,
+              "isolation": null
+            },
+            "rows": 10
+          },
+          {
+            "arm": "treatment",
+            "conditions": {
+              "model": null,
+              "effort": null,
+              "trialTimeoutMs": null,
+              "maxTurns": null,
+              "pluginDir": null,
+              "isolation": null
+            },
+            "rows": 9
+          }
+        ],
+        "metrics": {
+          "duration_ms": {
+            "baseline_avg": 159563.8,
+            "treatment_avg": 362650.2,
+            "delta": 203086.4,
+            "regression": true
+          },
+          "input_tokens": {
+            "baseline_avg": 22,
+            "treatment_avg": 34.4,
+            "delta": 12.4,
+            "regression": false
+          },
+          "output_tokens": {
+            "baseline_avg": 16622,
+            "treatment_avg": 33285.6,
+            "delta": 16663.6,
+            "regression": true
+          }
+        }
+      },
+      "by_model": {
+        "opus[1m]": {
+          "trials": 5,
+          "pass_rate": 0.2,
+          "avg_score": 0.8,
+          "last_run": "2026-09-30T11:40:39.002Z"
+        }
+      },
+      "other_pools": [
+        {
+          "conditions": {
+            "model": null,
+            "effort": null,
+            "trialTimeoutMs": null,
+            "maxTurns": null,
+            "pluginDir": null,
+            "isolation": null
+          },
+          "rows": 9
+        }
+      ]
+    },
+    "eval-dispatching-report-not-evidence": {
+      "scope": "skill",
+      "claim_type": "discriminative-lift",
+      "grader": "mixed",
+      "trials": 4,
+      "error_trials": 1,
+      "pass_rate": 1,
+      "avg_score": 0.93,
+      "stddev": 0.08,
+      "ci95": {
+        "lower": 0.8,
+        "upper": 1,
+        "width": 0.26
+      },
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-08-15T04:19:18.208Z",
+      "metrics": {
+        "duration_ms": {
+          "count": 4,
+          "avg": 144086,
+          "min": 111343,
+          "max": 182833,
+          "total": 576344
+        },
+        "input_tokens": {
+          "count": 4,
+          "avg": 20,
+          "min": 16,
+          "max": 24,
+          "total": 80
+        },
+        "output_tokens": {
+          "count": 4,
+          "avg": 6369,
+          "min": 5784,
+          "max": 7170,
+          "total": 25476
+        }
+      },
+      "warning": "NOTE: k=4, confidence intervals are wide"
+    },
+    "eval-evaluating-cross-condition-validity": {
+      "scope": "skill",
+      "claim_type": "discriminative-lift",
+      "grader": "model",
+      "trials": 5,
+      "error_trials": 0,
+      "pass_rate": 1,
+      "avg_score": 1,
+      "stddev": 0,
+      "ci95": {
+        "lower": 1,
+        "upper": 1,
+        "width": 0
+      },
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-08-15T04:35:08.673Z",
+      "metrics": {
+        "duration_ms": {
+          "count": 5,
+          "avg": 106992,
+          "min": 70498,
+          "max": 145043,
+          "total": 534960
+        },
+        "input_tokens": {
+          "count": 5,
+          "avg": 13.6,
+          "min": 12,
+          "max": 16,
+          "total": 68
+        },
+        "output_tokens": {
+          "count": 5,
+          "avg": 4030,
+          "min": 3263,
+          "max": 5389,
+          "total": 20150
+        }
+      }
+    },
+    "eval-executing-verify-decides-done": {
+      "scope": "skill",
+      "claim_type": "discriminative-lift",
+      "grader": "code",
+      "trials": 20,
+      "error_trials": 0,
+      "pass_rate": 1,
+      "avg_score": 1,
+      "stddev": 0,
+      "ci95": {
+        "lower": 1,
+        "upper": 1,
+        "width": 0
+      },
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-08-15T07:41:48.353Z",
+      "metrics": {
+        "duration_ms": {
+          "count": 20,
+          "avg": 309455.25,
+          "min": 184366,
+          "max": 430848,
+          "total": 6189105
+        },
+        "input_tokens": {
+          "count": 20,
+          "avg": 67.3,
+          "min": 32,
+          "max": 254,
+          "total": 1346
+        },
+        "output_tokens": {
+          "count": 20,
+          "avg": 12879.65,
+          "min": 8741,
+          "max": 19026,
+          "total": 257593
+        }
+      },
+      "compared": {
+        "baseline": {
+          "count": 20,
+          "avg": 0.75,
+          "stddev": 0.44,
+          "min": 0,
+          "max": 1,
+          "ci95": {
+            "lower": 0.54,
+            "upper": 0.96,
+            "width": 0.42
+          },
+          "passRate": 0.75
+        },
+        "treatment": {
+          "count": 20,
+          "avg": 1,
+          "stddev": 0,
+          "min": 1,
+          "max": 1,
+          "ci95": {
+            "lower": 1,
+            "upper": 1,
+            "width": 0
+          },
+          "passRate": 1
+        },
+        "delta": 0.25,
+        "delta_ci": {
+          "lower": 0.04,
+          "upper": 0.46,
+          "width": 0.42
+        },
+        "verdict": "IMPROVED",
+        "verdict_policy": "delta",
+        "metrics": {
+          "duration_ms": {
+            "baseline_avg": 248660.25,
+            "treatment_avg": 309455.25,
+            "delta": 60795,
+            "regression": false
+          },
+          "input_tokens": {
+            "baseline_avg": 59.95,
+            "treatment_avg": 67.3,
+            "delta": 7.35,
+            "regression": false
+          },
+          "output_tokens": {
+            "baseline_avg": 8110.85,
+            "treatment_avg": 12879.65,
+            "delta": 4768.8,
+            "regression": false
+          }
+        }
+      }
+    },
+    "eval-finishing-verify-before-options": {
+      "scope": "skill",
+      "claim_type": "discriminative-lift",
+      "grader": "mixed",
+      "trials": 5,
+      "error_trials": 0,
+      "pass_rate": 1,
+      "avg_score": 1,
+      "stddev": 0,
+      "ci95": {
+        "lower": 1,
+        "upper": 1,
+        "width": 0
+      },
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-09-30T11:53:21.012Z",
+      "metrics": {
+        "duration_ms": {
+          "count": 5,
+          "avg": 13737.6,
+          "min": 11816,
+          "max": 15747,
+          "total": 68688
+        },
+        "input_tokens": {
+          "count": 5,
+          "avg": 6.8,
+          "min": 6,
+          "max": 8,
+          "total": 34
+        },
+        "output_tokens": {
+          "count": 5,
+          "avg": 1011.4,
+          "min": 828,
+          "max": 1204,
+          "total": 5057
+        }
+      },
+      "compared": {
+        "baseline": {
+          "count": 5,
+          "avg": 0.29,
+          "stddev": 0,
+          "min": 0.29,
+          "max": 0.29,
+          "ci95": {
+            "lower": 0.29,
+            "upper": 0.29,
+            "width": 0
+          },
+          "passRate": 0
+        },
+        "treatment": {
+          "count": 5,
+          "avg": 1,
+          "stddev": 0,
+          "min": 1,
+          "max": 1,
+          "ci95": {
+            "lower": 1,
+            "upper": 1,
+            "width": 0
+          },
+          "passRate": 1
+        },
+        "delta": 0.71,
+        "delta_ci": {
+          "lower": 0.71,
+          "upper": 0.71,
+          "width": 0
+        },
+        "verdict": "IMPROVED",
+        "other_pools": [
+          {
+            "arm": "baseline",
+            "conditions": {
+              "model": null,
+              "effort": null,
+              "trialTimeoutMs": null,
+              "maxTurns": null,
+              "pluginDir": null,
+              "isolation": null
+            },
+            "rows": 15
+          },
+          {
+            "arm": "treatment",
+            "conditions": {
+              "model": null,
+              "effort": null,
+              "trialTimeoutMs": null,
+              "maxTurns": null,
+              "pluginDir": null,
+              "isolation": null
+            },
+            "rows": 15
+          }
+        ],
+        "metrics": {
+          "duration_ms": {
+            "baseline_avg": 30022,
+            "treatment_avg": 13737.6,
+            "delta": -16284.4,
+            "regression": false
+          },
+          "input_tokens": {
+            "baseline_avg": 12,
+            "treatment_avg": 6.8,
+            "delta": -5.2,
+            "regression": false
+          },
+          "output_tokens": {
+            "baseline_avg": 2283.4,
+            "treatment_avg": 1011.4,
+            "delta": -1272,
+            "regression": false
+          }
+        }
+      },
+      "by_model": {
+        "opus[1m]": {
+          "trials": 5,
+          "pass_rate": 1,
+          "avg_score": 1,
+          "last_run": "2026-09-30T11:53:21.012Z"
+        }
+      },
+      "other_pools": [
+        {
+          "conditions": {
+            "model": null,
+            "effort": null,
+            "trialTimeoutMs": null,
+            "maxTurns": null,
+            "pluginDir": null,
+            "isolation": null
+          },
+          "rows": 15
+        }
+      ]
+    },
+    "eval-learning-marker-preservation": {
+      "scope": "skill",
+      "claim_type": "discriminative-lift",
+      "grader": "code",
+      "trials": 5,
+      "error_trials": 0,
+      "pass_rate": 0.8,
+      "avg_score": 0.8,
+      "stddev": 0.45,
+      "ci95": {
+        "lower": 0.24,
+        "upper": 1,
+        "width": 1.11
+      },
+      "pass_at_k": true,
+      "pass_all_k": false,
+      "last_run": "2026-08-15T04:24:49.076Z",
+      "metrics": {
+        "duration_ms": {
+          "count": 5,
+          "avg": 140041.6,
+          "min": 106771,
+          "max": 169399,
+          "total": 700208
+        },
+        "input_tokens": {
+          "count": 5,
+          "avg": 28,
+          "min": 26,
+          "max": 34,
+          "total": 140
+        },
+        "output_tokens": {
+          "count": 5,
+          "avg": 6107.2,
+          "min": 4978,
+          "max": 8913,
+          "total": 30536
+        }
+      }
+    },
+    "eval-looping-stale-state-relaunch": {
+      "scope": "skill",
+      "claim_type": "discriminative-lift",
+      "grader": "mixed",
+      "trials": 5,
+      "error_trials": 0,
+      "pass_rate": 1,
+      "avg_score": 0.86,
+      "stddev": 0.08,
+      "ci95": {
+        "lower": 0.77,
+        "upper": 0.96,
+        "width": 0.19
+      },
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-08-15T04:59:27.043Z",
+      "metrics": {
+        "duration_ms": {
+          "count": 5,
+          "avg": 246714.6,
+          "min": 200080,
+          "max": 280450,
+          "total": 1233573
+        },
+        "input_tokens": {
+          "count": 5,
+          "avg": 34,
+          "min": 24,
+          "max": 42,
+          "total": 170
+        },
+        "output_tokens": {
+          "count": 5,
+          "avg": 10779.8,
+          "min": 8818,
+          "max": 12995,
+          "total": 53899
+        }
+      }
+    },
+    "eval-maintaining-obsidian-vault-only-answer": {
+      "scope": "skill",
+      "claim_type": "discriminative-lift",
+      "grader": "mixed",
+      "trials": 5,
+      "error_trials": 0,
+      "pass_rate": 1,
+      "avg_score": 0.8,
+      "stddev": 0,
+      "ci95": {
+        "lower": 0.8,
+        "upper": 0.8,
+        "width": 0
+      },
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-09-30T11:12:29.821Z",
+      "metrics": {
+        "duration_ms": {
+          "count": 5,
+          "avg": 61022.6,
+          "min": 51914,
+          "max": 77085,
+          "total": 305113
+        },
+        "input_tokens": {
+          "count": 5,
+          "avg": 8,
+          "min": 8,
+          "max": 8,
+          "total": 40
+        },
+        "output_tokens": {
+          "count": 5,
+          "avg": 5883.6,
+          "min": 4895,
+          "max": 7429,
+          "total": 29418
+        }
+      },
+      "compared": {
+        "baseline": {
+          "count": 5,
+          "avg": 0.6,
+          "stddev": 0,
+          "min": 0.6,
+          "max": 0.6,
+          "ci95": {
+            "lower": 0.6,
+            "upper": 0.6,
+            "width": 0
+          },
+          "passRate": 0
+        },
+        "treatment": {
+          "count": 5,
+          "avg": 0.8,
+          "stddev": 0,
+          "min": 0.8,
+          "max": 0.8,
+          "ci95": {
+            "lower": 0.8,
+            "upper": 0.8,
+            "width": 0
+          },
+          "passRate": 1
+        },
+        "delta": 0.2,
+        "delta_ci": {
+          "lower": 0.2,
+          "upper": 0.2,
+          "width": 0
+        },
+        "verdict": "IMPROVED",
+        "other_pools": [
+          {
+            "arm": "baseline",
+            "conditions": {
+              "model": null,
+              "effort": null,
+              "trialTimeoutMs": null,
+              "maxTurns": null,
+              "pluginDir": null,
+              "isolation": null
+            },
+            "rows": 5
+          },
+          {
+            "arm": "treatment",
+            "conditions": {
+              "model": null,
+              "effort": null,
+              "trialTimeoutMs": null,
+              "maxTurns": null,
+              "pluginDir": null,
+              "isolation": null
+            },
+            "rows": 5
+          }
+        ],
+        "metrics": {
+          "duration_ms": {
+            "baseline_avg": 42130,
+            "treatment_avg": 61022.6,
+            "delta": 18892.6,
+            "regression": false
+          },
+          "input_tokens": {
+            "baseline_avg": 6,
+            "treatment_avg": 8,
+            "delta": 2,
+            "regression": false
+          },
+          "output_tokens": {
+            "baseline_avg": 3850.2,
+            "treatment_avg": 5883.6,
+            "delta": 2033.4,
+            "regression": false
+          }
+        }
+      },
+      "by_model": {
+        "opus[1m]": {
+          "trials": 5,
+          "pass_rate": 1,
+          "avg_score": 0.8,
+          "last_run": "2026-09-30T11:12:29.821Z"
+        }
+      },
+      "other_pools": [
+        {
+          "conditions": {
+            "model": null,
+            "effort": null,
+            "trialTimeoutMs": null,
+            "maxTurns": null,
+            "pluginDir": null,
+            "isolation": null
+          },
+          "rows": 5
+        }
+      ]
+    },
+    "eval-router-skill-selection": {
+      "scope": "skill",
+      "claim_type": "discriminative-lift",
+      "grader": "mixed",
+      "trials": 10,
+      "error_trials": 0,
+      "pass_rate": 1,
+      "avg_score": 0.94,
+      "stddev": 0.1,
+      "ci95": {
+        "lower": 0.87,
+        "upper": 1,
+        "width": 0.14
+      },
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-08-15T06:04:34.193Z",
+      "metrics": {
+        "duration_ms": {
+          "count": 10,
+          "avg": 90149.3,
+          "min": 42832,
+          "max": 215709,
+          "total": 901493
+        },
+        "input_tokens": {
+          "count": 10,
+          "avg": 20.4,
+          "min": 13,
+          "max": 36,
+          "total": 204
+        },
+        "output_tokens": {
+          "count": 10,
+          "avg": 3455.7,
+          "min": 2256,
+          "max": 6128,
+          "total": 34557
+        }
+      },
+      "compared": {
+        "baseline": {
+          "count": 10,
+          "avg": 0.6,
+          "stddev": 0,
+          "min": 0.6,
+          "max": 0.6,
+          "ci95": {
+            "lower": 0.6,
+            "upper": 0.6,
+            "width": 0
+          },
+          "passRate": 0
+        },
+        "treatment": {
+          "count": 10,
+          "avg": 0.94,
+          "stddev": 0.1,
+          "min": 0.8,
+          "max": 1,
+          "ci95": {
+            "lower": 0.87,
+            "upper": 1,
+            "width": 0.14
+          },
+          "passRate": 1
+        },
+        "delta": 0.34,
+        "delta_ci": {
+          "lower": 0.27,
+          "upper": 0.41,
+          "width": 0.14
+        },
+        "verdict": "IMPROVED",
+        "metrics": {
+          "duration_ms": {
+            "baseline_avg": 57050.4,
+            "treatment_avg": 90149.3,
+            "delta": 33098.9,
+            "regression": false
+          },
+          "input_tokens": {
+            "baseline_avg": 17.1,
+            "treatment_avg": 20.4,
+            "delta": 3.3,
+            "regression": false
+          },
+          "output_tokens": {
+            "baseline_avg": 1890.1,
+            "treatment_avg": 3455.7,
+            "delta": 1565.6,
+            "regression": false
+          }
+        }
+      }
+    },
+    "eval-sessions-handover-completeness": {
+      "scope": "skill",
+      "claim_type": "discriminative-lift",
+      "grader": "mixed",
+      "trials": 5,
+      "error_trials": 0,
+      "pass_rate": 1,
+      "avg_score": 1,
+      "stddev": 0,
+      "ci95": {
+        "lower": 1,
+        "upper": 1,
+        "width": 0
+      },
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-08-15T08:09:38.087Z",
+      "metrics": {
+        "duration_ms": {
+          "count": 5,
+          "avg": 85597.6,
+          "min": 74576,
+          "max": 100262,
+          "total": 427988
+        },
+        "input_tokens": {
+          "count": 5,
+          "avg": 12,
+          "min": 10,
+          "max": 14,
+          "total": 60
+        },
+        "output_tokens": {
+          "count": 5,
+          "avg": 2257.2,
+          "min": 1943,
+          "max": 2707,
+          "total": 11286
+        }
+      },
+      "compared": {
+        "baseline": {
+          "count": 5,
+          "avg": 0.71,
+          "stddev": 0,
+          "min": 0.71,
+          "max": 0.71,
+          "ci95": {
+            "lower": 0.71,
+            "upper": 0.71,
+            "width": 0
+          },
+          "passRate": 0
+        },
+        "treatment": {
+          "count": 5,
+          "avg": 1,
+          "stddev": 0,
+          "min": 1,
+          "max": 1,
+          "ci95": {
+            "lower": 1,
+            "upper": 1,
+            "width": 0
+          },
+          "passRate": 1
+        },
+        "delta": 0.29,
+        "delta_ci": {
+          "lower": 0.29,
+          "upper": 0.29,
+          "width": 0
+        },
+        "verdict": "IMPROVED",
+        "metrics": {
+          "duration_ms": {
+            "baseline_avg": 111572,
+            "treatment_avg": 85597.6,
+            "delta": -25974.4,
+            "regression": false
+          },
+          "input_tokens": {
+            "baseline_avg": 14.8,
+            "treatment_avg": 12,
+            "delta": -2.8,
+            "regression": false
+          },
+          "output_tokens": {
+            "baseline_avg": 2712.8,
+            "treatment_avg": 2257.2,
+            "delta": -455.6,
+            "regression": false
+          }
+        }
+      }
+    },
+    "eval-speccing-spec-before-code": {
+      "scope": "skill",
+      "claim_type": "discriminative-lift",
+      "grader": "code",
+      "trials": 10,
+      "error_trials": 0,
+      "pass_rate": 0,
+      "avg_score": 0.33,
+      "stddev": 0,
+      "ci95": {
+        "lower": 0.33,
+        "upper": 0.33,
+        "width": 0
+      },
+      "pass_at_k": false,
+      "pass_all_k": false,
+      "last_run": "2026-09-07T00:39:08.418Z",
+      "metrics": {
+        "duration_ms": {
+          "count": 10,
+          "avg": 195672.2,
+          "min": 153107,
+          "max": 258115,
+          "total": 1956722
+        },
+        "input_tokens": {
+          "count": 10,
+          "avg": 22,
+          "min": 18,
+          "max": 26,
+          "total": 220
+        },
+        "output_tokens": {
+          "count": 10,
+          "avg": 4209.1,
+          "min": 3140,
+          "max": 5516,
+          "total": 42091
+        }
+      }
+    },
+    "eval-speccing-supersede-not-overwrite": {
+      "scope": "skill",
+      "claim_type": "discriminative-lift",
+      "grader": "code",
+      "trials": 5,
+      "error_trials": 0,
+      "pass_rate": 0.8,
+      "avg_score": 0.95,
+      "stddev": 0.11,
+      "ci95": {
+        "lower": 0.81,
+        "upper": 1,
+        "width": 0.28
+      },
+      "pass_at_k": true,
+      "pass_all_k": false,
+      "last_run": "2026-09-07T00:19:50.720Z",
+      "metrics": {
+        "duration_ms": {
+          "count": 5,
+          "avg": 186026.8,
+          "min": 140025,
+          "max": 251009,
+          "total": 930134
+        },
+        "input_tokens": {
+          "count": 5,
+          "avg": 19.2,
+          "min": 16,
+          "max": 22,
+          "total": 96
+        },
+        "output_tokens": {
+          "count": 5,
+          "avg": 5126.2,
+          "min": 3965,
+          "max": 6324,
+          "total": 25631
+        }
+      }
+    },
+    "eval-tdd-test-first-gate": {
+      "scope": "skill",
+      "claim_type": "discriminative-lift",
+      "grader": "mixed",
+      "trials": 11,
+      "error_trials": 0,
+      "pass_rate": 0.73,
+      "avg_score": 0.89,
+      "stddev": 0.15,
+      "ci95": {
+        "lower": 0.79,
+        "upper": 1,
+        "width": 0.21
+      },
+      "pass_at_k": true,
+      "pass_all_k": false,
+      "last_run": "2026-08-15T05:46:34.095Z",
+      "metrics": {
+        "duration_ms": {
+          "count": 11,
+          "avg": 288014,
+          "min": 243127,
+          "max": 332146,
+          "total": 3168154
+        },
+        "input_tokens": {
+          "count": 6,
+          "avg": 64.33,
+          "min": 42,
+          "max": 82,
+          "total": 386
+        },
+        "output_tokens": {
+          "count": 6,
+          "avg": 13118.83,
+          "min": 8481,
+          "max": 15611,
+          "total": 78713
+        }
+      },
+      "compared": {
+        "baseline": {
+          "count": 11,
+          "avg": 0.14,
+          "stddev": 0.07,
+          "min": 0,
+          "max": 0.17,
+          "ci95": {
+            "lower": 0.09,
+            "upper": 0.19,
+            "width": 0.09
+          },
+          "passRate": 0
+        },
+        "treatment": {
+          "count": 11,
+          "avg": 0.89,
+          "stddev": 0.15,
+          "min": 0.67,
+          "max": 1,
+          "ci95": {
+            "lower": 0.79,
+            "upper": 1,
+            "width": 0.21
+          },
+          "passRate": 0.73
+        },
+        "delta": 0.76,
+        "delta_ci": {
+          "lower": 0.65,
+          "upper": 0.86,
+          "width": 0.22
+        },
+        "verdict": "IMPROVED",
+        "metrics": {
+          "duration_ms": {
+            "baseline_avg": 125819.73,
+            "treatment_avg": 288014,
+            "delta": 162194.27,
+            "regression": true
+          },
+          "input_tokens": {
+            "baseline_avg": 40.18,
+            "treatment_avg": 64.33,
+            "delta": 24.15,
+            "regression": false
+          },
+          "output_tokens": {
+            "baseline_avg": 5779.36,
+            "treatment_avg": 13118.83,
+            "delta": 7339.47,
+            "regression": true
+          }
+        }
+      }
+    },
+    "eval-writing-skills-recipe-over-prohibition": {
+      "scope": "skill",
+      "claim_type": "discriminative-lift",
+      "grader": "mixed",
+      "trials": 5,
+      "error_trials": 0,
+      "pass_rate": 1,
+      "avg_score": 1,
+      "stddev": 0,
+      "ci95": {
+        "lower": 1,
+        "upper": 1,
+        "width": 0
+      },
+      "pass_at_k": true,
+      "pass_all_k": true,
+      "last_run": "2026-08-15T03:47:54.177Z",
+      "metrics": {
+        "duration_ms": {
+          "count": 5,
+          "avg": 241802.8,
+          "min": 195234,
+          "max": 323011,
+          "total": 1209014
+        },
+        "input_tokens": {
+          "count": 5,
+          "avg": 162.2,
+          "min": 19,
+          "max": 715,
+          "total": 811
+        },
+        "output_tokens": {
+          "count": 5,
+          "avg": 9037.8,
+          "min": 6450,
+          "max": 11367,
+          "total": 45189
+        }
+      }
+    }
+  }
+}
