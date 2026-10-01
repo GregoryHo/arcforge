@@ -2,14 +2,9 @@
 
 **Contract version**: 2 (2026-10-01)
 
-**Changelog**: v2 — the Action × Status matrix gains `approved → dismiss` and `materialized → materialize` (D-036, product learning B-15), the table now shows the `deactivate` column `lifecycle.js` already enforced, and `name` is checked at ingestion (D-035, B-14). v1 — the first-slice contract.
+**Changelog**: v2 — (1) the Action × Status matrix gains `approved → dismiss` and `materialized → materialize` (D-036, product learning B-15); the table also shows the `deactivate` column `lifecycle.js` already enforced, and `name` is checked at ingestion (D-035, B-14); (2) rejection retention bounds the live `rejections.jsonl` only — rotated records move to `rejections.archive.jsonl` and are never pruned by the engine (D-041; see *Retention, rotation, and recovery*). v1 — every revision before this line existed.
 
 **Parent index**: [`./README.md`](./README.md)
-
-**Contract version**: 2 — 2026-10-01: rejection retention bounds the live
-`rejections.jsonl` only; rotated records move to `rejections.archive.jsonl` and
-are never pruned by the engine (see *Retention, rotation, and recovery*).
-Version 1 is every revision before that line existed.
 
 ## Responsibility
 
