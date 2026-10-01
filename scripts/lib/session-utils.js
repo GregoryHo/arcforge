@@ -10,7 +10,9 @@ const {
   sanitizeSessionId,
   sanitizeProjectName,
 } = require('./utils');
-const { draftIsStale } = require('./diary-capture');
+
+// The marker the diary draft template leaves in every unfilled section.
+const DIARY_PLACEHOLDER = 'TO BE ENRICHED';
 
 function getDiaryPath(project, date, sessionId) {
   return path.join(getDateDiariesDir(project, date), `diary-${sanitizeSessionId(sessionId)}.md`);
@@ -55,13 +57,22 @@ function parseProcessedLog(logPath) {
 
 /**
  * Whether a file in a diary date directory counts toward reflection (B-8,
- * D-042): a diary, enriched — not a draft still carrying the TO BE ENRICHED
- * placeholders. scanDiaries and determineReflectStrategy share this so the
- * strategy picker and the scan agree about the same directory (#169).
+ * D-042): a regular file, read successfully, with no TO BE ENRICHED
+ * placeholder. Anything unreadable — a dangling symlink, a file gone between
+ * readdir and read, permission denied — is uncountable, never enriched.
+ * scanDiaries and determineReflectStrategy share this so the strategy picker,
+ * the scan and the Stop nudge agree about the same directory (#169).
  */
 function isCountableDiary(dirPath, fileName) {
   if (!fileName.startsWith('diary-') || !fileName.endsWith('.md')) return false;
-  return !draftIsStale(path.join(dirPath, fileName));
+  const filePath = path.join(dirPath, fileName);
+  try {
+    if (!fs.statSync(filePath).isFile()) return false;
+    return !fs.readFileSync(filePath, 'utf-8').includes(DIARY_PLACEHOLDER);
+  } catch {
+    // Unreadable: uncountable — counting it would claim content nobody can read.
+    return false;
+  }
 }
 
 /**

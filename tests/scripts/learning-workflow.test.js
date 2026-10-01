@@ -202,6 +202,24 @@ describe('learning-workflow reflection scan', () => {
     expect(result.diaries.some((d) => d.includes('diary-stub-'))).toBe(false);
   });
 
+  it('an unreadable diary is not counted as enriched', () => {
+    writeDiaries(REFLECT_READY_MIN_DIARIES - 1);
+    const dir = path.join(home, 'diaries', project, '2026-08-14');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.symlinkSync(path.join(dir, 'missing-target.md'), path.join(dir, 'diary-dangling.md'));
+    const locked = path.join(dir, 'diary-locked.md');
+    fs.writeFileSync(locked, '## Decisions Made\n\n- chose X\n');
+    fs.chmodSync(locked, 0o000);
+    try {
+      const result = scanForReflection(project);
+      expect(result.count).toBe(REFLECT_READY_MIN_DIARIES - 1);
+      expect(result.ready).toBe(false);
+      expect(checkReflectReady(project).ready).toBe(false);
+    } finally {
+      fs.chmodSync(locked, 0o644);
+    }
+  });
+
   it('stubs do not move the strategy picker past the enriched count', () => {
     writeStubDrafts(6);
     expect(scanForReflection(project).strategy).toBe('recent_window');
