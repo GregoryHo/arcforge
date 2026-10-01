@@ -2,7 +2,9 @@
  * worktree-paths.js - Canonical path helper for arcforge worktrees.
  *
  * Worktrees live under ~/.arcforge/worktrees/<project>-<hash>-<epic>/
- * where <hash> is a 6-char sha256 prefix of the absolute project root.
+ * where <hash> is a 6-char sha256 prefix of the absolute project root —
+ * the repository's top level (resolveProjectRoot), not the directory a
+ * command ran in.
  * Storing worktrees outside the git tree keeps them from polluting the
  * working copy; the hash prevents collisions between same-named projects.
  *
@@ -13,6 +15,7 @@
 
 const crypto = require('node:crypto');
 const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 const { sanitizeProjectName, getArcforgeHome } = require('./utils');
 
 const ARCFORGE_HOME_NAME = '.arcforge';
@@ -104,6 +107,57 @@ function getWorktreePath(projectRoot, specId, epicId, homeDir) {
 }
 
 /**
+ * Resolve the project root worktree paths derive from: the repository's top
+ * level as `git rev-parse --show-toplevel` reports it, so every directory of
+ * one repository derives the same paths. Outside a git repository the
+ * directory itself is used, and `fallbackReason` says why — callers append it
+ * to any error the fallback leads to.
+ *
+ * @param {string} dir - Directory the command ran in.
+ * @returns {{root: string, fallbackReason: string|null}}
+ */
+function resolveProjectRoot(dir) {
+  if (typeof dir !== 'string' || !dir) {
+    throw new TypeError('resolveProjectRoot requires a non-empty directory string');
+  }
+  const resolved = path.resolve(dir);
+  try {
+    const top = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+      cwd: resolved,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+    return { root: top, fallbackReason: null };
+  } catch (err) {
+    const detail = String(err.stderr || err.message).trim();
+    return {
+      root: resolved,
+      fallbackReason: `git rev-parse --show-toplevel failed in ${resolved} (${detail}); used ${resolved} as the project root`,
+    };
+  }
+}
+
+/**
+ * Every path a worktree may live at, in lookup order: the path derived from
+ * the repository root, then the path the pre-6.2 derivation produced from the
+ * directory the command ran in (so worktrees created by 6.1.x and earlier
+ * from a subdirectory stay findable). Deduplicated when the two agree.
+ *
+ * @param {string} projectRoot - Absolute repository root (resolveProjectRoot).
+ * @param {string} cwd - Absolute directory the command ran in.
+ * @param {string|null} specId
+ * @param {string} epicId
+ * @returns {string[]}
+ */
+function getWorktreeLookupPaths(projectRoot, cwd, specId, epicId) {
+  const paths = [
+    getWorktreePath(projectRoot, specId, epicId),
+    getWorktreePath(cwd, specId, epicId),
+  ];
+  return [...new Set(paths)];
+}
+
+/**
  * Parse an absolute worktree path back into {project, hash, epic}.
  * Returns null if the path is not under the worktree root or the basename
  * does not match the expected pattern.
@@ -159,6 +213,8 @@ module.exports = {
   getWorktreeRoot,
   hashRepoPath,
   getWorktreePath,
+  getWorktreeLookupPaths,
   parseWorktreePath,
   getEpicBranchName,
+  resolveProjectRoot,
 };

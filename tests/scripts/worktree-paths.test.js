@@ -1,14 +1,59 @@
 const crypto = require('node:crypto');
+const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 
 const {
   getWorktreeRoot,
   hashRepoPath,
   getWorktreePath,
+  getWorktreeLookupPaths,
   parseWorktreePath,
   getEpicBranchName,
+  resolveProjectRoot,
 } = require('../../scripts/lib/worktree-paths');
+
+describe('resolveProjectRoot', () => {
+  let tmp;
+
+  beforeEach(() => {
+    tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'wtp-root-')));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it('returns the git top level when called from a subdirectory', () => {
+    execFileSync('git', ['init', '-q'], { cwd: tmp });
+    const sub = path.join(tmp, 'a', 'b');
+    fs.mkdirSync(sub, { recursive: true });
+    expect(resolveProjectRoot(sub)).toEqual({ root: tmp, fallbackReason: null });
+  });
+
+  it('falls back to the directory itself outside a git repo, with the reason', () => {
+    const result = resolveProjectRoot(tmp);
+    expect(result.root).toBe(tmp);
+    expect(result.fallbackReason).toMatch(/git rev-parse --show-toplevel/);
+  });
+});
+
+describe('getWorktreeLookupPaths', () => {
+  it('lists the root-derived path first, then the old cwd-derived path', () => {
+    const paths = getWorktreeLookupPaths('/repo', '/repo/packages/api', null, 'x');
+    expect(paths).toEqual([
+      getWorktreePath('/repo', null, 'x'),
+      getWorktreePath('/repo/packages/api', null, 'x'),
+    ]);
+  });
+
+  it('returns one path when the command ran at the root', () => {
+    expect(getWorktreeLookupPaths('/repo', '/repo/', null, 'x')).toEqual([
+      getWorktreePath('/repo', null, 'x'),
+    ]);
+  });
+});
 
 describe('getWorktreeRoot', () => {
   it('returns ~/.arcforge/worktrees', () => {

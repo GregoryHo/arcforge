@@ -215,4 +215,61 @@ describe('worktree-generic', () => {
       expect(fs.existsSync(extPath)).toBe(true);
     });
   });
+
+  // #202: paths derive from the repository root, not the directory the
+  // command ran in; paths from the older cwd derivation stay findable.
+  describe('root-derived paths', () => {
+    let subdir;
+
+    beforeEach(() => {
+      subdir = path.join(root, 'packages', 'api');
+      fs.mkdirSync(subdir, { recursive: true });
+    });
+
+    test('CLI: add from a subdirectory, remove by name from the root', () => {
+      const added = runCli(['worktree', 'add', 'spike-auth', '--json'], subdir);
+      expect(added.exitCode).toBe(0);
+      const wtPath = JSON.parse(added.stdout).path;
+      expect(wtPath).toBe(getWorktreePath(root, null, 'spike-auth'));
+
+      const removed = runCli(['worktree', 'remove', 'spike-auth', '--json'], root);
+      expect(removed.exitCode).toBe(0);
+      expect(JSON.parse(removed.stdout).path).toBe(wtPath);
+      expect(fs.existsSync(wtPath)).toBe(false);
+    });
+
+    test('a worktree at the old cwd-derived path is listed and removable', () => {
+      const oldPath = getWorktreePath(subdir, null, 'legacy');
+      fs.mkdirSync(getWorktreeRoot(), { recursive: true });
+      runGit(['worktree', 'add', '-q', '-b', 'legacy', oldPath], root);
+
+      const listed = listWorktrees({ projectRoot: root }).worktrees.find(
+        (wt) => wt.path === oldPath,
+      );
+      expect(listed?.kind).toBe('generic');
+
+      const out = removeGenericWorktree({ projectRoot: subdir, target: 'legacy' });
+      expect(out.path).toBe(oldPath);
+      expect(fs.existsSync(oldPath)).toBe(false);
+      expect(runGit(['worktree', 'list', '--porcelain'], root)).not.toContain(oldPath);
+    });
+
+    test('remove by name reports every path it checked when none exists', () => {
+      let message = '';
+      try {
+        removeGenericWorktree({ projectRoot: subdir, target: 'ghost' });
+      } catch (err) {
+        message = err.message;
+      }
+      expect(message).toContain(getWorktreePath(root, null, 'ghost'));
+      expect(message).toContain(getWorktreePath(subdir, null, 'ghost'));
+    });
+
+    test('outside a git repository, add fails naming why the root fell back', () => {
+      const outside = fs.mkdtempSync(path.join(testHome, 'not-a-repo-'));
+      expect(() => addGenericWorktree({ projectRoot: outside, name: 'x' })).toThrow(
+        /git rev-parse --show-toplevel/,
+      );
+    });
+  });
 });

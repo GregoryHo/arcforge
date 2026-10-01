@@ -110,8 +110,20 @@ way into someone's `find .`. Keeping them under your home directory means the
 repository you are looking at is only ever the repository.
 
 The `<hash>` is derived from the project's absolute path, so two projects with
-the same directory name never collide. You do not need to construct these paths —
-ask `worktree list` and use what it reports.
+the same directory name never collide. The project is the repository root as
+`git rev-parse --show-toplevel` reports it, not the directory you ran the command
+in: a worktree added from `packages/api/` is listed and removed by name from the
+root or any other subdirectory alike. Outside a git repository the current
+directory is used instead, and any resulting error says so.
+
+Worktrees created by arcforge 6.1.x or earlier were placed by the directory the
+command ran in. They stay usable: `worktree list` shows them as `generic`, and
+`worktree remove <name>` checks that older path too when nothing exists at the
+root-derived one — run it from the directory you originally added from, or pass
+the absolute path that `worktree list` reports.
+
+You do not need to construct these paths — ask `worktree list` and use what it
+reports.
 
 ## Using one
 
