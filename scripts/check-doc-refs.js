@@ -20,10 +20,15 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { SKILL_BUCKETS } = require('../tests/scripts/skill-tree');
 const { lintDoc } = require('./lib/doc-refs');
 
 const repoRoot = path.resolve(__dirname, '..');
+
+// The lifecycle buckets, read as data from their single source (the jest and
+// pytest guards read the same file).
+const { buckets: SKILL_BUCKETS } = JSON.parse(
+  fs.readFileSync(path.join(repoRoot, 'tests', 'skill-buckets.json'), 'utf8'),
+);
 
 // Shipped doc surface to lint. Markdown only — code files are checked by their
 // own contract tests, not prose linting.

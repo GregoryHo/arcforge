@@ -43,8 +43,8 @@ Consequences to work with, not around:
   into it rather than keeping a placeholder.
 - Guards resolve skills through the bucket. The bucket list and the shipped
   bucket have a single point, `tests/skill-buckets.json`: `tests/scripts/skill-tree.js`
-  reads it for jest and `check:docs`, `tests/skills/test_skill_structure.py` for
-  pytest, and `tests/scripts/skill-tree.test.js` fails on a second hardcoded
+  reads it for jest, `scripts/check-doc-refs.js` for `check:docs`, and
+  `tests/skills/test_skill_structure.py` for pytest, and `tests/scripts/skill-tree.test.js` fails on a second hardcoded
   copy. The D8 lint treats a bucket segment as generic tree access and keys on
   the skill name inside it.
 

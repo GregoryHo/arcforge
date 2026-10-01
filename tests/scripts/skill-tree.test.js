@@ -3,8 +3,8 @@ const path = require('node:path');
 const { REPO_ROOT, SKILLS_DIR, SKILL_BUCKETS } = require('./skill-tree');
 
 // The bucket list has ONE source, tests/skill-buckets.json. skill-tree.js reads
-// it for the jest consumers (and check-doc-refs.js), test_skill_structure.py
-// reads it for pytest. A second hardcoded copy would let a new bucket be
+// it for the jest consumers, check-doc-refs.js reads it directly, and
+// test_skill_structure.py reads it for pytest. A second hardcoded copy would let a new bucket be
 // recognized by one guard and silently ignored by another.
 const MANIFEST = JSON.parse(
   fs.readFileSync(path.join(REPO_ROOT, 'tests', 'skill-buckets.json'), 'utf8'),

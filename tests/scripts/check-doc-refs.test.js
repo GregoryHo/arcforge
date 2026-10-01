@@ -1,3 +1,4 @@
+const fs = require('node:fs');
 const path = require('node:path');
 
 const { gatherFiles } = require('../../scripts/check-doc-refs');
@@ -16,5 +17,19 @@ describe('check:docs scan set', () => {
     '.claude/agents/README.md',
   ])('scans %s', (rel) => {
     expect(scanned).toContain(rel);
+  });
+});
+
+// The runner ships under scripts/; tests/ does not. It reads the bucket list
+// from tests/skill-buckets.json as data, never by requiring a test helper.
+describe('check:docs dependencies', () => {
+  const source = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'check-doc-refs.js'), 'utf8');
+
+  it('requires nothing under tests/', () => {
+    expect(source).not.toMatch(/require\(['"][^'"]*tests\//);
+  });
+
+  it('reads the bucket list from tests/skill-buckets.json', () => {
+    expect(source).toMatch(/'skill-buckets\.json'/);
   });
 });
