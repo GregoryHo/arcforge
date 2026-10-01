@@ -386,7 +386,7 @@ function SkillRow({name,desc,color,t}) {
 // ─── Hooks ───
 function Hooks({theme:t}) {
   const hooks = [
-    ['SessionStart','session-tracker/inject-context','Injects the previous session summary and any activated instincts.'],
+    ['SessionStart','session-tracker/inject-context','Injects activated instincts and pending notices; never the previous session.'],
     ['SessionStart','session-tracker/start','Creates the session file; lazily starts the observer daemon.'],
     ['UserPromptSubmit','user-message-counter','Counts user messages toward the diary threshold.'],
     ['PreToolUse','secrets-guard','Warn-only scan for hardcoded credentials in edits, writes, and git commit command text (not staged content).'],

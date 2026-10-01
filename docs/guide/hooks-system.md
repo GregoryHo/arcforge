@@ -12,7 +12,7 @@ session stops. What follows is what each one actually does to your session.
 
 | Event | Registration | What you notice |
 |-------|--------------|-----------------|
-| SessionStart | `inject-context` | A short summary of what carried over — activated instincts, pending actions, recent sessions |
+| SessionStart | `inject-context` | A short summary of what carried over — activated instincts, pending actions, session aliases |
 | SessionStart | `session-start` | Nothing; it creates this session's record in the background |
 | UserPromptSubmit | `user-message-counter` | Nothing; it counts your messages |
 | PreToolUse | `secrets-guard` | A warning if an edit, a write, or a `git commit` command looks like it contains a credential |
@@ -56,8 +56,16 @@ It is a suggestion. Nothing compacts unless you say so.
 ### `inject-context` — what carries into a new session
 
 At the start of a session — and again after a compaction rebuilds the context —
-this hook injects a short summary: which instincts are active, whether anything
-is waiting for your review, and where the previous session left off.
+this hook injects a short summary: which instincts you have activated, and
+whether anything is waiting for you — a diary draft ready for review, a finished
+loop run, or drafts that never got enriched. You also see how many session
+aliases this project has and how many patterns were promoted to global in the
+past week.
+
+It does not tell the new session where the previous one left off. Each session
+leaves a record (see below), but no hook reads that record back into a new
+session. To hand work over to your next session, write a handover with
+`/arcforge:sessions`.
 
 If you have never enabled learning, there are no instincts and this is close to
 silent.
