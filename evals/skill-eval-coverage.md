@@ -53,7 +53,7 @@ p7-benchmark-evidence.md「協定修正案」）。
 
 | skill | 現行證據 | 出處 |
 |---|---|---|
-| speccing | spec-before-code **+0.67 CI[0.67, 0.67] IMPROVED**（注入模態）；supersede-not-overwrite unmet-but-covered（baseline ceiling）；plugin 路由下自行觸發 **0/10**（routing-control 5/5 為對照，#179 確認），請以 `/arcforge:speccing` 呼叫；no-bootstrap-unasked（sdd B-6，D-020）已撰寫、尚未量測 | 6.1.0 ab k=10；6.1.1 WP-E `claude plugin eval`（見 6.1.1 量測輪）；no-bootstrap-unasked 無量測 |
+| speccing | spec-before-code **+0.67 CI[0.67, 0.67] IMPROVED**（注入模態）；supersede-not-overwrite unmet-but-covered（baseline ceiling）；plugin 路由下自行觸發 **0/10**（routing-control 5/5 為對照，#179 確認），請以 `/arcforge:speccing` 呼叫；no-bootstrap-unasked（sdd B-6，D-020）已撰寫；V1 於 2026-10-01 preflight 觸及 baseline 上限（3/3）而 BLOCK，已重新設計一次（V2：A2 改為也檢查 doc 檔新增的 roadmap／decision 章節），尚未量測 | 6.1.0 ab k=10；6.1.1 WP-E `claude plugin eval`（見 6.1.1 量測輪）；no-bootstrap-unasked V2 無量測 |
 | tdd | +0.63 CI[0.41, 0.86] | P7 ab |
 | finishing | **+0.71 CI[0.71, 0.71]** | 6.1.1 ab k=5（修復後儀器；P7 +0.54 為修復前池） |
 | code-review | two-axis +0.40；range-fidelity +0.27 non-reg PASS；answering-feedback +0.05 但 non-reg **REGRESSED**（4/5，D-026） | P7 ab ×3 |
