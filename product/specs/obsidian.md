@@ -103,5 +103,7 @@ verified-save bar predate this log; rationale inline above. Registry mechanics
 live behind the CLI per [cli](cli.md) B-8.
 
 - **D-028** — the `index.md` rebuild is a write step of LINK mode (B-5).
+- **D-045** — that rebuild ships without harness evidence: its scenario's
+  baseline is at ceiling (B-5).
 - **D-034** — *proposed*: the provenance pair applies where the vault adopts raw
   sources (B-4).

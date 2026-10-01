@@ -451,7 +451,7 @@ reverse one, append a superseding entry (see AGENTS.md).
 ### D-015 — `speccing` is model-invoked, and never bootstraps unasked
 - Date: 2026-09-03
 - Version: 6.1.0
-- Status: Accepted
+- Status: Accepted · partially superseded by D-044
 - Decision: `speccing` is model-invoked (no `disable-model-invocation`), and its
   body gates creation of product state behind an explicit user request: it
   offers once and starts only on a yes, and it does not apply at all in a repo
@@ -1053,3 +1053,54 @@ reverse one, append a superseding entry (see AGENTS.md).
 - Cost accepted: the A5 floor can still pass on code that reads right and does
   not run. The floor ships with the scenario's other three rubric repairs
   (#157, #162, #168) in one `## Version` bump and a k=10 rerun of both arms.
+
+### D-044 — `speccing` is user-invoked in practice
+- Date: 2026-10-01
+- Version: 6.1.1
+- Supersedes: D-015 (clause 1)
+- Status: Accepted
+- Decision: The README and the skills-reference guide say users invoke
+  `speccing` as `/arcforge:speccing`; its description is not edited in 6.1.1,
+  and a description redesign, if any, is a 6.2.0 question with its own
+  measurement. D-015's second clause — the skill never bootstraps product
+  state unasked — stays in force.
+- Why: D-024's re-measurement ran through `claude plugin eval` on a
+  verified-clean instrument: in 0 of 10 runs did the model invoke `speccing`,
+  or make any Skill call at all. A control case on the same instrument invoked
+  `arcforge:brainstorming` in 5 of 5 runs, so headless plugin routing works and
+  the low rate is specific to `speccing`'s description, not to the instrument.
+  D-024 pre-registered the default for that outcome — document the skill as
+  user-invoked in practice rather than tune its description — and D-015's
+  premise, that the skill fires on its own mid-task, does not hold.
+- Verification: `docs/plans/v6.1/wp-e/speccing-trigger.aggregate.json` (0/10)
+  and `docs/plans/v6.1/wp-e/routing-control.aggregate.json` (5/5);
+  `docs/plans/v6.1/wp-e/isolation-check.aggregate.json` is the two-session
+  isolation check D-025 required, passed on both runs.
+- Residual: the skill's frontmatter still lacks `disable-model-invocation`, so
+  the host still offers `speccing` to the model and it may still fire on its
+  own, rarely. Adding the key is a `skills/` edit, left to 6.2.0.
+
+### D-045 — The four ceiling BLOCKs in 6.1.1's round are findings about the scenarios
+- Date: 2026-10-01
+- Version: 6.1.1
+- Status: Accepted
+- Decision: The preflight BLOCKs of `eval-executing-verify-decides-done`,
+  `eval-router-skill-selection`,
+  `eval-maintaining-obsidian-audit-runs-lint-script` and
+  `eval-maintaining-obsidian-link-rebuilds-index` are recorded as findings,
+  not as failures of their skills: those skills keep their last evidence,
+  marked as measured on the pre-repair instrument, and redesigning each
+  scenario for the clean instrument is backlog work.
+- Why: On the repaired instrument the baseline already passes these four
+  scenarios, so a good skill and a useless one score the same and no delta
+  could be read (eval B-3: a BLOCK is a verdict about the scenario, not the
+  change). The rest of D-021's round measured: finishing +0.71, diagramming
+  +0.20 and maintaining-obsidian vault-only +0.20, all IMPROVED. Calling the
+  four BLOCKs regressions would blame the skills for a ceiling the instrument
+  repair exposed; quietly dropping them would hide that four pools carry no
+  fresh evidence.
+- Residual: D-028's behavior, the `index.md` rebuild in LINK mode, ships with
+  a passing structural test but without harness evidence, because the
+  scenario written to measure it has its baseline at ceiling.
+- Cost accepted: about 34 live sessions spent on a first batch run on an
+  instrument that denied tools before #213, all discarded.
