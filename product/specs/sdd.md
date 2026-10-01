@@ -14,9 +14,10 @@ shipped to nobody. This area is the method itself, packaged as the user-facing
 product stay merged with the code they describe, and the reasoning behind a
 choice survives the reversal of that choice.
 
-The user-visible outcome: an agent that keeps a project's product ledger honest
-without being told to, and that never invents one for a project that does not
-want it.
+The user-visible outcome: an agent that, once the user invokes
+`/arcforge:speccing`, keeps a project's product ledger honest, and that never
+invents one for a project that does not want it. Under plugin routing the skill
+does not fire on its own in practice (D-044).
 
 ## Scope
 
@@ -106,11 +107,13 @@ roadmap row carries the marker.
 
 - **D-014** — the method ships as a user-facing skill at 6.1.0, rather than
   staying an internal practice.
-- **D-015** — `speccing` is model-invoked, and never bootstraps product state
-  unasked (B-6).
+- **D-015** — `speccing` never bootstraps product state unasked (B-6); its
+  model-invoked clause is superseded by D-044.
 - **D-016** — no arcforge product CLI group at 6.1.0; the method is prose (B-8).
 - **D-024** — `speccing` is re-measured under plugin routing before its
   description or its documented invocation changes; a reversal of D-015 would
   be its own entry (B-6).
+- **D-044** — `speccing` is user-invoked in practice: documented as
+  `/arcforge:speccing`, description unchanged in 6.1.1 (Purpose).
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).

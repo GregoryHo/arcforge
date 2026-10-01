@@ -1,0 +1,14 @@
+{
+  "scenario_hash": "21a613c70fd71f8d",
+  "scenario_name": "eval-finishing-verify-before-options",
+  "model": "opus[1m]",
+  "max_turns": 20,
+  "plugin_dir": false,
+  "effort": "xhigh",
+  "trial_timeout_ms": 900000,
+  "pass_rate": 0,
+  "k": 3,
+  "verdict": "PASS",
+  "reason": "Baseline pass rate 0% < 80% — scenario is discriminative. Proceed with arcforge eval ab.",
+  "timestamp": "2026-09-30T11:48:16.881Z"
+}

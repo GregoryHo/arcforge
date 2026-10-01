@@ -1,0 +1,14 @@
+{
+  "scenario_hash": "091682c484dd86c7",
+  "scenario_name": "eval-diagramming-obsidian-unverified-save-claim",
+  "model": "opus[1m]",
+  "max_turns": 40,
+  "plugin_dir": false,
+  "effort": "xhigh",
+  "trial_timeout_ms": 1800000,
+  "pass_rate": 0,
+  "k": 3,
+  "verdict": "PASS",
+  "reason": "Baseline pass rate 0% < 80% — scenario is discriminative. Proceed with arcforge eval ab.",
+  "timestamp": "2026-09-30T11:02:18.478Z"
+}

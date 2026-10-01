@@ -1,0 +1,14 @@
+{
+  "scenario_hash": "223fe220d5b4dc34",
+  "scenario_name": "eval-executing-verify-decides-done",
+  "model": "opus[1m]",
+  "max_turns": 45,
+  "plugin_dir": false,
+  "effort": "xhigh",
+  "trial_timeout_ms": 900000,
+  "pass_rate": 1,
+  "k": 3,
+  "verdict": "BLOCK",
+  "reason": "Baseline pass rate 100% >= 80% ceiling — scenario is not discriminative. Redesign the scenario to be harder.",
+  "timestamp": "2026-09-30T10:58:06.374Z"
+}

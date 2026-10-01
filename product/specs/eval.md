@@ -197,6 +197,8 @@ its rationale is inline at B-10.
   flag is informational for an injected treatment (B-4).
 - **D-027** — floor assertions keep the weight the engine gives them today,
   written down before 6.1.1's results are read (B-5).
+- **D-045** — the four ceiling BLOCKs of 6.1.1's round are findings about the
+  scenarios, not the skills; those skills keep their pre-repair evidence (B-3).
 - **D-020** — 6.2.0 carries the scenario rubric fixes with their own
   measurement round (B-8).
 - **D-043** — *proposed*: graders never execute trial output (B-6, B-7).

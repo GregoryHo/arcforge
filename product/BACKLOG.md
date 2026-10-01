@@ -91,6 +91,10 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 - **plugin-eval-corpus-migration** — move more routing scenarios onto
   `claude plugin eval` once D-025's isolation check has run and the feature
   leaves `experimental` · needs: D-025.
+- **redesign-executing-verify-decides-done** — redesign `eval-executing-verify-decides-done` for the clean instrument · needs: D-045.
+- **redesign-router-skill-selection** — redesign `eval-router-skill-selection` for the clean instrument · needs: D-045.
+- **redesign-maintaining-obsidian-audit-runs-lint-script** — redesign `eval-maintaining-obsidian-audit-runs-lint-script` for the clean instrument · needs: D-045.
+- **redesign-maintaining-obsidian-link-rebuilds-index** — redesign `eval-maintaining-obsidian-link-rebuilds-index` for the clean instrument · needs: D-045.
 
 ## Hooks
 

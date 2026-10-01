@@ -1,0 +1,14 @@
+{
+  "scenario_hash": "d765a547fc3d202a",
+  "scenario_name": "eval-maintaining-obsidian-vault-only-answer",
+  "model": "opus[1m]",
+  "max_turns": 40,
+  "plugin_dir": false,
+  "effort": "xhigh",
+  "trial_timeout_ms": 900000,
+  "pass_rate": 0,
+  "k": 3,
+  "verdict": "PASS",
+  "reason": "Baseline pass rate 0% < 80% — scenario is discriminative. Proceed with arcforge eval ab.",
+  "timestamp": "2026-09-30T11:02:26.965Z"
+}

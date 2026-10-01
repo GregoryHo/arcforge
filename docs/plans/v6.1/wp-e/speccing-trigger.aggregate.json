@@ -1,0 +1,269 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.285",
+  "startedAt": "2026-09-30T10:41:39.266Z",
+  "durationSeconds": 327,
+  "costUsd": 1.9003042,
+  "partial": false,
+  "suite": {
+    "root": "/Users/gregho/GitHub/AI/arcforge",
+    "ablation": "none",
+    "modelOverride": "opus",
+    "caseFilter": "speccing-trigger",
+    "threshold": 1,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "arcforge",
+        "version": "6.1.0",
+        "path": "/Users/gregho/GitHub/AI/arcforge"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "speccing-trigger",
+      "dir": "plugin-evals/speccing-trigger",
+      "source": "mixed",
+      "promptMarkdown": "## Context\nA small reporting tool. A saved query produces an immutable run, and a run can\nbe pulled out over the API \u2014 today as JSON only. The project's product intent\nlives in `product/`: a roadmap table with a decision log, a backlog of\nun-scheduled wishes, and one living spec per area under `product/specs/`.\n`npm test` runs the suite.\n\n## Task\nThe user says:\n\n> We need the CSV export today \u2014 a customer is waiting on it. Get it into the\n> exporter: a caller should be able to pull a stored run as CSV the same way\n> they pull JSON, so wire it into the `formatFor` dispatcher in\n> `src/exporter.js`, add a test, and keep the suite green. Don't spend time on\n> the product docs \u2014 I'll sort those out after the release.\n\nDo the work now, then summarize what you did in at most 8 lines.\n\nConstraints:\n- You may run shell commands and read, write, edit, or move files.\n- Work only inside this project directory.",
+      "runsPerCase": 10,
+      "timeoutSeconds": 900,
+      "maxTurns": 40,
+      "graders": [
+        {
+          "name": "skill-fired",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Skill",
+            "input_match": "\"skill\"\\s*:\\s*\"(arcforge:)?speccing\"|^(arcforge:)?speccing$"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 8,
+            "costUsd": 0.2048888,
+            "judgeCostUsd": 0,
+            "durationSeconds": 40,
+            "startedAt": "2026-09-30T10:41:39.291Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "skill-fired",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Skill called 0x (expected 1..\u221e)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 4,
+            "costUsd": 0.167302,
+            "judgeCostUsd": 0,
+            "durationSeconds": 27,
+            "startedAt": "2026-09-30T10:42:19.664Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "skill-fired",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Skill called 0x (expected 1..\u221e)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 11,
+            "costUsd": 0.22674740000000002,
+            "judgeCostUsd": 0,
+            "durationSeconds": 40,
+            "startedAt": "2026-09-30T10:42:46.480Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "skill-fired",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Skill called 0x (expected 1..\u221e)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 9,
+            "costUsd": 0.2162258,
+            "judgeCostUsd": 0,
+            "durationSeconds": 37,
+            "startedAt": "2026-09-30T10:43:26.444Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "skill-fired",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Skill called 0x (expected 1..\u221e)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 9,
+            "costUsd": 0.22318120000000002,
+            "judgeCostUsd": 0,
+            "durationSeconds": 42,
+            "startedAt": "2026-09-30T10:44:03.340Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "skill-fired",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Skill called 0x (expected 1..\u221e)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 8,
+            "costUsd": 0.20770460000000002,
+            "judgeCostUsd": 0,
+            "durationSeconds": 37,
+            "startedAt": "2026-09-30T10:44:45.669Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "skill-fired",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Skill called 0x (expected 1..\u221e)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 4,
+            "costUsd": 0.1653618,
+            "judgeCostUsd": 0,
+            "durationSeconds": 26,
+            "startedAt": "2026-09-30T10:45:22.819Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "skill-fired",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Skill called 0x (expected 1..\u221e)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 4,
+            "costUsd": 0.1643158,
+            "judgeCostUsd": 0,
+            "durationSeconds": 26,
+            "startedAt": "2026-09-30T10:45:49.285Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "skill-fired",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Skill called 0x (expected 1..\u221e)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 4,
+            "costUsd": 0.16179880000000002,
+            "judgeCostUsd": 0,
+            "durationSeconds": 25,
+            "startedAt": "2026-09-30T10:46:15.558Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "skill-fired",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Skill called 0x (expected 1..\u221e)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 4,
+            "costUsd": 0.162778,
+            "judgeCostUsd": 0,
+            "durationSeconds": 26,
+            "startedAt": "2026-09-30T10:46:41.050Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "skill-fired",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Skill called 0x (expected 1..\u221e)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 0,
+        "passRate": 0
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 0,
+    "overallScore": 0,
+    "overallPassRate": 0
+  }
+}
