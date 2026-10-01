@@ -525,6 +525,9 @@ function runLoop(options) {
   const state = loadLoopState(projectRoot);
   beginRun(state, { pattern: 'tasks', maxRuns, maxCost });
   state.tasks_file = path.relative(projectRoot, tasksPath);
+  // Persist the reset now: a resumed file must read `running` while the first
+  // session works (and after a kill), not the previous run's terminal status.
+  saveLoopState(state, projectRoot);
 
   console.log(`[loop] Starting loop over ${state.tasks_file} (max ${maxRuns} runs)`);
 

@@ -94,6 +94,38 @@ describe('runLoop over a task list', () => {
     expect(markerDuringRun).toBe('~');
   });
 
+  it('persists the resumed status before the first session runs', () => {
+    writeTasks('- [ ] T1 — Resumed\n');
+    const statePath = path.join(tmpDir, '.arcforge-loop.json');
+    fs.writeFileSync(
+      statePath,
+      JSON.stringify({
+        iteration: 3,
+        pattern: 'tasks',
+        started_at: '2026-01-01T00:00:00Z',
+        completed_tasks: ['T0'],
+        failed_tasks: [],
+        errors: [],
+        total_cost: 0,
+        last_progress_at: '2026-01-01T00:05:00Z',
+        status: 'complete',
+        finished_at: '2026-01-01T00:05:00Z',
+      }),
+    );
+    // A monitor reading the file mid-session (or after a kill) must see this
+    // run as running, not the previous run's terminal status.
+    let onDisk = null;
+    spawnSession.mockImplementation(() => {
+      onDisk = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+      return { exitCode: 0, stdout: '', stderr: '', costUsd: 0 };
+    });
+
+    runLoop(options());
+
+    expect(onDisk.status).toBe('running');
+    expect(onDisk.finished_at).toBeNull();
+  });
+
   it('resumes a task left in-progress by a dead run instead of skipping it', () => {
     writeTasks('- [~] T1 — Interrupted\n- [ ] T2 — Later\n');
 
