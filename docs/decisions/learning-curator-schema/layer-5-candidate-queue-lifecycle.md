@@ -1,5 +1,9 @@
 # Layer 5 — Candidate Queue + Lifecycle
 
+**Contract version**: 2 (2026-10-01)
+
+**Changelog**: v2 — the Action × Status matrix gains `approved → dismiss` and `materialized → materialize` (D-036, product learning B-15), the table now shows the `deactivate` column `lifecycle.js` already enforced, and `name` is checked at ingestion (D-035, B-14). v1 — the first-slice contract.
+
 **Parent index**: [`./README.md`](./README.md)
 
 ## Responsibility
@@ -675,6 +679,7 @@ approved
   → dismissed
 
 materialized
+  → materialized   (materialize again: rewrite the draft from the stored record)
   → activated
   → dismissed
   → superseded
@@ -708,16 +713,16 @@ Layer 5 may record successful `materialized`, `activated`, `deactivated`, and `s
 Layer 6 dashboard actions and CLI lifecycle actions must consult this matrix. Layer 5 is the canonical authority — any action handler at any layer must reject requests that violate it. `✓` = action is legal from this status; `✗` = action must be rejected with `policy_violation`.
 
 ```text
-status \ action       │ dismiss │ approve │ materialize │ activate │ promote │ evolve
-─────────────────────────────────────────────────────────────────────────────────────
-pending_review        │   ✓     │   ✓     │     ✗       │    ✗     │   ✓     │   ✓
-needs_more_evidence   │   ✓     │   ✗     │     ✗       │    ✗     │   ✗     │   ✗
-approved              │   ✗     │   ✗     │     ✓       │    ✗     │   ✓     │   ✓
-materialized          │   ✗     │   ✗     │     ✗       │    ✓     │   ✗     │   ✗
-activated             │   ✗     │   ✗     │     ✗       │    ✗     │   ✗     │   ✗
-deactivated           │   ✗     │   ✗     │     ✓       │    ✓     │   ✗     │   ✗
-dismissed             │   ✗     │   ✗     │     ✗       │    ✗     │   ✗     │   ✗
-superseded            │   ✗     │   ✗     │     ✗       │    ✗     │   ✗     │   ✗
+status \ action       │ dismiss │ approve │ materialize │ activate │ promote │ evolve │ deactivate
+──────────────────────────────────────────────────────────────────────────────────────────────────
+pending_review        │   ✓     │   ✓     │     ✗       │    ✗     │   ✓     │   ✓    │    ✗
+needs_more_evidence   │   ✓     │   ✗     │     ✗       │    ✗     │   ✗     │   ✗    │    ✗
+approved              │   ✓     │   ✗     │     ✓       │    ✗     │   ✓     │   ✓    │    ✗
+materialized          │   ✗     │   ✗     │     ✓       │    ✓     │   ✗     │   ✗    │    ✗
+activated             │   ✗     │   ✗     │     ✗       │    ✗     │   ✗     │   ✗    │    ✓
+deactivated           │   ✗     │   ✗     │     ✓       │    ✓     │   ✗     │   ✗    │    ✗
+dismissed             │   ✗     │   ✗     │     ✗       │    ✗     │   ✗     │   ✗    │    ✗
+superseded            │   ✗     │   ✗     │     ✗       │    ✗     │   ✗     │   ✗    │    ✗
 ```
 
 Notes:
@@ -725,6 +730,9 @@ Notes:
 - `promote` and `evolve` are candidate-producing actions, not status transitions on the source candidate. They create a new candidate (global-scoped for `promote`; evolved skill candidate for `evolve`) and add a relationship event on the source. The source candidate's lifecycle status does not change.
 - `materialize` and `activate` require the prior state to be `approved` and `materialized` respectively. The deactivated → materialized / activated path allows re-materializing or re-activating a previously deactivated artifact.
 - `dismiss` is reversible only via re-creating a new candidate; once `dismissed` it is terminal.
+- `approved → dismiss` (v2) retires a verdict that cannot proceed — an artifact type Layer 7 has no renderer for, or a name queued before the ingestion name check. Without it `approved` was a dead end for both.
+- `materialized → materialize` (v2) rewrites the draft from the stored record, so the reviewed content and the file agree after the draft was edited or deleted by hand. Layer 7 hands back the existing draft when it is still intact and writes a fresh materialization beside a stale one, never over it.
+- `deactivate` is the Layer 8 extension (Slice G): legal only from `activated`. The table and `scripts/lib/learning-curator/lifecycle.js` are one matrix, asserted cell by cell by `tests/scripts/learning-curator-lifecycle.test.js`.
 
 ## Relationships
 

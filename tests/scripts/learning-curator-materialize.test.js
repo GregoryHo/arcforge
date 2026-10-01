@@ -180,12 +180,12 @@ describe('L7-1: reject non-approved candidates', () => {
     expect(result.failure.reason).toBe('invalid_lifecycle_status');
   });
 
-  it('rejects materialized candidate', () => {
+  it('admits a materialized candidate, to rewrite its draft (B-15)', () => {
     const result = callMaterialize({
       lifecycle: { status: 'materialized', status_changed_at: 'x' },
     });
-    expect(result.ok).toBe(false);
-    expect(result.failure.reason).toBe('invalid_lifecycle_status');
+    expect(result.ok).toBe(true);
+    expect(result.record.source_candidate.lifecycle_status_at_materialization).toBe('materialized');
   });
 
   it('rejects dismissed candidate', () => {

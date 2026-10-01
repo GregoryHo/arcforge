@@ -260,8 +260,8 @@ function runDrafts({ scope }) {
  * matrix allows to materialize, so re-running is the recovery. Neither
  * prerequisite checked below is transient — no re-run clears an artifact type
  * the curator cannot render, and none clears a name it cannot write to disk —
- * and the matrix allows an `approved` candidate neither to materialize nor to
- * dismiss, so half-landing strands it in a status with no way out. Refusing
+ * so half-landing leaves an approval the reviewer then has to retire with a
+ * second command (`learn reject`, legal from `approved` since B-15). Refusing
  * before the first dispatch is the only outcome that keeps the command
  * all-or-nothing.
  *

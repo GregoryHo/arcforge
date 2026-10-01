@@ -19,12 +19,16 @@
 //  status \ action     | dismiss | approve | materialize | activate | promote | evolve | deactivate
 //  pending_review      |   ✓     |   ✓     |     ✗       |    ✗     |   ✓     |   ✓   |    ✗
 //  needs_more_evidence |   ✓     |   ✗     |     ✗       |    ✗     |   ✗     |   ✗   |    ✗
-//  approved            |   ✗     |   ✗     |     ✓       |    ✗     |   ✓     |   ✓   |    ✗
-//  materialized        |   ✗     |   ✗     |     ✗       |    ✓     |   ✗     |   ✗   |    ✗
+//  approved            |   ✓     |   ✗     |     ✓       |    ✗     |   ✓     |   ✓   |    ✗
+//  materialized        |   ✗     |   ✗     |     ✓       |    ✓     |   ✗     |   ✗   |    ✗
 //  activated           |   ✗     |   ✗     |     ✗       |    ✗     |   ✗     |   ✗   |    ✓
 //  deactivated         |   ✗     |   ✗     |     ✓       |    ✓     |   ✗     |   ✗   |    ✗
 //  dismissed           |   ✗     |   ✗     |     ✗       |    ✗     |   ✗     |   ✗   |    ✗
 //  superseded          |   ✗     |   ✗     |     ✗       |    ✗     |   ✗     |   ✗   |    ✗
+//
+// approved → dismiss and materialized → materialize are B-15 / D-036 (contract
+// version 2): no status a candidate can reach without the reviewer giving up on
+// it is a dead end.
 // ---------------------------------------------------------------------------
 
 // Canonical lifecycle status set (Layer 5 spec — CandidateLifecycleStatus).
@@ -79,8 +83,8 @@ const ACTIONS = Object.freeze(Object.values(LIFECYCLE_ACTION));
 const MATRIX = {
   pending_review: [true, true, false, false, true, true, false],
   needs_more_evidence: [true, false, false, false, false, false, false],
-  approved: [false, false, true, false, true, true, false],
-  materialized: [false, false, false, true, false, false, false],
+  approved: [true, false, true, false, true, true, false],
+  materialized: [false, false, true, true, false, false, false],
   activated: [false, false, false, false, false, false, true],
   deactivated: [false, false, true, true, false, false, false],
   dismissed: [false, false, false, false, false, false, false],

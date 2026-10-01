@@ -260,9 +260,10 @@ those are about the opt-in, not about candidates.)
 
 **Only what is legal is offered.** Each entry carries its `available_actions`,
 straight from the matrix, and a transition outside them is refused with the
-list of what is allowed instead. So `reject` works on a pending candidate but
-not on one you already approved — approving it is a decision, and undoing it is
-not one of the moves.
+list of what is allowed instead. So `reject` works on a pending candidate and
+on one you approved — an approval that cannot go further, such as a candidate of
+a type the engine cannot build, is retired that way — but not on one already
+materialized or activated: those are retired by deactivating.
 
 **`materialize` and `activate` handle instinct candidates.** That is what the
 engine can build today. A candidate of any other artifact type stays in the
@@ -288,8 +289,8 @@ longer allows declining it, the dashboard is named instead of it. The
 single-step commands do the opposite, and dispatch
 first, so what you read is the engine's own refusal and the refusal is recorded.
 Accept is all-or-nothing because half of it cannot be undone — the queue is
-append-only, and an approval it could never build on would be a decision you are
-stuck with.
+append-only, and an approval it could never build on would be a decision you
+would then have to retire with `learn reject`.
 
 On a candidate that is already materialized, `accept` has nothing left to do,
 so it re-reports the draft it already wrote — but only while there is a draft to
@@ -297,20 +298,21 @@ re-report. If the file has been deleted or edited, or the record that named it
 is gone, `accept` refuses and says which, instead of handing back a path that
 does not resolve or an empty list. In that state neither `learn drafts` nor
 `learn inspect` offers you the activation that would refuse: the drafts entry
-points at `learn inspect`, and `learn inspect` says what became of the draft.
-Read a draft, but do not edit it in place: activation checks the draft against
-the content hash recorded when it was written, so an edited draft is one that
-`learn activate` will refuse — and from `materialized` activation is the only
-move the matrix allows, so there is no second `learn materialize` and no
-`learn reject` waiting behind the refusal. Restoring the file to what the
-manifest recorded is what clears it. A candidate holds a second draft only by
-being materialized again after the dashboard deactivated it, and there the
-commands agree on which one counts: the draft `learn drafts` and `learn accept`
-report is the draft `learn activate` consumes.
+points at `learn inspect`, and `learn inspect` says what became of the draft and
+names the way back. Read a draft, but do not edit it in place: activation checks
+the draft against the content hash recorded when it was written, so an edited
+draft is one that `learn activate` will refuse. `learn materialize` on a
+materialized candidate is the way back — the dashboard's Materialize button
+does the same — it writes a fresh draft from the stored record beside the one
+you edited, which is left where you left it, and activation then runs on the
+fresh one. While the draft is intact, the same command hands that draft back
+unchanged. A candidate holds a second draft only by being materialized again,
+and the commands agree on which one counts: the draft `learn drafts` and
+`learn accept` report is the draft `learn activate` consumes.
 
 A retired candidate can lose its draft the same way, and `learn inspect` says so
-there too — but what it offers is different, because `deactivated` is the one
-status the matrix lets both materialize and activate. Activating it again is the
+there too — and from `deactivated` the matrix lets you both materialize and
+activate it again. Activating it again is the
 half that refuses — on the recorded content hash when the file no longer matches
 it, and for want of a usable record when the manifest is gone; materializing it
 again writes a fresh draft and is what `learn inspect` points you at. `learn inbox` prints no

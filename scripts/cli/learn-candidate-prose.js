@@ -127,24 +127,27 @@ function describeStaleDrafts(stale) {
  * `materialization_missing`). The empty-list arm is not cosmetic —
  * `describeStaleDrafts([])` would leave a dangling colon naming nothing.
  *
- * Neither arm names a recovery command, because from `materialized` there is
- * none: the matrix allows only `activate`, and activation is exactly what
- * refuses. That is what separates this from `retiredDraftActions` below, where
- * the matrix still allows a `materialize` that runs.
+ * Both name the recovery: the matrix lets a `materialized` candidate be
+ * materialized again (B-15), which writes a fresh draft from the stored record.
  */
-function staleDraftActions(stale) {
+function staleDraftActions(card, stale) {
+  const recover = `materialize it again to rewrite the draft from the stored record: ${rematerializeCommandFor(card)}`;
   if (stale.length === 0) {
     return [
-      'no usable materialization record remains for this candidate, so there is no draft to review',
-      'activation refuses without a usable record, so there is nothing to activate — ' +
-        'review the queue in: arcforge learn dashboard',
+      'no usable materialization record remains for this candidate, so there is no draft to ' +
+        'review and activation refuses',
+      recover,
     ];
   }
   return [
-    `the recorded draft is not what was written: ${describeStaleDrafts(stale)}`,
-    'activation refuses on the recorded content hash, so there is nothing to activate — ' +
-      'review the queue in: arcforge learn dashboard',
+    `the recorded draft is not what was written: ${describeStaleDrafts(stale)}, so activation ` +
+      'refuses on the recorded content hash',
+    recover,
   ];
+}
+
+function rematerializeCommandFor(card) {
+  return `arcforge learn materialize ${card.candidate_id} --project`;
 }
 
 /**
@@ -205,7 +208,7 @@ function retiredDraftActions(stale) {
  */
 function draftUnavailableActions(card, stale) {
   if (!isMaterializableType(card.artifact_type)) return null;
-  if (card.lifecycle_status === 'materialized') return staleDraftActions(stale);
+  if (card.lifecycle_status === 'materialized') return staleDraftActions(card, stale);
   if (card.lifecycle_status === 'deactivated') return retiredDraftActions(stale);
   return null;
 }
@@ -240,8 +243,13 @@ function inspectCommandFor(card) {
   return `arcforge learn inspect ${card.candidate_id} --project`;
 }
 
+// The two B-15 exits (D-036) are ways out, not next steps: dismissing an
+// approval retires a verdict that cannot proceed, and materializing a
+// materialized candidate again recovers a lost draft. Neither is suggested.
+const EXIT_ONLY = { approved: 'dismiss', materialized: 'materialize' };
+
 function nextCommandFor(card) {
-  const runnable = cliActionsFor(card);
+  const runnable = cliActionsFor(card).filter((a) => EXIT_ONLY[card.lifecycle_status] !== a);
   const action = NEXT_ACTION_PREFERENCE.find((a) => runnable.includes(a));
   if (!action) return inspectCommandFor(card);
   return `arcforge learn ${VERB_FOR_ACTION[action]} ${card.candidate_id} --project`;
@@ -373,12 +381,10 @@ function refusalMessage(result, verb, card) {
  * which is why it ends in "leave it queued" rather than pushing the reviewer to
  * discard something a later renderer could build.
  *
- * The asymmetry with the sibling below is temporal, not about stranding. Both
- * obstacles strand the candidate in the CLI's own terms: from `approved` the
- * matrix allows `materialize`, `promote` and `evolve`, and the CLI can run none
- * of them — `materialize` meets the type refusal, the other two are
- * dashboard-only — so the approval this message recommends is the last CLI move
- * either candidate has. It is still worth recommending here and not there,
+ * The asymmetry with the sibling below is temporal. From `approved` the only
+ * CLI move either candidate has left is `learn reject` (B-15) — `materialize`
+ * meets the refusal, `promote` and `evolve` are dashboard-only. Recording the
+ * approval is still worth recommending here and not there,
  * because the type's obstacle can lift: a renderer arrives, and the approval is
  * already recorded (and until then the dashboard still has `promote` and
  * `evolve`, and the approval is a verdict on merit worth holding on its own).
@@ -404,12 +410,10 @@ function acceptRefusalMessage(card) {
  * Like its sibling above it does not claim the candidate is otherwise ready —
  * a `dismissed` or `activated` candidate has a nearer obstacle — and for the
  * same reason the recovery it names is conditional: `dismiss` is legal only
- * from `pending_review` and `needs_more_evidence`, so a candidate the matrix
- * would refuse to dismiss is sent to the dashboard rather than at a command
- * that would refuse in turn. Unlike its sibling it offers no "approve it on its
- * own" either. Not because approving is the move that strands the candidate and
- * approving there is not: the `approved` row leaves both of them with no CLI
- * move, as the sibling's comment sets out. It is because this obstacle is the
+ * from `pending_review`, `needs_more_evidence` and `approved`, so a candidate
+ * the matrix would refuse to dismiss is sent to the dashboard rather than at a
+ * command that would refuse in turn. Unlike its sibling it offers no "approve
+ * it on its own" either, because this obstacle is the
  * one that never lifts — nothing the CLI offers renames a candidate, so an
  * approval recorded here is a decision no later release redeems, while the
  * sibling's is one a renderer eventually makes good on.
@@ -436,12 +440,10 @@ function acceptNameRefusalMessage(card) {
  * nothing and hands back the draft it already has. So "nothing was applied" is
  * literally true here — the refusal replaces a report, not a transition.
  *
- * It names no recovery command on purpose. `materialized` allows only
- * `activate`, and activation refuses on the recorded content hash — or with
- * `materialization_missing` when no usable manifest is left — so every command
- * the CLI has would refuse in turn; inventing one would send the reviewer
- * around that loop. The dashboard is where the queue is reviewable, so that is
- * what it points at.
+ * It names `learn materialize` as the recovery: activation refuses on the
+ * recorded content hash — or with `materialization_missing` when no usable
+ * manifest is left — but the matrix lets a `materialized` candidate be
+ * materialized again (B-15), which rewrites the draft from the stored record.
  *
  * `stale` is empty when the manifest itself is absent, unparseable or names no
  * draft: there is no recorded file left to call stale, so the cause clause says
@@ -457,10 +459,9 @@ function staleDraftAcceptMessage(card, stale) {
       : 'No usable materialization record remains for it, so there is no draft to hand back.';
   return (
     `arcforge learn accept refused, and nothing was applied — ${card.candidate_id} is ` +
-    `already materialized and is unchanged. ${cause} There is nothing left to hand back: the ` +
-    'canonical Action × Status matrix allows a materialized candidate only to activate, and ' +
-    'activation refuses without an intact recorded draft. Review the queue in: ' +
-    'arcforge learn dashboard'
+    `already materialized and is unchanged. ${cause} Activation refuses without an intact ` +
+    'recorded draft; to rewrite the draft from the stored record, run: ' +
+    rematerializeCommandFor(card)
   );
 }
 

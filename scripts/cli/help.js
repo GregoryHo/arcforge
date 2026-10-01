@@ -83,11 +83,14 @@ COMMANDS:
                                      Read-only review summary: evidence summaries, a redacted body
                                      preview, draft paths and next actions (project scope only).
   learn approve|reject <candidate-id> --project [--json]
-                                     Record user authorization decision for a candidate (project scope only).
+                                     Record user authorization decision for a candidate; reject also
+                                     retires an approval that cannot proceed (project scope only).
   learn accept <candidate-id> --project [--json]
                                      Approve and materialize drafts in one step; never activates.
   learn materialize <candidate-id> --project [--json]
-                                     Write approved candidate drafts without activating behavior (project scope only).
+                                     Write approved candidate drafts without activating behavior, or
+                                     rewrite a materialized candidate's lost or edited draft from the
+                                     stored record (project scope only).
   learn activate <candidate-id> --project [--json]
                                      Promote materialized drafts to active artifacts (project scope only).
   learn dashboard [--port N]

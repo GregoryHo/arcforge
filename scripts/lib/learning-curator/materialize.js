@@ -24,6 +24,9 @@ const { NAME_POLICY_SUMMARY, checkDraftName, isMaterializableName } = require('.
 
 const FIRST_SLICE_SUPPORTED_TYPES = ['instinct'];
 
+// The statuses the Layer-5 matrix lets `materialize` run from (L7-1).
+const REMATERIALIZABLE_STATUSES = ['approved', 'materialized', 'deactivated'];
+
 /**
  * Whether Layer 7 has a renderer for an artifact type.
  *
@@ -412,11 +415,14 @@ function materialize({
     return { ok: false, failure };
   }
 
-  // L7-1: candidate must be approved (first materialization) or deactivated (re-materialization).
-  // Matrix-allowed transitions: approved → materialized, deactivated → materialized.
+  // L7-1: candidate must be approved (first materialization), materialized (rewriting
+  // a draft that was edited or deleted, B-15) or deactivated (re-materialization).
   const status = candidate?.lifecycle ? candidate.lifecycle.status : undefined;
-  if (status !== 'approved' && status !== 'deactivated') {
-    return fail('invalid_lifecycle_status', `Expected approved or deactivated, got: ${status}`);
+  if (!REMATERIALIZABLE_STATUSES.includes(status)) {
+    return fail(
+      'invalid_lifecycle_status',
+      `Expected ${REMATERIALIZABLE_STATUSES.join(', ')}, got: ${status}`,
+    );
   }
 
   // L7-2: First-slice supports instinct only
@@ -483,9 +489,9 @@ function materialize({
     //
     // This cannot double-log: `handleDashboardAction` delegates the materialize
     // action to this module and returns before its own appendTransitionEvent, so
-    // this is the sole appender for the action; and the matrix forbids
-    // `materialized → materialize`, so only `approved` and `deactivated` reach
-    // here, both of which legally become `materialized`.
+    // this is the sole appender for the action; and every status L7-1 admits
+    // legally becomes `materialized` — from `materialized` itself (B-15) the
+    // intact draft is handed back and the event records the reviewer's move.
     appendTransitionEvent(candidate.candidate_id, 'materialize', 'materialized', actor);
     return { ok: true, record: existingRecord, draftPaths: existingDraftPaths };
   }

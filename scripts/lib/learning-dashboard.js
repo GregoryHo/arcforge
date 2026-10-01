@@ -515,9 +515,9 @@ function handleDashboardAction({
     const arcforgeRoot = getArcforgeRoot();
     // The manifest every draft surface resolves to, which is the one
     // `materialize()` reused or wrote: activating the newest instead can pick a
-    // manifest Layer 7 skipped as stale, and the refusal that follows lands on a
-    // `materialized` candidate the matrix lets neither re-materialize nor
-    // dismiss. See `findUsableMaterialization`.
+    // manifest Layer 7 skipped as stale, and the refusal that follows sends the
+    // reviewer to re-materialize a candidate whose intact draft is right there.
+    // See `findUsableMaterialization`.
     const materializationRecord = findUsableMaterialization(arcforgeRoot, candidateId);
     if (!materializationRecord) {
       return reject('materialization_missing', {

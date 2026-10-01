@@ -747,7 +747,7 @@ describe('HTML — statistical-pipeline dead code removed (criterion 4)', () => 
     expect(html).toMatch(/dismiss|approve|promote/i);
   });
 
-  it('HTML exposes every lifecycle action in ACTION_LABELS and ACTION_AVAILABLE_FROM', () => {
+  it('HTML labels every lifecycle action and keeps no copy of the matrix (B-15)', () => {
     const htmlPath = path.join(__dirname, '../../scripts/lib/learning-dashboard.html');
     const html = fs.readFileSync(htmlPath, 'utf8');
 
@@ -761,7 +761,7 @@ describe('HTML — statistical-pipeline dead code removed (criterion 4)', () => 
       'evolve',
     ]) {
       expect(html).toMatch(new RegExp(`${action}:\\s*'[A-Z][a-z]+'`));
-      expect(html).toMatch(new RegExp(`${action}:\\s*\\[[^\\]]+\\]`));
+      expect(html).not.toMatch(new RegExp(`${action}:\\s*\\[[^\\]]+\\]`));
     }
   });
 

@@ -37,7 +37,7 @@ describe('Action × Status matrix — canonical spec', () => {
       deactivate: false,
     },
     approved: {
-      dismiss: false,
+      dismiss: true, // B-15 / D-036: an approval that cannot proceed can be retired
       approve: false,
       materialize: true,
       activate: false,
@@ -48,7 +48,7 @@ describe('Action × Status matrix — canonical spec', () => {
     materialized: {
       dismiss: false,
       approve: false,
-      materialize: false,
+      materialize: true, // B-15 / D-036: rewrite the draft from the stored record
       activate: true,
       promote: false,
       evolve: false,
@@ -212,8 +212,8 @@ describe('isLegalAction — illegal cells (✗)', () => {
     expect(isLegalAction('needs_more_evidence', 'evolve')).toBe(false);
   });
 
-  it('approved → dismiss is illegal', () => {
-    expect(isLegalAction('approved', 'dismiss')).toBe(false);
+  it('approved → dismiss is legal (B-15)', () => {
+    expect(isLegalAction('approved', 'dismiss')).toBe(true);
   });
 
   it('approved → approve is illegal', () => {
@@ -338,8 +338,12 @@ describe('applyTransition — throws for illegal transitions', () => {
     );
   });
 
-  it('approved + dismiss throws', () => {
-    expect(() => applyTransition('approved', 'dismiss')).toThrow();
+  it('approved + dismiss → dismissed (B-15)', () => {
+    expect(applyTransition('approved', 'dismiss')).toBe('dismissed');
+  });
+
+  it('materialized + materialize → materialized (B-15)', () => {
+    expect(applyTransition('materialized', 'materialize')).toBe('materialized');
   });
 
   it('materialized + dismiss throws', () => {
@@ -427,5 +431,50 @@ describe('LC-6: existing transitions still pass after deactivate extension', () 
 
   it('activated → dismiss is still illegal', () => {
     expect(isLegalAction('activated', 'dismiss')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The frozen Layer-5 contract and lifecycle.js carry one matrix (B-15, D-036)
+// ---------------------------------------------------------------------------
+
+describe('the Layer-5 contract document matches MATRIX', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const doc = fs.readFileSync(
+    path.join(
+      __dirname,
+      '../../docs/decisions/learning-curator-schema/layer-5-candidate-queue-lifecycle.md',
+    ),
+    'utf8',
+  );
+
+  it('states its contract version near the top, bumped for the B-15 matrix', () => {
+    const header = doc.split('\n').slice(0, 8).join('\n');
+    const match = header.match(/^\*\*Contract version\*\*: (\d+)/m);
+    expect(match).not.toBeNull();
+    expect(Number(match[1])).toBeGreaterThanOrEqual(2);
+  });
+
+  it('every cell of the canonical table equals isLegalAction', () => {
+    const section = doc.split('### Action × Status legality matrix (canonical)')[1];
+    const table = section.split('```text')[1].split('```')[0].trim().split('\n');
+    const actions = table[0]
+      .split('│')
+      .slice(1)
+      .map((c) => c.trim());
+    expect([...actions].sort()).toEqual([...ACTIONS].sort());
+    const rows = table.slice(2);
+    expect(rows.map((r) => r.split('│')[0].trim()).sort()).toEqual([...LIFECYCLE_STATUSES].sort());
+    for (const row of rows) {
+      const [status, ...cells] = row.split('│').map((c) => c.trim());
+      actions.forEach((action, i) => {
+        expect({ status, action, legal: cells[i] === '✓' }).toEqual({
+          status,
+          action,
+          legal: isLegalAction(status, action),
+        });
+      });
+    }
   });
 });

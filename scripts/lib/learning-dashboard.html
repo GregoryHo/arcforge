@@ -80,18 +80,10 @@
       const countsEl = document.getElementById('counts');
 
       const ACTION_LABELS = { dismiss: 'Dismiss', approve: 'Approve', materialize: 'Materialize', activate: 'Activate', deactivate: 'Deactivate', promote: 'Promote', evolve: 'Evolve' };
-      const ACTION_AVAILABLE_FROM = {
-        dismiss: ['pending_review', 'needs_more_evidence'],
-        approve: ['pending_review'],
-        materialize: ['approved', 'deactivated'],
-        activate: ['materialized', 'deactivated'],
-        deactivate: ['activated'],
-        promote: ['pending_review', 'approved'],
-        evolve: ['pending_review', 'approved'],
-      };
-
-      function availableActions(lifecycleStatus) {
-        return Object.keys(ACTION_AVAILABLE_FROM).filter((a) => ACTION_AVAILABLE_FROM[a].includes(lifecycleStatus));
+      // The buttons are the card's own available_actions: the server reads them
+      // from the canonical Action × Status matrix, so the page keeps no copy.
+      function availableActions(card) {
+        return Array.isArray(card.available_actions) ? card.available_actions : [];
       }
 
       function createCard(c) {
@@ -154,7 +146,7 @@
 
         const actionsEl = document.createElement('div');
         actionsEl.className = 'actions';
-        const acts = availableActions(c.lifecycle_status);
+        const acts = availableActions(c);
         for (const action of acts) {
           const btn = document.createElement('button');
           btn.dataset.act = action;
