@@ -1199,6 +1199,75 @@ describe('DH-6: deactivate action calls deactivate.js module', () => {
 });
 
 // ===========================================================================
+// #167 — activation and materialize() land on the same manifest
+// ===========================================================================
+
+// The issue's reachable trigger, driven end to end through the dashboard. It
+// leaves an older manifest whose draft is intact beside a newer one whose draft
+// is gone. Activation used to resolve the newest manifest by date
+// (`findLatestMaterialization`) and refuse with materialization_hash_mismatch
+// on a `materialized` candidate, while materialize() had reused the intact one.
+// Both now screen on intact drafts, so the activation succeeds on the manifest
+// materialize() picked.
+describe('#167: activation resolves the manifest materialize() reused', () => {
+  const ACTIVATE_ACK = {
+    reviewer_saw_behavior_change_warning: true,
+    reviewer_saw_target_path_summary: true,
+  };
+  const DEACTIVATE_ACK = { reviewer_saw_behavior_change_warning: true };
+
+  function act(action, candidateId, safetyAck) {
+    const result = handleDashboardAction({
+      action,
+      candidate_id: candidateId,
+      safety_ack: safetyAck,
+    });
+    expect(result).toMatchObject({ action, accepted: true });
+    return result;
+  }
+
+  /** A materialize() reuse is keyed on the manifest's created_at — keep them distinct. */
+  function nextMillisecond() {
+    const start = Date.now();
+    while (Date.now() === start) {
+      /* spin */
+    }
+  }
+
+  it('activates the restored older draft after the newer one is deleted', () => {
+    const record = makeCandidateRecord();
+    appendCandidate(record);
+    appendTransitionEvent(record.candidate_id, 'approve', 'approved');
+    const id = record.candidate_id;
+
+    // accept → activate → deactivate
+    const first = act('materialize', id);
+    const firstDraft = first.draft_paths[0];
+    const firstBody = fs.readFileSync(firstDraft, 'utf8');
+    act('activate', id, ACTIVATE_ACK);
+    act('deactivate', id, DEACTIVATE_ACK);
+
+    // hand-edit the draft → accept writes a second manifest → activate → deactivate
+    fs.writeFileSync(firstDraft, `${firstBody}\nhand edit\n`, 'utf8');
+    nextMillisecond();
+    const second = act('materialize', id);
+    expect(second.materialization_id).not.toBe(first.materialization_id);
+    act('activate', id, ACTIVATE_ACK);
+    act('deactivate', id, DEACTIVATE_ACK);
+
+    // restore the first draft, delete the second → accept reuses the first
+    fs.writeFileSync(firstDraft, firstBody, 'utf8');
+    fs.rmSync(second.draft_paths[0]);
+    const third = act('materialize', id);
+    expect(third.materialization_id).toBe(first.materialization_id);
+
+    const activated = act('activate', id, ACTIVATE_ACK);
+    expect(activated.reason).toBeUndefined();
+    expect(readCurrentCandidates()[id].lifecycle.status).toBe('activated');
+  });
+});
+
+// ===========================================================================
 // PR-D Criterion 1 — evidence_quality_chip + relationships on card
 // ===========================================================================
 

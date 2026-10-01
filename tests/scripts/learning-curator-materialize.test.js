@@ -975,6 +975,14 @@ describe('findUsableMaterialization', () => {
   it('returns null when the candidate has no manifest at all', () => {
     expect(findUsable(path.join(tmpDir, '.arcforge'), 'cand_never_materialized')).toBeNull();
   });
+
+  // #167's remaining gap, pinned. `findExistingMaterialization` also screens on
+  // the render policy version; this selector does not. With one version in play
+  // the two cannot disagree. A second version reopens #167 — align the two
+  // screens first, then update this pin.
+  it('has one render policy version in play, so the policy screen cannot split the selectors', () => {
+    expect(defaultRenderPolicy().policy_version).toBe('v1');
+  });
 });
 
 // ---------------------------------------------------------------------------
