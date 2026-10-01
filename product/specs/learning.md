@@ -153,9 +153,10 @@ was recorded about them.
   carries one; files archived before that stamp existed carry none and are
   restorable all the same. When an active instinct of the same name already
   exists, restore MUST refuse and name both files rather than overwrite either.
-  The restored file carries no archive stamp — restore strips `archive_reason`
-  and its companions — so a later archive is never labelled with the old
-  reason. Hand-editing state stays out of contract (B-5), so this is the only
+  The restored file carries no archive stamp: restore removes `archived_at`
+  and `archive_reason` and keeps `decay_charged_through`, so a later archive is
+  never labelled or dated by the earlier one and decay never re-charges weeks
+  it already charged (D-046). Hand-editing state stays out of contract (B-5), so this is the only
   supported route back; like every change to what may be
   injected, it is audited (D-040).
 - **B-14 A candidate name is checked at the door, once.** Layer 5 ingestion
@@ -338,5 +339,7 @@ data contracts live in `docs/decisions/learning-curator-schema/`.
   says so (B-3, B-4, B-13).
 - **D-040** — `learn instinct restore` brings back a decay-archived instinct,
   audited (B-5, B-11).
+- **D-046** — restore returns the file without `archived_at` and
+  `archive_reason`, keeping `decay_charged_through` (B-11).
 - **D-041** — rejections rotate to an archive, never deleted (B-5, B-17).
 - **D-042** — reflection counts only enriched diaries (B-8).
