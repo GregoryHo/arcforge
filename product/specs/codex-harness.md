@@ -168,7 +168,8 @@ The manifest pair — four hand-maintained files, each owned by one host:
 | `.agents/plugins/marketplace.json` | Codex CLI | `interface.displayName`; `plugins[0].source` object; `policy` |
 | `skills/core/<name>/agents/openai.yaml` | Codex CLI | `interface` (required when present); `policy.allow_implicit_invocation` for the three user-invoked skills |
 
-Shapes worth knowing, all verified against codex-cli 0.151.0 rather than inferred:
+Shapes worth knowing, verified rather than inferred — against codex-cli 0.151.0
+unless a bullet names a later version:
 
 - Codex's `skills` is a **bare string**, not an array. Both forms load
   identically — the rendered `<skills_instructions>` blocks were byte-identical
@@ -180,7 +181,7 @@ Shapes worth knowing, all verified against codex-cli 0.151.0 rather than inferre
   verification that counts absolute per-skill paths will read zero; count the
   `arcforge:<name>` entries instead — thirteen, because the three gated skills
   (B-2a) are kept out of the listing; sixteen with their Codex metadata files
-  moved aside.
+  moved aside (codex-cli 0.156.1, 2026-10-01).
 - **`.codex-plugin/plugin.json` wins outright.** A fixture whose Codex manifest
   declared no components, while its `.claude-plugin/plugin.json` declared both a
   skills directory and a `hooks` path, loaded neither — the Claude Code manifest
