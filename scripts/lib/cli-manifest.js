@@ -17,6 +17,8 @@
  *      runs the live `<cmd> --json` in a deterministic fixture and asserts the
  *      key skeleton (keys + nested keys + array-element keys; values ignored)
  *      matches `output` EXACTLY — no missing keys, no extra keys.
+ *   3. Flag parity: each command's `flags` (with its subcommands' flags) equal
+ *      the flags its handlers read — no undeclared flag, no unread entry.
  *
  * `output: null` means "shape deliberately not pinned by the live contract
  * test", NOT "shape unknown". A command is null'd when the contract test
@@ -73,7 +75,8 @@ const CLI_MANIFEST = {
     output: null,
   },
 
-  // eval list reads project evals/; subcommands spawn/serve → no JSON contract.
+  // eval list reads project evals/; subcommands spawn/serve → no pinned JSON
+  // contract. `eval report --json` prints the benchmark object, unpinned.
   eval: {
     flags: [
       '--k',
@@ -87,6 +90,7 @@ const CLI_MANIFEST = {
       '--port',
       '--skill-file',
       '--interleave',
+      '--json',
     ],
     output: null,
   },

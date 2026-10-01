@@ -13,7 +13,7 @@ function runObsidianCommand(args, { asJson }) {
     const vaultPath = args.options.path;
     if (!name || !vaultPath) {
       console.error(
-        'Usage: arc obsidian register --name <n> --path <p> [--default] [--preset <p>] [--scope "..."]',
+        'Usage: arcforge obsidian register --name <n> --path <p> [--default] [--preset <p>] [--scope "..."]',
       );
       process.exit(1);
     }
@@ -49,7 +49,7 @@ function runObsidianCommand(args, { asJson }) {
   if (subcommand === 'unregister') {
     const name = args.positional[1];
     if (!name) {
-      console.error('Usage: arc obsidian unregister <name>');
+      console.error('Usage: arcforge obsidian unregister <name>');
       process.exit(1);
     }
     const result = registry.removeVault(name);
@@ -60,7 +60,7 @@ function runObsidianCommand(args, { asJson }) {
   if (subcommand === 'set-default') {
     const name = args.positional[1];
     if (!name) {
-      console.error('Usage: arc obsidian set-default <name>');
+      console.error('Usage: arcforge obsidian set-default <name>');
       process.exit(1);
     }
     const result = registry.setDefault(name);
@@ -73,7 +73,7 @@ function runObsidianCommand(args, { asJson }) {
     if (asJson) {
       output(reg, true);
     } else if (reg.vaults.length === 0) {
-      console.log('No vaults registered. Run: arc obsidian register --name X --path Y');
+      console.log('No vaults registered. Run: arcforge obsidian register --name X --path Y');
     } else {
       for (const v of reg.vaults) {
         const tag = reg.default === v.name ? ' (default)' : '';
@@ -84,7 +84,7 @@ function runObsidianCommand(args, { asJson }) {
     return;
   }
 
-  console.error('Usage: arc obsidian <register|unregister|set-default|list-vaults> [...args]');
+  console.error('Usage: arcforge obsidian <register|unregister|set-default|list-vaults> [...args]');
   process.exit(1);
 }
 

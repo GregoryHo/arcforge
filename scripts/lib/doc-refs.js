@@ -11,7 +11,9 @@
  *   R2  CLI     — a CLI invocation (`node …cli.js <cmd>` or backticked
  *                 `arcforge <cmd>` / `arc <cmd>`) must name a command in
  *                 cli-manifest.js, and every `--flag` it uses must be declared
- *                 for that command (or a subcommand) in the manifest.
+ *                 for that command (or a subcommand) in the manifest. In
+ *                 reverse, a `## \`<cmd>\`` section must name every manifest
+ *                 flag of that command (doc-flag-coverage.js).
  *   R3  fields  — a `--json` output field promise (jq path or a doc `.field`
  *                 promise tied to a command) must exist in that command's
  *                 manifest `output` shape (only checked for commands whose
@@ -44,6 +46,7 @@
  */
 
 const { CLI_MANIFEST } = require('./cli-manifest');
+const { scanFlagCoverage } = require('./doc-flag-coverage');
 
 // R4 is gating (WT-6 has merged; the finishing twin no longer dangles).
 const R4_SEVERITY = 'error';
@@ -606,6 +609,7 @@ function lintDoc(file, content, probes = {}) {
   let findings = [
     ...scanR1Paths(file, spans, pathExists),
     ...scanR2AndR3Cli(file, spans, CLI_MANIFEST),
+    ...scanFlagCoverage(file, content, spans),
     ...r4.findings,
   ];
 

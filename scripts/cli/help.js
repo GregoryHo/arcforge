@@ -8,7 +8,7 @@ function printHelp() {
 arcforge CLI - engine surface for the arcforge skill toolkit
 
 USAGE:
-  node scripts/cli.js <command> [options]
+  arcforge <command> [options]
 
 COMMANDS:
   worktree add <name> [--branch <b>] [--from <ref>] [--setup]
@@ -59,7 +59,8 @@ COMMANDS:
       --interleave   Alternate baseline/treatment trials instead of running arms back-to-back
       --effort       Reasoning effort passed to spawned trials
   eval compare <name>                Compare A/B results
-  eval report [name] [--since ISO]   Benchmark report, optionally bounded to recent result rows
+  eval report [name] [--since ISO] [--json]
+                                     Benchmark report, optionally bounded to recent result rows
   eval history                       List benchmark snapshots
   eval audit [--top N]               Audit grading history for promotion/retirement candidates
   eval dashboard [--port N]          Live web dashboard (default: 3333)
@@ -134,12 +135,19 @@ COMMANDS:
   obsidian list-vaults [--json]      List registered vaults.
 
 ENVIRONMENT:
-  CLAUDE_PROJECT_DIR    Project root directory (default: cwd)
+  All optional; each has a default.
+  CLAUDE_PROJECT_DIR              Project root directory (default: cwd)
+  CLAUDE_SESSION_ID               Default --session for learn diary
+  ARCFORGE_HOME                   State root (default: ~/.arcforge)
+  ARCFORGE_EVAL_TRIAL_TIMEOUT_MS  Eval per-trial ceiling in ms (default: 900000)
+  CLAUDE_PACKAGE_MANAGER          Installer for worktree add --setup
+  EVAL_DEBUG                      Print eval trial diagnostics to stderr
+  NO_COLOR                        Never color stderr output
 
 EXAMPLES:
-  node scripts/cli.js worktree list --json
-  node scripts/cli.js loop --tasks TASKS.md --max-runs 10
-  node scripts/cli.js eval list
+  arcforge worktree list --json
+  arcforge loop --tasks TASKS.md --max-runs 10
+  arcforge eval list
 `);
 }
 

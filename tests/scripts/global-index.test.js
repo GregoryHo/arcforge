@@ -42,7 +42,7 @@ describe('global-index', () => {
 
       expect(exitCode).toBe(1);
       expect(stderr).toMatch(/deprecated/i);
-      expect(stderr).toMatch(/arc learn dashboard/);
+      expect(stderr).toMatch(/arcforge learn dashboard/);
     });
   });
 

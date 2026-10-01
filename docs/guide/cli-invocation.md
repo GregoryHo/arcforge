@@ -115,7 +115,7 @@ arcforge eval preflight <name>
 arcforge eval run <name> [--k N] [--model <m>]
 arcforge eval ab <name> [--skill-file <path>]
 arcforge eval compare <name>
-arcforge eval report [name] [--since <ISO>]
+arcforge eval report [name] [--since <ISO>] [--json]
 arcforge eval history
 arcforge eval audit [--top N]
 arcforge eval dashboard [--port N]
@@ -125,12 +125,14 @@ arcforge eval dashboard [--port N]
 |------|-----------|--------|
 | `--k` | `run`, `ab` | Trials per condition |
 | `--model` | `run`, `ab`, `preflight` | Model to run trials on |
+| `--effort` | `run`, `ab`, `preflight` | Reasoning effort passed to every spawned trial |
 | `--no-isolate` | `run` | Keep plugins and MCP servers loaded in the trial session (stripped by default); the clean trial directory is used either way |
 | `--plugin-dir` | `run`, `ab` | Load a plugin directory into the trial session |
 | `--max-turns` | `run`, `ab` | Turn budget, overriding the scenario's own |
 | `--skill-file` | `ab` | The skill body injected into the treatment arm |
 | `--interleave` | `ab` | Alternate baseline and treatment trials instead of running each arm in a block |
 | `--since` | `report` | Bound the report to results at or after an ISO timestamp |
+| `--json` | `report` | Print the benchmark as JSON |
 | `--top` | `audit` | How many candidates to surface |
 | `--port` | `dashboard` | Port for the live dashboard (default: 3333) |
 
@@ -170,6 +172,24 @@ further subgroups — `learn diary`, `learn reflect`, `learn instinct`, and
 `learn recall` — which the `/learning` skill drives. The
 [learning guide](learning-dashboard.md) walks the whole loop.
 
+The subgroups take their entity id positionally and everything else as a flag.
+Here `--project` is a value — a project name, defaulting to the current
+directory's — not the scope switch the candidate commands take.
+
+```bash
+arcforge learn diary path [--draft] [--project P] [--date D] [--session S]
+arcforge learn diary save --content "..." [--project P] [--date D] [--session S]
+arcforge learn diary finalize [--project P] [--date D] [--session S]
+arcforge learn reflect scan [--project P] [--json]
+arcforge learn reflect record <reflect-id> [--diaries "a,b"] [--reflection FILE] [--summary "..."]
+arcforge learn instinct status [--project P] [--json]
+arcforge learn instinct save <id> --trigger "..." --action "..." [--source manual|reflection] [--domain D] [--evidence "..."] [--evidence-count N]
+arcforge learn instinct confirm|contradict <id> [--project P] [--json]
+arcforge learn recall record <recall-id> [--query "..."] [--instinct-ids "a,b"] [--summary "..."]
+```
+
+`--date` defaults to today and `--session` to the current Claude Code session.
+
 ## `obsidian`
 
 ```bash
@@ -202,9 +222,16 @@ output once before you build on a specific field.
 | Variable | Effect |
 |----------|--------|
 | `CLAUDE_PROJECT_DIR` | Project root the CLI operates on (defaults to the current directory) |
+| `CLAUDE_SESSION_ID` | Session a `learn diary` entry belongs to when `--session` is not given (Claude Code sets it) |
+| `ARCFORGE_HOME` | Where arcforge keeps its state (default: `~/.arcforge`) |
+| `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS` | Per-trial ceiling for `eval` runs, in milliseconds (default: 900000) |
+| `CLAUDE_PACKAGE_MANAGER` | Installer `worktree add --setup` runs, ahead of lock-file detection |
+| `EVAL_DEBUG` | When set, `eval` prints each trial's `claude` command and exit details to stderr |
+| `NO_COLOR` | When set, stderr output is never colored |
 
-Everything else the CLI needs it derives — you do not point it at its own
-installation, and there is no configuration file to create before first use.
+None of them is required: every one has a default, and everything else the CLI
+needs it derives — you do not point it at its own installation, and there is no
+configuration file to create before first use.
 
 ## Calling the CLI from a skill
 

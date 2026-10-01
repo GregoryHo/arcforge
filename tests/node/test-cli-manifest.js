@@ -227,115 +227,109 @@ for (const probe of liveProbes) {
 fs.rmSync(testDir, { recursive: true, force: true });
 
 // ---------------------------------------------------------------------------
-// Layer 3: flag COMPLETENESS (live ⊆ manifest, per command).
+// Layer 3: flag PARITY (live ≡ manifest, per command, both directions).
 //
-// Layers 1–2 pin the command set and the --json shapes but NOT the flag list,
-// so a live flag absent from a command's manifest `flags` (e.g. `loop --reset`)
-// went undetected. This layer derives each command's live flag
-// set STATICALLY from the handlers' actual `args.flags.X` / `args.options['X']`
-// reads (the parser turns any `--x` into flags.x/options.x, so there is no
-// declarative flag list to read — what a handler READS is what it accepts) and
-// asserts every live command-specific flag appears in that command's manifest
-// `flags`. One-directional (live ⊆ manifest): extra manifest entries are not the
-// concern here; a live flag missing from the manifest is.
+// Layers 1–2 pin the command set and the --json shapes but NOT the flag list.
+// This layer derives each command's live flag set STATICALLY from what its
+// handlers READ — `args.flags.X` / `args.options['X']` (the parser turns any
+// `--x` into flags.x/options.x, so there is no declarative flag list to read)
+// — and asserts it equals the union of the command's manifest `flags` and its
+// subcommands' `flags`:
+//   live ⊆ manifest — a flag the CLI accepts is declared (e.g. `loop --reset`);
+//   manifest ⊆ live — a declared flag is one the CLI actually reads.
 //
-// One ambient read is handled explicitly so it does not produce false
-// positives or escape enforcement: the META flags `--json` and `--help`/`-h`
-// are global, listed selectively (never `--help`/`-h`), and excluded from the
-// live set.
+// `--json` is parsed once in cli.js into `asJson` and handed to the handlers,
+// so a command reads `--json` when its handler source USES `asJson` (a
+// parameter declaration alone does not count). `--help`/`-h` are global,
+// handled before dispatch, and never listed per command.
 // ---------------------------------------------------------------------------
 
-console.log('  Layer 3: flag completeness (live reads ⊆ manifest flags)...');
+console.log('  Layer 3: flag parity (live reads ≡ manifest flags, both directions)...');
 
 const CLI_DIR = path.join(SCRIPT_DIR, 'cli');
 const LIB_DIR = path.join(SCRIPT_DIR, 'lib');
 
-// Global meta flags — read in cli.js (lines 93, 104), apply to every command,
-// and are listed selectively (or never, for --help/-h). Excluded from the
-// derived live set so they never force a manifest entry.
-const META_FLAGS = new Set(['--json', '--help', '-h']);
+const META_FLAGS = new Set(['--help', '-h']);
 
-// Scan a source string for every flag a handler READS and return them as a Set
-// of `--flag` strings, minus the meta flags. Matches both boolean reads
-// (args.flags.X / args.flags['X']) and value reads (args.options.X /
-// args.options['X']). Aliased reads (e.g. `const o = args.options; o['x']`) are
-// NOT resolved — a file that only reads via an alias yields an empty set, which
-// is trivially ⊆ manifest (sound, just under-covered); sdd-gate is such a file
-// and is reported as scoped-out below.
+// Every flag a source READS, as `--flag` strings. Aliased reads (e.g.
+// `const o = args.options; o['x']`) are NOT resolved — keep reads literal.
 function liveFlagsFromSource(source) {
   const flags = new Set();
   const re = /args\.(?:flags|options)(?:\.([a-zA-Z_$][\w$]*)|\['([^']+)'\])/g;
   for (const m of source.matchAll(re)) {
-    const name = m[1] || m[2];
-    const flag = `--${name}`;
+    const flag = `--${m[1] || m[2]}`;
     if (!META_FLAGS.has(flag)) flags.add(flag);
   }
+  // `asJson` in a function signature only receives the flag; any other
+  // occurrence acts on it.
+  const withoutSignatures = source.replace(/^.*\bfunction\b.*\basJson\b.*$/gm, '');
+  if (/\basJson\b/.test(withoutSignatures)) flags.add('--json');
   return flags;
 }
 
-const evalSource = fs.readFileSync(path.join(CLI_DIR, 'eval-command.js'), 'utf8');
-// `learn` is spread over three files — the entry/dispatch layer and the two
-// halves it coordinates. Every flag read is meant to stay in the entry layer,
-// but the derivation reads all three: a flag read that drifted into a sibling
-// would otherwise shrink the derived set, the ⊆ assertion below would still
-// pass, and the flag would escape the manifest gate unnoticed.
-const learnSource = ['learn-command.js', 'learn-candidate-queue.js', 'learn-candidate-prose.js']
-  .map((file) => fs.readFileSync(path.join(CLI_DIR, file), 'utf8'))
-  .join('\n');
-const loopSource = fs.readFileSync(path.join(CLI_DIR, 'loop-command.js'), 'utf8');
-const obsidianSource = fs.readFileSync(path.join(CLI_DIR, 'obsidian-command.js'), 'utf8');
-const worktreeSource = fs.readFileSync(path.join(LIB_DIR, 'worktree-generic.js'), 'utf8');
-
-// Derive the live flag set per command. Every shipped command is derivable
-// from a literal `args.flags.X` / `args.options.X` scan, so nothing is
-// scoped out.
-const SCOPED_OUT = new Set([]);
-
-const liveFlagSets = {};
-liveFlagSets.eval = liveFlagsFromSource(evalSource);
-liveFlagSets.learn = liveFlagsFromSource(learnSource);
-// `loop` is not a DAG command: its handler lives in cli/loop-command.js and it
-// reads no --spec-id (its task source is a task-list file, not a spec DAG).
-liveFlagSets.loop = liveFlagsFromSource(loopSource);
-liveFlagSets.obsidian = liveFlagsFromSource(obsidianSource);
-liveFlagSets.worktree = liveFlagsFromSource(worktreeSource);
-
-// Manifest allowed set per command. For commands with pinned subcommands
-// (worktree), a live flag may legitimately live on a subcommand's flags, so the
-// allowed set is the union of top-level flags + every subcommand's flags.
-function manifestAllowedFlags(entry) {
-  const allowed = new Set(entry.flags || []);
-  if (entry.subcommands) {
-    for (const sub of Object.values(entry.subcommands)) {
-      for (const f of sub.flags || []) allowed.add(f);
-    }
-  }
-  return allowed;
+// The body of `case '<cmd>':` in cli.js's dispatch switch — where a command
+// whose handler returns data (worktree) applies `--json` itself.
+function cliCaseBody(cmd) {
+  const m = CLI_SOURCE.match(new RegExp(`case '${cmd}': \\{([\\s\\S]*?)\\n {6}\\}`));
+  if (!m) throw new Error(`Could not locate case '${cmd}' in cli.js`);
+  return m[1];
 }
 
-// Every command must be either derived (in liveFlagSets) or explicitly scoped
-// out — no command may silently escape this layer.
-const uncovered = manifestKeys.filter((c) => !(c in liveFlagSets) && !SCOPED_OUT.has(c));
-assert.deepStrictEqual(
-  uncovered,
-  [],
-  `command(s) neither flag-derived nor scoped-out of the completeness check: ${uncovered.join(', ')}`,
+const read = (dir, file) => fs.readFileSync(path.join(dir, file), 'utf8');
+
+// `learn` is spread over every `learn-*.js` file in scripts/cli/ — the
+// entry/dispatch layer, the candidate-queue halves it coordinates, and the
+// diary/reflect/instinct/recall workflow subgroups. The derivation reads them
+// all, found by glob so a new sibling cannot be missed: a flag read living in
+// an unscanned file would shrink the derived set and escape the gate.
+const LEARN_FILES = fs.readdirSync(CLI_DIR).filter((f) => /^learn-.*\.js$/.test(f));
+assert.ok(
+  LEARN_FILES.includes('learn-workflow-command.js'),
+  `learn flag scan must cover learn-workflow-command.js, found: ${LEARN_FILES.join(', ')}`,
 );
 
-const gaps = [];
+const liveFlagSets = {
+  eval: liveFlagsFromSource(read(CLI_DIR, 'eval-command.js')),
+  learn: liveFlagsFromSource(LEARN_FILES.map((f) => read(CLI_DIR, f)).join('\n')),
+  loop: liveFlagsFromSource(read(CLI_DIR, 'loop-command.js')),
+  obsidian: liveFlagsFromSource(read(CLI_DIR, 'obsidian-command.js')),
+  worktree: liveFlagsFromSource(
+    `${read(LIB_DIR, 'worktree-generic.js')}\n${cliCaseBody('worktree')}`,
+  ),
+};
+
+// A live flag may legitimately live on a subcommand's flags, so the manifest
+// set is the union of top-level flags + every subcommand's flags.
+function manifestFlagSet(entry) {
+  const declared = new Set(entry.flags || []);
+  for (const sub of Object.values(entry.subcommands || {})) {
+    for (const f of sub.flags || []) declared.add(f);
+  }
+  return declared;
+}
+
+// Every command must be derived — none may silently escape this layer.
+const uncovered = manifestKeys.filter((c) => !(c in liveFlagSets));
+assert.deepStrictEqual(uncovered, [], `command(s) not flag-derived: ${uncovered.join(', ')}`);
+
+const undeclared = [];
+const unread = [];
 for (const [cmd, live] of Object.entries(liveFlagSets)) {
-  const allowed = manifestAllowedFlags(CLI_MANIFEST[cmd]);
-  for (const flag of live) {
-    if (!allowed.has(flag)) gaps.push(`${cmd} ${flag}`);
-  }
+  const declared = manifestFlagSet(CLI_MANIFEST[cmd]);
+  for (const flag of live) if (!declared.has(flag)) undeclared.push(`${cmd} ${flag}`);
+  for (const flag of declared) if (!live.has(flag)) unread.push(`${cmd} ${flag}`);
 }
 assert.deepStrictEqual(
-  gaps.sort(),
+  undeclared.sort(),
   [],
-  `live CLI flag(s) missing from CLI_MANIFEST: ${gaps.join(', ')}`,
+  `live CLI flag(s) missing from CLI_MANIFEST: ${undeclared.join(', ')}`,
 );
-console.log(
-  `    ✓ ${Object.keys(liveFlagSets).length} commands: every live flag is in the manifest`,
+console.log(`    ✓ ${manifestKeys.length} commands: every live flag is in the manifest`);
+assert.deepStrictEqual(
+  unread.sort(),
+  [],
+  `CLI_MANIFEST flag(s) no handler reads: ${unread.join(', ')}`,
 );
+console.log(`    ✓ ${manifestKeys.length} commands: every manifest flag is read by the CLI`);
 
 console.log('\n✅ All cli-manifest contract tests passed!\n');

@@ -409,8 +409,8 @@ function runLearnCommand(args, { projectRoot, asJson }) {
     output(runDrafts(candidateContext(args)), asJson);
   } else if (subcommand === 'analyze') {
     console.error(
-      'arc learn analyze is deprecated. The statistical analyzer has been retired; ' +
-        'candidate review now lives in the dashboard. Run: arc learn dashboard',
+      'arcforge learn analyze is deprecated. The statistical analyzer has been retired; ' +
+        'candidate review now lives in the dashboard. Run: arcforge learn dashboard',
     );
     process.exit(1);
   } else if (subcommand === 'accept') {

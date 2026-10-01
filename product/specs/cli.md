@@ -35,9 +35,17 @@ underneath without breaking anything written against it.
   engine MUST shell out to the bare command and treat everything behind it as
   opaque — the answer to a host without the mechanism is a decision recorded
   here, never a skill that builds its own path.
-- **B-2 One environment input.** The CLI reads `CLAUDE_PROJECT_DIR` for the
-  project root (defaulting to the current directory) and derives everything
-  else. It MUST NOT require being pointed at its own installation.
+- **B-2 No required environment.** The CLI runs with no environment variable
+  set. It reads `CLAUDE_PROJECT_DIR` for the project root (defaulting to the
+  current directory) and derives everything else. It MUST NOT require being
+  pointed at its own installation. Every other variable it reads is an
+  optional override with a default: `CLAUDE_SESSION_ID` (the session a
+  `learn diary` entry belongs to), `ARCFORGE_HOME` (the state root, default
+  `~/.arcforge`), `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS` (the eval trial ceiling,
+  [eval](eval.md)), `CLAUDE_PACKAGE_MANAGER` (the installer
+  `worktree add --setup` runs), `EVAL_DEBUG` (eval trial diagnostics on
+  stderr), and `NO_COLOR` (plain stderr). The guide lists the same set, and a
+  test holds both to the variables the engine actually reads.
 
 ### Surface
 - **B-3 Five independent command groups.** `worktree`, `loop`, `eval`, `learn`,
@@ -47,8 +55,9 @@ underneath without breaking anything written against it.
   engine's CLI manifest; documentation checks and linters read it, and a second
   hardcoded copy of the command list is forbidden
   (`.claude/rules/architecture.md`, "Docs Are the Contract"). `--help` prints
-  the full list; the guides describe the same surface and `npm run check:docs`
-  holds them to it.
+  the full list, and a test holds each command's help flags equal to its
+  manifest flags; the guides describe the same surface and
+  `npm run check:docs` holds them to it.
 
 ### Output contracts
 - **B-5 Exit codes are the API.** `0` on success and non-zero on any failure,
@@ -62,7 +71,12 @@ underneath without breaking anything written against it.
 - **B-6 `--json` where scripting is expected.** Commands that take `--json`
   emit a stable shape suitable for `jq`. `worktree list --json` has its shape
   pinned by a test that runs the live command; other shapes are stable but
-  unpinned — the guide says so rather than overpromising.
+  unpinned — the guide says so rather than overpromising. Residual: the
+  `--json` shapes of `learn`, `obsidian`, and `eval report` are held by no
+  test (their manifest `output` is `null`), so a renamed or dropped field
+  there fails nothing. Pinning them needs deterministic fixtures for the
+  `~/.arcforge` state they read; until then a script built on one of their
+  fields is relying on intent, not on a check.
 
 ### Implementation stance
 - **B-7 Zero external runtime dependencies.** The engine runs on the Node.js
@@ -78,10 +92,10 @@ This area owns no on-disk format of its own: each command group's state belongs 
 the area behind it, and the CLI is only the door to it (B-8). What it does own is
 the command surface — command groups, flags, and the `--json` field promises — held
 once in `scripts/lib/cli-manifest.js`, with a second copy forbidden (B-4). A contract
-test holds that manifest against the live CLI, but not uniformly: command labels and
-pinned `--json` shapes match in both directions, while flags are checked one way —
-every flag the live CLI reads must be declared, and the manifest may declare more
-(the global `--json` is listed per command yet never derived live). Its structural
+test holds that manifest against the live CLI in both directions: command labels,
+pinned `--json` shapes, and each command's flags — every flag a handler reads is
+declared, and every declared flag is one a handler reads (`--json` included: a
+command declares it exactly when its handler acts on it). Its structural
 invariants are the exit-code API (B-5) and the stability of a `--json` shape once a
 command offers one (B-6).
 

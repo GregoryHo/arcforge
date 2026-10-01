@@ -130,7 +130,71 @@ describe('doc-refs engine (SRH-4)', () => {
     });
   });
 
-  describe('R3 — --json field promises (against manifest output shapes)', () => {
+  describe('R2 — a command section documents every manifest flag (reverse direction)', () => {
+    // A doc section headed `## \`<command>\`` is that command's reference: every
+    // flag the manifest declares for the command must appear in its code.
+    const worktreeSection = (flags) =>
+      [
+        '# CLI',
+        '',
+        '## `worktree`',
+        '',
+        '```bash',
+        '# a shell comment is not a heading',
+        'arcforge worktree add <name>',
+        '```',
+        '',
+        ...flags.map((f) => `| \`${f}\` | effect |`),
+        '',
+        '## Next section',
+        '',
+        'Mentions `--force` outside the worktree section, which does not count.',
+        '',
+      ].join('\n');
+
+    test('a manifest flag missing from its command section is a finding', () => {
+      const flags = CLI_MANIFEST.worktree.flags.filter((f) => f !== '--force');
+      const { findings } = lintDoc('docs/guide/x.md', worktreeSection(flags), ALL_EXIST);
+      const r2 = findings.filter((f) => f.rule === 'R2');
+      expect(r2).toHaveLength(1);
+      expect(r2[0].message).toContain('--force');
+      expect(r2[0].message).toContain('worktree');
+      expect(r2[0].line).toBe(3);
+    });
+
+    test('a section that names every manifest flag produces nothing', () => {
+      const doc = worktreeSection(CLI_MANIFEST.worktree.flags);
+      const { findings } = lintDoc('docs/guide/x.md', doc, ALL_EXIST);
+      expect(findings.filter((f) => f.rule === 'R2')).toHaveLength(0);
+    });
+
+    test('a flag that only prefixes another does not count as documented', () => {
+      // `--max-turns` must not satisfy a hypothetical `--max`; here `--from`
+      // must not be satisfied by `--from-ref`.
+      const flags = CLI_MANIFEST.worktree.flags.filter((f) => f !== '--from');
+      const doc = worktreeSection([...flags, '--from-ref']);
+      const { findings } = lintDoc('docs/guide/x.md', doc, ALL_EXIST);
+      const messages = findings.filter((f) => f.rule === 'R2').map((f) => f.message);
+      expect(messages.some((m) => m.includes('flag --from is'))).toBe(true);
+    });
+
+    test('a doc with no command section is not held to the reverse check', () => {
+      const doc = '# Notes\n\nRun `arcforge worktree list --json`.\n';
+      const { findings } = lintDoc('docs/guide/x.md', doc, ALL_EXIST);
+      expect(findings.filter((f) => f.rule === 'R2')).toHaveLength(0);
+    });
+
+    test('every manifest eval flag, --effort included, is in the CLI guide', () => {
+      const fs = require('node:fs');
+      const path = require('node:path');
+      const file = 'docs/guide/cli-invocation.md';
+      const content = fs.readFileSync(path.resolve(__dirname, '../..', file), 'utf8');
+      const { findings } = lintDoc(file, content, ALL_EXIST);
+      expect(findings.filter((f) => f.rule === 'R2').map((f) => f.message)).toEqual([]);
+    });
+  });
+
+  describe('R3 —--json field promises (against manifest output shapes)', () => {
     test('a field absent from the pinned output shape is a finding', () => {
       const doc =
         "Get it: `arcforge worktree list --json | jq '.worktrees[0].nonexistent_field'`.\n";
