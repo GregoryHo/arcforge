@@ -161,9 +161,16 @@ one flipped line on the old one — and which flip depends on how much died:
 | `Supersedes: D-NNN` | `Superseded-by: D-MMM` | the whole decision is replaced |
 | `Supersedes: D-NNN (clause 2)` | `Accepted · partially superseded by D-MMM` | only that clause died; the rest still governs |
 
-C3 reads the flipped entry's whole `Status:` as `·`-separated clauses from a closed
-vocabulary — `Accepted`, `Proposed`, `Superseded-by: D-NNN`, `partially superseded by
-D-NNN`. A totally superseded entry stops being `Accepted`; a partially superseded one
+The `N` in `(clause N)` counts the superseded entry's `Decision:` clauses from 1 — by
+the entry's own numbering where it numbers them, otherwise in the order they are
+written — so `Supersedes: D-015 (clause 1)` names the first clause of D-015's
+`Decision:`. A clause has one claimant: two decisions naming the same clause of one
+entry are reported (C3), since the second would reverse a clause already dead.
+
+C3 reads every entry's whole `Status:` — not only a flipped one's — as `·`-separated
+clauses from a closed vocabulary — `Accepted`, `Proposed`, `Superseded-by: D-NNN`,
+`partially superseded by D-NNN` — and a trailing `·`, which leaves an empty clause,
+is rejected. A totally superseded entry stops being `Accepted`; a partially superseded one
 keeps exactly one live clause. That is what lets one entry carry two clause-scoped
 flips from different decisions, or a partial flip beside the later total one that
 finished it off — and what rejects the self-contradicting `Accepted · Superseded-by:
@@ -192,9 +199,14 @@ into the `<details>` index is unaffected — the rule compares `D-id`s, not posi
   are read inside its `## Decisions` section. An emptied scope fails in one of two
   directions: rename, indent or drop `## Decision Log` or `## Roadmap`, or let an
   unclosed fence or an unterminated `<!--` swallow the rest of one, and C6 reports the
-  section empty (fail-closed); do the same to a spec's `## Decisions` and the spec
-  cites nothing and is checked for nothing (silent, fail-open) — keep the heading as
-  the template writes it.
+  section empty (fail-closed); do the same to a spec's `## Decisions` and C5 finds
+  nothing to read there, which C8 below reports rather than leaving the spec checked
+  for nothing — keep the heading as the template writes it.
+- **Spec sections (C8).** Every spec carries the template's five section headings —
+  `## Purpose`, `## Scope`, `## Behavior`, `## Data / domain model`, `## Decisions` —
+  each opening at column 1 as a scope does. A heading dropped, renamed, indented or
+  swallowed by an unclosed fence or comment is reported, so no spec escapes C5 by
+  losing the section C5 reads.
 - **Indent bounds.** Only the `##` that *opens* a scope is read at column 1; indented,
   it opens nothing and the scope is empty. Everything else — `### D-NNN`, `- Status:`,
   `> Status:`, roadmap rows, relation bullets, the `<details>` opener, the `<!--`
@@ -240,7 +252,8 @@ into the `<details>` index is unaffected — the rule compares `D-id`s, not posi
 - **Near-misses are reported, not skipped.** Two or zero `Status:` lines, an empty
   one, a wrong-arity row, a non-row line anywhere in the table run, a fence or comment
   opening inside it, a non-blank line directly above the header, a second `> Status:`
-  header, a malformed relation label.
+  header, a malformed relation label, a `Status:` ending in a trailing `·`, a missing
+  spec section.
 
 ## Conventions
 

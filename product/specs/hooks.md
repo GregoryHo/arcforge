@@ -1,6 +1,6 @@
 # hooks — spec
 
-> Status: shipped v6.1.1 · extended by 6.1.2 (next) · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.1.1 · extended by 6.1.2 (building) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -120,15 +120,25 @@ down, never block the user, and never observe them uninvited.
   session start.
 
 ### Continuity
-- **B-8 The session leaves a record.** Session tracking maintains a durable
-  record of each session (duration, activity) that the learning loop and diary
-  build from — kept unconditionally, because continuity is not a learning
-  feature (B-6 bounds what that record holds); `pre-compact` captures what
-  compaction is about to drop so the
-  worthwhile part of a long session survives the boundary; `inject-context`
-  starts the next session with what carried over — active instincts, pending
-  reviews, where the last session left off — and is close to silent when
-  learning has never been enabled.
+- **B-8 The session leaves a record; the next session does not read it
+  back.** Session tracking maintains a durable record of each session
+  (duration, activity) that the learning loop and diary build from — kept
+  unconditionally, because continuity is not a learning feature (B-6 bounds
+  what that record holds); `session-start` opens it, and `pre-compact` captures
+  what compaction is about to drop so the worthwhile part of a long session
+  survives the boundary. What a new session starts with is `inject-context`'s,
+  drawn from learning and pending-action state and never from the previous
+  session's record (D-031). The model receives up to five activated instincts
+  — only ids the user activated, ranked and capped by confidence — the queued
+  notices (a diary draft ready, a finished loop run, and the reflection nudge
+  under the opt-in only, B-6), and, once learning is on, the stale-draft
+  warning. The user sees a one-line summary of the same, plus counts of
+  session aliases and of patterns promoted to global in the past week. With
+  learning never enabled no instinct, nudge or stale-draft warning appears, so
+  the injection is close to silent.
+  *Residual:* carrying over where the last session left off is not built; it
+  waits as the `session-continuity-injection` wish in
+  [BACKLOG](../BACKLOG.md).
 
 ## Data / domain model
 
@@ -170,5 +180,5 @@ implements fail-open is pinned in `.claude/rules/coding-standards.md`.
   ([learning](learning.md) B-9).
 - **D-029** — B-4 says the guard scans the commit command, not the
   committed content; a staged-content scan waits as a wish (B-4).
-- **D-031** — *proposed*: B-8 stops promising where the last session left off
+- **D-031** — B-8 stops promising where the last session left off
   (B-8).

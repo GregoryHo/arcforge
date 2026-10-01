@@ -49,12 +49,18 @@ crash, a compaction, or a closed laptop could lose.
   interruption — resuming is just reading the file again.
 - **B-5 Every run is bounded.** Iteration, cost, and per-session-time ceilings
   cap an unattended run; an unbounded loop is not offered.
-- **B-6 Done is decided by a command, not a claim.** A task's `verify:` line
-  (or the run-level verify command) is executed to prove completion — the loop
-  never accepts the model's self-report. An optional independent verifier adds
-  a second gate: a FAIL retries with the verifier's feedback, bounded retries,
-  and an exhausted or unreadable verdict **blocks** the task rather than
-  passing it.
+- **B-6 Done is decided by a command where one is given, and the loop says
+  where none is.** A task's `verify:` line, or for a task without one the
+  run-level `--verify-cmd`, is that task's floor: it runs after the session
+  exits 0, and a failing floor routes the task to its retry and then to
+  blocked, never to done. A task with neither has no floor, and is done when
+  its session exits 0 — a clean exit, which says the session ended, not that
+  the work happened. The loop warns at start, naming every task that will run
+  without a floor, while the user can still add one (D-032). An optional
+  independent verifier (`--verifier`) adds a second gate after the floor, or
+  after the clean exit where there is none: a FAIL retries with the verifier's
+  feedback, bounded retries, and an exhausted or unreadable verdict **blocks**
+  the task rather than passing it.
 
 ### The task list
 - **B-7 One format, one owner, strict parsing.** The markdown checkbox list is
@@ -84,5 +90,5 @@ The four-state marker set, stable ids, and no-nesting rules carry their own
 `docs/decisions/task-list-format.md`. The isolation-outside-the-repo and
 verify-over-self-report choices predate this log; rationale inline above.
 
-- **D-032** — *proposed*: without a verify floor a task is done on exit 0, and
+- **D-032** — without a verify floor a task is done on exit 0, and
   the loop warns at start (B-6).
