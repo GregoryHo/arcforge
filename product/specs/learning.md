@@ -167,17 +167,18 @@ was recorded about them.
   are never normalized at materialization: one candidate has one name.
   Candidates queued under such a name before this check existed are not
   rewritten; they leave `approved` through the dismiss exit of B-15 (D-035).
-- **B-15 No lifecycle state is a dead end.** Besides the transitions of B-3,
-  the Action × Status matrix lets an `approved` candidate be dismissed —
+- **B-15 `approved` and `materialized` are not dead ends.** Besides the
+  transitions of B-3, the Action × Status matrix lets an `approved` candidate be dismissed —
   retiring a verdict that cannot proceed, such as a non-instinct artifact type
   or a name from before B-14 — and a `materialized` candidate be materialized
   again, which rewrites its draft from the stored record so the reviewed
   content and the file agree after a hand edit or a deletion. Both exits are
   offered on the dashboard and on the CLI (`learn reject`, the CLI's name for
   dismiss, and `learn materialize`), pass the same gate and land in the same
-  audit log (B-5). The frozen Layer-5 contract carries both cells in its
-  canonical matrix, and its version is bumped with them, so a reader can tell
-  this matrix from the one before (D-036).
+  audit log (B-5). `dismissed` and `superseded` stay terminal, as the Layer-5
+  contract defines them. The frozen Layer-5 contract carries both new cells in
+  its canonical matrix, and its version is bumped with them, so a reader can
+  tell this matrix from the one before (D-036).
 - **B-16 A transition is checked and recorded under one lock.** The legality
   check a transition passes reads the candidate's current state inside the
   same store lock that appends the transition — on the dashboard, on the CLI,
