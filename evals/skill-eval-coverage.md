@@ -47,20 +47,22 @@ p7-benchmark-evidence.md「協定修正案」）。
 **84.2% ≥ 80% ✓**（線下：brainstorming 0.40、diagramming 0.00、tdd 0.40——三支 delta
 皆 IMPROVED；低 pass 反映 0.8 trial bar 的嚴格性，非技能無效）。
 
-## 每支 skill 的現行 delta 證據（P7 收官）
+## 每支 skill 的現行 delta 證據（P7 收官，6.1.1 更新）
+
+未標 6.1.1 的列皆為修復前池（unrecorded 條件），見文末「6.1.1 量測輪」。
 
 | skill | 現行證據 | 出處 |
 |---|---|---|
-| speccing | spec-before-code **+0.67 CI[0.67, 0.67] IMPROVED**；supersede-not-overwrite unmet-but-covered（baseline ceiling） | 6.1.0 ab k=10 |
+| speccing | spec-before-code **+0.67 CI[0.67, 0.67] IMPROVED**（注入模態）；supersede-not-overwrite unmet-but-covered（baseline ceiling）；plugin 路由下自行觸發 **0/10**（routing-control 5/5 為對照，#179 確認），請以 `/arcforge:speccing` 呼叫 | 6.1.0 ab k=10；6.1.1 WP-E `claude plugin eval`（見 6.1.1 量測輪） |
 | tdd | +0.63 CI[0.41, 0.86] | P7 ab |
-| finishing | +0.54 CI[0.46, 0.62] | P7 ab（P4 +0.58 同量級） |
+| finishing | **+0.71 CI[0.71, 0.71]** | 6.1.1 ab k=5（修復後儀器；P7 +0.54 為修復前池） |
 | code-review | two-axis +0.40；range-fidelity +0.27 non-reg PASS；answering-feedback +0.05 但 non-reg **REGRESSED**（4/5，D-026） | P7 ab ×3 |
-| executing | +0.40 CI[0.03, 0.77] | P7 ab k=10 |
-| using（router） | +0.36 CI[0.25, 0.47]；另 e2e 矩陣 16/16（P6） | P7 ab（v6.1.0 有較新的 non-regression 覆蓋，見下節） |
+| executing | 6.1.1 preflight **BLOCK**（乾淨儀器上 baseline 100%）；+0.40 CI[0.03, 0.77] 為修復前池 | 6.1.1 preflight；P7 ab k=10 |
+| using（router） | 6.1.1 preflight **BLOCK**（乾淨儀器上 baseline 100%）；+0.36 CI[0.25, 0.47] 為修復前池；另 e2e 矩陣 16/16（P6） | 6.1.1 preflight；P7 ab（v6.1.0 有較新的 non-regression 覆蓋，見下節） |
 | brainstorming | +0.35 CI[0.11, 0.59] | P7 ab（P6 +0.50 同向） |
 | sessions | +0.29（吸收 compacting：non-reg 1.00） | P7 ab |
-| maintaining-obsidian | +0.28 CI[0.14, 0.42] | P7 ab |
-| diagramming-obsidian | +0.23 CI[0.09, 0.38] | P7 ab 合池 |
+| maintaining-obsidian | vault-only-answer **+0.20 CI[0.2, 0.2]**；audit-runs-lint-script、link-rebuilds-index preflight **BLOCK**（baseline 100%） | 6.1.1 ab k=5 + preflight（P7 +0.28 為修復前池） |
+| diagramming-obsidian | **+0.20 CI[0.01, 0.39]**（1800 s ceiling） | 6.1.1 ab k=5（P7 +0.23 為修復前合池） |
 | learning | +0.25（標記保留；e2e 全鏈路 PASS） | P5，P7 run 池 0.80 佐證 |
 | looping | +0.19 CI[0.07, 0.31]；loop e2e PASS | P6 |
 | debugging | unmet-but-covered（P7 ceiling ×2；P4 +0.16 歷史） | 存廢建議書 |
@@ -1661,3 +1663,103 @@ A/B, or compare was run.
 | eval-speccing-spec-before-code | 5 + 5 | 0/10，全部 0.33（A1–A4 ✗，A5/A6 ✓） | baseline 簽名：模型直接實作 CSV，從未路由到 `speccing` |
 
 上表最後一列是本版**已分類的已知缺口**（[#179](https://github.com/GregoryHo/arcforge/issues/179)）：本檔記錄的 +0.67 CI[0.67, 0.67] 來自 A/B 的 treatment 臂，那一臂以 `--skill-file` 注入 skill 本文，量的是 skill 的指示，不是 description 能否讓模型自行路由。prompt 明說「不要花時間在 product docs」時，只靠 description 拉不進來。把 description 還原成 A/B 當時的觸發語（review 期間曾被改寫）後再跑 5 trial 仍為 0/5，故不是措辭問題。兩次 run 的 transcript 都看得到使用者環境的「advisor」步驟與只用 Bash 的工具型態（#170 漏進 trial）。這一列的 fail row 在原始快照裡沒有分類欄位；本段就是它的分類。
+
+## 6.1.1 量測輪（2026-10-01，修復後儀器）
+
+依 D-021，本輪只重跑主體在上次快照後有變動、或儀器修復本來就要讀的 scenario。快照
+`evals/benchmarks/2026-10-01.json`（= `latest.json`）於 **2026-10-01T01:16:02Z** 生成，
+程式碼等同 main 合入 #206（儀器修復：#170 隔離漏洞、refusal-as-trial 計分等）與 #213
+（權限回歸修正）之後。本次快照未帶 `--since`（無 `result_filter`），每列依 scenario
+Version 與執行條件分池（eval B-8）。
+
+**條件**（新池每列皆記錄於 raw row）：`--model 'opus[1m]' --effort xhigh`、isolation
+`isolated`、排除使用者設定（`--setting-sources project,local`）、
+`--dangerously-skip-permissions`（#213 起每個 contained trial 都帶）、不帶
+`--plugin-dir`（skill scope 以 `--skill-file` 注入，量的是 skill 指示，不是路由）。
+trial ceiling 預設 900 s；diagramming 依 D-017 以 1800 s 執行，數值逐列記在
+`trialTimeoutMs`。
+
+### A/B 結果（k=5／臂，皆先過 preflight k=3 PASS）
+
+| scenario | run id | baseline | treatment | delta |
+|---|---|---|---|---|
+| finishing-verify-before-options | `20260930-114816` | avg 0.29 / pass 0% | avg 1.00 / pass 100%（5/5） | **+0.71 CI[0.71, 0.71] IMPROVED** |
+| diagramming-obsidian-unverified-save-claim | `20260930-110218` | avg 0.60 / pass 0% | avg 0.80 / pass 20%（1/5） | **+0.20 CI[0.01, 0.39] IMPROVED**（1800 s ceiling） |
+| maintaining-obsidian-vault-only-answer | `20260930-110227` | avg 0.60 / pass 0% | avg 0.80 / pass 100%（5/5 皆 0.8） | **+0.20 CI[0.2, 0.2] IMPROVED** |
+
+三支各有一個 `other_pools` 條目：修復前的舊池（finishing 15+15 列、diagramming 10+9
+列、vault-only-answer 5+5 列），條件欄位全為 `null`，即「unrecorded」條件。讀者不合併
+不同條件的池（D-021），因此上表就是這三支的現行證據；P7 的 +0.54、+0.23、+0.28 留作
+修復前紀錄。
+
+### Preflight BLOCK：紀錄本身就是發現
+
+以下四支在乾淨儀器上 preflight **BLOCK**——baseline pass rate 100%，達到 80% 天花板。
+依 D-021，未跑 A/B；BLOCK 就是本輪對它們的紀錄，不是待補的缺口。
+
+| scenario | 本輪 | 快照中的列 |
+|---|---|---|
+| executing-verify-decides-done | preflight BLOCK（baseline 100%） | 修復前池（2026-08-14／08-15，20 列，unrecorded 條件）：+0.25 CI[0.04, 0.46]；P7 窗內為 +0.40 CI[0.03, 0.77] |
+| router-skill-selection | preflight BLOCK（baseline 100%） | 修復前池（2026-08-01／08-15，unrecorded 條件）：+0.34 CI[0.27, 0.41] |
+| maintaining-obsidian-audit-runs-lint-script | preflight BLOCK（baseline 100%） | 無列（從未跑過 A/B） |
+| maintaining-obsidian-link-rebuilds-index（D-028 新 scenario） | preflight BLOCK（baseline 100%） | 無列（從未跑過 A/B） |
+
+讀法：#170 漏洞修好、使用者設定被排除之後，這四個任務 baseline 自己就做得到。修復前
+量到 IMPROVED，可能有一部分是漏進 trial 的使用者環境把 baseline 拉低，這點本輪無法分辨；
+能確定的只有「在乾淨儀器上，這些 scenario 已沒有鑑別力」。router 一列另有意義：它本來
+就是 #170 隔離修復的驗收測試（D-021），BLOCK 表示修復後的隔離下 baseline 不再失敗。
+
+### 未重跑的池：全部是修復前、unrecorded 條件
+
+以下池本輪沒有重跑，快照中的列全數量測於儀器修復之前、#170 漏洞仍在的時候，條件欄位
+未記錄（D-021 Residual）。逐池列出，任何一支都不得描述為已重測：
+
+| skill / scenario | 快照中的最後一次 run |
+|---|---|
+| brainstorming-alternatives-before-build | 2026-08-15 |
+| code-review-answering-feedback | 2026-08-15（REGRESSED，依 D-026 照量測值記錄） |
+| code-review-range-fidelity | 2026-08-15 |
+| code-review-two-axis | 2026-08-15 |
+| compacting-persist-before-compact | 2026-08-15 |
+| d1-bare-cli-invocation | 2026-08-15 |
+| debugging-root-cause-first | 2026-08-15 |
+| dispatching-report-not-evidence | 2026-08-15 |
+| evaluating-cross-condition-validity | 2026-08-15 |
+| learning-marker-preservation | 2026-08-15 |
+| looping-stale-state-relaunch | 2026-08-15 |
+| sessions-handover-completeness | 2026-08-15 |
+| tdd-test-first-gate | 2026-08-15 |
+| writing-skills-recipe-over-prohibition | 2026-08-15 |
+| speccing-spec-before-code | 2026-09-07（6.1.0 plugin-routed run） |
+| speccing-supersede-not-overwrite | 2026-09-07（6.1.0 plugin-routed run） |
+
+快照未帶 `--since`，因此部分未重跑列的數值與 P7 窗內數值不同（例如 brainstorming 讀
++0.43、tdd 讀 +0.76，P7 窗內為 +0.35、+0.63）：差別來自池的時間範圍，不是新量測。
+
+### 作廢的批次
+
+本輪較早的一批 trial 在 #213 修正前執行：#206 讓 contained trial 不再讀使用者設定，連帶
+失去了 `permissions.defaultMode: auto`，而當時 `--dangerously-skip-permissions` 只在帶
+plugin dir 時才加，於是沒有 plugin dir 的 isolated trial 在 `-p` 模式下 Bash／Write／Edit
+全被拒，兩臂都跌破 code-grader floor。這批約 **34 個 session** 整批作廢、未進入任何池；
+上方所有數字都來自 #213 之後的重跑。
+
+### WP-E：`claude plugin eval` 量路由（D-024、D-025）
+
+這三個 case 不進 release gate、也不進快照（eval B-11）；讀數是觸發率，不是判定。證據在
+`docs/plans/v6.1/wp-e/*.aggregate.json`（trace 路徑已移除），case 定義與執行方式見
+`plugin-evals/README.md`。三者皆以 `--model opus`、`--ablation none`、`--no-publish`
+執行，plugin 版本 6.1.0。
+
+| case | 日期 | 結果 | 讀法 |
+|---|---|---|---|
+| isolation-check | 2026-09-30 | 2/2 run 全部 grader 通過 | 每次 run 的 `HOME` 與 `CLAUDE_CONFIG_DIR` 都是全新目錄；output style `default`、無使用者 `CLAUDE.md`、無使用者 hook、arcforge 已載入；operator 的 hook 事件 log 未增加。D-025 對隔離的推論成立 |
+| speccing-trigger | 2026-09-30 | **0/10** run 呼叫 `speccing` | 10 次 run 都沒有任何 `Skill` 呼叫；每次 4–11 turn |
+| routing-control | 2026-10-01 | **5/5** run 呼叫 `arcforge:brainstorming` | prompt 對準 `brainstorming` 的 description register；grader 接受任一 `Skill` 呼叫，載入的 skill 由 operator 讀 trace 確認 |
+
+讀法：routing-control 證明 headless plugin 路由本身是通的，所以 speccing-trigger 的 0/10
+是 `speccing` 特有的結果，不是量測方式的問題。**#179 在乾淨儀器上確認**：使用者要求
+「先別管 product docs」時，`speccing` 不會只靠 description 自行觸發。依 D-024，處置是在
+文件上揭露並請使用者以 `/arcforge:speccing` 明確呼叫，不改 skill 的 description；本輪
+README 與 `docs/guide/skills-reference.md` 已照此更新。spec-before-code 量到的 +0.67
+仍證明注入模態下 skill 指示有效，這和路由觸發率是兩件事。

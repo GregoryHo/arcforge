@@ -79,7 +79,7 @@ If you want the whole toolkit, use Claude Code.
 
 Those are the Claude Code spellings. On Codex CLI the same skills are listed as `arcforge:using`, `arcforge:tdd`, and so on, and you invoke one from the composer's `$` mention picker rather than by typing a slash command.
 
-Most skills also fire on their own when their trigger condition shows up. The three marked _user-invoked_ below never do, on either host.
+Most skills also fire on their own when their trigger condition shows up. The three marked _user-invoked_ below never do, on either host. `speccing` is not marked, but in measurement it does not fire on its own under plugin routing (0 of 10 isolated runs), so invoke it as `/arcforge:speccing` (on Codex, from the `$` picker).
 
 ## The 16 skills
 

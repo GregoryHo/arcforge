@@ -11,6 +11,11 @@ own when the situation matches. You do not have to know they exist. Ask for a bu
 to be fixed and `debugging` applies itself; say a branch is finished and
 `finishing` takes over.
 
+One of the thirteen does not hold up in measurement: `speccing` does not fire on
+its own under plugin routing (0 of 10 isolated runs, while a control prompt
+routed to `brainstorming` in 5 of 5). Invoke it as `/arcforge:speccing` (on
+Codex, from the `$` picker).
+
 Three are **user-invoked** — they load only when you ask for them by name,
 because starting them is a deliberate act rather than something to infer:
 
@@ -143,7 +148,7 @@ it on; nothing it proposes changes behavior until you activate it. See the
 | `using` | you are unsure which skill fits |
 | `brainstorming` | a design is not settled and alternatives have not been named |
 | `executing` | the work needs a task list and someone to run it |
-| `speccing` | a project's specs, roadmap, or decision log has to move with the code |
+| `speccing` | a project's specs, roadmap, or decision log has to move with the code (invoke by name — see above) |
 | `tdd` | code is about to be written or changed |
 | `debugging` | something failed and the cause is not yet known |
 | `code-review` | a change is ready to hand off, or feedback came back |

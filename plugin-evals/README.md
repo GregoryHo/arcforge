@@ -14,8 +14,9 @@ is contributor-only and is not in `package.json` `files`, so it ships to nobody.
 |---|---|---|
 | `isolation-check/` | D-025's inference that each run starts from a fresh `HOME` and `CLAUDE_CONFIG_DIR`, so the operator's output style, user hooks and user `CLAUDE.md` do not reach the trial | 2 |
 | `speccing-trigger/` | #179 / D-024: how often `speccing` fires on its own when a user asks for a feature in a repo that keeps product state under `product/` | 10 |
+| `routing-control/` | Control for D-024: whether *any* arcforge skill fires on its own in a headless run. The prompt matches `brainstorming`'s description register, so a 0 on `speccing-trigger` can be read as a speccing result only if this one fires | 5 |
 
-Expected sessions: **10 + 2**.
+Expected sessions: **10 + 2 + 5**.
 
 Cost: `speccing-trigger` runs with the scenario's own limits — 40 turns and a
 900 s timeout — so a late `Skill` call is not cut off. At those limits a run
@@ -47,7 +48,14 @@ claude plugin eval . --eval-dir plugin-evals --case isolation-check \
 claude plugin eval . --eval-dir plugin-evals --case speccing-trigger \
   --scaffold --allow-tools Bash Write Edit \
   --ablation none --no-publish --model <model> --max-cost-usd <n> -j 1
+
+claude plugin eval . --eval-dir plugin-evals --case routing-control \
+  --ablation none --no-publish --model <model> --max-cost-usd <n> -j 1
 ```
+
+`routing-control` needs no `--allow-tools` (its tools — `Skill`, `Read`, `Glob`,
+`Grep` — are not gated) and no `--scaffold`; it is 5 short runs (12 turns,
+300 s).
 
 Every flag is there for a reason:
 
@@ -174,3 +182,23 @@ tested against these inputs:
 
 The case score over 10 runs is the trigger rate. The task itself is not graded
 here; the ledger edits are what the harness scenario scores.
+
+**routing-control** has one grader, `any-skill-fired`: a `Skill` call that
+loaded any skill. It does not name the skill, so read which one loaded from the
+trace. The case score over 5 runs is the control's trigger rate.
+
+## Readings
+
+Each run used `--model opus`, `--ablation none` and `--no-publish` against
+arcforge 6.1.0. The aggregates, with trace paths stripped, are in
+`docs/plans/v6.1/wp-e/`; the ledger entry is the 6.1.1 round in
+`evals/skill-eval-coverage.md`.
+
+| Case | Date | Result |
+|---|---|---|
+| `isolation-check` | 2026-09-30 | 2 of 2 runs passed every grader; the manual gate held (fresh `HOME` and `CLAUDE_CONFIG_DIR` per run, the operator's hook event log unchanged) |
+| `speccing-trigger` | 2026-09-30 | 0 of 10 runs invoked `speccing`; no run made any `Skill` call (4–11 turns each) |
+| `routing-control` | 2026-10-01 | 5 of 5 runs invoked a skill — `arcforge:brainstorming` in each trace (4 turns each) |
+
+Read together: headless plugin routing works, so the 0 of 10 is specific to
+`speccing`, and #179 holds on a clean instrument.
