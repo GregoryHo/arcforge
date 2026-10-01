@@ -414,3 +414,34 @@ is committed on your behalf.
 
 The commands above print the absolute path of anything they write, so you can
 always read exactly what was recorded and where it went.
+
+## Known limits, and what is not built yet
+
+These are deliberate edges of what learning does today, stated so you do not
+have to find them by surprise.
+
+- **The unenriched-draft warning can be wrong in a few cases.** At session
+  start, arcforge warns about diary drafts whose enrichment never ran — but only
+  drafts written after you turned learning on, judged by the file's creation and
+  last-write times. A copy that resets both (a sync re-download, a naive unzip),
+  or a filesystem that records no creation time, can make an older draft look
+  new and get reported. It also misses two cases: a draft first written before
+  you turned learning on and rewritten in place afterwards, and drafts written
+  between two opt-ins when you turn off the scope you enabled first — global on,
+  project on, global off moves the cutoff forward to the project's date.
+- **Only instincts are built.** The candidate format reserves other artifact
+  types — `skill`, `command`, `agent`, `eval` and a repository-convention patch
+  — but nothing can materialize or activate them yet, and nothing proposes them
+  today.
+- **Turning learning off does not erase stored messages at once.** The recent
+  message text kept in the session record while learning was on stays there
+  until the next time a session stops or compacts, which is when the record is
+  rewritten without it.
+- **The curator does not read session transcripts.** Its batches are built
+  from observations, diaries, reflections and recalls; each run's manifest
+  records transcript summaries as unavailable (`source_not_implemented`).
+- **Not on the dashboard yet:** rolling an activated instinct back to the
+  version it replaced (activation keeps that version under `.backups/`, but
+  nothing restores it for you); a preview of a materialized draft file (read it at the path `learn drafts`
+  prints); promoting several candidates to global at once; and the curator's run
+  manifests (they are under `learning/curator-runs/`).
