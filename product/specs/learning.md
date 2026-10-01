@@ -156,7 +156,10 @@ was recorded about them.
   The restored file carries no archive stamp: restore removes `archived_at`
   and `archive_reason` and keeps `decay_charged_through`, so a later archive is
   never labelled or dated by the earlier one and decay never re-charges weeks
-  it already charged (D-046). Hand-editing state stays out of contract (B-5), so this is the only
+  it already charged (D-046). Restore moves a file and never activates
+  anything: a curator instinct a contradiction retired stays out of sessions
+  until `learn activate`, and the command says which case it was. Hand-editing
+  state stays out of contract (B-5), so this is the only
   supported route back; like every change to what may be
   injected, it is audited (D-040).
 - **B-14 A candidate name is checked at the door, once.** Layer 5 ingestion
