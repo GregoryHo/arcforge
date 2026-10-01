@@ -4,6 +4,11 @@
  *
  * B-1: the user-facing invocation is the bare `arcforge` command, so the help
  * text must never tell a plugin user to run `node scripts/cli.js`.
+ *
+ * B-4: `--help` prints the full surface, so for every command the flags its
+ * help entries name equal the flags the manifest declares for it (subcommand
+ * flags included) — a flag added to the manifest but not the help, or the
+ * reverse, fails here.
  */
 
 const assert = require('node:assert');
@@ -11,6 +16,7 @@ const { execFileSync } = require('node:child_process');
 const path = require('node:path');
 
 const CLI_PATH = path.resolve(__dirname, '../../scripts/cli.js');
+const { CLI_MANIFEST } = require('../../scripts/lib/cli-manifest');
 
 console.log('Testing arcforge --help...\n');
 
@@ -55,6 +61,45 @@ test('every EXAMPLES line starts with the bare arcforge command', () => {
   assert.ok(examples.length > 0, 'expected at least one example');
   for (const line of examples) assert.match(line, /^arcforge /, line);
 });
+
+// COMMANDS entries grouped by command: an entry line starts `  <command> `,
+// and every line up to the next entry belongs to it.
+function helpFlagsByCommand() {
+  const commands = Object.keys(CLI_MANIFEST);
+  const entryRe = new RegExp(`^ {2}(${commands.join('|')})\\b`);
+  const byCommand = Object.fromEntries(commands.map((c) => [c, new Set()]));
+  let current = null;
+  for (const line of section('COMMANDS')) {
+    const m = `  ${line}`.match(entryRe);
+    if (m) current = m[1];
+    if (!current) continue;
+    for (const flag of line.match(/--[a-z][a-z0-9-]*/g) || []) byCommand[current].add(flag);
+  }
+  return byCommand;
+}
+
+function manifestFlags(cmd) {
+  const entry = CLI_MANIFEST[cmd];
+  const flags = new Set(entry.flags || []);
+  for (const sub of Object.values(entry.subcommands || {})) {
+    for (const flag of sub.flags || []) flags.add(flag);
+  }
+  return flags;
+}
+
+const helpFlags = helpFlagsByCommand();
+for (const cmd of Object.keys(CLI_MANIFEST)) {
+  test(`${cmd}: help names exactly the manifest's flags (B-4)`, () => {
+    const declared = manifestFlags(cmd);
+    const shown = helpFlags[cmd];
+    const missing = [...declared].filter((f) => !shown.has(f)).sort();
+    const extra = [...shown].filter((f) => !declared.has(f)).sort();
+    assert.deepStrictEqual(
+      { missingFromHelp: missing, notInManifest: extra },
+      { missingFromHelp: [], notInManifest: [] },
+    );
+  });
+}
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

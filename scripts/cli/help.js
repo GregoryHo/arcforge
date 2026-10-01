@@ -134,7 +134,8 @@ COMMANDS:
   obsidian set-default <name>        Set the default vault.
   obsidian list-vaults [--json]      List registered vaults.
 
-ENVIRONMENT (all optional):
+ENVIRONMENT:
+  All optional; each has a default.
   CLAUDE_PROJECT_DIR              Project root directory (default: cwd)
   CLAUDE_SESSION_ID               Default --session for learn diary
   ARCFORGE_HOME                   State root (default: ~/.arcforge)

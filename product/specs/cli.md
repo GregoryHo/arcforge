@@ -55,8 +55,9 @@ underneath without breaking anything written against it.
   engine's CLI manifest; documentation checks and linters read it, and a second
   hardcoded copy of the command list is forbidden
   (`.claude/rules/architecture.md`, "Docs Are the Contract"). `--help` prints
-  the full list; the guides describe the same surface and `npm run check:docs`
-  holds them to it.
+  the full list, and a test holds each command's help flags equal to its
+  manifest flags; the guides describe the same surface and
+  `npm run check:docs` holds them to it.
 
 ### Output contracts
 - **B-5 Exit codes are the API.** `0` on success and non-zero on any failure,
