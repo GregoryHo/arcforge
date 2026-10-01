@@ -107,9 +107,14 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 
 ## Obsidian
 
-- **diagramming-headless-fallback** — give the diagramming references a headless
-  fallback for when no renderer can run, the gap left open since 6.0.0 alongside
-  the A4 hunting incentive; a skill edit, so it needs eval evidence.
+- **diagramming-headless-fallback** — `diagramming-obsidian`'s body points at
+  its `references/` helpers and templates with no fallback for when that
+  directory cannot be resolved, as in a headless eval trial. The agent then
+  hunts the filesystem for it (`find / -name diagramming-obsidian`,
+  `ls ~/.claude/skills/`), which the scenario's A4 criterion fails in both arms
+  alike. Missing: a stated fallback in the skill for an unresolvable
+  `references/`, and a measurement showing A4 stops firing. Open since 6.0.0
+  (P7 benchmark); a skill edit, so it needs eval evidence.
 
 ## Skill system
 
