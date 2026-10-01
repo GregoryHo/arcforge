@@ -12,8 +12,9 @@ render_excalidraw.py` from its own directory. A stub `uv` on PATH stands in for
 that render, so no test here needs Playwright or Chromium.
 
 The verifier's paths are fixed — it writes `/tmp/verify.excalidraw` and
-`/tmp/diagram-post-save.png` and compares against `/tmp/diagram.png` — so the
-manual-path tests write those two files, and never create `/tmp/diagram.png`.
+`/tmp/diagram-post-save.png` and compares against `/tmp/diagram.png` — so an
+autouse fixture moves any existing copy of the three aside for each test and
+puts it back afterwards; ambient `/tmp` state never reaches an assertion.
 """
 
 import importlib.util
@@ -38,10 +39,9 @@ MARKERS = (
 SCENE = json.dumps({"type": "excalidraw", "elements": [{"type": "rectangle", "x": 0, "y": 0}]})
 
 # Stands in for `uv run python render_excalidraw.py <in> --output <out> --scale 2`:
-# records its argv and cwd, then fails or writes a PNG of FAKE_UV_BYTES bytes (or
-# a copy of /tmp/diagram.png when that exists, so the size comparison passes).
+# records its argv and cwd, then fails or writes FAKE_UV_BYTES (default 100) bytes.
 FAKE_UV = '''
-import json, os, shutil, sys
+import json, os, sys
 from pathlib import Path
 with open(os.environ["FAKE_UV_LOG"], "w") as log:
     json.dump({"argv": sys.argv[1:], "cwd": os.getcwd()}, log)
@@ -49,12 +49,27 @@ if os.environ.get("FAKE_UV_MODE") == "fail":
     print("render exploded", file=sys.stderr)
     sys.exit(1)
 out = Path(sys.argv[sys.argv.index("--output") + 1])
-ref = Path("/tmp/diagram.png")
-if "FAKE_UV_BYTES" not in os.environ and ref.exists():
-    shutil.copyfile(ref, out)
-else:
-    out.write_bytes(b"x" * int(os.environ.get("FAKE_UV_BYTES", "100")))
+out.write_bytes(b"x" * int(os.environ.get("FAKE_UV_BYTES", "100")))
 '''
+
+FIXED_PATHS = tuple(Path(p) for p in ("/tmp/diagram.png", "/tmp/verify.excalidraw", "/tmp/diagram-post-save.png"))
+REFERENCE_PNG = FIXED_PATHS[0]
+
+
+@pytest.fixture(autouse=True)
+def isolated_fixed_paths():
+    # Save and remove whatever an earlier or interrupted run left at the
+    # verifier's fixed paths; restore it once the test is done.
+    saved = {path: path.read_bytes() for path in FIXED_PATHS if path.exists()}
+    for path in FIXED_PATHS:
+        path.unlink(missing_ok=True)
+    try:
+        yield
+    finally:
+        for path in FIXED_PATHS:
+            path.unlink(missing_ok=True)
+        for path, data in saved.items():
+            path.write_bytes(data)
 
 
 def _fake_uv(tmp_path: Path, mode: str, size: int | None = None) -> dict:
@@ -156,6 +171,8 @@ def test_no_drawing_block_fails(tmp_path):
 
 
 def test_manual_path_renders_from_the_scripts_directory_and_reports_success(tmp_path):
+    # A pre-save reference the same size as the stub's render: the ratio check runs and passes.
+    REFERENCE_PNG.write_bytes(b"x" * 100)
     env = _fake_uv(tmp_path, "ok")
     proc = _verify(tmp_path, _manual(SCENE), env)
     assert proc.returncode == 0, proc.stderr
@@ -186,8 +203,7 @@ def _load_module():
 def test_post_save_render_size_must_stay_within_half_to_double_the_reference(
     tmp_path, monkeypatch, capsys, new_size, passes
 ):
-    # Called in-process with a reference PNG under tmp_path: `main()` hard-wires
-    # the reference to /tmp/diagram.png, which a test must not create.
+    # Called in-process so the reference PNG can be any path, here under tmp_path.
     for key, value in _fake_uv(tmp_path, "ok", new_size).items():
         monkeypatch.setenv(key, value)
     reference = tmp_path / "ref.png"

@@ -6,9 +6,11 @@ validation, the "playwright missing" and "Chromium missing" messages, and that
 the Chromium hint's command can be run as printed — its `cd` target exists and
 is the directory holding the script's `pyproject.toml`.
 
-One test does a real render. It runs only where `uv sync` has built the
-script's own environment (`references/.venv`), and skips when Chromium is
-not installed there.
+One test does a real render. It is opt-in, because the render template loads
+Excalidraw from https://esm.sh and so needs the network: it runs only with
+`ARCFORGE_RENDER_TESTS=1` set and where `uv sync` has built the script's own
+environment (`references/.venv`), and it skips when Chromium is not installed
+there.
 """
 
 import json
@@ -182,8 +184,10 @@ def test_launch_failure_other_than_a_missing_browser_is_raised(tmp_path):
 
 
 @pytest.mark.skipif(
-    not (REFERENCES / ".venv").is_dir() or shutil.which("uv") is None,
-    reason="real render needs `uv sync` in the skill's references/ (no .venv there) and network for esm.sh",
+    os.environ.get("ARCFORGE_RENDER_TESTS") != "1"
+    or not (REFERENCES / ".venv").is_dir()
+    or shutil.which("uv") is None,
+    reason="opt-in real render: set ARCFORGE_RENDER_TESTS=1; needs network (esm.sh), uv, and `uv sync` in references/",
 )
 def test_real_render_writes_a_png_next_to_the_input(tmp_path):
     diagram = tmp_path / "d.excalidraw"
