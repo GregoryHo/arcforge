@@ -221,6 +221,15 @@ describe('loop-state', () => {
       expect(state.run_started_iteration).toBe(7);
     });
 
+    it('resets the previous run\'s terminal status and finished_at on resume', () => {
+      const state = loadLoopState(tmpDir);
+      state.status = 'max_runs';
+      state.finished_at = '2026-01-01T00:00:00.000Z';
+      beginRun(state, { pattern: 'tasks', maxRuns: 20 });
+      expect(state.status).toBe('running');
+      expect(state.finished_at).toBeNull();
+    });
+
     it('assigns a new run_id on each run (resume gets its own scope)', () => {
       const state = loadLoopState(tmpDir);
       beginRun(state, { pattern: 'sequential', maxRuns: 20 });
