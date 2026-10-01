@@ -25,7 +25,10 @@ also why running `npm run check:product` is something `pm` hands off rather than
 `qa` gets read, search, and **Bash**, because running `npm test` and the six static
 checks is its entire job — and no editing tools, because a reviewer that fixes what
 it finds has stopped being evidence. It reports; a human or `pm` acts. The explicit
-`disallowedTools:` line states that intent a second time.
+`disallowedTools:` line states that intent a second time. That restriction is
+instruction plus frontmatter only: `disallowedTools:` has not been verified against
+the host's subagent loader (D-007 Residual), so count on the `tools:` allowlist, not
+on it.
 
 Be honest about both seams. `qa` holds Bash, and a shell can write files: the
 allowlist removes the editing tools, not the possibility. And a `tools:` allowlist
