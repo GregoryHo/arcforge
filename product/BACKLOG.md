@@ -95,6 +95,7 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 - **redesign-router-skill-selection** — redesign `eval-router-skill-selection` for the clean instrument · needs: D-045.
 - **redesign-maintaining-obsidian-audit-runs-lint-script** — redesign `eval-maintaining-obsidian-audit-runs-lint-script` for the clean instrument · needs: D-045.
 - **redesign-maintaining-obsidian-link-rebuilds-index** — redesign `eval-maintaining-obsidian-link-rebuilds-index` for the clean instrument · needs: D-045.
+- **redesign-speccing-supersede-not-overwrite** — redesign `eval-speccing-supersede-not-overwrite`'s rubric for the clean instrument, where its Version 8 baseline sits at ceiling · needs: D-047.
 
 ## Hooks
 

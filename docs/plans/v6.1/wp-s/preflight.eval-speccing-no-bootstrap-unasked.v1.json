@@ -1,0 +1,14 @@
+{
+  "scenario_hash": "1a8cde1a195966af",
+  "scenario_name": "eval-speccing-no-bootstrap-unasked",
+  "model": "opus[1m]",
+  "max_turns": 30,
+  "plugin_dir": false,
+  "effort": "xhigh",
+  "trial_timeout_ms": 900000,
+  "pass_rate": 1,
+  "k": 3,
+  "verdict": "BLOCK",
+  "reason": "Baseline pass rate 100% >= 80% ceiling — scenario is not discriminative. Redesign the scenario to be harder.",
+  "timestamp": "2026-10-01T08:44:58.648Z"
+}

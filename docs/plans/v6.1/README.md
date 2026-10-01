@@ -8,6 +8,7 @@
 | [`recap-2026-09-29.json`](recap-2026-09-29.json) | 盤點出的 120 項未完成事項，每項含 `id`、排定的 `version`、說明與證據 |
 | [`wp-e/`](wp-e/) | `claude plugin eval` 三個 case 的彙總結果（D-024、D-025、D-044 的證據） |
 | [`wp-f/`](wp-f/) | 6.1.1 量測回合的七份 preflight 讀數，從被 gitignore 的快取複製出來（D-021、D-045 的證據） |
+| [`wp-s/`](wp-s/) | 6.2.0 量測回合的五份 preflight 讀數（四支 scenario，no-bootstrap 分 V1、V2），從被 gitignore 的快取複製出來（D-047 的證據） |
 | [`wp-g-post-install.md`](wp-g-post-install.md) | 6.1.1 安裝後查核（release-4、hooks-8、GitHub 來源的 hook 驗證）與兩個 6.1.2 候選 |
 
 ## 事項編號

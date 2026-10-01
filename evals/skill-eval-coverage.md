@@ -47,13 +47,13 @@ p7-benchmark-evidence.md「協定修正案」）。
 **84.2% ≥ 80% ✓**（線下：brainstorming 0.40、diagramming 0.00、tdd 0.40——三支 delta
 皆 IMPROVED；低 pass 反映 0.8 trial bar 的嚴格性，非技能無效）。
 
-## 每支 skill 的現行 delta 證據（P7 收官，6.1.1 更新）
+## 每支 skill 的現行 delta 證據（P7 收官，6.1.1、6.2.0 更新）
 
-未標 6.1.1 的列皆為修復前池（unrecorded 條件），見文末「6.1.1 量測輪」。
+未標 6.1.1 或 6.2.0 的列皆為修復前池（unrecorded 條件），見文末「6.1.1 量測輪」與「6.2.0 量測輪」。
 
 | skill | 現行證據 | 出處 |
 |---|---|---|
-| speccing | spec-before-code **+0.67 CI[0.67, 0.67] IMPROVED**（注入模態）；supersede-not-overwrite unmet-but-covered（baseline ceiling）；plugin 路由下自行觸發 **0/10**（routing-control 5/5 為對照，#179 確認），請以 `/arcforge:speccing` 呼叫；no-bootstrap-unasked（sdd B-6，D-020）已撰寫；V1 於 2026-10-01 preflight 觸及 baseline 上限（3/3）而 BLOCK，已重新設計一次（V2：A2 改為也檢查 doc 檔新增的 roadmap／decision 章節），尚未量測 | 6.1.0 ab k=10；6.1.1 WP-E `claude plugin eval`（見 6.1.1 量測輪）；no-bootstrap-unasked V2 無量測 |
+| speccing | spec-before-code V3 **+0.60 CI[0.51, 0.68] IMPROVED**（注入模態；V2 的 +0.67 CI[0.67, 0.67] 為修復前讀數）；no-bootstrap-unasked V2（sdd B-6，D-020）**+0.20 CI[0.06, 0.34] IMPROVED**，B-6 的第一筆 harness 證據；supersede-not-overwrite V8 preflight **BLOCK**（baseline 100%），仍為 unmet-but-covered（baseline ceiling）；plugin 路由下自行觸發 **0/10**（routing-control 5/5 為對照，#179 確認），請以 `/arcforge:speccing` 呼叫 | 6.2.0 ab k=10／k=5 + preflight（見 6.2.0 量測輪）；6.1.1 WP-E `claude plugin eval`（見 6.1.1 量測輪） |
 | tdd | +0.63 CI[0.41, 0.86] | P7 ab |
 | finishing | **+0.71 CI[0.71, 0.71]** | 6.1.1 ab k=5（修復後儀器；P7 +0.54 為修復前池） |
 | code-review | two-axis +0.40；range-fidelity +0.27 non-reg PASS；answering-feedback +0.05 但 non-reg **REGRESSED**（4/5，D-026） | P7 ab ×3 |
@@ -63,7 +63,7 @@ p7-benchmark-evidence.md「協定修正案」）。
 | sessions | +0.29（吸收 compacting：non-reg 1.00） | P7 ab |
 | maintaining-obsidian | vault-only-answer **+0.20 CI[0.2, 0.2]**；audit-runs-lint-script、link-rebuilds-index preflight **BLOCK**（baseline 100%） | 6.1.1 ab k=5 + preflight（P7 +0.28 為修復前池） |
 | diagramming-obsidian | **+0.20 CI[0.01, 0.39]**（1800 s ceiling） | 6.1.1 ab k=5（P7 +0.23 為修復前合池） |
-| learning | +0.25（標記保留；e2e 全鏈路 PASS） | P5，P7 run 池 0.80 佐證 |
+| learning | marker-preservation **+1.00 CI[1, 1] IMPROVED**（D-038 的一句修改之後；e2e 全鏈路 PASS） | 6.2.0 ab k=5（P5 +0.25 為修復前讀數） |
 | looping | +0.19 CI[0.07, 0.31]；loop e2e PASS | P6 |
 | debugging | unmet-but-covered（P7 ceiling ×2；P4 +0.16 歷史） | 存廢建議書 |
 | dispatching | unmet-but-covered（ceiling ×3） | 存廢建議書 |
@@ -343,8 +343,8 @@ only. This gap closes when a harness can reach that host, not before.
 
 | scenario | Version | preflight | A/B (k=10) | 結論 |
 |---|---|---|---|---|
-| `eval-speccing-spec-before-code` | 2 | PASS（baseline 0%） | baseline avg 0.33 / pass 0%；treatment avg 1.00 / pass 100% | **+0.67 CI[0.67, 0.67] IMPROVED** |
-| `eval-speccing-supersede-not-overwrite` | 7 | **BLOCK（baseline 100%, k=3；以 Version 3 文本量測）** | 未執行 | **unmet-but-covered（baseline ceiling）** |
+| `eval-speccing-spec-before-code` | 2（現行 3，見 6.2.0 量測輪） | PASS（baseline 0%） | baseline avg 0.33 / pass 0%；treatment avg 1.00 / pass 100% | **+0.67 CI[0.67, 0.67] IMPROVED** |
+| `eval-speccing-supersede-not-overwrite` | 7（現行 8，見 6.2.0 量測輪） | **BLOCK（baseline 100%, k=3；以 Version 3 文本量測）** | 未執行 | **unmet-but-covered（baseline ceiling）** |
 
 預登記門檻：delta > 0 且 CI 下界 ≥ 0，k=10。前者達標，後者依其 Design Notes 內
 預登記的 fallback 出貨。
@@ -1667,7 +1667,8 @@ A/B, or compare was run.
 ## 6.1.1 量測輪（2026-10-01，修復後儀器）
 
 依 D-021，本輪只重跑主體在上次快照後有變動、或儀器修復本來就要讀的 scenario。快照
-`evals/benchmarks/2026-10-01.json`（= `latest.json`）於 **2026-10-01T01:16:02Z** 生成，
+`evals/benchmarks/2026-10-01.json`（= `latest.json`）於 **2026-10-01T01:16:02Z** 生成（該檔後來被同日的
+6.2.0 量測輪覆寫，此版復原為 `2026-10-01-v6.1.1.json`），
 程式碼等同 main 合入 #206（儀器修復：#170 隔離漏洞、refusal-as-trial 計分等）與 #213
 （權限回歸修正）之後。本次快照未帶 `--since`（無 `result_filter`），每列依 scenario
 Version 與執行條件分池（eval B-8）。
@@ -1725,13 +1726,13 @@ trial ceiling 預設 900 s；diagramming 依 D-017 以 1800 s 執行，數值逐
 | debugging-root-cause-first | 2026-08-15 |
 | dispatching-report-not-evidence | 2026-08-15 |
 | evaluating-cross-condition-validity | 2026-08-15 |
-| learning-marker-preservation | 2026-08-15 |
 | looping-stale-state-relaunch | 2026-08-15 |
 | sessions-handover-completeness | 2026-08-15 |
 | tdd-test-first-gate | 2026-08-15 |
 | writing-skills-recipe-over-prohibition | 2026-08-15 |
-| speccing-spec-before-code | 2026-09-07（6.1.0 plugin-routed run） |
-| speccing-supersede-not-overwrite | 2026-09-07（6.1.0 plugin-routed run） |
+
+learning-marker-preservation 與兩支 speccing scenario 原本也列在此表，已於 6.2.0 量測輪重跑，
+見下一節。
 
 快照未帶 `--since`，因此部分未重跑列的數值與 P7 窗內數值不同（例如 brainstorming 讀
 +0.43、tdd 讀 +0.76，P7 窗內為 +0.35、+0.63）：差別來自池的時間範圍，不是新量測。
@@ -1763,3 +1764,58 @@ plugin dir 時才加，於是沒有 plugin dir 的 isolated trial 在 `-p` 模�
 文件上揭露並請使用者以 `/arcforge:speccing` 明確呼叫，不改 skill 的 description；本輪
 README 與 `docs/guide/skills-reference.md` 已照此更新。spec-before-code 量到的 +0.67
 仍證明注入模態下 skill 指示有效，這和路由觸發率是兩件事。
+
+## 6.2.0 量測輪（2026-10-01，修復後儀器）
+
+本輪量的是 6.2.0 動到的 skill 與 eval 語料。6.2.0 唯一的 skill 修改是 D-038 在
+`skills/core/learning/SKILL.md` 加的一句話（#234）；scenario 修改來自 WP-S（#235、#238），
+其中 spec-before-code 的 A5 依 D-043（grader 不執行 trial 產出）改成靜態檢查。快照
+`evals/benchmarks/2026-10-01.json`（= `latest.json`）於 **2026-10-01T09:13:37Z** 生成，
+覆寫了同日稍早 6.1.1 量測輪的同名檔案（引擎對同日快照只留一份）；6.1.1 那一版從 `v6.1.1`
+tag 復原為 `evals/benchmarks/2026-10-01-v6.1.1.json` 與 `raw/2026-10-01-v6.1.1.json`，
+`eval history` 只列日期檔名所以不會列出它，但 repo 裡兩份都在。本次快照同樣未帶
+`--since`，每列依 scenario Version 與執行條件分池（eval B-8）。本輪的發現由 D-047 記錄。
+
+**條件**：與 6.1.1 量測輪相同——`--model 'opus[1m]' --effort xhigh`、isolation
+`isolated`、`--setting-sources project,local`、`--dangerously-skip-permissions`、不帶
+`--plugin-dir`（skill 以 `--skill-file` 注入）、trial ceiling 900 s。每支先跑 k=3 的
+preflight。本輪共 **55 個 live session**（預算 70）：no-bootstrap V1 preflight 3、learning
+3 + 10、spec-before-code 3 + 20、no-bootstrap V2 3 + 10、supersede preflight 3。五份
+preflight 讀數從被 gitignore 的快取複製到 `docs/plans/v6.1/wp-s/`：四支各一份，
+no-bootstrap-unasked 另分 V1 的 BLOCK（`.v1.json`）與 V2 的 PASS（`.v2.json`）兩份。
+
+### A/B 結果（皆先過 preflight k=3 PASS，baseline 0%）
+
+| scenario | Version | run id | baseline | treatment | delta |
+|---|---|---|---|---|---|
+| learning-marker-preservation | 1 | `20261001-084604` | avg 0.00 / pass 0%（0/5） | avg 1.00 / pass 100%（5/5） | **+1.00 CI[1, 1] IMPROVED** |
+| speccing-spec-before-code | 3 | `20261001-084831` | avg 0.39 / pass 0%（0/10） | avg 0.99 / pass 90%（9/10；trial 6 只錯 A7） | **+0.60 CI[0.51, 0.68] IMPROVED** |
+| speccing-no-bootstrap-unasked | 2 | `20261001-090524` | avg 0.75 / pass 0%（0/5，全部錯在 A2） | avg 0.95 / pass 80%（4/5；trial 4 錯 A3） | **+0.20 CI[0.06, 0.34] IMPROVED** |
+
+- **learning-marker-preservation**：本輪量它，是因為 D-038 的那一句是 6.2.0 唯一的 skill
+  修改。P5 的 +0.25 與 P7 的 run 池（2026-08-15，unrecorded 條件）留作修復前紀錄。
+- **spec-before-code V3**（#235）：A5 依 D-043 改為靜態檢查、A4 改認刪除線、A1 修正極性、
+  新增 A7（揭露）。V2 的 +0.67 CI[0.67, 0.67] 改列為修復前讀數；兩者分屬不同 Version，
+  不合併。
+- **no-bootstrap-unasked V2**（#238）：sdd B-6 的第一筆 harness 證據。V1 的 BLOCK 見下節。
+
+### Preflight BLOCK：紀錄本身就是發現
+
+| scenario | Version | preflight run id | 本輪 | 讀法 |
+|---|---|---|---|---|
+| speccing-no-bootstrap-unasked | 1 | `20261001-084255` | preflight BLOCK（baseline 3/3） | baseline 把 `## Roadmap` 與 `## Decisions` 寫進 README.md，而 V1 的 A2 只檢查檔名。依預登記，用掉它唯一一次重新設計：V2（#238）的 A2 改為逐一比對 doc 檔與 fixture 的差異，之後 preflight PASS 並量出上節的 +0.20 |
+| speccing-supersede-not-overwrite | 8 | `20261001-091023` | preflight BLOCK（baseline 3/3） | V8（#235）把 A3 改為位置判定。這是 V7 起的 grader 與修好的儀器第一次評 baseline，結果證實預期中的天花板；未跑 A/B，快照中無此 scenario 的池。維持 **unmet-but-covered（baseline ceiling）**，現在有了帶日期的讀數 |
+
+### 未重跑的池
+
+6.1.1 量測輪「未重跑的池」表中剩下的 13 支本輪仍未重跑，數值仍是修復前、unrecorded 條件；
+6.1.1 本身量過的 finishing、diagramming-obsidian、maintaining-obsidian（vault-only-answer）
+維持 6.1.1 的讀數，四支 preflight BLOCK 也維持原紀錄。
+
+### WP-S 讀法
+
+WP-S 修的是儀器，不是 skill。spec-before-code 從 +0.67 變成 +0.60，原因是 V3 改了 rubric，
+不是 skill 變差：baseline 平均從 0.33 升到 0.39，treatment 從 1.00 降到 0.99（一個 trial
+錯在新增的 A7）。no-bootstrap-unasked 從 V1 的 BLOCK 到 V2 的 IMPROVED，說明 V1 的天花板
+來自斷言太鬆，不是 baseline 本來就會做對。supersede-not-overwrite 在修好的 grader 上仍是
+BLOCK，證實了預期中的 baseline 天花板。以上讀法的定案見 D-047。

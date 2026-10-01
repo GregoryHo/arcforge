@@ -1,0 +1,14 @@
+{
+  "scenario_hash": "edd3cb5002f2c837",
+  "scenario_name": "eval-speccing-spec-before-code",
+  "model": "opus[1m]",
+  "max_turns": 40,
+  "plugin_dir": false,
+  "effort": "xhigh",
+  "trial_timeout_ms": 900000,
+  "pass_rate": 0,
+  "k": 3,
+  "verdict": "PASS",
+  "reason": "Baseline pass rate 0% < 80% — scenario is discriminative. Proceed with arcforge eval ab.",
+  "timestamp": "2026-10-01T08:48:31.635Z"
+}

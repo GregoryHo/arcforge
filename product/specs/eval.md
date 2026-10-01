@@ -211,6 +211,9 @@ its rationale is inline at B-10.
   written down before 6.1.1's results are read (B-5).
 - **D-045** — the four ceiling BLOCKs of 6.1.1's round are findings about the
   scenarios, not the skills; those skills keep their pre-repair evidence (B-3).
+- **D-047** — 6.2.0's round: the supersede scenario's ceiling BLOCK is a
+  finding about the scenario, and the no-bootstrap scenario measured after its
+  one pre-registered redesign (B-3, B-8).
 - **D-020** — 6.2.0 carries the scenario rubric fixes with their own
   measurement round (B-8).
 - **D-043** — graders never execute trial output (B-6, B-7, B-8, B-12).
