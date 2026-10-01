@@ -118,6 +118,7 @@ arcforge eval dashboard [--port N]
 |------|-----------|--------|
 | `--k` | `run`, `ab` | Trials per condition |
 | `--model` | `run`, `ab`, `preflight` | Model to run trials on |
+| `--effort` | `run`, `ab`, `preflight` | Reasoning effort passed to every spawned trial |
 | `--no-isolate` | `run` | Keep plugins and MCP servers loaded in the trial session (stripped by default); the clean trial directory is used either way |
 | `--plugin-dir` | `run`, `ab` | Load a plugin directory into the trial session |
 | `--max-turns` | `run`, `ab` | Turn budget, overriding the scenario's own |
@@ -162,6 +163,24 @@ candidates — the artifact the engine can build today. Every command takes
 further subgroups — `learn diary`, `learn reflect`, `learn instinct`, and
 `learn recall` — which the `/learning` skill drives. The
 [learning guide](learning-dashboard.md) walks the whole loop.
+
+The subgroups take their entity id positionally and everything else as a flag.
+Here `--project` is a value — a project name, defaulting to the current
+directory's — not the scope switch the candidate commands take.
+
+```bash
+arcforge learn diary path [--draft] [--project P] [--date D] [--session S]
+arcforge learn diary save --content "..." [--project P] [--date D] [--session S]
+arcforge learn diary finalize [--project P] [--date D] [--session S]
+arcforge learn reflect scan [--project P] [--json]
+arcforge learn reflect record <reflect-id> [--diaries "a,b"] [--reflection FILE] [--summary "..."]
+arcforge learn instinct status [--project P] [--json]
+arcforge learn instinct save <id> --trigger "..." --action "..." [--source manual|reflection] [--domain D] [--evidence "..."] [--evidence-count N]
+arcforge learn instinct confirm|contradict <id> [--project P] [--json]
+arcforge learn recall record <recall-id> [--query "..."] [--instinct-ids "a,b"] [--summary "..."]
+```
+
+`--date` defaults to today and `--session` to the current Claude Code session.
 
 ## `obsidian`
 
