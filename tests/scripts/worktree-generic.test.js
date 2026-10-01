@@ -238,6 +238,27 @@ describe('worktree-generic', () => {
       expect(fs.existsSync(wtPath)).toBe(false);
     });
 
+    test('linked worktree and main checkout share one namespace, both directions', () => {
+      const linked = path.join(testHome, 'linked');
+      runGit(['worktree', 'add', '-q', '-b', 'linked', linked], root);
+
+      const fromLinked = runCli(['worktree', 'add', 'one', '--json'], linked);
+      expect(fromLinked.exitCode).toBe(0);
+      const onePath = JSON.parse(fromLinked.stdout).path;
+      expect(onePath).toBe(getWorktreePath(root, null, 'one'));
+      const removedAtRoot = runCli(['worktree', 'remove', 'one', '--json'], root);
+      expect(removedAtRoot.exitCode).toBe(0);
+      expect(JSON.parse(removedAtRoot.stdout).path).toBe(onePath);
+
+      const fromRoot = runCli(['worktree', 'add', 'two', '--json'], root);
+      expect(fromRoot.exitCode).toBe(0);
+      const twoPath = JSON.parse(fromRoot.stdout).path;
+      const removedInLinked = runCli(['worktree', 'remove', 'two', '--json'], linked);
+      expect(removedInLinked.exitCode).toBe(0);
+      expect(JSON.parse(removedInLinked.stdout).path).toBe(twoPath);
+      expect(fs.existsSync(twoPath)).toBe(false);
+    });
+
     test('a worktree at the old cwd-derived path is listed and removable', () => {
       const oldPath = getWorktreePath(subdir, null, 'legacy');
       fs.mkdirSync(getWorktreeRoot(), { recursive: true });
@@ -268,7 +289,7 @@ describe('worktree-generic', () => {
     test('outside a git repository, add fails naming why the root fell back', () => {
       const outside = fs.mkdtempSync(path.join(testHome, 'not-a-repo-'));
       expect(() => addGenericWorktree({ projectRoot: outside, name: 'x' })).toThrow(
-        /git rev-parse --show-toplevel/,
+        /git rev-parse --git-common-dir/,
       );
     });
   });

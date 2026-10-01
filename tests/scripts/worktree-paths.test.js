@@ -32,10 +32,27 @@ describe('resolveProjectRoot', () => {
     expect(resolveProjectRoot(sub)).toEqual({ root: tmp, fallbackReason: null });
   });
 
+  it('returns the primary checkout from inside a linked worktree', () => {
+    const repo = path.join(tmp, 'repo');
+    fs.mkdirSync(repo);
+    const git = (args, cwd) => execFileSync('git', args, { cwd, stdio: 'pipe' });
+    git(['init', '-q'], repo);
+    git(
+      ['-c', 'user.email=t@e.com', '-c', 'user.name=T', 'commit', '-q', '--allow-empty', '-m', 'i'],
+      repo,
+    );
+    const linked = path.join(tmp, 'linked');
+    git(['worktree', 'add', '-q', '-b', 'linked', linked], repo);
+    const sub = path.join(linked, 'deep');
+    fs.mkdirSync(sub);
+    expect(resolveProjectRoot(linked)).toEqual(resolveProjectRoot(repo));
+    expect(resolveProjectRoot(sub).root).toBe(repo);
+  });
+
   it('falls back to the directory itself outside a git repo, with the reason', () => {
     const result = resolveProjectRoot(tmp);
     expect(result.root).toBe(tmp);
-    expect(result.fallbackReason).toMatch(/git rev-parse --show-toplevel/);
+    expect(result.fallbackReason).toMatch(/git rev-parse --git-common-dir/);
   });
 });
 
