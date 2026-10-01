@@ -45,8 +45,11 @@ const DECISION_INDENT_RE = /^ {1,3}###/;
 // two adjacent shapes. The surrounding `\s*` collapse every whitespace-only value
 // to exactly `''`, so emptiness is a string comparison downstream, not a trim.
 const STATUS_FIELD_RE = /^ {0,3}-\s+Status:\s*(.*?)\s*$/;
+// The clause number is captured, not just its presence, because a clause has
+// one claimant: two `(clause N)` edges naming the same N of one victim are the
+// second reversing a clause the first already killed.
 const RELATION_FIELD_RE =
-  /^-\s+(Supersedes|Refines|Extends):\s+D-(\d{3})(\s*\(clause\s+\d+\))?\s*$/;
+  /^-\s+(Supersedes|Refines|Extends):\s+D-(\d{3})(?:\s*\(clause\s+(\d+)\))?\s*$/;
 // Candidate-shaped: any markdown bullet whose field label is one of the three
 // relation labels, however it is cased or spaced around the colon. Wider than
 // RELATION_FIELD_RE on purpose — the strict form is what reports these, so a
@@ -200,7 +203,11 @@ function parseDecisions(roadmap, errors) {
         );
         continue;
       }
-      current.relations.push({ kind: rel[1], target: Number(rel[2]), clause: !!rel[3] });
+      current.relations.push({
+        kind: rel[1],
+        target: Number(rel[2]),
+        clause: rel[3] === undefined ? null : Number(rel[3]),
+      });
     }
   }
   return entries;
@@ -240,8 +247,8 @@ function checkDecisionNumbering(entries, errors) {
  * while accepting none applies the same structural rule in one direction only:
  * an entry with no `Status:` records nothing about whether it still governs, and
  * a later reversal finds no line to flip. Counting needs no vocabulary, so this
- * runs on every entry — unlike the *value* check below, which stays scoped to
- * entries something supersedes (D-006 records that scope as a deliberate residual).
+ * runs on every entry, as the vocabulary check below now does too (D-033 widened
+ * it from the entries something supersedes, the residual D-006 had recorded).
  *
  * Three states, not two, because a line can be present and still record nothing:
  * no line at all, a line with nothing after the colon, and a line with a value.
@@ -260,7 +267,11 @@ function checkStatusPresence(entries, errors) {
   }
 }
 
-/** A decision `Status:` split into its `·`-separated clauses. */
+/**
+ * A decision `Status:` split into its `·`-separated clauses. Empty clauses are
+ * dropped here because every caller runs after `checkStatusVocabulary`, which
+ * is what reports them — a trailing `·` is rejected there, not discarded.
+ */
 function statusClauses(status) {
   return status
     .split('·')
@@ -269,25 +280,44 @@ function statusClauses(status) {
 }
 
 /**
- * C3 — a superseded entry's `Status:` as a whole has to stay coherent, not just
- * contain the right phrase somewhere: every clause comes from the closed
- * vocabulary, a decision dies at most once, a totally superseded one has stopped
- * being live, a partially superseded one keeps the live clause that still
- * governs the rest of it, and one decision does not both replace it whole and
- * reverse a clause of it — the two forms mean different things, so they cannot
- * both hold for one superseder/victim pair.
+ * C3 — every entry's `Status:`, not only a superseded one's, is `·`-separated
+ * clauses from the closed vocabulary. Scoped to victims, an unflipped entry
+ * could say `banana` and pass, and a stray separator on any entry was split
+ * into an empty clause and silently thrown away. Returns whether the status
+ * passed, so the coherence check below reads only a status made of known
+ * clauses and one bad clause stays one error.
  */
-function checkSupersededStatus(victim, errors) {
-  const clauses = statusClauses(victim.status);
-  const unknown = clauses.find(
+function checkStatusVocabulary(entry, errors) {
+  const raw = entry.status.split('·').map((s) => s.trim());
+  if (raw.includes('')) {
+    errors.push(
+      `C3 ${entry.id}: Status is "${entry.status}" — an empty clause (a leading, doubled or trailing "·") is reported rather than discarded`,
+    );
+    return false;
+  }
+  const unknown = raw.find(
     (c) => !DECISION_LIVE_STATUS.has(c) && !TOTAL_FLIP_RE.test(c) && !PARTIAL_FLIP_RE.test(c),
   );
   if (unknown) {
     errors.push(
-      `C3 ${victim.id}: Status carries "${unknown}", which is not one of Accepted | Proposed | Superseded-by: D-NNN | partially superseded by D-NNN`,
+      `C3 ${entry.id}: Status carries "${unknown}", which is not one of Accepted | Proposed | Superseded-by: D-NNN | partially superseded by D-NNN`,
     );
-    return;
+    return false;
   }
+  return true;
+}
+
+/**
+ * C3 — a superseded entry's `Status:` as a whole has to stay coherent, not just
+ * contain the right phrase somewhere: a decision dies at most once, a totally
+ * superseded one has stopped being live, a partially superseded one keeps the
+ * live clause that still governs the rest of it, and one decision does not both
+ * replace it whole and reverse a clause of it — the two forms mean different
+ * things, so they cannot both hold for one superseder/victim pair. Its clauses
+ * are already known to be in the vocabulary (`checkStatusVocabulary`).
+ */
+function checkSupersededStatus(victim, errors) {
+  const clauses = statusClauses(victim.status);
   const totals = clauses.filter((c) => TOTAL_FLIP_RE.test(c));
   const live = clauses.filter((c) => DECISION_LIVE_STATUS.has(c));
   // Each relation edge only ever asks whether its own flip clause is present, so
@@ -356,6 +386,25 @@ function checkFlipsAreClaimed(entries, byNum, errors) {
 }
 
 /**
+ * C3 — a clause has one claimant. Two decisions naming the same `(clause N)` of
+ * one entry both find their `partially superseded by` flip on it and pass the
+ * pairing, yet the second reverses a clause that was already dead. Keyed on the
+ * victim and the clause number, so two decisions reversing *different* clauses
+ * of one entry stay legal.
+ */
+function checkClauseClaimant(superseder, targetId, clause, claimants, errors) {
+  const key = `${targetId}#${clause}`;
+  const first = claimants.get(key);
+  if (first === undefined) {
+    claimants.set(key, superseder.id);
+    return;
+  }
+  errors.push(
+    `C3 ${superseder.id}: "Supersedes: ${targetId} (clause ${clause})" names a clause ${first} already claims — a clause has one claimant, so the second would reverse a clause already dead`,
+  );
+}
+
+/**
  * C3 — every relation resolves backwards, and a supersession is two edits: the
  * flip on the superseded entry is the second one. `Refines:` and `Extends:`
  * sharpen or widen a decision that stays in force, so they need an earlier
@@ -372,6 +421,7 @@ function checkFlipsAreClaimed(entries, byNum, errors) {
 function checkRelations(entries, errors) {
   const byNum = new Map(entries.map((e) => [e.num, e]));
   const victims = new Map();
+  const claimants = new Map();
   for (const e of entries) {
     for (const { kind, target, clause } of e.relations) {
       const targetId = `D-${String(target).padStart(3, '0')}`;
@@ -387,12 +437,14 @@ function checkRelations(entries, errors) {
         continue;
       }
       if (kind !== 'Supersedes') continue;
+      if (clause !== null) checkClauseClaimant(e, targetId, clause, claimants, errors);
       // A victim with no `Status:` is already reported once by
       // `checkStatusPresence`; saying it again per superseding edge would turn
       // one missing line into N errors.
       if (victim.status === null) continue;
       victims.set(target, victim);
-      const expected = clause ? `partially superseded by ${e.id}` : `Superseded-by: ${e.id}`;
+      const expected =
+        clause !== null ? `partially superseded by ${e.id}` : `Superseded-by: ${e.id}`;
       if (!statusClauses(victim.status).includes(expected)) {
         errors.push(
           `C3 ${targetId}: Status is "${victim.status}" but ${e.id} supersedes it — expected it to carry "${expected}"`,
@@ -401,7 +453,13 @@ function checkRelations(entries, errors) {
     }
   }
   checkFlipsAreClaimed(entries, byNum, errors);
-  for (const victim of victims.values()) checkSupersededStatus(victim, errors);
+  const coherent = new Set();
+  for (const e of entries) {
+    if (e.status !== null && checkStatusVocabulary(e, errors)) coherent.add(e);
+  }
+  for (const victim of victims.values()) {
+    if (coherent.has(victim)) checkSupersededStatus(victim, errors);
+  }
 }
 
 module.exports = {

@@ -135,6 +135,18 @@ function spec({
       '',
       'What it does.',
       '',
+      '## Scope',
+      '',
+      'What it covers.',
+      '',
+      '## Behavior',
+      '',
+      'How it acts.',
+      '',
+      '## Data / domain model',
+      '',
+      'What it stores.',
+      '',
       '## Decisions',
       '',
       decisions,
@@ -799,6 +811,53 @@ describe('check-product', () => {
         decision({ id: 'D-003', extra: ['- Supersedes: D-001'] }),
       ];
       expect(of('C3', run({ roadmap: { decisions } }))).toEqual([]);
+    });
+
+    it('rejects an unknown clause on an entry nothing supersedes', () => {
+      const decisions = [decision({ id: 'D-001', status: 'banana' })];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/D-001: Status carries "banana", which is not one of Accepted/);
+    });
+
+    it('rejects an unknown clause beside a live one on an entry nothing supersedes', () => {
+      const decisions = [decision({ id: 'D-001', status: 'Accepted · banana' })];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/Status carries "banana"/);
+    });
+
+    it('rejects a trailing separator on an entry nothing supersedes', () => {
+      const decisions = [decision({ id: 'D-001', status: 'Accepted ·' })];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/D-001: Status is "Accepted ·" — an empty clause/);
+    });
+
+    it('rejects a trailing separator on a superseded entry', () => {
+      const decisions = supersedingLog(
+        '- Supersedes: D-001 (clause 2)',
+        'Accepted · partially superseded by D-002 ·',
+      );
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/an empty clause/);
+    });
+
+    it('rejects two decisions claiming the same clause of one entry', () => {
+      const decisions = [
+        decision({
+          id: 'D-001',
+          status: 'Accepted · partially superseded by D-002 · partially superseded by D-003',
+        }),
+        decision({ id: 'D-002', extra: ['- Supersedes: D-001 (clause 1)'] }),
+        decision({ id: 'D-003', extra: ['- Supersedes: D-001 (clause 1)'] }),
+      ];
+      const errors = of('C3', run({ roadmap: { decisions } }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(
+        /D-003: "Supersedes: D-001 \(clause 1\)" names a clause D-002 already claims/,
+      );
     });
 
     it('rejects an entry both wholly and partially superseded by the same decision', () => {
@@ -1686,6 +1745,50 @@ describe('check-product', () => {
       const errors = of('C5', validateProduct({ roadmap: roadmap(), specs }));
       expect(errors).toHaveLength(1);
       expect(errors[0]).toMatch(/cites D-009/);
+    });
+  });
+
+  describe('C8 — a spec carries the five template sections', () => {
+    const HEADINGS = ['Purpose', 'Scope', 'Behavior', 'Data / domain model', 'Decisions'];
+    /** The default spec with its `## <heading>` line replaced by `replacement` lines. */
+    const mutated = (heading, replacement) => {
+      const base = spec();
+      const lines = base.content.split('\n');
+      const at = lines.indexOf(`## ${heading}`);
+      lines.splice(at, 1, ...replacement);
+      return { ...base, content: lines.join('\n') };
+    };
+
+    it('accepts a spec carrying all five headings', () => {
+      expect(of('C8', run())).toEqual([]);
+    });
+
+    it.each(HEADINGS)('rejects a spec that dropped "## %s"', (heading) => {
+      const errors = of('C8', run({ specs: [mutated(heading, [])] }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toBe(
+        `C8 specs/alpha.md: missing the "## ${heading}" section heading — a spec carries the template's five, each at column 1 outside a fence or comment`,
+      );
+    });
+
+    it.each([
+      ['renamed', ['## Behaviour']],
+      ['indented', [' ## Behavior']],
+      ['demoted', ['### Behavior']],
+      ['fenced', ['```', '## Behavior', '```']],
+      ['commented', ['<!--', '## Behavior', '-->']],
+    ])('rejects the heading when %s', (_kind, replacement) => {
+      const errors = of('C8', run({ specs: [mutated('Behavior', replacement)] }));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/^C8 specs\/alpha\.md: missing the "## Behavior" section heading/);
+    });
+
+    it('reports the spec whose Decisions heading an unclosed fence swallowed', () => {
+      const errors = of('C8', run({ specs: [mutated('Data / domain model', ['```'])] }));
+      expect(errors).toEqual([
+        expect.stringMatching(/missing the "## Data \/ domain model" section heading/),
+        expect.stringMatching(/missing the "## Decisions" section heading/),
+      ]);
     });
   });
 

@@ -5,10 +5,10 @@
  *
  * Reads the hand-maintained product state under `product/` — the roadmap table
  * and Decision Log in `ROADMAP.md`, plus every living spec in `specs/` — and
- * validates it with scripts/lib/product-lint.js, which owns the C1–C7 rules
+ * validates it with scripts/lib/product-lint.js, which owns the C1–C8 rules
  * (the `← we are here` marker, the log's numbering and supersession
  * invariants, spec headers against their governing roadmap row, spec citations,
- * the sanity floor, and the `Tag` cell). Each of the two formats in `ROADMAP.md`
+ * the sanity floor, the `Tag` cell, and the spec's five sections). Each of the two formats in `ROADMAP.md`
  * has its own reader beside it — the roadmap table's is
  * scripts/lib/product-roadmap.js, the Decision Log's is
  * scripts/lib/product-decisions.js — and this file imports from each directly
