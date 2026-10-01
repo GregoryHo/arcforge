@@ -192,6 +192,12 @@ that the step changes how future sessions behave — for **Activate**, together
 with the exact file activation writes — and sends the acknowledgement only once
 you confirm what it showed. Decline, and nothing is sent.
 
+Promote creates a new candidate from the one you picked, and so does the
+dashboard's evolve action. That new candidate goes through the same validation
+as any other. If it fails — a source candidate written before a schema rule
+tightened, say — the action is refused with `candidate_invalid` and the
+validator's reasons, and nothing is created.
+
 Every action is written to an audit log, accepted or rejected, with the reason.
 Do not route around the dashboard by editing state files by hand — that is the
 one path where nothing checks the transition and nothing records it.

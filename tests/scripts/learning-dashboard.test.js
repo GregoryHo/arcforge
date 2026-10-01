@@ -570,6 +570,42 @@ describe('action handlers — Action × Status matrix (criterion 2)', () => {
     expect(result.reason).toBe('policy_violation');
   });
 
+  // ---------- candidate-producing actions whose new record fails validation (#159) ----------
+
+  /** A source record that predates a schema tightening: empty evidence. */
+  function writeInvalidSource(status) {
+    const record = makeCandidateRecord({ evidence: [] });
+    writeDirectlyToQueue(record);
+    if (status) appendTransitionEvent(record.candidate_id, 'approve', status);
+    return record;
+  }
+
+  function rejectionsLines() {
+    const p = path.join(tmpDir, '.arcforge', 'learning', 'candidates', 'rejections.jsonl');
+    return fs.existsSync(p) ? fs.readFileSync(p, 'utf8').split('\n').filter(Boolean) : [];
+  }
+
+  it.each([
+    ['evolve', 'approved'],
+    ['promote', null],
+  ])('%s answers accepted:false when the derived record fails validation', (action, status) => {
+    const record = writeInvalidSource(status);
+    const before = Object.keys(readCurrentCandidates()).length;
+
+    const result = handleDashboardAction({ action, candidate_id: record.candidate_id });
+
+    expect(result.accepted).toBe(false);
+    expect(result.reason).toBe('candidate_invalid');
+    expect(result.new_candidate_id).toBeUndefined();
+    expect(result.validation_reasons.map((r) => r.code)).toContain('too_few_evidence_refs');
+    // No candidate was created, and the source carries no link to one.
+    const candidates = readCurrentCandidates();
+    expect(Object.keys(candidates).length).toBe(before);
+    expect(candidates[record.candidate_id].relationships?.evolved_to_candidate_id).toBeUndefined();
+    expect(candidates[record.candidate_id].relationships?.promoted_to_candidate_id).toBeUndefined();
+    expect(rejectionsLines()).toHaveLength(1);
+  });
+
   // ---------- candidate not found ----------
 
   it('returns 404 when candidate_id is not found', () => {

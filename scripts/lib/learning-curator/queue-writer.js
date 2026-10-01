@@ -175,6 +175,10 @@ function generateEventId() {
  * @param {object} record — CandidateQueueRecord
  * @param {object} [options]
  * @param {object} [options.actor] — actor metadata for the queue event
+ * @returns {{ ok: true, candidate_id: string } | { ok: false, reasons: object[] }}
+ *   Whether the record reached the queue. A caller that reports the new
+ *   candidate to someone must check `ok`: an invalid record is recorded only in
+ *   rejections.jsonl.
  */
 function appendCandidate(record, options = {}) {
   const validation = validateCandidateV1(record);
@@ -208,7 +212,7 @@ function appendCandidate(record, options = {}) {
       };
       appendJsonlLine(getRejectionsPath(), rejection);
     });
-    return;
+    return { ok: false, reasons: validation.reasons };
   }
 
   // Valid → sanitize then append to queue
@@ -226,6 +230,7 @@ function appendCandidate(record, options = {}) {
     };
     appendJsonlLine(getQueuePath(), event);
   });
+  return { ok: true, candidate_id: sanitized.candidate_id };
 }
 
 /**
