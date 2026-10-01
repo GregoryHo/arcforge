@@ -1,6 +1,6 @@
 # eval — spec
 
-> Status: shipped v6.1.1 · extended by 6.2.0 (next) · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.1.1 · extended by 6.2.0 (building) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -124,6 +124,18 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   prose edits do not. A pool is the scenario version plus the run conditions
   (model, effort, ceiling, turn budget, plugin dir, isolation), and readers never combine
   conditions (D-021).
+- **B-12 A grader reads what a trial produced; it never runs it.** No grader
+  executes code a trial wrote — no probe, no import, no test run over the
+  trial's files — because the agent under test wrote it, it would run on the
+  operator's machine with the operator's permissions, and isolation is not a
+  sandbox (B-7). A claim about what that code does is graded statically, over
+  the trial's files. The A5 floor of `eval-speccing-spec-before-code` (#156) is
+  such a check: it reads the trial's files for the CSV branch rather than
+  probing the exported function with `node -e`. It ships with the scenario's
+  other three rubric repairs (#157, #162, #168) in one `## Version` bump, which
+  empties the scenario's pool (B-8), and the scenario is re-measured at k=10 in
+  both arms. Cost accepted: a static floor can pass on code that reads right
+  and does not run (D-043).
 - **B-10 A trial the runner cut off is an instrument failure, not a
   measurement.** Every trial's `claude -p` session runs under a per-trial
   ceiling: 900 s, unless `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS` moves it for one run —
@@ -201,4 +213,4 @@ its rationale is inline at B-10.
   scenarios, not the skills; those skills keep their pre-repair evidence (B-3).
 - **D-020** — 6.2.0 carries the scenario rubric fixes with their own
   measurement round (B-8).
-- **D-043** — *proposed*: graders never execute trial output (B-6, B-7).
+- **D-043** — graders never execute trial output (B-6, B-7, B-8, B-12).
