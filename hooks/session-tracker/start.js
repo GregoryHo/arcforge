@@ -157,18 +157,23 @@ function runDecayCycles(project) {
  * Main entry point (async background tasks)
  */
 function main() {
-  const stdin = readStdinSync();
-  const input = parseStdinJson(stdin);
-  setSessionIdFromInput(input);
+  try {
+    const stdin = readStdinSync();
+    const input = parseStdinJson(stdin);
+    setSessionIdFromInput(input);
 
-  const project = getProjectName();
+    const project = getProjectName();
 
-  initializeSession();
-  checkDaemon();
-  migrateInstincts(project);
-  runDecayCycles(project);
+    initializeSession();
+    checkDaemon();
+    migrateInstincts(project);
+    runDecayCycles(project);
 
-  log('Session tracker initialized (background tasks)');
+    log('Session tracker initialized (background tasks)');
+  } catch {
+    // Fail-open (hooks B-2): an unwritable arcforge home must not end the
+    // hook with a stack trace — the session continues without its record.
+  }
   process.exit(0);
 }
 
