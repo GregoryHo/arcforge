@@ -71,7 +71,12 @@ underneath without breaking anything written against it.
 - **B-6 `--json` where scripting is expected.** Commands that take `--json`
   emit a stable shape suitable for `jq`. `worktree list --json` has its shape
   pinned by a test that runs the live command; other shapes are stable but
-  unpinned — the guide says so rather than overpromising.
+  unpinned — the guide says so rather than overpromising. Residual: the
+  `--json` shapes of `learn`, `obsidian`, and `eval report` are held by no
+  test (their manifest `output` is `null`), so a renamed or dropped field
+  there fails nothing. Pinning them needs deterministic fixtures for the
+  `~/.arcforge` state they read; until then a script built on one of their
+  fields is relying on intent, not on a check.
 
 ### Implementation stance
 - **B-7 Zero external runtime dependencies.** The engine runs on the Node.js
