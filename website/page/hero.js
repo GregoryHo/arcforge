@@ -75,7 +75,7 @@ function Hero({
       color: t.dim,
       marginLeft: 6
     }
-  }, "v6.1.2")), /*#__PURE__*/React.createElement("div", {
+  }, "v6.2.0")), /*#__PURE__*/React.createElement("div", {
     className: "af-nav-links",
     style: {
       display: 'flex',
