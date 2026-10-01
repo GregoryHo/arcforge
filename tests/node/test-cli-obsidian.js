@@ -158,7 +158,7 @@ test('unregister: missing name fails', () => {
 test('list-vaults: empty registry shows hint', () => {
   resetRegistry();
   const { stdout } = runCli('obsidian list-vaults');
-  assert.match(stdout, /No vaults registered/);
+  assert.match(stdout, /No vaults registered\. Run: arcforge obsidian register/);
 });
 
 // --- bare obsidian without subcommand ---
@@ -166,6 +166,15 @@ test('obsidian without subcommand fails with usage', () => {
   const { exitCode, stderr } = runCli('obsidian', true);
   assert.notStrictEqual(exitCode, 0);
   assert.match(stderr, /register\|unregister\|set-default\|list-vaults/);
+  assert.match(stderr, /Usage: arcforge obsidian /);
+});
+
+// --- every usage line names the real executable ---
+test('subcommand usage messages name arcforge, not arc', () => {
+  for (const cmd of ['obsidian register', 'obsidian unregister', 'obsidian set-default']) {
+    const { stderr } = runCli(cmd, true);
+    assert.match(stderr, /Usage: arcforge obsidian /, `${cmd}: ${stderr}`);
+  }
 });
 
 // Cleanup

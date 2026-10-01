@@ -135,7 +135,7 @@ function main() {
   console.error(
     'global-index.js --check-promote is deprecated. Auto-promotion of project ' +
       'instincts to global has been retired. Use the dashboard [Promote] action ' +
-      'instead: arc learn dashboard',
+      'instead: arcforge learn dashboard',
   );
   process.exit(1);
 }

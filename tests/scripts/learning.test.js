@@ -501,7 +501,7 @@ describe('the learning opt-in', () => {
 
     expect(exitCode).toBe(1);
     expect(stderr).toMatch(/deprecated/i);
-    expect(stderr).toMatch(/arc learn dashboard/);
+    expect(stderr).toMatch(/arcforge learn dashboard/);
     // After deprecation, the analyzer must not silently enqueue candidates.
     expect(
       fs.existsSync(path.join(homeDir, '.arcforge', 'learning', 'candidates', 'queue.jsonl')),
