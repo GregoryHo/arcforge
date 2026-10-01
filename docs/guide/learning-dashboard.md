@@ -198,6 +198,14 @@ as any other. If it fails — a source candidate written before a schema rule
 tightened, say — the action is refused with `candidate_invalid` and the
 validator's reasons, and nothing is created.
 
+Below the candidates, the dashboard lists **declined proposals**: what the
+curator proposed but the queue turned away before it became a candidate — a
+proposal citing evidence that does not exist, say, or one whose name could not
+be used as a filename — each with its reason and when. They are shown through
+the same redacted view as a card, never the raw proposal, and they are a record
+only: nothing here can be approved, and no declined proposal is ever read back as
+evidence for a new one.
+
 Every action is written to an audit log, accepted or rejected, with the reason.
 Do not route around the dashboard by editing state files by hand — that is the
 one path where nothing checks the transition and nothing records it.
@@ -368,10 +376,16 @@ is stored in the session record at all.
 
 Almost everything sits under `~/.arcforge/`: diaries in
 `diaries/<project>/<date>/`, raw observations in `observations/<project>/`, the
-candidate queue and the review audit log in `learning/`, the drafts
+candidate queue, the declined proposals and the review audit log in `learning/`, the drafts
 materialization writes in `learning/drafts/<candidate-id>/`, and activated
 instincts in `instincts/<project>/` (or `instincts/global/`). The project's own
 `.arcforge/learning/` holds one thing: that scope's opt-in.
+
+Declined proposals live in `learning/candidates/rejections.jsonl`. Once that
+file holds a record older than 30 days, 5,000 records, or 10 MB — whichever
+comes first — its records move to `rejections.archive.jsonl` beside it and the
+live file starts over. Nothing is deleted: the archive is yours to keep or
+remove, arcforge never prunes it, and the dashboard shows only the live file.
 
 Nothing in the loop writes into your repository. A materialized candidate is a
 draft under the arcforge home, and activating it writes an instinct there too —

@@ -4,6 +4,7 @@
  * Public API:
  *   appendCandidate(record, options)  — validate, sanitize, append to queue.jsonl
  *   rejectProposal(reasons, source)   — append rejection record to rejections.jsonl
+ *   readRejections()                  — live rejections.jsonl records, newest first
  *   readCurrentCandidates()           — replay queue.jsonl, return current candidate map
  *   getQueuePath()                    — absolute path of the canonical queue.jsonl
  *
@@ -39,6 +40,10 @@ function getQueuePath() {
 
 function getRejectionsPath() {
   return path.join(getCandidatesDir(), 'rejections.jsonl');
+}
+
+function getRejectionsArchivePath() {
+  return path.join(getCandidatesDir(), 'rejections.archive.jsonl');
 }
 
 function getLockPath() {
@@ -130,6 +135,51 @@ function appendJsonlLine(filePath, obj) {
 }
 
 // ---------------------------------------------------------------------------
+// rejections.jsonl retention (Layer 5 "Retention limits"; B-17, D-041)
+//
+// Once the live file passes any limit, its records move to the archive file
+// and the live file starts over. Rotation moves records, never deletes one —
+// malformed lines included. Callers hold store.lock.
+// ---------------------------------------------------------------------------
+
+const REJECTIONS_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const REJECTIONS_MAX_RECORDS = 5000;
+const REJECTIONS_MAX_BYTES = 10 * 1024 * 1024;
+
+function oldestRejectedAt(lines) {
+  let oldest = Number.POSITIVE_INFINITY;
+  for (const line of lines) {
+    try {
+      const ts = Date.parse(JSON.parse(line).rejected_at);
+      if (ts < oldest) oldest = ts;
+    } catch {
+      // Malformed line — it carries no date; it still moves with the rest.
+    }
+  }
+  return oldest;
+}
+
+function rotateRejectionsIfPastLimits(now = Date.now()) {
+  const livePath = getRejectionsPath();
+  if (!fs.existsSync(livePath)) return;
+  const content = fs.readFileSync(livePath, 'utf8');
+  const lines = content.split('\n').filter((l) => l.trim().length > 0);
+  const pastLimit =
+    Buffer.byteLength(content, 'utf8') >= REJECTIONS_MAX_BYTES ||
+    lines.length >= REJECTIONS_MAX_RECORDS ||
+    now - oldestRejectedAt(lines) > REJECTIONS_MAX_AGE_MS;
+  if (!pastLimit) return;
+  const terminated = content.endsWith('\n') ? content : `${content}\n`;
+  fs.appendFileSync(getRejectionsArchivePath(), terminated, 'utf8');
+  fs.unlinkSync(livePath);
+}
+
+function appendRejection(rejection) {
+  rotateRejectionsIfPastLimits();
+  appendJsonlLine(getRejectionsPath(), rejection);
+}
+
+// ---------------------------------------------------------------------------
 // Sanitizer — run on body and every evidence field (PR #31 reconcile 1.9)
 // Per advisor guidance: use redactObservationText (no truncation) because
 // validation already enforces length limits on the input.
@@ -210,7 +260,7 @@ function appendCandidate(record, options = {}) {
         },
         raw_proposal_saved: false,
       };
-      appendJsonlLine(getRejectionsPath(), rejection);
+      appendRejection(rejection);
     });
     return { ok: false, reasons: validation.reasons };
   }
@@ -257,7 +307,7 @@ function rejectProposal(reasons, source) {
       },
       raw_proposal_saved: false,
     };
-    appendJsonlLine(getRejectionsPath(), rejection);
+    appendRejection(rejection);
   });
 }
 
@@ -329,4 +379,33 @@ function readCurrentCandidates() {
   return candidates;
 }
 
-module.exports = { appendCandidate, rejectProposal, readCurrentCandidates, getQueuePath };
+/**
+ * Read the live rejections.jsonl, newest first. Malformed lines are skipped
+ * (Layer 5: rejection log corruption never blocks a reader). Archived records
+ * are not read. These are audit records for display — never learning evidence.
+ *
+ * @returns {object[]} CandidateRejectionRecord[] as stored
+ */
+function readRejections() {
+  const livePath = getRejectionsPath();
+  if (!fs.existsSync(livePath)) return [];
+  const records = [];
+  for (const line of fs.readFileSync(livePath, 'utf8').split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const record = JSON.parse(line);
+      if (record && typeof record === 'object') records.push(record);
+    } catch {
+      // Malformed line — skipped for display; it stays in the file.
+    }
+  }
+  return records.reverse();
+}
+
+module.exports = {
+  appendCandidate,
+  rejectProposal,
+  readCurrentCandidates,
+  readRejections,
+  getQueuePath,
+};
