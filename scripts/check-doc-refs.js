@@ -20,6 +20,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { SKILL_BUCKETS } = require('../tests/scripts/skill-tree');
 const { lintDoc } = require('./lib/doc-refs');
 
 const repoRoot = path.resolve(__dirname, '..');
@@ -55,13 +56,11 @@ function pathExists(relPath, docDir) {
   return false;
 }
 
-// Lifecycle buckets a skill dir can sit in (P6.5). Only `core` ships, but a doc
-// may legitimately name a skill parked elsewhere, so all three resolve.
-const SKILL_BUCKETS = ['core', 'in-progress', 'deprecated'];
-
 /**
- * Existence probe for a backticked arc-<name> reference. Resolves against all
- * three component trees a doc may legitimately name: a skill dir, a hook dir,
+ * Existence probe for a backticked arc-<name> reference. A skill dir resolves
+ * in every lifecycle bucket (SKILL_BUCKETS, from tests/skill-buckets.json —
+ * only one ships, but a doc may name a skill parked in another). Resolves
+ * against all three component trees a doc may legitimately name: a skill dir, a hook dir,
  * or an agent file — a referenced component need not live under skills/.
  */
 function skillExists(name) {

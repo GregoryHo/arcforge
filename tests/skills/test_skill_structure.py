@@ -20,10 +20,13 @@ import pytest
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-# Shipped skills live in the `core` lifecycle bucket — the one bucket
-# `.claude-plugin/plugin.json` whitelists. `in-progress/` and `deprecated/` are
-# on-disk holding areas that never load, so this schema does not govern them.
-SKILLS_DIR = PROJECT_ROOT / "skills" / "core"
+# The lifecycle buckets come from tests/skill-buckets.json, the single source
+# tests/scripts/skill-tree.js (jest) reads too. Shipped skills live in the
+# `shipped` bucket — the one `.claude-plugin/plugin.json` whitelists. The others
+# are on-disk holding areas that never load, so this schema does not govern them.
+_SKILL_BUCKET_MANIFEST = json.loads((PROJECT_ROOT / "tests" / "skill-buckets.json").read_text())
+SKILL_BUCKETS = tuple(_SKILL_BUCKET_MANIFEST["buckets"])
+SKILLS_DIR = PROJECT_ROOT / "skills" / _SKILL_BUCKET_MANIFEST["shipped"]
 ROUTER_MANIFEST = PROJECT_ROOT / "tests" / "router-skill.json"
 
 # Line budget: soft cap warns, hard cap fails.
@@ -115,7 +118,9 @@ _ROUTER_ROW_PATTERN = re.compile(r"^\|\s*`?/([a-z0-9][a-z0-9-]*)`?\s*\|")
 # boundary crossing. The bucket segment is optional so a bucket-less
 # `skills/<other>/` spelling is still caught rather than silently ignored.
 _DEEP_LINK_PATTERN = re.compile(
-    r"(?:\.\./|skills/(?:core/|in-progress/|deprecated/)?)([a-z][a-z0-9-]*)/"
+    r"(?:\.\./|skills/(?:"
+    + "|".join(re.escape(f"{bucket}/") for bucket in SKILL_BUCKETS)
+    + r")?)([a-z][a-z0-9-]*)/"
 )
 
 # Claude Code builtin slash commands. Skill prose legitimately names these
@@ -631,6 +636,13 @@ def test_deep_link_violations_see_through_the_bucket_segment():
     assert _deep_link_violations(text, "writing-skills") == ["skills/core/tdd/"]
     # ...and a pointer at the skill's OWN dir is still not a boundary crossing.
     assert _deep_link_violations(text, "tdd") == []
+
+
+def test_deep_link_violations_see_through_every_bucket():
+    """Every bucket in tests/skill-buckets.json is seen through, not just `core`."""
+    for bucket in SKILL_BUCKETS:
+        text = f"Read skills/{bucket}/tdd/references/examples.md."
+        assert _deep_link_violations(text, "writing-skills") == [f"skills/{bucket}/tdd/"]
 
 
 def test_deep_link_violations_allow_self_and_local_paths():
