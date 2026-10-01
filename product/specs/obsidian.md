@@ -89,6 +89,21 @@ work carries provenance a reader can check.
   operation is handed to `/diagramming-obsidian` — after user approval, and
   only by prose invocation, per [skill-system](skill-system.md) B-5.
 
+**Residual — most of this section has no harness evidence.** Three items rest
+on eval scenarios, and only in part: B-3 on
+`eval-maintaining-obsidian-vault-only-answer`; B-5 on
+`eval-maintaining-obsidian-audit-runs-lint-script` (the lint pass) and
+`eval-maintaining-obsidian-link-rebuilds-index` (the index rebuild), both at
+ceiling on the repaired instrument (D-045); B-8's failure path — not claiming a
+save that was never verified — on
+`eval-diagramming-obsidian-unverified-save-claim`. B-1, B-4, B-6, B-7 and B-9
+rest on the skills' text alone. B-2 is engine behavior, covered by the
+registry and `arcforge obsidian` tests rather than an eval. No harness run has
+saved into a live Obsidian vault, so the `ea.create()` path B-8 verifies is
+unexercised; its four Python helpers have subprocess contract tests
+(`tests/skills/test_<script>.py`), which prove the scripts' own behavior, not
+the skill's use of them.
+
 ## Data / domain model
 
 Two contracts meet here, and only one is arcforge's. The vault registry — one
