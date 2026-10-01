@@ -615,10 +615,13 @@ function dispatchChecked({
     if (!deactResult.ok) {
       return reject(deactResult.failure.reason, { module_failure: deactResult.failure });
     }
-    return accept({
+    const accepted = accept({
       next_status: 'deactivated',
       activation_id: deactResult.record.activation_id,
     });
+    // Where the active file went — outside `accept()` for the reason the
+    // materialize arm gives: the audit trail carries no absolute paths.
+    return { ...accepted, archive_paths: deactResult.activeArtifacts.map((a) => a.active_path) };
   }
 
   // Status-changing actions: dismiss, approve (materialize, activate, deactivate handled above)

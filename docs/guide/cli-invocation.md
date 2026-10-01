@@ -185,6 +185,8 @@ arcforge learn reflect record <reflect-id> [--diaries "a,b"] [--reflection FILE]
 arcforge learn instinct status [--project P] [--json]
 arcforge learn instinct save <id> --trigger "..." --action "..." [--source manual|reflection] [--domain D] [--evidence "..."] [--evidence-count N]
 arcforge learn instinct confirm|contradict <id> [--project P] [--json]
+arcforge learn instinct deactivate <id> --project [--json]
+arcforge learn instinct restore <name> --project [--json]
 arcforge learn recall record <recall-id> [--query "..."] [--instinct-ids "a,b"] [--summary "..."]
 ```
 

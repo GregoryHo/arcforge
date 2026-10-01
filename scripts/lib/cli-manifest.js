@@ -174,7 +174,17 @@ const CLI_MANIFEST = {
       // The workflow subgroups take an action as their second positional.
       diary: { subcommands: names('path', 'save', 'finalize') },
       reflect: { subcommands: names('scan', 'record') },
-      instinct: { subcommands: names('status', 'check', 'save', 'confirm', 'contradict') },
+      instinct: {
+        subcommands: names(
+          'status',
+          'check',
+          'save',
+          'confirm',
+          'contradict',
+          'deactivate',
+          'restore',
+        ),
+      },
       recall: { subcommands: names('record') },
     },
     output: null,

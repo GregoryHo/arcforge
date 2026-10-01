@@ -151,6 +151,22 @@ archived by decay — it leaves the injected set only when you deactivate it —
 when the record of which instincts are activated cannot be read, decay archives
 nothing and the session start message says so.
 
+An archived instinct is not gone. Bring one back with:
+
+```bash
+arcforge learn instinct restore <name> --project
+```
+
+It moves the file out of `archived` and back beside the others, whether decay
+or a contradiction put it there — your command outranks both — and writes the
+restore to the audit log with the reason the file was archived for, when it
+carries one. When decay archived the same instinct more than once, the archives
+carry a date and restore asks you to name the one you mean. If an active
+instinct of that name already exists, restore refuses and names both files
+rather than overwrite either; nothing moves. Like the other commands that change
+what may reach a session, it works on the project you run it in, so `--project`
+takes no value here and `--global` is refused.
+
 ## Review: from candidate to active
 
 Once learning is on, observations turn into **candidates** automatically. That is
@@ -346,8 +362,20 @@ analysis — not now, and not if you turn learning back on later; it stays on
 disk, and only what is recorded after the new opt-in is analyzed. With learning
 off everywhere, the background process is not even started. Instincts you already
 activated stay active — disabling learning stops it accumulating more, it does
-not undo what you accepted. To retire an individual instinct, deactivate it from
-the dashboard.
+not undo what you accepted. To retire an individual instinct, deactivate it —
+from the dashboard, or from the project it belongs to with:
+
+```bash
+arcforge learn instinct deactivate <id> --project
+```
+
+The command is the dashboard's Deactivate button: the same legality check, the
+same audit record (attributed to the CLI), and the same move of the active file
+into the `.disabled` archive rather than a deletion. Typing it is the
+acknowledgement — it prints that future sessions will no longer receive the
+instinct, and the archive path. An id that names no activated instinct of this
+project is refused with nothing moved. A deactivated candidate can be activated
+again with `learn activate`.
 
 ## What is stored, and where
 

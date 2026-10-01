@@ -60,7 +60,7 @@ describe('website page copy (.jsx)', () => {
     const jsx = [
       // biome-ignore lint/suspicious/noTemplateCurlyInString: literal JSX source the linter must parse
       '<div style={{border:`1px solid ${t.line}`}}>$ arcforge eval run eval-made-up --k 3</div>',
-      "{name:'x',cmd:'arcforge learn instinct restore x'}",
+      "{name:'x',cmd:'arcforge learn instinct purge x'}",
       '<div><span>$ </span>/arcforge:ghost</div>',
     ].join('\n');
     expect(
@@ -108,9 +108,9 @@ describe('R2 — subcommands against cli-manifest.js', () => {
   });
 
   it('flags an action a learn workflow group does not dispatch', () => {
-    const findings = r2('README.md', '```\narcforge learn instinct restore x\n```');
+    const findings = r2('README.md', '```\narcforge learn instinct purge x\n```');
     expect(findings).toHaveLength(1);
-    expect(findings[0].message).toMatch(/"learn instinct restore"/);
+    expect(findings[0].message).toMatch(/"learn instinct purge"/);
   });
 
   it('checks each half of an a|b subcommand', () => {

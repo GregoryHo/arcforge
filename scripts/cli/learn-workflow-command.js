@@ -34,6 +34,8 @@ const USAGE = [
   '                       [--evidence-count N]',
   '  instinct confirm     <id> [--project P]',
   '  instinct contradict  <id> [--project P]',
+  '  instinct deactivate  <id> --project',
+  '  instinct restore     <name> --project',
   '',
   '  recall record   <recall-id> --project P [--query "..."] [--instinct-ids "a,b"]',
   '                  [--summary "..."] [--session S]',
@@ -131,7 +133,15 @@ function runReflect(action, args, project, asJson) {
   throw new Error(`Unknown 'learn reflect' action: ${action}`);
 }
 
-const INSTINCT_ACTIONS = new Set(['status', 'check', 'save', 'confirm', 'contradict']);
+const INSTINCT_ACTIONS = new Set([
+  'status',
+  'check',
+  'save',
+  'confirm',
+  'contradict',
+  'deactivate',
+  'restore',
+]);
 
 function runInstinct(action, args, project, asJson) {
   const feedback = require('../lib/instinct-feedback');
@@ -155,6 +165,16 @@ function runInstinct(action, args, project, asJson) {
     `pass it positionally, e.g. \`learn instinct ${action} always-run-tests\``,
   );
 
+  // The two actions that change what may be injected act on the project the
+  // command runs in (`--project`, no value), never on `--project P`.
+  if (action === 'deactivate') {
+    require('./learn-instinct-lifecycle').runInstinctDeactivate(args, instinctId, asJson);
+    return;
+  }
+  if (action === 'restore') {
+    require('./learn-instinct-lifecycle').runInstinctRestore(args, instinctId, asJson);
+    return;
+  }
   if (action === 'check') {
     const { checkInstinctDuplicate } = require('../lib/instinct-writer');
     console.log(checkInstinctDuplicate(instinctId, project));

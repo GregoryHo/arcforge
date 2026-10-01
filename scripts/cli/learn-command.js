@@ -73,10 +73,10 @@ function candidateContext(args) {
   return { scope: requireProjectCandidateScope(args) };
 }
 
-function dispatchAction({ verb, card, expectedStatus, safetyAck }) {
+function dispatchAction({ verb, action = ACTION_FOR_VERB[verb], card, expectedStatus, safetyAck }) {
   const { handleDashboardAction } = require('../lib/learning-dashboard');
   const result = handleDashboardAction({
-    action: ACTION_FOR_VERB[verb],
+    action,
     candidate_id: card.candidate_id,
     expected_current_status: expectedStatus,
     safety_ack: safetyAck,
@@ -105,14 +105,14 @@ function dispatchAction({ verb, card, expectedStatus, safetyAck }) {
  *
  * Reads never come through here: they dispatch no action to record.
  */
-function findTransitionCandidate(verb, candidateId) {
+function findTransitionCandidate(verb, candidateId, action = ACTION_FOR_VERB[verb]) {
   try {
     return findProjectCandidate(candidateId);
   } catch (error) {
     if (isUnknownCandidateId(candidateId)) {
       const { handleDashboardAction } = require('../lib/learning-dashboard');
       handleDashboardAction({
-        action: ACTION_FOR_VERB[verb],
+        action,
         candidate_id: candidateId,
         actor: CLI_ACTOR,
       });
@@ -434,4 +434,12 @@ function runLearnCommand(args, { projectRoot, asJson }) {
   }
 }
 
-module.exports = { runLearnCommand };
+// `learn instinct deactivate` (learn-instinct-lifecycle.js) dispatches through
+// the same scope gate, candidate lookup and refusal rendering as the verbs here.
+module.exports = {
+  runLearnCommand,
+  CLI_ACTOR,
+  requireProjectCandidateScope,
+  findTransitionCandidate,
+  dispatchAction,
+};

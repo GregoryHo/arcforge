@@ -1165,7 +1165,7 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(detail.candidate.lifecycle_status).toBe('activated');
       expect(detail.draft_paths_stale).toEqual([{ draft_path: draftPath, reason: 'missing' }]);
       expect(detail.next_actions).toEqual([
-        'already active — retire it by deactivating it from the dashboard',
+        'already active — retire it with: arcforge learn instinct deactivate <id> --project',
       ]);
     });
 
@@ -1244,7 +1244,7 @@ describe('learn candidate commands over the canonical queue', () => {
       const activated = runJson(['inspect', CANDIDATE_ID, '--project']);
       expect(activated.candidate.lifecycle_status).toBe('activated');
       expect(activated.next_actions).toEqual([
-        'already active — retire it by deactivating it from the dashboard',
+        'already active — retire it with: arcforge learn instinct deactivate <id> --project',
       ]);
 
       deactivate(CANDIDATE_ID);

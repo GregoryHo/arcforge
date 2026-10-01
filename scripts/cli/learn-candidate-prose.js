@@ -94,7 +94,7 @@ const NEXT_ACTIONS = {
     'review the draft at draft_paths',
     'activate explicitly when satisfied — activation changes how future sessions behave',
   ],
-  activated: ['already active — retire it by deactivating it from the dashboard'],
+  activated: ['already active — retire it with: arcforge learn instinct deactivate <id> --project'],
   deactivated: ['materialize or activate it again, or leave it retired'],
   dismissed: ['dismissed — no action available'],
   superseded: ['superseded by another candidate — no action available'],

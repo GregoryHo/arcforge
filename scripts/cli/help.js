@@ -124,6 +124,14 @@ COMMANDS:
   learn instinct confirm|contradict <id> [--project P] [--json]
                                      Record agreement/disagreement with a detected pattern;
                                      a contradiction below the archive threshold archives it.
+  learn instinct deactivate <id> --project [--json]
+                                     Take an activated instinct of this project out of the
+                                     injected set — the dashboard's Deactivate, audited the same.
+                                     Future sessions no longer receive it. --project takes no value.
+  learn instinct restore <name> --project [--json]
+                                     Move an archived instinct of this project back, whether decay
+                                     or a contradiction archived it; refused when an active
+                                     instinct of that name exists. --project takes no value.
   learn recall record <recall-id> [--query "..."] [--instinct-ids "a,b"] [--summary "..."]
                                      Write the curator's evidence record for a manual recall.
                                      Id must start with 'recall-'.
