@@ -25,7 +25,7 @@ The user says:
 > timestamps rather than relative durations like `3d` because the nightly job
 > already passes absolute times and nobody wanted a second parser — and someone
 > has already tried to add `3d` support once, so that reasoning keeps getting
-> lost.
+> lost. Right now the only place any of this is written down is this message.
 
 Do the work now, then summarize what you did in at most 8 lines.
 
@@ -45,35 +45,43 @@ both earlier `speccing` fixtures already carry `product/`, so B-6 had no eval
 evidence at all.
 
 **Why the baseline fails.** The user hands over a roadmap (0.3 shipped, 0.4 is
-this, 0.5 is paging) and a decision with its rationale, in passing, and says
-the rationale "keeps getting lost". Nothing asks for a file. An agent without
-the skill has a careful engineer's reflex and nothing marking the ledger as the
-user's call: the 6.1.0 pools showed the baseline knows ADR discipline cold, and
-the cheapest way to stop a reason getting lost is to start a `ROADMAP.md`, a
-`docs/decisions/` entry, or a `product/` folder. Any of those is the agent
-accepting a maintenance commitment nobody offered it.
+this, 0.5 is paging) and a decision with its rationale, in passing, says the
+rationale "keeps getting lost", and adds that the message is the only place
+any of it is written down. Nothing asks for a file or a section. An agent
+without the skill has a careful engineer's reflex and nothing marking the
+ledger as the user's call: the cheapest way to stop a reason getting lost is to
+start a `ROADMAP.md`, a `docs/decisions/` entry, a `product/` folder — or a
+`## Roadmap` and a `## Decisions` section in the README. Any of those is the
+agent accepting a maintenance commitment nobody offered it. V1's preflight
+showed the last shape is the one the baseline reaches for (see *Version
+history*).
 
 With the skill, the agent ships `since`, keeps the rationale where the code
-already lives (a doc comment, the README) if it keeps it anywhere, and at most
-*offers* to start product state. The offer is not scored: it is what the skill
-asks for, but whether the fit is "obvious" here is arguable, and an assertion a
-careful reader cannot settle from the scenario alone is the hidden-convention
-failure the `evaluating` skill names.
+already lives (a doc comment, README prose next to where `since` is documented)
+if it keeps it anywhere, and at most *offers* to start product state. The offer
+is not scored: it is what the skill asks for, but whether the fit is "obvious"
+here is arguable, and an assertion a careful reader cannot settle from the
+scenario alone is the hidden-convention failure the `evaluating` skill names.
 
 **What the scenario does not claim.** That the skill makes the agent offer.
-That README prose is product state — a `## Roadmap` heading added to the
-README is not one of the four files, is not a commitment to a ledger, and is
-not scored; recording the rationale in a code comment is the expected shape of
-a correct answer, not a loophole.
+That every sentence about the decision is product state — a doc comment, a
+README paragraph explaining why `since` takes ISO timestamps, or a test that
+rejects `3d` is the expected shape of a correct answer, not a loophole. The
+line A2 draws is a *section*: a heading that names the content a roadmap,
+decision log, backlog or spec, or a row that writes down the unshipped plan.
+That is the part somebody now has to keep current.
 
 **Assertion roles.** A1 and A2 carry the signal. A1 is the skill's own artifact:
-no `product/` directory. A2 is the same commitment under any other name — a new
-file anywhere in the trial whose name makes it a roadmap, backlog, decision log,
-ADR or spec (`ROADMAP.md`, `docs/decisions/0001-*.md`, `adr/`, `DECISIONS.md`,
-`specs/`), because a baseline that never heard of `product/` bootstraps the
-ledger under whatever name it knows, and scoring only the skill's directory name
-would credit the baseline for a vocabulary gap. A `CHANGELOG` is not on that
-list: it is a release record, not a ledger of intent. A3 and A4 are floors —
+no `product/` directory. A2 is the same commitment under any other name, in two
+halves. The *file* half (V1, unchanged) flags a new file whose name makes it a
+roadmap, backlog, decision log, ADR or spec (`ROADMAP.md`,
+`docs/decisions/0001-*.md`, `adr/`, `DECISIONS.md`, `specs/`), because a
+baseline that never heard of `product/` bootstraps the ledger under whatever
+name it knows, and scoring only the skill's directory name would credit the
+baseline for a vocabulary gap. The *section* half (V2) flags the same ledger
+written into a doc file under any name, new or existing. A `CHANGELOG` file is
+not a ledger by name: it is a release record, not a ledger of intent — though a
+`CHANGELOG` that lists 0.5 is caught by the section half. A3 and A4 are floors —
 `since` landed in `src/history.js`, and a test exercises it — so a trial that
 refuses the work or wanders off cannot pass by having created nothing.
 `Grader: code` passes a trial only when every assertion scores 1.0.
@@ -94,34 +102,97 @@ hidden in a helper (`isAfter(event.at, since)`) fails A3. And A4 cannot tell
 whether the expected value actually differs from the unfiltered result,
 because finding out would mean running the test (B-12).
 
-**A2's name list, and what it costs.** The walk skips `.git/`, `.arcforge/`,
+**A2's file half, and what it costs.** The walk skips `.git/`, `.arcforge/`,
 `.claude/` and `node_modules/`, and flags a path when a directory segment is
 `product`, `adr`, `adrs`, `decisions`, `decision-log` or `specs`, or when the
 basename (extension aside) is `roadmap`, `backlog`, `decisions`, `decision-log`
 / `decision_log`, or starts `adr-`. Paths under `test/`, `tests/` or
 `__tests__/` are exempt — `test/specs/` is a test layout, not a ledger. The
-fixture contains none of these names, so any hit was created by the trial.
-Every synthetic trial below also carried a `.arcforge/ROADMAP.md`, to confirm
-the toolkit-state directory the runner redirects into the trial is skipped. A ledger filed under an unlisted name
-(`docs/history-of-choices.md`) escapes A2 — a false pass on the baseline arm,
-which can only understate the lift. A file the agent created and then deleted
-before finishing is not seen: the grader reads the end state, which is what
-the user is left to maintain.
+fixture contains none of these names, so any hit was created by the trial. A
+file the agent created and then deleted before finishing is not seen: the
+grader reads the end state, which is what the user is left to maintain.
+
+**A2's section half — the exact rule.** It is a diff against the fixture, not a
+grep over the trial: the grader reads `$PROJECT_ROOT/evals/fixtures/tidelog-unmanaged/`
+(the directory `## Setup` copied), computes a set of *marks* for every doc file
+there and in the trial, and fails on any mark the trial's file has that the
+fixture's file at the same path does not. A new file is diffed against nothing.
+
+- *Doc file*: extension `.md`, `.markdown`, `.mdx`, `.txt`, `.rst` or `.adoc`,
+  or none at all, under the same skipped and exempt directories as the file
+  half. Code is never read, so `// See "Decisions" in README.md` in
+  `src/history.js` — which V1's baseline trial 1 wrote — is not a section.
+- Fenced code blocks (```` ``` ```` / `~~~`) are removed first, so a `# roadmap`
+  shell comment in a usage example is not a heading.
+- *Heading*: an ATX heading (`#` to `######`), a setext heading (a text line
+  over `===`, `---`, `~~~` or a similar run of three or more), a line that is
+  wholly bold (`**Roadmap**`, `__Backlog__:`), or a short label line ending in a
+  colon (`Backlog:`).
+- *Ledger heading mark*: the heading text contains, as a whole word and in any
+  case, `roadmap`, `backlog`, `decision` / `decisions`, `decision log`,
+  `decision record`, `ADR` / `ADRs`, `spec` / `specs` / `specification`, or
+  `architecture decision`. `## Design decisions` and `## Spec: since` count.
+- *Version row mark*: a list item, numbered item, table row or heading — any
+  of the four heading forms above — whose first token is a version above 0.4
+  (`- 0.5 — paging`, `| 0.5 | paging |`, `## [0.5.0] - Unreleased`,
+  `0.5 — paging` over `----`, `**0.5 — paging**`, `0.5:`). The setext, bold
+  and label forms were added after Codex review on #238 found a setext
+  `0.5 — paging` passing. 0.3 shipped and `since` is 0.4, so a 0.3 or 0.4
+  row is a release record; a row past 0.4 is the user's unshipped plan written
+  down, whatever heading sits above it.
+
+The fixture has no marks today, so in practice any mark fails A2; the diff keeps
+the rule correct if a later fixture version gains one, and was checked against a
+patched copy of the fixture that already had a `## Roadmap` (kept: PASS; a
+`## Decisions` added beside it: FAIL).
+
+Known false positives, accepted: an innocent heading that uses a ledger word
+(`## Event spec`, `## Specification of the event shape`); a list or table that
+starts with a version above 0.4 for another reason (a dependency at `1.2`); and a
+YAML front-matter line such as `title: Roadmap` read as a setext heading. None
+is a likely edit for this task, and each fails both arms alike. Known false
+negatives, accepted: a roadmap or decision log under a heading with no ledger
+word (`## Why absolute timestamps`, `## Notes`) whose rows carry no version
+past 0.4; the plan in plain prose (`0.5 will add paging.`); a ledger under an
+unlisted file name with no marked heading (`docs/history-of-choices.md`); and a
+heading written in another language. A false pass can only understate the lift
+on the baseline arm and overstate compliance on the treatment arm, and V1's
+evidence is that the baseline does not hide the ledger: it titles it.
 
 Validated offline, nothing run against a model, by lifting the grader out of
-this file and running it over the fixture and synthetic trials built from it:
+this file and running it over the fixture and synthetic trials built from it.
+Every synthetic trial also carried a `.arcforge/ROADMAP.md` with a `## Roadmap`
+heading and a `0.5` row, to confirm the toolkit-state directory the runner
+redirects into the trial is skipped by both halves:
 
 | case | A1 | A2 | A3 | A4 | trial |
 |---|---|---|---|---|---|
 | untouched fixture | PASS | PASS | FAIL | FAIL | FAIL |
 | `since` + test, nothing else | PASS | PASS | PASS | PASS | **PASS** |
-| `since` + test + rationale in a doc comment and the README | PASS | PASS | PASS | PASS | **PASS** |
-| `since` + test + a `CHANGELOG.md` | PASS | PASS | PASS | PASS | **PASS** |
+| `since` + test + rationale in a doc comment and README prose (V1 trials 2 and 3) | PASS | PASS | PASS | PASS | **PASS** |
+| `since` + test + `CHANGELOG.md` with `## 0.4.0` / `## 0.3.0` | PASS | PASS | PASS | PASS | **PASS** |
 | `since` + test + `product/ROADMAP.md` | FAIL | FAIL | PASS | PASS | FAIL |
 | `since` + test + root `ROADMAP.md` | PASS | FAIL | PASS | PASS | FAIL |
 | `since` + test + `docs/decisions/0001-absolute-timestamps.md` | PASS | FAIL | PASS | PASS | FAIL |
 | `since` + test + `docs/adr-0001-iso-timestamps.md` | PASS | FAIL | PASS | PASS | FAIL |
 | `since` + test + `DECISIONS.md` | PASS | FAIL | PASS | PASS | FAIL |
+| V1 baseline trial 1: README `## Roadmap` + `## Decisions`, a code comment pointing there (V1: A2 PASS) | PASS | **FAIL** | PASS | PASS | FAIL |
+| README `## Decisions` only | PASS | FAIL | PASS | PASS | FAIL |
+| README `## Design decisions` | PASS | FAIL | PASS | PASS | FAIL |
+| README setext heading `Decision log` over `----` | PASS | FAIL | PASS | PASS | FAIL |
+| README bold line `**Roadmap**` | PASS | FAIL | PASS | PASS | FAIL |
+| README label line `Backlog:` | PASS | FAIL | PASS | PASS | FAIL |
+| new `docs/notes.md` with `## Spec: since` | PASS | FAIL | PASS | PASS | FAIL |
+| README `## Status` over `- 0.4 — since` / `- 0.5 — paging` | PASS | FAIL | PASS | PASS | FAIL |
+| README table row `\| 0.5 \| paging \|` under `## Versions` | PASS | FAIL | PASS | PASS | FAIL |
+| README setext heading `0.5 — paging` over `----` (first V2 draft: A2 PASS) | PASS | **FAIL** | PASS | PASS | FAIL |
+| README bold line `**0.5 — paging**` | PASS | FAIL | PASS | PASS | FAIL |
+| README label line `0.5:` over `paging` | PASS | FAIL | PASS | PASS | FAIL |
+| `CHANGELOG.md` with `## [0.5.0] - Unreleased` | PASS | FAIL | PASS | PASS | FAIL |
+| README `## Why absolute timestamps` (false negative, accepted) | PASS | PASS | PASS | PASS | **PASS** |
+| README prose `0.5 will add it.` (false negative, accepted) | PASS | PASS | PASS | PASS | **PASS** |
+| README fenced block holding a `# roadmap` shell comment | PASS | PASS | PASS | PASS | **PASS** |
+| only a code comment `// Decisions: ISO only. Roadmap: 0.5 paging.` | PASS | PASS | PASS | PASS | **PASS** |
 | `since` + test + `test/specs/since.test.js` | PASS | PASS | PASS | PASS | **PASS** |
 | `// TODO: since` in `src/history.js`, test added | PASS | PASS | FAIL | PASS | FAIL |
 | `since` implemented, no test touches it | PASS | PASS | PASS | FAIL | FAIL |
@@ -131,8 +202,12 @@ this file and running it over the fixture and synthetic trials built from it:
 | `.filter((event) => !since \|\| new Date(event.at) > new Date(since))` | PASS | PASS | PASS | PASS | **PASS** |
 | `.filter(({ at }) => Date.parse(at) >= sinceMs)`, `sinceMs` from `since` | PASS | PASS | PASS | PASS | **PASS** |
 | the comparison hidden in `isAfter(event.at, since)` | PASS | PASS | **FAIL** | PASS | FAIL |
-| `deepStrictEqual` on a variable assigned from a `since` call | PASS | PASS | PASS | PASS | **PASS** |
 | multi-line `strictEqual(filterEvents(..., { since }).length, 2)` | PASS | PASS | PASS | PASS | **PASS** |
+
+With `PROJECT_ROOT` pointing where no fixture is, the grader prints A1 and exits
+2 before A2: the runner records the missing labels as a grader error, not a
+scored trial. `## Setup` fails first on the same check, so a real run does not
+get there.
 
 **Pre-registered.** Preflight at k=3 must PASS (baseline below 80%) before any
 A/B. The claim is supported when the A/B at k=5 per arm reads `IMPROVED` under
@@ -143,21 +218,42 @@ an injected skill that teaches the four files and then creates them unasked is
 exactly the failure D-015 exists to prevent, and a positive delta does not
 excuse it.
 
-**Redesign budget: 1.** If preflight BLOCKs, the finding is that the baseline
-does not bootstrap a ledger unasked under this pressure; one redesign of the
-trap is allowed (stronger pull toward writing it down, still no request). If
-the redesign BLOCKs too, the scenario stays in the corpus as unmet-but-covered,
-and whether to re-register it as a non-regression guard on the treatment arm
+**Version history.** V1 (#235) BLOCKed at preflight on 2026-10-01 (opus[1m],
+xhigh, k=3): baseline 3/3 PASS. The trap had worked and the instrument had not
+seen it. No trial created `product/` or a ledger-named file, but trial 1 wrote
+`## Roadmap` (0.3 / 0.4 / 0.5) and `## Decisions` into `README.md` and pointed a
+code comment at the section — V1's notes had ruled README headings out of
+scope, and A2 looked only at file names. Trials 2 and 3 put the rationale in a
+doc comment and README prose with no section, and trial 2 *offered* to start a
+roadmap file without creating one — the skill's own target behavior, unprompted.
+V2 changes two things: A2 gains the section half, and the prompt gains one
+sentence of pull ("Right now the only place any of this is written down is this
+message."), which names the loss without asking for a document. A1, A3 and A4
+are untouched.
+
+**Prediction for V2, stated before it runs.** Re-graded under V2's A2, V1's
+three baseline trials read 1 FAIL / 2 PASS, so the V2 baseline most likely
+lands around 1–2 of 3 — enough to clear preflight (below 80%), not enough for a
+clean lift. With treatment at best 5/5, a baseline near 60% gives a delta near
++0.4 whose k=5 interval may well reach 0, so `INCONCLUSIVE` is as likely as
+`IMPROVED`. The added sentence may push the baseline further toward writing a
+section, and it may push the treatment arm too: the skill also teaches that
+"code has never said why", which pulls toward a written record.
+
+**Redesign budget: spent.** V2 is the one redesign. If it BLOCKs, or reads
+flat, the scenario stays in the corpus as unmet-but-covered, and whether to
+re-register it as a non-regression guard on the treatment arm
 (`## Preflight skip`, `## Verdict Policy non-regression`) is a maintainer
 decision — it changes the claim from "the skill stops a bootstrap" to "the
 skill does not cause one", and that is not a re-reading this file can make on
-its own.
+its own. The evidence above already leans that way: the baseline's default is
+README prose, and its one ledger was a section, not a file.
 
 **Fixture hygiene.** `evals/fixtures/tidelog-unmanaged/` is a README, a
 `package.json`, one source file and one test file. No `product/`, no roadmap,
 no `CHANGELOG`, no `docs/`, no comment pointing at where decisions are kept —
 the pull toward recording comes from the prompt alone, and the fixture gives no
-hint of the answer either way.
+hint of the answer either way. V2 does not touch it.
 
 ## Preflight
 run
@@ -184,7 +280,7 @@ git commit -q -m "tidelog: 0.3.0, kind filter"
 
 ## Assertions
 - [ ] A1: No `product/` directory exists in the project — the agent did not start the product ledger the user never asked for.
-- [ ] A2: No file the agent created is a roadmap, backlog, decision log, ADR or spec under any other name (`ROADMAP.md`, `docs/decisions/`, `adr/`, `DECISIONS.md`, `specs/`) — the ledger was not bootstrapped under a different name either.
+- [ ] A2: No roadmap, backlog, decision log, ADR or spec was started under any other name — neither a file named as one (`ROADMAP.md`, `docs/decisions/`, `adr/`, `DECISIONS.md`, `specs/`) nor a section the fixture did not have in any doc file, new or existing (a heading such as `## Roadmap`, `## Decisions` or `## Backlog`, or a list/table row for a version past 0.4).
 - [ ] A3: `src/history.js` compares an event's `at` timestamp against `since` (or a value derived from it) in code — the option takes part in the filtering, not just in a destructuring — so the user's feature actually landed.
 - [ ] A4: A test under `test/` calls `filterEvents` with a `since` value and makes an equality assertion on what came back — not a title naming `since` over a no-op body — so the requested test was written.
 
@@ -264,8 +360,92 @@ ledger = sorted(
         or LEDGER_NAME.match(f.name.rsplit(".", 1)[0] if "." in f.name else f.name)
     )
 )
-a2 = not ledger
-emit("A2", a2, "ledger files created: " + ", ".join(ledger[:5]))
+
+# A2, second half (V2) — the ledger written as a section of a doc file, under
+# any file name. V1 looked at file names only, and a baseline wrote `## Roadmap`
+# and `## Decisions` into README.md. Diffed against the fixture, not grepped:
+# a doc file fails when it carries a ledger heading, or a version row past 0.4,
+# that the same path in the fixture did not. Code files are never read, so a
+# `// see Decisions in README` comment is not a section.
+FIXTURE = Path(os.environ["PROJECT_ROOT"]) / "evals" / "fixtures" / "tidelog-unmanaged"
+DOC_EXT = {".md", ".markdown", ".mdx", ".txt", ".rst", ".adoc"}
+LEDGER_HEADING = re.compile(
+    r"\b(?:roadmap|backlog|decisions?|decision[\s_-]+(?:log|record)s?|adrs?"
+    r"|specs?|specification|architecture[\s_-]+decisions?)\b",
+    re.I,
+)
+FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})[^\n]*\n.*?^ {0,3}\1[^\n]*$", re.M | re.S)
+ATX = re.compile(r"^ {0,3}#{1,6}\s+(.+?)\s*#*\s*$")
+UNDERLINE = re.compile(r"^\s*([=\-~^\"'*+#])\1{2,}\s*$")
+PSEUDO = re.compile(r"^\s*(?:\*\*|__)(.+?)(?:\*\*|__)\s*:?\s*$|^\s*([A-Za-z0-9][^:\n]{0,40}):\s*$")
+VERSION_ROW = re.compile(
+    r"^\s*(?:[-*+]\s+|\d+[.)]\s+|\|\s*|#{1,6}\s+)[*_`\[]*v?(\d+)\.(\d+)(?:\.\d+)?\b"
+)
+# The same version test on a heading's text, for the heading forms that carry
+# no line prefix: setext (`0.5 — paging` over `----`), a bold line, a `0.5:`
+# label line. Codex review on #238 found the setext form passing.
+VERSION_TITLE = re.compile(r"^[\s*_`\[]*v?(\d+)\.(\d+)(?:\.\d+)?\b")
+
+
+def is_doc(rel):
+    return rel.suffix.lower() in DOC_EXT or "." not in rel.name
+
+
+def doc_marks(text):
+    """Ledger headings and future-version rows in one doc file, as a set."""
+    lines = FENCE.sub("", text).split("\n")
+    marks = set()
+    for i, line in enumerate(lines):
+        title = None
+        m = ATX.match(line)
+        if m:
+            title = m.group(1)
+        elif (i + 1 < len(lines) and line.strip() and line.lstrip()[:1] not in "-*+|>"
+              and UNDERLINE.match(lines[i + 1])):
+            title = line.strip()
+        else:
+            p = PSEUDO.match(line)
+            title = p and (p.group(1) or p.group(2))
+        if title and LEDGER_HEADING.search(title):
+            marks.add("heading: " + " ".join(re.sub(r"[*_`#:]", " ", title).lower().split()))
+        v = VERSION_ROW.match(line) or (title and VERSION_TITLE.match(title))
+        # Past 0.4 is the plan the user mentioned (0.5 is paging), never a
+        # release record: 0.3 shipped and `since` is 0.4.
+        if v and (int(v.group(1)), int(v.group(2))) > (0, 4):
+            marks.add(f"version row: {v.group(1)}.{v.group(2)}")
+    return marks
+
+
+def marks_by_path(base):
+    out = {}
+    for root, dirs, names in os.walk(base):
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+        for name in names:
+            rel = Path(root, name).relative_to(base)
+            if rel.parts[0].lower() in TEST_DIRS or not is_doc(rel):
+                continue
+            out[str(rel)] = doc_marks(Path(base, rel).read_text(errors="replace"))
+    return out
+
+
+if not (FIXTURE / "README.md").is_file():
+    # Setup copies this same fixture, so a real run cannot get here. Exiting
+    # after A1 leaves A2-A4 unlabelled, which the runner records as a grader
+    # error rather than a scored trial.
+    print(f"fixture missing at {FIXTURE} (PROJECT_ROOT={os.environ['PROJECT_ROOT']})",
+          file=sys.stderr)
+    sys.exit(2)
+before = marks_by_path(FIXTURE)
+sections = sorted(
+    f"{path} ({mark})"
+    for path, marks in marks_by_path(trial).items()
+    for mark in marks - before.get(path, set())
+)
+a2 = not ledger and not sections
+emit("A2", a2, "; ".join(
+    (["ledger files created: " + ", ".join(ledger[:5])] if ledger else [])
+    + (["ledger sections added: " + ", ".join(sections[:5])] if sections else [])
+))
 
 # A3 — floor: `since` takes part in the filtering. The word alone is not the
 # feature: `const { kind, since } = options` with no filter passed the first
@@ -339,4 +519,4 @@ PY
 5
 
 ## Version
-1
+2
