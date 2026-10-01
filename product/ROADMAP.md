@@ -1109,3 +1109,22 @@ reverse one, append a superseding entry (see AGENTS.md).
   each carries its baseline pass rate, k, model, effort, turn budget, ceiling
   and timestamp. The four BLOCKs read 100% at k=3 on `opus[1m]` / `xhigh`,
   2026-09-30.
+
+### D-046 — Restore returns an instinct without its archive stamp
+- Date: 2026-10-01
+- Version: 6.2.0
+- Status: Accepted
+- Refines: D-040
+- Decision: `learn instinct restore` removes `archived_at` and `archive_reason`
+  from the file it returns to the active set, and keeps
+  `decay_charged_through`; it still refuses a same-name collision and audits
+  the archive reason it removed (B-11).
+- Why: D-040 specified the move, the collision refusal and the audit, not what
+  the restored file carries. Left in place, `archive_reason` would label a
+  later archive of the same instinct with the old reason, and `archived_at`
+  would date it to the earlier archive, so a reader could not tell the second
+  archive from the first. `decay_charged_through` is the opposite case: it
+  records the weeks decay has already charged, and removing it would let the
+  next cycle charge those weeks again and re-archive the instinct the user
+  just restored — the loop D-022 closed. The audit record keeps the removed
+  reason, so nothing is lost; only the file stops claiming it.
