@@ -1104,3 +1104,8 @@ reverse one, append a superseding entry (see AGENTS.md).
   scenario written to measure it has its baseline at ceiling.
 - Cost accepted: about 34 live sessions spent on a first batch run on an
   instrument that denied tools before #213, all discarded.
+- Verification: the seven preflight readings of the round, copied out of the
+  gitignored cache, are `docs/plans/v6.1/wp-f/preflight.<scenario>.json` —
+  each carries its baseline pass rate, k, model, effort, turn budget, ceiling
+  and timestamp. The four BLOCKs read 100% at k=3 on `opus[1m]` / `xhigh`,
+  2026-09-30.

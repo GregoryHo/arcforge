@@ -1,0 +1,14 @@
+{
+  "scenario_hash": "87dd77d26e724fb5",
+  "scenario_name": "eval-router-skill-selection",
+  "model": "opus[1m]",
+  "max_turns": 25,
+  "plugin_dir": false,
+  "effort": "xhigh",
+  "trial_timeout_ms": 900000,
+  "pass_rate": 1,
+  "k": 3,
+  "verdict": "BLOCK",
+  "reason": "Baseline pass rate 100% >= 80% ceiling — scenario is not discriminative. Redesign the scenario to be harder.",
+  "timestamp": "2026-09-30T11:00:00.953Z"
+}

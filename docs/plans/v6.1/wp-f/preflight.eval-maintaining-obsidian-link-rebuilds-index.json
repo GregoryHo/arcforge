@@ -1,0 +1,14 @@
+{
+  "scenario_hash": "e3040169b6ad7597",
+  "scenario_name": "eval-maintaining-obsidian-link-rebuilds-index",
+  "model": "opus[1m]",
+  "max_turns": 40,
+  "plugin_dir": false,
+  "effort": "xhigh",
+  "trial_timeout_ms": 900000,
+  "pass_rate": 1,
+  "k": 3,
+  "verdict": "BLOCK",
+  "reason": "Baseline pass rate 100% >= 80% ceiling — scenario is not discriminative. Redesign the scenario to be harder.",
+  "timestamp": "2026-09-30T11:04:04.254Z"
+}
