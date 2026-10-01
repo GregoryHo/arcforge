@@ -13,6 +13,7 @@ const crypto = require('node:crypto');
 
 const {
   createDashboardModel,
+  createRejectionsModel,
   sanitizeDashboardDetail,
   handleDashboardAction,
 } = require('./learning-dashboard');
@@ -77,6 +78,7 @@ function hasDashboardWriteHeader(req, writeToken) {
  *   GET  /api/candidates           → DashboardCandidateCard[] list
  *   GET  /api/candidates/:id       → DashboardCandidateDetail
  *   POST /api/candidates/:id/action → action dispatch (requires write token)
+ *   GET  /api/rejections           → declined proposals, allowlisted (B-17)
  *
  * @param {{ htmlBody: string, writeToken: string }} options
  * @returns {function}
@@ -96,6 +98,14 @@ function createRouter({ htmlBody, writeToken }) {
         return sendJson(res, createDashboardModel());
       } catch {
         return sendError(res, 500, 'dashboard failed to load candidates');
+      }
+    }
+
+    if (method === 'GET' && pathname === '/api/rejections') {
+      try {
+        return sendJson(res, createRejectionsModel());
+      } catch {
+        return sendError(res, 500, 'dashboard failed to load rejections');
       }
     }
 

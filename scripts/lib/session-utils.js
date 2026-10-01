@@ -11,6 +11,9 @@ const {
   sanitizeProjectName,
 } = require('./utils');
 
+// The marker the diary draft template leaves in every unfilled section.
+const DIARY_PLACEHOLDER = 'TO BE ENRICHED';
+
 function getDiaryPath(project, date, sessionId) {
   return path.join(getDateDiariesDir(project, date), `diary-${sanitizeSessionId(sessionId)}.md`);
 }
@@ -53,6 +56,26 @@ function parseProcessedLog(logPath) {
 }
 
 /**
+ * Whether a file in a diary date directory counts toward reflection (B-8,
+ * D-042): a regular file, read successfully, with no TO BE ENRICHED
+ * placeholder. Anything unreadable — a dangling symlink, a file gone between
+ * readdir and read, permission denied — is uncountable, never enriched.
+ * scanDiaries and determineReflectStrategy share this so the strategy picker,
+ * the scan and the Stop nudge agree about the same directory (#169).
+ */
+function isCountableDiary(dirPath, fileName) {
+  if (!fileName.startsWith('diary-') || !fileName.endsWith('.md')) return false;
+  const filePath = path.join(dirPath, fileName);
+  try {
+    if (!fs.statSync(filePath).isFile()) return false;
+    return !fs.readFileSync(filePath, 'utf-8').includes(DIARY_PLACEHOLDER);
+  } catch {
+    // Unreadable: uncountable — counting it would claim content nobody can read.
+    return false;
+  }
+}
+
+/**
  * Scan for diary files based on strategy.
  */
 function scanDiaries(project, strategy, processedLogPath) {
@@ -71,7 +94,7 @@ function scanDiaries(project, strategy, processedLogPath) {
     const dirPath = path.join(diariesDir, dateDir);
     const diaries = fs
       .readdirSync(dirPath)
-      .filter((f) => f.startsWith('diary-') && f.endsWith('.md'))
+      .filter((f) => isCountableDiary(dirPath, f))
       .map((f) => path.join(dirPath, f))
       .sort();
     allDiaries.push(...diaries);
@@ -99,9 +122,7 @@ function determineReflectStrategy(project, processedLogPath) {
     .filter((d) => fs.statSync(path.join(diariesDir, d)).isDirectory());
   for (const dateDir of dateDirs) {
     const dirPath = path.join(diariesDir, dateDir);
-    const diaries = fs
-      .readdirSync(dirPath)
-      .filter((f) => f.startsWith('diary-') && f.endsWith('.md'));
+    const diaries = fs.readdirSync(dirPath).filter((f) => isCountableDiary(dirPath, f));
     allDiaries.push(...diaries);
   }
 

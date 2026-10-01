@@ -25,7 +25,13 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { getDefaultInstallCommand } = require('./package-manager');
 const { sanitizeProjectName } = require('./utils');
-const { getWorktreeRoot, getWorktreePath, parseWorktreePath } = require('./worktree-paths');
+const {
+  getWorktreeRoot,
+  getWorktreePath,
+  getWorktreeLookupPaths,
+  parseWorktreePath,
+  resolveProjectRoot,
+} = require('./worktree-paths');
 const { parse } = require('./yaml-parser');
 
 const MARKER_FILENAME = '.arcforge-epic';
@@ -88,6 +94,11 @@ function runGit(args, cwd) {
   }
 }
 
+/** Error suffix carrying why the project root fell back to the cwd, if it did. */
+function withReason(fallbackReason) {
+  return fallbackReason ? `. Note: ${fallbackReason}` : '';
+}
+
 function requireNonEmptyString(value, label) {
   if (typeof value !== 'string' || !value.trim()) {
     throw new Error(`${label} must be a non-empty string`);
@@ -117,12 +128,14 @@ function branchExists(projectRoot, branch) {
 function addGenericWorktree({ projectRoot, name, branch, from, setup = false }) {
   requireNonEmptyString(projectRoot, 'projectRoot');
   requireNonEmptyString(name, 'name');
-  const root = path.resolve(projectRoot);
+  const cwd = path.resolve(projectRoot);
+  const { root, fallbackReason } = resolveProjectRoot(cwd);
 
   const slug = sanitizeProjectName(name);
   const worktreePath = getWorktreePath(root, null, slug);
-  if (fs.existsSync(worktreePath)) {
-    throw new Error(`Worktree already exists at ${worktreePath}`);
+  const existing = getWorktreeLookupPaths(root, cwd, null, slug).find((p) => fs.existsSync(p));
+  if (existing) {
+    throw new Error(`Worktree already exists at ${existing}`);
   }
 
   const branchName = branch || name;
@@ -140,7 +153,9 @@ function addGenericWorktree({ projectRoot, name, branch, from, setup = false }) 
     : ['worktree', 'add', worktreePath, '-b', branchName, from || 'HEAD'];
   const result = runGit(gitArgs, root);
   if (result.exitCode !== 0) {
-    throw new Error(`Failed to create worktree '${slug}': ${result.stderr.trim()}`);
+    throw new Error(
+      `Failed to create worktree '${slug}': ${result.stderr.trim()}${withReason(fallbackReason)}`,
+    );
   }
 
   const out = { name, slug, branch: branchName, branch_created: !exists, path: worktreePath };
@@ -244,18 +259,21 @@ function listWorktrees({ projectRoot }) {
 function removeGenericWorktree({ projectRoot, target, force = false }) {
   requireNonEmptyString(projectRoot, 'projectRoot');
   requireNonEmptyString(target, 'target');
-  const root = path.resolve(projectRoot);
+  const cwd = path.resolve(projectRoot);
+  const { root, fallbackReason } = resolveProjectRoot(cwd);
 
-  const resolved = path.isAbsolute(target)
-    ? path.resolve(target)
-    : getWorktreePath(root, null, sanitizeProjectName(target));
+  const candidates = path.isAbsolute(target)
+    ? [path.resolve(target)]
+    : getWorktreeLookupPaths(root, cwd, null, sanitizeProjectName(target));
+  const resolved = candidates.find((p) => fs.existsSync(p)) || candidates[0];
   if (parseWorktreePath(resolved) === null) {
     throw new Error(
       `Not an arcforge-managed worktree: ${resolved}. External worktrees are removed with raw git (git worktree remove).`,
     );
   }
   if (!fs.existsSync(resolved)) {
-    throw new Error(`Worktree not found: ${resolved}`);
+    const also = candidates.slice(1).map((p) => ` (also checked ${p})`);
+    throw new Error(`Worktree not found: ${resolved}${also.join('')}${withReason(fallbackReason)}`);
   }
   if (hasArcforgeMarker(resolved)) {
     throw new Error(

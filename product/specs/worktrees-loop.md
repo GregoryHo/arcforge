@@ -1,6 +1,6 @@
 # worktrees-loop — spec
 
-> Status: shipped v6.1.2 · extended by 6.2.0 (next) · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.1.2 · extended by 6.2.0 (building) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -31,7 +31,15 @@ crash, a compaction, or a closed laptop could lose.
   a nested worktree pollutes `git status`, test globs, and file watchers. The
   hash comes from the project's absolute path so same-named projects never
   collide. Paths are derived by the engine and reported by `worktree list`;
-  nothing else constructs them by hand.
+  nothing else constructs them by hand. The project they derive from is the
+  primary repository — the parent of `git rev-parse --git-common-dir`, the
+  identity every linked worktree of a repo shares — never the directory the
+  command was run in nor the checkout it was run from, so a worktree added
+  from a subdirectory or from another worktree is found, listed and removed
+  from the root or anywhere else alike.
+  A worktree created under the older working-directory derivation stays
+  findable: lookup also checks the path that derivation produced, so an
+  upgrade never strands a checkout the user already has (#202, D-020).
 - **B-2 Removal respects ownership and dirt.** arcforge removes only what it
   created: external trees and trees another lifecycle owns are refused. A
   worktree with uncommitted changes refuses removal without `--force`, so a
@@ -92,3 +100,5 @@ verify-over-self-report choices predate this log; rationale inline above.
 
 - **D-032** — without a verify floor a task is done on exit 0, and
   the loop warns at start (B-6).
+- **D-020** — 6.2.0 carries worktree paths derived from the repo root, with
+  paths from the older derivation still found (B-1).

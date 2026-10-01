@@ -1,6 +1,6 @@
 # sdd — spec
 
-> Status: shipped v6.1.1 · extended by 6.2.0 (next) · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.1.1 · extended by 6.2.0 (building) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -115,5 +115,10 @@ roadmap row carries the marker.
   be its own entry (B-6).
 - **D-044** — `speccing` is user-invoked in practice: documented as
   `/arcforge:speccing`, description unchanged in 6.1.1 (Purpose).
+- **D-020** — 6.2.0's measurement round adds a scenario for B-6, D-015's
+  surviving clause: a fixture with no `product/` state and no request for any,
+  where the skill must not create the four files. Both existing `speccing`
+  fixtures already carry `product/`, so until that scenario is measured B-6
+  has no eval evidence (B-6).
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).

@@ -60,6 +60,11 @@
       .detail-section summary { cursor: pointer; font-weight: 600; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
       .evidence-summary-item { padding: 6px 0; border-bottom: 1px solid var(--border); }
       .evidence-summary-item:last-child { border-bottom: none; }
+      #rejections { padding: 0 32px 64px; }
+      #rejections h2 { font-size: 16px; margin: 0 0 4px; }
+      #rejections p { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+      .rejection { border-top: 1px solid var(--border); padding: 8px 0; font-size: 13px; }
+      .rejection .meta { color: var(--muted); font-size: 12px; }
       .llm-block, .lifecycle-block { background: var(--border); border-radius: 6px; padding: 8px; font-size: 12px; }
     </style>
   </head>
@@ -73,6 +78,7 @@
       <span id="counts" class="badge"></span>
     </div>
     <main id="cards"></main>
+    <section id="rejections"></section>
     <script>
       const DASHBOARD_TOKEN = '__ARCFORGE_DASHBOARD_TOKEN__';
       const cardsEl = document.getElementById('cards');
@@ -360,8 +366,42 @@
         }
       }
 
-      refreshEl.addEventListener('click', load);
+      // Declined proposals (B-17): what the curator turned away, why, and when.
+      // Shown for the record only — none of these is a candidate.
+      const rejectionsEl = document.getElementById('rejections');
+      function appendText(parent, tag, className, text) {
+        const el = document.createElement(tag);
+        el.className = className;
+        el.textContent = text;
+        parent.appendChild(el);
+        return el;
+      }
+      function renderRejections(model) {
+        while (rejectionsEl.firstChild) rejectionsEl.removeChild(rejectionsEl.firstChild);
+        appendText(rejectionsEl, 'h2', '', 'Declined proposals (' + model.count + ')');
+        appendText(rejectionsEl, 'p', '', 'Proposals the curator turned away before they became candidates. Older ones are kept in rejections.archive.jsonl.');
+        for (const r of model.rejections || []) {
+          const row = appendText(rejectionsEl, 'div', 'rejection', '');
+          appendText(row, 'div', 'name', (r.name || '(unnamed)') + (r.artifact_type ? ' — ' + r.artifact_type : ''));
+          const why = (r.reasons || []).map((x) => x.code + (x.detail ? ': ' + x.detail : '')).join('; ');
+          appendText(row, 'div', 'summary', why || 'no reason recorded');
+          appendText(row, 'div', 'meta', (r.rejected_at || 'unknown time') + (r.scope && r.scope.project ? ' · ' + r.scope.project : ''));
+        }
+      }
+      async function loadRejections() {
+        try {
+          const res = await fetch('/api/rejections');
+          const model = await res.json();
+          if (!res.ok) throw new Error(model.error || 'Failed to load rejections');
+          renderRejections(model);
+        } catch (e) {
+          while (rejectionsEl.firstChild) rejectionsEl.removeChild(rejectionsEl.firstChild);
+          appendText(rejectionsEl, 'p', '', 'Could not load declined proposals.');
+        }
+      }
+      refreshEl.addEventListener('click', () => { load(); loadRejections(); });
       load();
+      loadRejections();
     </script>
   </body>
 </html>

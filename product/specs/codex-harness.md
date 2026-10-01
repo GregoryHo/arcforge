@@ -1,6 +1,6 @@
 # codex-harness — spec
 
-> Status: shipped v6.1.2 · extended by 6.2.0 (next) · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.1.2 · extended by 6.2.0 (building) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 > Tracks: `.codex-plugin/plugin.json`, `.agents/plugins/marketplace.json`,
@@ -155,6 +155,22 @@ whole and fails halfway through a workflow.
   variants, no conditional branches in a skill body on which host is running.
   If a future host needs behavior arcforge cannot express in one tree, that is a
   decision to record, not a directory to add.
+- **B-8 The boundary does not move in 6.2.0.** Each item below stays where
+  D-013 drew it, as a Residual here with its wish left in the Backlog (D-039):
+  - Residual: the seven CLI-backed skills keep reporting `command not found` on
+    Codex (B-3) — a skill-relative engine path would break D1/D9, and a
+    SessionStart-hook route would re-open the discovery guard of B-2
+    (`codex-cli-on-path`).
+  - Residual: the hooks get no Codex-native implementation and do not run there
+    (B-2) — blocked on ownership and trust, not on protocol
+    (`codex-hooks-adapter`).
+  - Residual: cross-skill handoffs keep the slash notation, read through the
+    router's per-host note (B-6) — a host-neutral spelling reopens the frozen
+    skill schema §4.1/§5 (`host-neutral-skill-handoffs`).
+  - Residual: learning's enricher and curator, the eval harness and the loop
+    still spawn `claude` with no runner seam, so none of them reaches Codex —
+    a harness-neutral runner is a prerequisite nobody has scheduled
+    (`harness-neutral-model-runner`).
 
 ## Data / domain model
 
@@ -200,7 +216,7 @@ unless a bullet names a later version:
   6.0.0 and left unscheduled.
 - **D-013** — Codex packaging ships at 6.1.0, skills only, with the hook registry
   renamed out of Codex's discovery path.
-- **D-039** — *proposed*: the boundary stays where D-013 drew it for 6.2.0; each
-  open item is a Residual here and a wish in the backlog (B-2, B-3, B-7).
+- **D-039** — the boundary stays where D-013 drew it for 6.2.0; each open item
+  is a Residual here and a wish in the backlog (B-2, B-3, B-6, B-7, B-8).
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).

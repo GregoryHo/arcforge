@@ -6,6 +6,11 @@
 
 **Parent index**: [`./README.md`](./README.md)
 
+**Contract version**: 2 — 2026-10-01: rejection retention bounds the live
+`rejections.jsonl` only; rotated records move to `rejections.archive.jsonl` and
+are never pruned by the engine (see *Retention, rotation, and recovery*).
+Version 1 is every revision before that line existed.
+
 ## Responsibility
 
 Layer 5 is the deterministic candidate authority for the learning system.
@@ -762,6 +767,7 @@ Default production files:
 ```text
 ~/.arcforge/learning/candidates/queue.jsonl
 ~/.arcforge/learning/candidates/rejections.jsonl
+~/.arcforge/learning/candidates/rejections.archive.jsonl
 ~/.arcforge/learning/candidates/store.lock
 ```
 
@@ -775,7 +781,8 @@ Ownership:
 
 ```text
 queue.jsonl       = accepted candidate lifecycle source of truth
-rejections.jsonl  = rejected proposal audit log
+rejections.jsonl  = rejected proposal audit log (live, retention-bound)
+rejections.archive.jsonl = rotated rejection records (append-only, never pruned)
 index.json        = derived / rebuildable cache
 store.lock        = shared exclusive write lock
 ```
@@ -907,20 +914,26 @@ Contract:
 
 `queue.jsonl` is product state source of truth and should not be short-term pruned.
 
-`rejections.jsonl` is retention-bound audit/debug state. A default implementation may choose a time or record-count limit, but the contract is:
+`rejections.jsonl` is retention-bound audit/debug state. The contract is:
 
 ```text
 rejections.jsonl is not permanent product state.
 ```
 
-Rotation/archive is allowed if replay semantics remain identical:
+Revised 2026-10-01 (contract version 2): the retention limits bound the **live**
+`rejections.jsonl`, not the record of what was declined. Before a rejection is
+appended (under `store.lock`), a live file that has passed any limit in
+*First-slice defaults* §1 has its records appended, unchanged and in order —
+malformed lines included — to `~/.arcforge/learning/candidates/rejections.archive.jsonl`,
+and the live file starts over. The archive is the user's to keep or delete; the
+engine never prunes, rewrites or reads it as learning evidence, so it is
+unbounded. Readers that show rejections (Layer 6) read the live file only.
+
+`queue.jsonl` rotation, when it lands, must keep replay semantics identical:
 
 ```text
 queue.jsonl
 queue.2026-05.jsonl.gz
-
-rejections.jsonl
-rejections.2026-05.jsonl.gz
 ```
 
 Archived queue logs remain part of replayable source-of-truth history.
@@ -1137,7 +1150,7 @@ Candidate Queue → CLAUDE.md
 
 The first 3.1 implementation slice uses these defaults unless a later reviewed plan changes them:
 
-1. `rejections.jsonl` retention is bounded by **30 days**, **5,000 records**, or **10 MB**, whichever limit is reached first. Rotation/deletion must preserve local-only behavior and must not promote rejected proposal data into future learning evidence.
+1. The live `rejections.jsonl` is bounded by **30 days** (its oldest record), **5,000 records**, or **10 MB**, whichever limit is reached first; past one, its records rotate to `rejections.archive.jsonl` (see *Retention, rotation, and recovery*). Rotation deletes nothing, stays local-only, and must not promote rejected proposal data into future learning evidence.
 2. `queue.jsonl` rotation is **deferred** for the first slice. The append-only event log remains the source of truth; `index.json` is rebuildable and may be recreated whenever stale or corrupt.
 3. `needs_more_evidence` is a **review/lifecycle action after candidate creation**, not a Layer 5 validation fallback. Proposals with too few valid evidence refs are rejected before queue insertion; accepted candidates start at `pending_review`.
 4. First-slice field limits are:
