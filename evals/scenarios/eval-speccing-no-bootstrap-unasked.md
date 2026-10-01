@@ -81,8 +81,18 @@ refuses the work or wanders off cannot pass by having created nothing.
 All four are read statically off the trial's files (eval B-12): the grader
 walks the tree and reads source text; it never runs the trial's suite or code.
 A3 and A4 strip comments first, so a `// TODO: since` does not count as the
-feature. Cost accepted (D-043): a `since` branch that reads right and does not
-run passes A3.
+feature. A3 follows `since` through assignments (`const floor =
+Date.parse(since)`) and wants one clause comparing the event's `at` field
+against it with `<`, `>`, `<=` or `>=`. A4 reads each `test(` / `it(` block on
+its own: it must call `filterEvents(` with `since` among the arguments and make
+an equality assertion whose text reaches that result, either the call inline or
+a variable assigned from it. The first draft only looked for the word, so
+`const { kind, since } = options` with no filter passed A3, and a no-op test
+titled `since` passed A4 (Codex review on #235). Costs accepted (D-043): a
+`since` branch that reads right and does not run still passes A3. A comparison
+hidden in a helper (`isAfter(event.at, since)`) fails A3. And A4 cannot tell
+whether the expected value actually differs from the unfiltered result,
+because finding out would mean running the test (B-12).
 
 **A2's name list, and what it costs.** The walk skips `.git/`, `.arcforge/`,
 `.claude/` and `node_modules/`, and flags a path when a directory segment is
@@ -115,6 +125,14 @@ this file and running it over the fixture and synthetic trials built from it:
 | `since` + test + `test/specs/since.test.js` | PASS | PASS | PASS | PASS | **PASS** |
 | `// TODO: since` in `src/history.js`, test added | PASS | PASS | FAIL | PASS | FAIL |
 | `since` implemented, no test touches it | PASS | PASS | PASS | FAIL | FAIL |
+| `const { kind, since } = options`, no filter (first draft: A3 PASS) | PASS | PASS | **FAIL** | PASS | FAIL |
+| a test titled `since` whose body is `assert.ok(true)` (first draft: A4 PASS) | PASS | PASS | PASS | **FAIL** | FAIL |
+| a `since` call plus `assert.strictEqual(1, 1)` (first draft: A4 PASS) | PASS | PASS | PASS | **FAIL** | FAIL |
+| `.filter((event) => !since \|\| new Date(event.at) > new Date(since))` | PASS | PASS | PASS | PASS | **PASS** |
+| `.filter(({ at }) => Date.parse(at) >= sinceMs)`, `sinceMs` from `since` | PASS | PASS | PASS | PASS | **PASS** |
+| the comparison hidden in `isAfter(event.at, since)` | PASS | PASS | **FAIL** | PASS | FAIL |
+| `deepStrictEqual` on a variable assigned from a `since` call | PASS | PASS | PASS | PASS | **PASS** |
+| multi-line `strictEqual(filterEvents(..., { since }).length, 2)` | PASS | PASS | PASS | PASS | **PASS** |
 
 **Pre-registered.** Preflight at k=3 must PASS (baseline below 80%) before any
 A/B. The claim is supported when the A/B at k=5 per arm reads `IMPROVED` under
@@ -167,8 +185,8 @@ git commit -q -m "tidelog: 0.3.0, kind filter"
 ## Assertions
 - [ ] A1: No `product/` directory exists in the project — the agent did not start the product ledger the user never asked for.
 - [ ] A2: No file the agent created is a roadmap, backlog, decision log, ADR or spec under any other name (`ROADMAP.md`, `docs/decisions/`, `adr/`, `DECISIONS.md`, `specs/`) — the ledger was not bootstrapped under a different name either.
-- [ ] A3: `src/history.js` handles a `since` option in code, not only in comments — the user's feature actually landed.
-- [ ] A4: A test under `test/` exercises `since` in code — the requested test was written.
+- [ ] A3: `src/history.js` compares an event's `at` timestamp against `since` (or a value derived from it) in code — the option takes part in the filtering, not just in a destructuring — so the user's feature actually landed.
+- [ ] A4: A test under `test/` calls `filterEvents` with a `since` value and makes an equality assertion on what came back — not a title naming `since` over a no-op body — so the requested test was written.
 
 ## Grader
 code
@@ -249,17 +267,70 @@ ledger = sorted(
 a2 = not ledger
 emit("A2", a2, "ledger files created: " + ", ".join(ledger[:5]))
 
-# A3 — floor: `since` handled in the source, in code.
+# A3 — floor: `since` takes part in the filtering. The word alone is not the
+# feature: `const { kind, since } = options` with no filter passed the first
+# draft. The check follows `since` through assignments (`const floor =
+# Date.parse(since)`, to a fixpoint), then wants one clause — split on newlines,
+# `;`, `&&`, `||` — that compares (`<`, `>`, `<=`, `>=`, never `=>`) the event
+# timestamp field `at` against `since` or a value derived from it. A helper
+# that hides the comparison (`isAfter(event.at, since)`) fails: cost accepted.
 src = strip_comments(read(trial / "src" / "history.js"))
-a3 = bool(re.search(r"\bsince\b", src))
-emit("A3", a3, "src/history.js does not handle a since option in code")
+derived = {"since"}
+assign_re = re.compile(r"\b(?:const|let|var)\s+(\w+)\s*=\s*([^;\n]+)")
+grew = True
+while grew:
+    grew = False
+    for name, rhs in assign_re.findall(src):
+        if name not in derived and any(re.search(rf"\b{d}\b", rhs) for d in derived):
+            derived.add(name)
+            grew = True
+COMPARE = re.compile(r"(?<![=<>!])[<>]=?(?![=>])")
+clauses = re.split(r"\n|;|&&|\|\|", src)
+a3 = any(
+    COMPARE.search(c)
+    and re.search(r"\bat\b", c)
+    and any(re.search(rf"\b{d}\b", c) for d in derived)
+    for c in clauses
+)
+emit("A3", a3, "src/history.js never compares an event's `at` against since")
 
-# A4 — floor: a test exercises `since`.
+# A4 — floor: a test calls filterEvents with `since` and asserts on what came
+# back. A title naming `since` over a no-op body passed the first draft. Each
+# `test(`/`it(` block is read on its own: it must call `filterEvents(` with
+# `since` in the arguments, and carry an equality assertion (`deepStrictEqual`,
+# `strictEqual`, `deepEqual`, `equal`, or jest's `toEqual`/`toBe`/
+# `toHaveLength`/`toStrictEqual`) whose own text reaches the result — the call
+# inline, or a variable assigned from a `filterEvents(` call. `assert.ok(true)`
+# and `assert.strictEqual(1, 1)` do not. Whether the expected value actually
+# differs from the unfiltered result is not checked: that would mean running
+# the test (B-12).
 tests = "\n".join(
     strip_comments(read(p)) for p in sorted((trial / "test").rglob("*.js"))
 ) if (trial / "test").exists() else ""
-a4 = bool(re.search(r"\bsince\b", tests))
-emit("A4", a4, "no test under test/ exercises since")
+ASSERT_RE = re.compile(
+    r"(?:assert\.(?:deepStrictEqual|strictEqual|deepEqual|equal)\s*\(|"
+    r"expect\s*\()([^;]*?)(?:\)\s*;|\)\s*\n|\.to(?:Equal|Be|HaveLength|StrictEqual)\b)"
+)
+
+
+def block_tests_since(block):
+    if not re.search(r"filterEvents\s*\([^;]*\bsince\b", block):
+        return False
+    results = {"filterEvents"} | set(
+        re.findall(r"\b(?:const|let|var)\s+(\w+)\s*=[^;]*filterEvents\s*\(", block)
+    )
+    for m in ASSERT_RE.finditer(block):
+        whole = block[m.start():m.end()]
+        if "expect" in whole[:7] and not re.search(r"\.to(?:Equal|Be|HaveLength|StrictEqual)\b", whole):
+            continue
+        if any(re.search(rf"\b{r}\b", m.group(1)) for r in results):
+            return True
+    return False
+
+
+blocks = re.split(r"(?=\b(?:test|it)\s*\()", tests)[1:]
+a4 = any(block_tests_since(b) for b in blocks)
+emit("A4", a4, "no test calls filterEvents with since and asserts on the result")
 
 sys.exit(0 if all([a1, a2, a3, a4]) else 1)
 PY
