@@ -47,9 +47,10 @@ usual false positives stay quiet.
 ### `compact-suggester` — a nudge when the session gets long
 
 Counting tool calls, it suggests `/compact` at 50 and then every 25 after that.
-The wording adapts to what you have been doing: during a heavy writing stretch it
-stays out of the way, and in a read-heavy stretch it speaks up sooner, because
-that is when compacting costs you least.
+Those points are fixed; what you have been doing over the last 20 tool calls
+changes only the wording — mostly reads, active implementation, or mixed work —
+with one exception: during a heavy writing stretch it skips the reminder at 75,
+so it does not interrupt you mid-implementation.
 
 It is a suggestion. Nothing compacts unless you say so.
 

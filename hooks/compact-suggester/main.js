@@ -6,7 +6,8 @@
  * - First suggestion at 50 tool calls
  * - Subsequent reminders every 25 calls
  * - Phase-aware messaging: references phase transitions instead of generic reminders
- * - Read/write ratio: suppresses during heavy write phases, boosts during read-heavy phases
+ * - Read/write ratio: a write-heavy window suppresses the reminder at 75; the
+ *   50/25 schedule is otherwise fixed and the phase only changes the wording
  *
  * Triggered on PostToolUse for ALL tools.
  *

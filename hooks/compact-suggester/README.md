@@ -9,7 +9,8 @@ Tracks tool call count and suggests `/compact` at strategic intervals.
 - **Phase-aware**: messaging reflects the current phase using a rolling window of
   the most recent 20 tool types (read-heavy / write-heavy / neutral), not the
   lifetime average — so a long research phase early in the session no longer
-  masks a later implementation phase.
+  masks a later implementation phase. The phase changes the wording only, never
+  the schedule — except that a write-heavy window skips the reminder at 75.
 - **Reset**: State is reset on every compaction by the PreCompact hook (via the
   shared `getSuggesterStatePath()` helper), so suggestions never survive a
   context boundary.
