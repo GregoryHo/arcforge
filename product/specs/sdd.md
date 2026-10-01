@@ -118,7 +118,12 @@ roadmap row carries the marker.
 - **D-020** — 6.2.0's measurement round adds a scenario for B-6, D-015's
   surviving clause: a fixture with no `product/` state and no request for any,
   where the skill must not create the four files. Both existing `speccing`
-  fixtures already carry `product/`, so until that scenario is measured B-6
-  has no eval evidence (B-6).
+  fixtures already carry `product/`; that scenario is now measured (D-047)
+  (B-6).
+- **D-047** — 6.2.0's round: `eval-speccing-no-bootstrap-unasked` measured
+  +0.20 CI[0.06, 0.34] IMPROVED, B-6's first eval evidence; the supersede
+  scenario's baseline ceiling, which D-015 recorded as predicted, is now
+  measured (V8 preflight BLOCK, 3/3), so B-4 still has no A/B evidence (B-4,
+  B-6).
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).

@@ -1128,3 +1128,38 @@ reverse one, append a superseding entry (see AGENTS.md).
   next cycle charge those weeks again and re-archive the instinct the user
   just restored — the loop D-022 closed. The audit record keeps the removed
   reason, so nothing is lost; only the file stops claiming it.
+
+### D-047 — 6.2.0's round: the supersede ceiling is measured, and B-6 has evidence
+- Date: 2026-10-01
+- Version: 6.2.0
+- Status: Accepted
+- Decision: Two readings of 6.2.0's round are recorded as findings, not
+  failures: `eval-speccing-supersede-not-overwrite` Version 8 BLOCKed at
+  preflight (baseline 3/3), so the scenario stays corpus coverage without
+  A/B evidence and its rubric redesign stays open work; and
+  `eval-speccing-no-bootstrap-unasked` spent its one pre-registered redesign
+  (Version 1 BLOCKed, Version 2 PASSed) and then measured **+0.20
+  CI[0.06, 0.34] IMPROVED** at k=5, which is sdd B-6's first harness evidence.
+- Why: The V8 reading is the first baseline taken on the V7+ grader and the
+  repaired instrument, so the ceiling D-015 recorded as a prediction (the 8/8
+  re-score) is now measured; eval B-3 makes that a verdict about the scenario,
+  not about `speccing`. The no-bootstrap V1 baseline wrote a `## Roadmap` and
+  a `## Decisions` into `README.md` while its A2 looked only for new files;
+  V2's A2 diffs every doc file against the fixture, and its baseline then
+  failed A2 in 5 of 5 trials. The rest of the round measured:
+  `eval-learning-marker-preservation` +1.00 CI[1, 1] (D-038's sentence) and
+  `eval-speccing-spec-before-code` Version 3 +0.60 CI[0.51, 0.68] at k=10
+  (D-043's static A5 and the #157/#162/#168 repairs), both IMPROVED; V2's
+  +0.67 is now the pre-repair reading.
+- Residual: the supersede redesign is the
+  `redesign-speccing-supersede-not-overwrite` wish — `supersede-v7-preflight`
+  graduated into 6.2.0 (D-020) and this round spent it on the reading. Until a
+  redesign is measured, B-4's append-only behavior has no A/B evidence. The
+  no-bootstrap treatment passed 4 of 5, not 5 of 5.
+- Cost accepted: 55 live sessions of a 70 budget, 3 of them on a no-bootstrap
+  Version 1 that BLOCKed.
+- Verification: `docs/plans/v6.1/wp-s/preflight.<scenario>.json`, one per
+  scenario and the final reading of each, on `opus[1m]` / `xhigh` at k=3,
+  2026-10-01; the A/B pools are in the snapshot
+  `evals/benchmarks/2026-10-01.json` (= `latest.json`, generated
+  2026-10-01T09:13:37Z).
