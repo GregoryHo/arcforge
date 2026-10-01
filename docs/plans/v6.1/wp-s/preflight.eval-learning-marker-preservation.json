@@ -1,0 +1,14 @@
+{
+  "scenario_hash": "4b59a2abd6b7be7f",
+  "scenario_name": "eval-learning-marker-preservation",
+  "model": "opus[1m]",
+  "max_turns": 40,
+  "plugin_dir": false,
+  "effort": "xhigh",
+  "trial_timeout_ms": 900000,
+  "pass_rate": 0,
+  "k": 3,
+  "verdict": "PASS",
+  "reason": "Baseline pass rate 0% < 80% — scenario is discriminative. Proceed with arcforge eval ab.",
+  "timestamp": "2026-10-01T08:46:04.473Z"
+}
