@@ -49,7 +49,7 @@ if (require.main === module && learningDefinitelyDisabled()) {
   process.exit(0);
 }
 
-const { spawn } = require('node:child_process');
+const { execFileSync, spawn } = require('node:child_process');
 
 const {
   getProjectName,
@@ -358,27 +358,51 @@ function archiveIfNeeded(obsPath, project) {
 }
 
 /**
+ * Whether `pid` is a live observer daemon: its command line runs
+ * observer-daemon.sh. A daemon that died without removing its lock leaves a PID
+ * the OS can hand to an unrelated process, so the PID alone proves nothing —
+ * and SIGUSR1's default action terminates whatever process receives it.
+ */
+function isDaemonPid(pid) {
+  try {
+    const command = execFileSync('ps', ['-o', 'command=', '-p', String(pid)], {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    return command.includes('observer-daemon.sh');
+  } catch {
+    return false; // ps exits non-zero when no such process exists
+  }
+}
+
+/**
  * Signal the observer daemon via SIGUSR1 with file-based cooldown.
  * Each hook invocation is a separate process — timestamp file coordinates cooldown.
+ * Returns a status string for testability:
+ *   'cooldown' | 'no-pid' | 'not-daemon' | 'signaled' | 'error'
+ * A lock whose PID is not a daemon is left for the daemon's own stale-lock
+ * reclaim; the hook only declines to signal it.
  */
 function signalDaemon() {
   try {
     // Check cooldown via timestamp file
     if (fs.existsSync(SIGNAL_TIMESTAMP_FILE)) {
       const lastSignal = fs.statSync(SIGNAL_TIMESTAMP_FILE).mtimeMs;
-      if (Date.now() - lastSignal < SIGNAL_COOLDOWN_MS) return;
+      if (Date.now() - lastSignal < SIGNAL_COOLDOWN_MS) return 'cooldown';
     }
 
     const pidFile = getPidFile();
-    if (!fs.existsSync(pidFile)) return;
+    if (!fs.existsSync(pidFile)) return 'no-pid';
     const pid = parseInt(fs.readFileSync(pidFile, 'utf-8').trim(), 10);
-    if (pid > 0) {
-      process.kill(pid, 'SIGUSR1');
-      // Touch timestamp file (write updates mtime)
-      fs.writeFileSync(SIGNAL_TIMESTAMP_FILE, String(Date.now()), 'utf-8');
-    }
+    if (!(pid > 0)) return 'no-pid';
+    if (!isDaemonPid(pid)) return 'not-daemon';
+    process.kill(pid, 'SIGUSR1');
+    // Touch timestamp file (write updates mtime)
+    fs.writeFileSync(SIGNAL_TIMESTAMP_FILE, String(Date.now()), 'utf-8');
+    return 'signaled';
   } catch {
     // Daemon not running or signal failed — silently ignore
+    return 'error';
   }
 }
 
@@ -534,6 +558,7 @@ module.exports = {
   getPidFile,
   shouldObserve,
   spawnDaemonIfNeeded,
+  signalDaemon,
   MAX_INPUT_LENGTH,
   LAZY_START_THRESHOLD,
 };
