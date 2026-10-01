@@ -23,10 +23,9 @@ const { output } = require('./shared');
  */
 function refusePluginDirOutsideWorkflow(scenario, pluginDir, cmd) {
   if (!pluginDir || scenario.scope === 'workflow') return;
-  console.error(
-    `Error: eval ${cmd} --plugin-dir is refused for a ${scenario.scope}-scope scenario. A plugin-routed comparison is a workflow measurement: give the scenario ## Scope workflow and ## Plugin Dir (B-1). A single skill's trigger rate is measured with \`claude plugin eval\`, not this harness (B-11).`,
+  throw new Error(
+    `eval ${cmd} --plugin-dir is refused for a ${scenario.scope}-scope scenario. A plugin-routed comparison is a workflow measurement: give the scenario ## Scope workflow and ## Plugin Dir (B-1). A single skill's trigger rate is measured with \`claude plugin eval\`, not this harness (B-11).`,
   );
-  process.exit(1);
 }
 
 /**
@@ -43,10 +42,9 @@ function requirePinnedToolkitFlags(scenario, options, cmd) {
   if (scenario.scope !== 'workflow' || options['plugin-dir'] || scenario.pluginDir) return;
   const missing = ['model', 'effort'].filter((flag) => !options[flag]).map((f) => `--${f}`);
   if (missing.length === 0) return;
-  console.error(
-    `Error: eval ${cmd} on a workflow scenario with no plugin dir runs the treatment on your full user config, so both arms need --model and --effort pinned (missing: ${missing.join(', ')}).`,
+  throw new Error(
+    `eval ${cmd} on a workflow scenario with no plugin dir runs the treatment on your full user config, so both arms need --model and --effort pinned (missing: ${missing.join(', ')}).`,
   );
-  process.exit(1);
 }
 
 function skillNameFromFile(file) {
@@ -88,13 +86,11 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
 
   const requireScenario = (name, cmd) => {
     if (!name) {
-      console.error(`Error: eval ${cmd} requires a scenario name`);
-      process.exit(1);
+      throw new Error(`eval ${cmd} requires a scenario name`);
     }
     const scenario = eval_.findScenario(name, projectRoot);
     if (!scenario) {
-      console.error(`Error: scenario "${name}" not found`);
-      process.exit(1);
+      throw new Error(`scenario "${name}" not found`);
     }
     return scenario;
   };
@@ -252,8 +248,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
   } else if (subcommand === 'preflight') {
     const scenarioName = args.positional[1];
     if (!scenarioName) {
-      console.error('Error: eval preflight requires a scenario name');
-      process.exit(1);
+      throw new Error('eval preflight requires a scenario name');
     }
     const { runPreflight } = require('../lib/eval-preflight');
     const model = args.options.model;
@@ -262,8 +257,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     // Resolve scenario for trial execution
     const scenario = eval_.findScenario(scenarioName, projectRoot);
     if (!scenario) {
-      console.error(`Error: scenario "${scenarioName}" not found`);
-      process.exit(1);
+      throw new Error(`scenario "${scenarioName}" not found`);
     }
 
     refusePluginDirOutsideWorkflow(scenario, args.options['plugin-dir'], 'preflight');
@@ -325,8 +319,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
   } else if (subcommand === 'lint') {
     const scenarioName = args.positional[1];
     if (!scenarioName) {
-      console.error('Error: eval lint requires a scenario name');
-      process.exit(1);
+      throw new Error('eval lint requires a scenario name');
     }
     const { lintScenario, formatDiagnostics } = require('../lib/eval-lint');
     const { resolveScenarioFile } = require('../lib/eval-preflight');
@@ -336,18 +329,14 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     // `arcforge eval run` would falsely fail `arcforge eval lint` with "file not found".
     const scenarioFile = resolveScenarioFile(scenarioName, projectRoot);
     if (!scenarioFile) {
-      console.error(`Error: scenario "${scenarioName}" not found in evals/scenarios/`);
-      process.exit(1);
+      throw new Error(`scenario "${scenarioName}" not found in evals/scenarios/`);
     }
 
     const diagnostics = lintScenario(scenarioFile);
     if (diagnostics.length === 0) {
       console.log(`${scenarioName}: ok`);
     } else {
-      for (const line of formatDiagnostics(diagnostics)) {
-        console.error(line);
-      }
-      process.exit(1);
+      throw new Error(formatDiagnostics(diagnostics).join('\n'));
     }
   } else if (subcommand === 'audit') {
     const { runAudit } = require('../lib/eval-audit');
@@ -421,8 +410,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
         },
       });
       if (gateError) {
-        console.error(`Error: ${gateError}`);
-        process.exit(1);
+        throw new Error(gateError);
       }
     }
 
@@ -455,15 +443,13 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     } else {
       const skillFile = args.options['skill-file'] || scenario.target;
       if (!skillFile) {
-        console.error(
-          'Error: eval ab for skill scope requires --skill-file <path> or ## Target in scenario',
+        throw new Error(
+          'eval ab for skill scope requires --skill-file <path> or ## Target in scenario',
         );
-        process.exit(1);
       }
       const resolvedSkillFile = path.resolve(projectRoot, skillFile);
       if (!fs.existsSync(resolvedSkillFile)) {
-        console.error(`Error: skill file not found: ${skillFile}`);
-        process.exit(1);
+        throw new Error(`skill file not found: ${skillFile}`);
       }
       const skillInstruction = fs.readFileSync(resolvedSkillFile, 'utf8');
       console.log(
@@ -523,8 +509,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
   } else if (subcommand === 'compare') {
     const name = args.positional[1];
     if (!name) {
-      console.error('Error: eval compare requires a scenario name');
-      process.exit(1);
+      throw new Error('eval compare requires a scenario name');
     }
 
     const scenario = eval_.findScenario(name, projectRoot);
@@ -536,18 +521,13 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     const bRows = eval_.loadResults(`${name}-baseline`, projectRoot, filterOpts);
     const tRows = eval_.loadResults(`${name}-treatment`, projectRoot, filterOpts);
     if (bRows.length === 0 || tRows.length === 0) {
-      console.error(
-        'Error: need both baseline and treatment results. Run: arcforge eval ab <name>',
-      );
-      process.exit(1);
+      throw new Error('need both baseline and treatment results. Run: arcforge eval ab <name>');
     }
     // Both arms on the newest pool pair that shares its conditions (B-8).
     const paired = pairArms(bRows, tRows);
     const unpairedLines = paired.unpaired.map((p) => otherPoolLines([p], p.arm)[0]);
     if (paired.error) {
-      console.error(`Error: ${paired.error}`);
-      for (const line of unpairedLines) console.error(`  ${line}`);
-      process.exit(1);
+      throw new Error([paired.error, ...unpairedLines.map((line) => `  ${line}`)].join('\n'));
     }
     const baseline = paired.baseline;
     const treatment = paired.treatment;

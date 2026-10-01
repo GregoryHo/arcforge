@@ -210,16 +210,15 @@ describe('eval command', () => {
     });
 
     it('refuses when the arms share no conditions, listing the pools', async () => {
-      const errors = [];
-      jest.spyOn(console, 'error').mockImplementation((...a) => errors.push(a.join(' ')));
       for (let t = 1; t <= 5; t++) {
         put('baseline', t, { model: 'opus' });
         put('treatment', t, { model: 'sonnet' });
       }
-      await expect(
-        runEvalCommand(args(['compare', 'paired']), { projectRoot: tempDir, asJson: false }),
-      ).rejects.toThrow('process.exit(1)');
-      const message = errors.join('\n');
+      // A runtime failure throws to cli.js's one catch, which owns stderr vs --json (B-5).
+      const { message } = await runEvalCommand(args(['compare', 'paired']), {
+        projectRoot: tempDir,
+        asJson: false,
+      }).catch((err) => err);
       expect(message).toContain('no run conditions in common');
       expect(message).toContain('Not combined (baseline): 5 row(s) under model opus');
       expect(message).toContain('Not combined (treatment): 5 row(s) under model sonnet');
@@ -227,8 +226,6 @@ describe('eval command', () => {
   });
 
   describe('a full-toolkit workflow A/B needs --model and --effort up front', () => {
-    let errors;
-
     beforeEach(() => {
       const dir = path.join(tempDir, evalLib.SCENARIOS_DIR);
       fs.mkdirSync(dir, { recursive: true });
@@ -236,21 +233,17 @@ describe('eval command', () => {
         path.join(dir, 'toolkit.md'),
         SCENARIO('toolkit').replace('## Scope\nagent', '## Scope\nworkflow'),
       );
-      errors = [];
-      jest.spyOn(console, 'error').mockImplementation((...a) => errors.push(a.join(' ')));
+      jest.spyOn(console, 'error').mockImplementation(() => {});
       jest.spyOn(process, 'exit').mockImplementation((code) => {
         throw new Error(`process.exit(${code})`);
       });
     });
 
     it('eval ab refuses before the preflight gate, so it never sends the user to preflight', async () => {
-      await expect(
-        runEvalCommand(args(['ab', 'toolkit'], { model: 'opus' }), {
-          projectRoot: tempDir,
-          asJson: false,
-        }),
-      ).rejects.toThrow('process.exit(1)');
-      const message = errors.join('\n');
+      const { message } = await runEvalCommand(args(['ab', 'toolkit'], { model: 'opus' }), {
+        projectRoot: tempDir,
+        asJson: false,
+      }).catch((err) => err);
       expect(message).toContain('--effort');
       expect(message).not.toContain('No preflight record');
       expect(evalLib.runWorkflowEval).not.toHaveBeenCalled();
@@ -259,8 +252,7 @@ describe('eval command', () => {
     it('eval preflight refuses the same invocation before spending a trial', async () => {
       await expect(
         runEvalCommand(args(['preflight', 'toolkit']), { projectRoot: tempDir, asJson: false }),
-      ).rejects.toThrow('process.exit(1)');
-      expect(errors.join('\n')).toMatch(/--model.*--effort|--effort.*--model/s);
+      ).rejects.toThrow(/--model.*--effort|--effort.*--model/s);
       expect(evalLib.runTrial).not.toHaveBeenCalled();
     });
 
@@ -454,7 +446,7 @@ describe('eval command', () => {
           projectRoot: tempDir,
           asJson: false,
         }),
-      ).rejects.toThrow('process.exit(1)');
+      ).rejects.toThrow('--plugin-dir is refused');
       expect(evalLib.runTrial).not.toHaveBeenCalled();
     });
 
@@ -469,7 +461,6 @@ describe('eval command', () => {
 
   describe('eval ab preflight gate matches the baseline conditions', () => {
     const { runPreflight } = require('../../scripts/lib/eval-preflight');
-    let errors;
 
     beforeEach(() => {
       const dir = path.join(tempDir, evalLib.SCENARIOS_DIR);
@@ -486,8 +477,7 @@ describe('eval command', () => {
         conditions: { maxTurns: 10, pluginDir: tempDir },
       });
       evalLib.runWorkflowEval.mockReturnValue({ baseline: [], treatment: [], delta: 0 });
-      errors = [];
-      jest.spyOn(console, 'error').mockImplementation((...a) => errors.push(a.join(' ')));
+      jest.spyOn(console, 'error').mockImplementation(() => {});
       jest.spyOn(process, 'exit').mockImplementation((code) => {
         throw new Error(`process.exit(${code})`);
       });
@@ -502,15 +492,12 @@ describe('eval command', () => {
     });
 
     it('refuses, naming the mismatch and the command, when they differ (miss)', async () => {
-      await expect(
-        // No plugin dir: a full-toolkit A/B, which must pin model and effort first.
-        runEvalCommand(args(['ab', 'gated'], { model: 'opus', effort: 'high' }), {
-          projectRoot: tempDir,
-          asJson: false,
-        }),
-      ).rejects.toThrow('process.exit(1)');
+      // No plugin dir: a full-toolkit A/B, which must pin model and effort first.
+      const { message } = await runEvalCommand(
+        args(['ab', 'gated'], { model: 'opus', effort: 'high' }),
+        { projectRoot: tempDir, asJson: false },
+      ).catch((err) => err);
       expect(evalLib.runWorkflowEval).not.toHaveBeenCalled();
-      const message = errors.join('\n');
       expect(message).toContain('max turns none, plugin dir no');
       expect(message).toContain('recorded under: max turns 10, plugin dir yes');
       expect(message).toContain('Run: arcforge eval preflight gated');
@@ -542,14 +529,11 @@ describe('eval command', () => {
 
     it('refuses --plugin-dir, pointing at workflow scope and claude plugin eval', async () => {
       writeSkillScenario('ab-plugin');
-      await expect(
-        runEvalCommand(args(['ab', 'ab-plugin'], { 'plugin-dir': tempDir }), {
-          projectRoot: tempDir,
-          asJson: false,
-        }),
-      ).rejects.toThrow('process.exit(1)');
+      const { message } = await runEvalCommand(
+        args(['ab', 'ab-plugin'], { 'plugin-dir': tempDir }),
+        { projectRoot: tempDir, asJson: false },
+      ).catch((err) => err);
       expect(evalLib.runSkillEval).not.toHaveBeenCalled();
-      const message = console.error.mock.calls.join('\n');
       expect(message).toContain('workflow');
       expect(message).toContain('claude plugin eval');
     });
@@ -564,7 +548,7 @@ describe('eval command', () => {
           }),
           { projectRoot: tempDir, asJson: false },
         ),
-      ).rejects.toThrow('process.exit(1)');
+      ).rejects.toThrow('--plugin-dir is refused');
       expect(evalLib.runSkillEval).not.toHaveBeenCalled();
     });
 
