@@ -12,7 +12,7 @@ decision *and* every reversal. How to maintain this file: [`product/AGENTS.md`](
 | 6.1.0 | `v6.1.0` | learning trust · spec-driven method · Codex packaging | **shipped** | Diary enrichment and user-message capture move behind the learning opt-in and the enricher loses blanket permissions; the CLI's candidate commands become a front end onto the canonical queue; the lightweight spec-driven method arcforge runs itself on ships as the `speccing` skill; arcforge installs on Codex as a skills-only plugin over the same tree. | [skill-system](specs/skill-system.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) · [codex-harness](specs/codex-harness.md) · [sdd](specs/sdd.md) |
 | 6.1.1 | `v6.1.1` | eval instrument · learning trust repairs · truthful safety claims | **shipped** | The three fixes merged after `v6.1.0` — the prompt audit's engine and skill findings (#181, #182) and the hook registry's non-schema keys (#188) — plus the repairs the release benchmark depends on: trials isolated from the operator's output style and user hooks (#170), a provider refusal scored as an error trial rather than behavior, grader prompts that no longer resolve empty outside the arcforge repo, and error trials excluded from every verdict. Learning stops undoing what the user accepted: decay no longer re-applies at every SessionStart and archives instincts, the curator daemon — a second outbound path the spec never named — no longer starts after an opt-out, the dashboard's Activate and Deactivate pass their own gate, and `learn enable` stops erasing config. The secrets-guard claim is corrected to what it scans, and every edit under `skills/` lands here, so the benchmark is measured once, on a repaired instrument. | [eval](specs/eval.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) · [skill-system](specs/skill-system.md) · [obsidian](specs/obsidian.md) · [sdd](specs/sdd.md) · [worktrees-loop](specs/worktrees-loop.md) |
 | 6.1.2 | `v6.1.2` | docs-are-the-contract sweep | **shipped** | Where the docs promise what the engine does not do: CLI messages and contract drift, hooks promises the engine never kept, loop state bugs, contributor tooling and repo hygiene. It touches no eval-backed path — nothing under `skills/`, `evals/scenarios/` or `evals/fixtures/` — so it ships without a benchmark regeneration. | [cli](specs/cli.md) · [hooks](specs/hooks.md) · [learning](specs/learning.md) · [worktrees-loop](specs/worktrees-loop.md) · [obsidian](specs/obsidian.md) · [codex-harness](specs/codex-harness.md) |
-| 6.2.0 | — | learning lifecycle · eval corpus repairs | **next ← we are here** | Exits for candidates stuck at `approved` or `materialized`, `learn instinct deactivate` and `learn instinct restore`, a policy for candidate names, and worktree paths derived from the repo root; plus the scenario rubric fixes, measured in their own, smaller round. A minor because it adds CLI commands. | [learning](specs/learning.md) · [cli](specs/cli.md) · [worktrees-loop](specs/worktrees-loop.md) · [codex-harness](specs/codex-harness.md) · [eval](specs/eval.md) · [sdd](specs/sdd.md) |
+| 6.2.0 | — | learning lifecycle · eval corpus repairs | **building ← we are here** | Exits for candidates stuck at `approved` or `materialized`, `learn instinct deactivate` and `learn instinct restore`, a policy for candidate names, and worktree paths derived from the repo root; plus the scenario rubric fixes, measured in their own, smaller round. A minor because it adds CLI commands. | [learning](specs/learning.md) · [cli](specs/cli.md) · [worktrees-loop](specs/worktrees-loop.md) · [codex-harness](specs/codex-harness.md) · [eval](specs/eval.md) · [sdd](specs/sdd.md) |
 
 > Un-scheduled ideas live in the [Backlog](BACKLOG.md); a wish graduates into a
 > version (row + spec + Decision Log entry) when picked.
@@ -894,7 +894,7 @@ reverse one, append a superseding entry (see AGENTS.md).
 - Date: 2026-09-30
 - Version: 6.2.0
 - Refines: D-012
-- Status: Proposed
+- Status: Accepted
 - Decision: Proposed: Layer 5 rejects at ingestion a candidate whose `name`
   the draft writer could not use as a filename or that the redactor would
   alter; names are not normalized at materialization. Until accepted, it gates
@@ -917,7 +917,7 @@ reverse one, append a superseding entry (see AGENTS.md).
 - Date: 2026-09-30
 - Version: 6.2.0
 - Extends: D-012
-- Status: Proposed
+- Status: Accepted
 - Decision: Proposed: the Layer-5 Action × Status matrix lets an `approved`
   candidate be dismissed and a `materialized` candidate be materialized again,
   so neither state is a dead end. Until accepted, it gates the matrix change,
@@ -936,7 +936,7 @@ reverse one, append a superseding entry (see AGENTS.md).
 ### D-037 — The learning keyspace stays the project directory's basename
 - Date: 2026-09-30
 - Version: 6.2.0
-- Status: Proposed
+- Status: Accepted
 - Decision: Proposed: observations, instincts and candidates stay keyed on the
   sanitized basename of the project directory, and the collision between two
   same-named projects is recorded as a Residual and stated in the learning
@@ -953,7 +953,7 @@ reverse one, append a superseding entry (see AGENTS.md).
 ### D-038 — Manually saved instincts are not activatable, and the product says so
 - Date: 2026-09-30
 - Version: 6.2.0
-- Status: Proposed
+- Status: Accepted
 - Decision: Proposed: an instinct saved by hand or from reflection is not
   activatable and is never injected; the learning guide and the save command's
   output say so. Until accepted, it gates the guide text, the command output,
@@ -970,7 +970,7 @@ reverse one, append a superseding entry (see AGENTS.md).
 ### D-039 — The Codex boundary stays where D-013 drew it this cycle
 - Date: 2026-09-30
 - Version: 6.2.0
-- Status: Proposed
+- Status: Accepted
 - Decision: Proposed: 6.2.0 leaves the Codex boundary unchanged — the seven
   CLI-backed skills keep reporting `command not found`, the hooks get no
   Codex-native implementation, cross-skill handoffs keep the slash notation,
@@ -1008,7 +1008,7 @@ reverse one, append a superseding entry (see AGENTS.md).
 ### D-041 — Rejections rotate to an archive and are never deleted
 - Date: 2026-09-30
 - Version: 6.2.0
-- Status: Proposed
+- Status: Accepted
 - Decision: Proposed: `rejections.jsonl` rotates to an archive file once it
   passes the Layer-5 contract's retention limits (30 days, 5,000 records,
   10 MB); no rejection record is deleted. Until accepted, it gates the
@@ -1024,7 +1024,7 @@ reverse one, append a superseding entry (see AGENTS.md).
 ### D-042 — Reflection counts only enriched diaries
 - Date: 2026-09-30
 - Version: 6.2.0
-- Status: Proposed
+- Status: Accepted
 - Decision: Proposed: learning B-8's three-diary threshold counts only
   diaries whose sections were enriched; an unenriched draft stub does not count
   toward readiness. Until accepted, it gates the B-8 definition and the
@@ -1039,7 +1039,7 @@ reverse one, append a superseding entry (see AGENTS.md).
 ### D-043 — Graders never execute trial output
 - Date: 2026-09-30
 - Version: 6.2.0
-- Status: Proposed
+- Status: Accepted
 - Decision: Proposed: an eval grader never runs code a trial produced; the A5
   floor of `eval-speccing-spec-before-code` (#156) becomes a static check over
   the trial's files instead of a `node -e` probe of the exported function.
