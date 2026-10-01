@@ -1,11 +1,10 @@
 # Layer 5 — Candidate Queue + Lifecycle
 
-**Parent index**: [`./README.md`](./README.md)
+**Contract version**: 2 (2026-10-01)
 
-**Contract version**: 2 — 2026-10-01: rejection retention bounds the live
-`rejections.jsonl` only; rotated records move to `rejections.archive.jsonl` and
-are never pruned by the engine (see *Retention, rotation, and recovery*).
-Version 1 is every revision before that line existed.
+**Changelog**: v2 — (1) the Action × Status matrix gains `approved → dismiss` and `materialized → materialize` (D-036, product learning B-15); the table also shows the `deactivate` column `lifecycle.js` already enforced, and `name` is checked at ingestion (D-035, B-14); (2) rejection retention bounds the live `rejections.jsonl` only — rotated records move to `rejections.archive.jsonl` and are never pruned by the engine (D-041; see *Retention, rotation, and recovery*). v1 — every revision before this line existed.
+
+**Parent index**: [`./README.md`](./README.md)
 
 ## Responsibility
 
@@ -680,6 +679,7 @@ approved
   → dismissed
 
 materialized
+  → materialized   (materialize again: rewrite the draft from the stored record)
   → activated
   → dismissed
   → superseded
@@ -713,16 +713,16 @@ Layer 5 may record successful `materialized`, `activated`, `deactivated`, and `s
 Layer 6 dashboard actions and CLI lifecycle actions must consult this matrix. Layer 5 is the canonical authority — any action handler at any layer must reject requests that violate it. `✓` = action is legal from this status; `✗` = action must be rejected with `policy_violation`.
 
 ```text
-status \ action       │ dismiss │ approve │ materialize │ activate │ promote │ evolve
-─────────────────────────────────────────────────────────────────────────────────────
-pending_review        │   ✓     │   ✓     │     ✗       │    ✗     │   ✓     │   ✓
-needs_more_evidence   │   ✓     │   ✗     │     ✗       │    ✗     │   ✗     │   ✗
-approved              │   ✗     │   ✗     │     ✓       │    ✗     │   ✓     │   ✓
-materialized          │   ✗     │   ✗     │     ✗       │    ✓     │   ✗     │   ✗
-activated             │   ✗     │   ✗     │     ✗       │    ✗     │   ✗     │   ✗
-deactivated           │   ✗     │   ✗     │     ✓       │    ✓     │   ✗     │   ✗
-dismissed             │   ✗     │   ✗     │     ✗       │    ✗     │   ✗     │   ✗
-superseded            │   ✗     │   ✗     │     ✗       │    ✗     │   ✗     │   ✗
+status \ action       │ dismiss │ approve │ materialize │ activate │ promote │ evolve │ deactivate
+──────────────────────────────────────────────────────────────────────────────────────────────────
+pending_review        │   ✓     │   ✓     │     ✗       │    ✗     │   ✓     │   ✓    │    ✗
+needs_more_evidence   │   ✓     │   ✗     │     ✗       │    ✗     │   ✗     │   ✗    │    ✗
+approved              │   ✓     │   ✗     │     ✓       │    ✗     │   ✓     │   ✓    │    ✗
+materialized          │   ✗     │   ✗     │     ✓       │    ✓     │   ✗     │   ✗    │    ✗
+activated             │   ✗     │   ✗     │     ✗       │    ✗     │   ✗     │   ✗    │    ✓
+deactivated           │   ✗     │   ✗     │     ✓       │    ✓     │   ✗     │   ✗    │    ✗
+dismissed             │   ✗     │   ✗     │     ✗       │    ✗     │   ✗     │   ✗    │    ✗
+superseded            │   ✗     │   ✗     │     ✗       │    ✗     │   ✗     │   ✗    │    ✗
 ```
 
 Notes:
@@ -730,6 +730,9 @@ Notes:
 - `promote` and `evolve` are candidate-producing actions, not status transitions on the source candidate. They create a new candidate (global-scoped for `promote`; evolved skill candidate for `evolve`) and add a relationship event on the source. The source candidate's lifecycle status does not change.
 - `materialize` and `activate` require the prior state to be `approved` and `materialized` respectively. The deactivated → materialized / activated path allows re-materializing or re-activating a previously deactivated artifact.
 - `dismiss` is reversible only via re-creating a new candidate; once `dismissed` it is terminal.
+- `approved → dismiss` (v2) retires a verdict that cannot proceed — an artifact type Layer 7 has no renderer for, or a name queued before the ingestion name check. Without it `approved` was a dead end for both.
+- `materialized → materialize` (v2) rewrites the draft from the stored record, so the reviewed content and the file agree after the draft was edited or deleted by hand. Layer 7 hands back the existing draft when it is still intact and writes a fresh materialization beside a stale one, never over it.
+- `deactivate` is the Layer 8 extension (Slice G): legal only from `activated`. The table and `scripts/lib/learning-curator/lifecycle.js` are one matrix, asserted cell by cell by `tests/scripts/learning-curator-lifecycle.test.js`.
 
 ## Relationships
 
@@ -1152,6 +1155,15 @@ The first 3.1 implementation slice uses these defaults unless a later reviewed p
    - `trigger`: 600 chars
    - `body`: 6,000 chars
    - rejection `detail`: 500 chars
+
+   `name` is also checked against the Layer 7 draft-filename policy (not blank, no
+   path separator, no `..`, no control character, at most 248 bytes UTF-8) and
+   against the sanitizer: a name the redactor would alter is rejected with
+   `unsafe_content`, one the filename policy refuses with `schema_invalid`, both
+   with `field_path: "name"` and a detail that never contains the name. Layer 5
+   never normalizes a name, so the stored name is the draft filename and the
+   heading Layer 7 and Layer 8 write (D-035). Records queued before this rule are
+   not rewritten.
 5. Dashboard `[Promote]` is enabled in the first slice. A valid project-scoped source candidate may create a new global-scoped candidate with `relationships.promoted_from_candidate_id`; the source project candidate receives `relationships.promoted_to_candidate_id` via a `candidate.related` event. Promotion remains non-runtime and does not imply approval, materialization, or activation.
 6. Duplicate detection compares all non-terminal candidates plus dismissed candidates from the last **30 days**. Older dismissed candidates do not block insertion, but may be surfaced as weak relationship/audit hints only after an explicit design.
 

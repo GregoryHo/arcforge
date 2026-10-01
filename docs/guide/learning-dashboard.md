@@ -171,6 +171,33 @@ archived by decay — it leaves the injected set only when you deactivate it —
 when the record of which instincts are activated cannot be read, decay archives
 nothing and the session start message says so.
 
+An archived instinct is not gone. Bring one back with:
+
+```bash
+arcforge learn instinct restore <name> --project
+```
+
+It moves the file out of `archived` and back beside the others, whether decay
+or a contradiction put it there — your command outranks both — and writes the
+restore to the audit log with the reason the file was archived for, when it
+carries one. When decay archived the same instinct more than once, the archives
+carry a date and restore asks you to name the one you mean; the restored file
+takes the instinct's own id back, never a name cut down from the archive's. The
+restore removes only the two archive stamps, `archived_at` and `archive_reason`,
+and keeps the record of how much decay has already been charged, so the next
+decay cycle does not charge those weeks again. If an active
+instinct of that name already exists, restore refuses and names both files
+rather than overwrite either; nothing moves. Like the other commands that change
+what may reach a session, it works on the project you run it in, so `--project`
+takes no value here and `--global` is refused.
+
+Restoring moves a file; it never activates anything. A curator instinct you
+contradicted away was deactivated when it was archived, so after a restore it
+stays out of your sessions — the command says so — until you run
+`arcforge learn activate <id> --project`. One that decay archived was never
+deactivated (decay leaves activated instincts alone), so it is back in sessions
+as soon as the file is.
+
 ## Review: from candidate to active
 
 Once learning is on, observations turn into **candidates** automatically. That is
@@ -191,6 +218,14 @@ Three separate gates, on purpose: agreeing that a pattern is real, seeing exactl
 what would be written, and accepting that it changes behavior are different
 decisions. The CLI's `accept` collapses the first two as a convenience — both
 are inert. Nothing collapses activation.
+
+A candidate's name is checked once, when it enters the queue. A proposed name
+that could not be a draft filename — a path separator, `..`, a control
+character, nothing at all, or more than 248 bytes — or that the secret redactor
+would alter is not queued: the proposal is recorded with its reason in
+`rejections.jsonl` instead, like any other proposal the queue declines. So the
+name a card shows is the name the draft file, the draft and the activated
+instinct carry; nothing renames a candidate later.
 
 ### The dashboard
 
@@ -280,9 +315,13 @@ those are about the opt-in, not about candidates.)
 
 **Only what is legal is offered.** Each entry carries its `available_actions`,
 straight from the matrix, and a transition outside them is refused with the
-list of what is allowed instead. So `reject` works on a pending candidate but
-not on one you already approved — approving it is a decision, and undoing it is
-not one of the moves.
+list of what is allowed instead. So `reject` works on a pending candidate and
+on one you approved — an approval that cannot go further, such as a candidate of
+a type the engine cannot build, is retired that way — but not on one already
+materialized or activated: those are retired by deactivating. Two moves on the
+same candidate at once — a command and a dashboard click, say — are taken one at
+a time: the second sees the first's result and is refused with `stale_status`
+when its move is no longer legal, and both outcomes are in the audit log.
 
 **`materialize` and `activate` handle instinct candidates.** That is what the
 engine can build today. A candidate of any other artifact type stays in the
@@ -291,11 +330,13 @@ it.
 
 `learn accept` is two moves in one — approve, then materialize — so before it
 starts it checks the two things no re-run can change: the artifact type, and
-whether the candidate's name can be used as a draft filename. On a non-instinct
-candidate, or one the curator named with a path separator, `..`, a control
-character, nothing at all, or more than a filesystem will hold as a filename —
-248 bytes, which a name in a non-Latin script reaches well short of 248
-characters — it refuses without approving anything: no draft, no audit entry,
+whether the candidate's name can be used as a draft filename. The queue refuses
+such a name on the way in, so the second check matters only for a candidate
+queued before that check existed. On a non-instinct candidate, or one queued
+under a name with a path separator, `..`, a control character, nothing at all,
+or more than a filesystem will hold as a filename — 248 bytes, which a name in a
+non-Latin script reaches well short of 248 characters — it refuses without
+approving anything: no draft, no audit entry,
 the candidate exactly as it was — and the refusal names the move that is left.
 The two name it differently. For a non-instinct candidate the move is recording
 the approval on its own, and the dashboard is named alongside it either way —
@@ -306,8 +347,8 @@ longer allows declining it, the dashboard is named instead of it. The
 single-step commands do the opposite, and dispatch
 first, so what you read is the engine's own refusal and the refusal is recorded.
 Accept is all-or-nothing because half of it cannot be undone — the queue is
-append-only, and an approval it could never build on would be a decision you are
-stuck with.
+append-only, and an approval it could never build on would be a decision you
+would then have to retire with `learn reject`.
 
 On a candidate that is already materialized, `accept` has nothing left to do,
 so it re-reports the draft it already wrote — but only while there is a draft to
@@ -315,20 +356,21 @@ re-report. If the file has been deleted or edited, or the record that named it
 is gone, `accept` refuses and says which, instead of handing back a path that
 does not resolve or an empty list. In that state neither `learn drafts` nor
 `learn inspect` offers you the activation that would refuse: the drafts entry
-points at `learn inspect`, and `learn inspect` says what became of the draft.
-Read a draft, but do not edit it in place: activation checks the draft against
-the content hash recorded when it was written, so an edited draft is one that
-`learn activate` will refuse — and from `materialized` activation is the only
-move the matrix allows, so there is no second `learn materialize` and no
-`learn reject` waiting behind the refusal. Restoring the file to what the
-manifest recorded is what clears it. A candidate holds a second draft only by
-being materialized again after the dashboard deactivated it, and there the
-commands agree on which one counts: the draft `learn drafts` and `learn accept`
-report is the draft `learn activate` consumes.
+points at `learn inspect`, and `learn inspect` says what became of the draft and
+names the way back. Read a draft, but do not edit it in place: activation checks
+the draft against the content hash recorded when it was written, so an edited
+draft is one that `learn activate` will refuse. `learn materialize` on a
+materialized candidate is the way back — the dashboard's Materialize button
+does the same — it writes a fresh draft from the stored record beside the one
+you edited, which is left where you left it, and activation then runs on the
+fresh one. While the draft is intact, the same command hands that draft back
+unchanged. A candidate holds a second draft only by being materialized again,
+and the commands agree on which one counts: the draft `learn drafts` and
+`learn accept` report is the draft `learn activate` consumes.
 
 A retired candidate can lose its draft the same way, and `learn inspect` says so
-there too — but what it offers is different, because `deactivated` is the one
-status the matrix lets both materialize and activate. Activating it again is the
+there too — and from `deactivated` the matrix lets you both materialize and
+activate it again. Activating it again is the
 half that refuses — on the recorded content hash when the file no longer matches
 it, and for want of a usable record when the manifest is gone; materializing it
 again writes a fresh draft and is what `learn inspect` points you at. `learn inbox` prints no
@@ -359,8 +401,20 @@ analysis — not now, and not if you turn learning back on later; it stays on
 disk, and only what is recorded after the new opt-in is analyzed. With learning
 off everywhere, the background process is not even started. Instincts you already
 activated stay active — disabling learning stops it accumulating more, it does
-not undo what you accepted. To retire an individual instinct, deactivate it from
-the dashboard.
+not undo what you accepted. To retire an individual instinct, deactivate it —
+from the dashboard, or from the project it belongs to with:
+
+```bash
+arcforge learn instinct deactivate <id> --project
+```
+
+The command is the dashboard's Deactivate button: the same legality check, the
+same audit record (attributed to the CLI), and the same move of the active file
+into the `.disabled` archive rather than a deletion. Typing it is the
+acknowledgement — it prints that future sessions will no longer receive the
+instinct, and the archive path. An id that names no activated instinct of this
+project is refused with nothing moved. A deactivated candidate can be activated
+again with `learn activate`.
 
 ## What is stored, and where
 

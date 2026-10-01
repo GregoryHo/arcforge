@@ -29,9 +29,9 @@ const {
   getInstinctsArchivedDir,
   getGlobalInstinctsDir,
 } = require('./session-utils');
-const { sanitizeFilename } = require('./utils');
+const { getArcforgeHome, sanitizeFilename } = require('./utils');
 const { readCurrentCandidates } = require('./learning-curator/queue-writer');
-const { appendTransitionEvent, appendUpdateEvent } = require('./learning-curator/dashboard-events');
+const { withStoreLock, appendUpdateEvent } = require('./learning-curator/dashboard-events');
 const {
   isLegalAction,
   LIFECYCLE_STATUS,
@@ -187,9 +187,13 @@ function renderInstinctStatus(status) {
  * consistent with the instinct frontmatter.
  *
  * When a contradiction archives the instinct AND the matched candidate is
- * currently `activated`, also append a `deactivate` transition — gated through
- * `isLegalAction`. This stays inside the curator event log; it does NOT run the
- * physical move-to-`.disabled/` or the reviewer_ack consent model.
+ * currently `activated`, also deactivate it through Layer 8 — gated through
+ * `isLegalAction` — so the activation gate and the queue both say
+ * `deactivated` (see `deactivateArchived`).
+ *
+ * The status it checks is read inside the store lock that appends the
+ * transition (B-16), so a deactivation that landed while this waited — the
+ * dashboard's button, say — is seen and not repeated.
  *
  * A non-curator instinct simply has no matching candidate: no event, no crash.
  *
@@ -199,41 +203,77 @@ function renderInstinctStatus(status) {
  */
 function syncCuratorCandidate(instinctId, feedback, archived) {
   try {
-    const candidates = readCurrentCandidates();
-    const candidate = candidates[instinctId];
-    if (!candidate) return;
-
-    const actor = { layer: 6, actor_type: 'instinct_cli' };
-
-    appendUpdateEvent(
-      instinctId,
-      {
-        feedback: {
-          confirmations: feedback.confirmations,
-          contradictions: feedback.contradictions,
-        },
-      },
-      actor,
-    );
-
-    if (!archived) return;
-
-    const status = candidate.lifecycle ? candidate.lifecycle.status : undefined;
-    if (
-      status === LIFECYCLE_STATUS.ACTIVATED &&
-      isLegalAction(status, LIFECYCLE_ACTION.DEACTIVATE)
-    ) {
-      appendTransitionEvent(
-        instinctId,
-        LIFECYCLE_ACTION.DEACTIVATE,
-        LIFECYCLE_STATUS.DEACTIVATED,
-        actor,
-      );
-    }
+    withStoreLock(() => syncUnderLock(instinctId, feedback, archived));
   } catch {
     // Curator store unavailable or locked — the instinct file write already
     // succeeded; do not fail the operation over best-effort lifecycle alignment.
   }
+}
+
+function syncUnderLock(instinctId, feedback, archived) {
+  const candidates = readCurrentCandidates();
+  const candidate = candidates[instinctId];
+  if (!candidate) return;
+
+  const actor = { layer: 6, actor_type: 'instinct_cli' };
+
+  appendUpdateEvent(
+    instinctId,
+    {
+      feedback: {
+        confirmations: feedback.confirmations,
+        contradictions: feedback.contradictions,
+      },
+    },
+    actor,
+  );
+
+  if (!archived) return;
+
+  const status = candidate.lifecycle ? candidate.lifecycle.status : undefined;
+  if (status === LIFECYCLE_STATUS.ACTIVATED && isLegalAction(status, LIFECYCLE_ACTION.DEACTIVATE)) {
+    deactivateArchived(candidate);
+  }
+}
+
+/**
+ * Retire a contradicted-away curator instinct through Layer 8, not the queue
+ * alone: `deactivate()` writes the ActivationRecord the SessionStart gate folds
+ * and appends the queue transition (reentering the held lock), so the gate and
+ * the queue agree that the candidate is deactivated. Recording only the queue
+ * half left the gate counting it as activated, kept inert just by the file
+ * being in `archived/` — a restore then put it straight back into sessions.
+ * The contradiction is the user's own explicit act, which is the behavior
+ * change the acknowledgement states. The file is already in `archived/`, so
+ * Layer 8 records its own archive as having found it missing.
+ */
+function deactivateArchived(candidate) {
+  const {
+    deactivate,
+    defaultActivationPolicy,
+    findLatestActivation,
+  } = require('./learning-curator/activate');
+  const root = getArcforgeHome();
+  const requestId = `contradict_${Date.now()}`;
+  const result = deactivate({
+    candidate,
+    activationRecord: findLatestActivation(root, candidate.candidate_id),
+    activationRequest: {
+      schema_version: 1,
+      request_id: requestId,
+      requested_at: new Date().toISOString(),
+      source_action_id: requestId,
+      action: 'deactivate',
+      candidate_id: candidate.candidate_id,
+      expected_candidate_status: LIFECYCLE_STATUS.ACTIVATED,
+      reviewer_ack: { confirmed_behavior_change: true, saw_target_summary: false },
+      // The queue event names who asked: the contradiction, not the gate.
+      actor: { layer: 6, actor_type: 'instinct_cli' },
+    },
+    activationPolicy: defaultActivationPolicy(root),
+    arcforgeRoot: root,
+  });
+  if (!result.ok) throw new Error(`deactivation failed: ${result.failure.reason}`);
 }
 
 /** Resolve an instinct file path, rejecting ids that are not safe filenames. */

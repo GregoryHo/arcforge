@@ -579,7 +579,7 @@ function deactivate({
 }) {
   const effectiveRoot = arcforgeRoot || getArcforgeHome();
   const effectivePolicy = activationPolicy || defaultActivationPolicy(effectiveRoot);
-  const actor = { layer: 8, actor_type: 'activation_gate' };
+  const actor = activationRequest?.actor || { layer: 8, actor_type: 'activation_gate' };
 
   function fail(reason, detail) {
     const failure = makeActivationFailure({

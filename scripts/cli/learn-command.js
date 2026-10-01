@@ -73,10 +73,10 @@ function candidateContext(args) {
   return { scope: requireProjectCandidateScope(args) };
 }
 
-function dispatchAction({ verb, card, expectedStatus, safetyAck }) {
+function dispatchAction({ verb, action = ACTION_FOR_VERB[verb], card, expectedStatus, safetyAck }) {
   const { handleDashboardAction } = require('../lib/learning-dashboard');
   const result = handleDashboardAction({
-    action: ACTION_FOR_VERB[verb],
+    action,
     candidate_id: card.candidate_id,
     expected_current_status: expectedStatus,
     safety_ack: safetyAck,
@@ -105,14 +105,14 @@ function dispatchAction({ verb, card, expectedStatus, safetyAck }) {
  *
  * Reads never come through here: they dispatch no action to record.
  */
-function findTransitionCandidate(verb, candidateId) {
+function findTransitionCandidate(verb, candidateId, action = ACTION_FOR_VERB[verb]) {
   try {
     return findProjectCandidate(candidateId);
   } catch (error) {
     if (isUnknownCandidateId(candidateId)) {
       const { handleDashboardAction } = require('../lib/learning-dashboard');
       handleDashboardAction({
-        action: ACTION_FOR_VERB[verb],
+        action,
         candidate_id: candidateId,
         actor: CLI_ACTOR,
       });
@@ -260,8 +260,8 @@ function runDrafts({ scope }) {
  * matrix allows to materialize, so re-running is the recovery. Neither
  * prerequisite checked below is transient — no re-run clears an artifact type
  * the curator cannot render, and none clears a name it cannot write to disk —
- * and the matrix allows an `approved` candidate neither to materialize nor to
- * dismiss, so half-landing strands it in a status with no way out. Refusing
+ * so half-landing leaves an approval the reviewer then has to retire with a
+ * second command (`learn reject`, legal from `approved` since B-15). Refusing
  * before the first dispatch is the only outcome that keeps the command
  * all-or-nothing.
  *
@@ -434,4 +434,12 @@ function runLearnCommand(args, { projectRoot, asJson }) {
   }
 }
 
-module.exports = { runLearnCommand };
+// `learn instinct deactivate` (learn-instinct-lifecycle.js) dispatches through
+// the same scope gate, candidate lookup and refusal rendering as the verbs here.
+module.exports = {
+  runLearnCommand,
+  CLI_ACTOR,
+  requireProjectCandidateScope,
+  findTransitionCandidate,
+  dispatchAction,
+};

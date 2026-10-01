@@ -83,11 +83,14 @@ COMMANDS:
                                      Read-only review summary: evidence summaries, a redacted body
                                      preview, draft paths and next actions (project scope only).
   learn approve|reject <candidate-id> --project [--json]
-                                     Record user authorization decision for a candidate (project scope only).
+                                     Record user authorization decision for a candidate; reject also
+                                     retires an approval that cannot proceed (project scope only).
   learn accept <candidate-id> --project [--json]
                                      Approve and materialize drafts in one step; never activates.
   learn materialize <candidate-id> --project [--json]
-                                     Write approved candidate drafts without activating behavior (project scope only).
+                                     Write approved candidate drafts without activating behavior, or
+                                     rewrite a materialized candidate's lost or edited draft from the
+                                     stored record (project scope only).
   learn activate <candidate-id> --project [--json]
                                      Promote materialized drafts to active artifacts (project scope only).
   learn dashboard [--port N]
@@ -121,6 +124,14 @@ COMMANDS:
   learn instinct confirm|contradict <id> [--project P] [--json]
                                      Record agreement/disagreement with a detected pattern;
                                      a contradiction below the archive threshold archives it.
+  learn instinct deactivate <id> --project [--json]
+                                     Take an activated instinct of this project out of the
+                                     injected set — the dashboard's Deactivate, audited the same.
+                                     Future sessions no longer receive it. --project takes no value.
+  learn instinct restore <name> --project [--json]
+                                     Move an archived instinct of this project back, whether decay
+                                     or a contradiction archived it; refused when an active
+                                     instinct of that name exists. --project takes no value.
   learn recall record <recall-id> [--query "..."] [--instinct-ids "a,b"] [--summary "..."]
                                      Write the curator's evidence record for a manual recall.
                                      Id must start with 'recall-'.

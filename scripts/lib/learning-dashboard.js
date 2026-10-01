@@ -28,6 +28,7 @@ const {
   appendCandidate,
 } = require('./learning-curator/queue-writer');
 const {
+  withStoreLock,
   appendTransitionEvent,
   appendRelatedEvent,
 } = require('./learning-curator/dashboard-events');
@@ -437,6 +438,40 @@ function handleDashboardAction({
     return reject('candidate_not_found');
   }
 
+  // B-16: every action reads the state its legality check judges inside the
+  // store lock that appends its result, and holds it through Layer 7/8 and
+  // through a promote's or evolve's derived-candidate and relationship appends
+  // (all of which reenter it), so a second writer waits and then sees this one's
+  // result.
+  return withStoreLock(() =>
+    dispatchChecked({
+      action,
+      candidateId,
+      expectedStatus,
+      safetyAck,
+      actor,
+      actionId,
+      requestedAt,
+      reject,
+      accept,
+      rejectInvalidCandidate,
+    }),
+  );
+}
+
+/** Steps 2-7 of the contract above, for one request. */
+function dispatchChecked({
+  action,
+  candidateId,
+  expectedStatus,
+  safetyAck,
+  actor,
+  actionId,
+  requestedAt,
+  reject,
+  accept,
+  rejectInvalidCandidate,
+}) {
   // Step 2: read current state
   const candidates = readCurrentCandidates();
 
@@ -568,9 +603,9 @@ function handleDashboardAction({
     const arcforgeRoot = getArcforgeRoot();
     // The manifest every draft surface resolves to, which is the one
     // `materialize()` reused or wrote: activating the newest instead can pick a
-    // manifest Layer 7 skipped as stale, and the refusal that follows lands on a
-    // `materialized` candidate the matrix lets neither re-materialize nor
-    // dismiss. See `findUsableMaterialization`.
+    // manifest Layer 7 skipped as stale, and the refusal that follows sends the
+    // reviewer to re-materialize a candidate whose intact draft is right there.
+    // See `findUsableMaterialization`.
     const materializationRecord = findUsableMaterialization(arcforgeRoot, candidateId);
     if (!materializationRecord) {
       return reject('materialization_missing', {
@@ -631,10 +666,13 @@ function handleDashboardAction({
     if (!deactResult.ok) {
       return reject(deactResult.failure.reason, { module_failure: deactResult.failure });
     }
-    return accept({
+    const accepted = accept({
       next_status: 'deactivated',
       activation_id: deactResult.record.activation_id,
     });
+    // Where the active file went — outside `accept()` for the reason the
+    // materialize arm gives: the audit trail carries no absolute paths.
+    return { ...accepted, archive_paths: deactResult.activeArtifacts.map((a) => a.active_path) };
   }
 
   // Status-changing actions: dismiss, approve (materialize, activate, deactivate handled above)

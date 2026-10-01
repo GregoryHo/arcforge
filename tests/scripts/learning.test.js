@@ -1165,7 +1165,7 @@ describe('learn candidate commands over the canonical queue', () => {
       expect(detail.candidate.lifecycle_status).toBe('activated');
       expect(detail.draft_paths_stale).toEqual([{ draft_path: draftPath, reason: 'missing' }]);
       expect(detail.next_actions).toEqual([
-        'already active — retire it by deactivating it from the dashboard',
+        'already active — retire it with: arcforge learn instinct deactivate <id> --project',
       ]);
     });
 
@@ -1244,7 +1244,7 @@ describe('learn candidate commands over the canonical queue', () => {
       const activated = runJson(['inspect', CANDIDATE_ID, '--project']);
       expect(activated.candidate.lifecycle_status).toBe('activated');
       expect(activated.next_actions).toEqual([
-        'already active — retire it by deactivating it from the dashboard',
+        'already active — retire it with: arcforge learn instinct deactivate <id> --project',
       ]);
 
       deactivate(CANDIDATE_ID);
@@ -1371,11 +1371,11 @@ describe('learn candidate commands over the canonical queue', () => {
       seed(makeRecord());
       runJson(['approve', CANDIDATE_ID, '--project']);
 
-      const result = runCli(['reject', CANDIDATE_ID, '--project', '--json']);
+      const result = runCli(['approve', CANDIDATE_ID, '--project', '--json']);
 
       expect(result.status).not.toBe(0);
       expect(JSON.parse(result.stdout).error).toMatch(/policy_violation/);
-      expect(JSON.parse(result.stdout).error).toMatch(/is approved.*allows: materialize/);
+      expect(JSON.parse(result.stdout).error).toMatch(/is approved.*allows: dismiss, materialize/);
     });
 
     it('names the instinct-only narrowing when asked to materialize another type', () => {
@@ -1413,7 +1413,7 @@ describe('learn candidate commands over the canonical queue', () => {
 
       expect(result.status).not.toBe(0);
       const { error } = JSON.parse(result.stdout);
-      expect(error).toMatch(/is approved.*allows: materialize/s);
+      expect(error).toMatch(/is approved.*allows: dismiss, materialize/s);
       expect(error).toMatch(/supports instinct candidates only.*is a skill candidate/s);
       expect(auditEntries()[1]).toMatchObject({
         accepted: false,
@@ -1620,13 +1620,13 @@ describe('learn candidate commands over the canonical queue', () => {
 
     // The other arm of the same ternary, and the difference from the type
     // refusal the guide draws: that one names the dashboard alongside its
-    // command, this one names it instead of one. `approve` is a single
-    // transition with no name pre-check, so a reviewer reaches `approved` with
-    // a name the draft writer can never use — and from there the matrix refuses
-    // to dismiss, so there is no `learn reject` left to offer.
+    // command, this one names it instead of one. Since B-15 `approved` may be
+    // dismissed, so the arm is reached from `materialized` — a legacy record
+    // seeded there directly — where the matrix refuses to dismiss, so there is
+    // no `learn reject` left to offer.
     it('sends the name refusal to the dashboard where declining is not legal', () => {
-      seed(makeRecord({ name: 'some/path/traversal' }));
-      expect(runCli(['approve', CANDIDATE_ID, '--project', '--json']).status).toBe(0);
+      seed(makeRecord({ name: 'some/path/traversal', lifecycle: { status: 'materialized' } }));
+      expect(runJson(['inbox', '--project']).candidates[0].lifecycle_status).toBe('materialized');
 
       const { error } = JSON.parse(runCli(['accept', CANDIDATE_ID, '--project', '--json']).stdout);
 

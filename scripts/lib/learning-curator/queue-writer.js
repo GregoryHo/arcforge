@@ -25,6 +25,7 @@ const crypto = require('node:crypto');
 const { validateCandidateV1 } = require('./schema');
 const { redactObservationText } = require('../sanitize-observation');
 const { getArcforgeHome } = require('../utils');
+const { withStoreLock } = require('./dashboard-events');
 
 // ---------------------------------------------------------------------------
 // Path helpers — evaluated lazily so ARCFORGE_HOME/HOME can be redirected
@@ -46,84 +47,12 @@ function getRejectionsArchivePath() {
   return path.join(getCandidatesDir(), 'rejections.archive.jsonl');
 }
 
-function getLockPath() {
-  return path.join(getCandidatesDir(), 'store.lock');
-}
-
 // ---------------------------------------------------------------------------
-// Inline exclusive lock (cannot reuse locking.js — it hardcodes .arcforge-lock)
+// Lock — the one store lock dashboard-events.js owns. It is reentrant within a
+// process, so an append made inside a caller's critical section (a dashboard
+// promote that read and checked its source under the lock, B-16) joins that
+// section instead of waiting on it.
 // ---------------------------------------------------------------------------
-
-const LOCK_TIMEOUT = 5000;
-const LOCK_STALE_THRESHOLD = 30000;
-
-function acquireStoreLock() {
-  const lockPath = getLockPath();
-  const dir = path.dirname(lockPath);
-  fs.mkdirSync(dir, { recursive: true });
-
-  const timeout = LOCK_TIMEOUT;
-  const startTime = Date.now();
-  let interval = 50;
-
-  while (true) {
-    try {
-      const fd = fs.openSync(
-        lockPath,
-        fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY,
-      );
-      fs.writeSync(fd, JSON.stringify({ pid: process.pid, ts: new Date().toISOString() }));
-      fs.closeSync(fd);
-      return lockPath;
-    } catch (err) {
-      if (err.code !== 'EEXIST') throw err;
-
-      // Check if stale
-      try {
-        const stat = fs.statSync(lockPath);
-        if (Date.now() - stat.mtimeMs > LOCK_STALE_THRESHOLD) {
-          try {
-            fs.unlinkSync(lockPath);
-          } catch {
-            // Another process may have removed it — retry
-          }
-          continue;
-        }
-      } catch {
-        // File may have been removed between check and stat — retry
-        continue;
-      }
-
-      if (Date.now() - startTime > timeout) {
-        throw new Error(`Failed to acquire store.lock after ${timeout}ms: ${lockPath}`);
-      }
-
-      const waitMs = Math.min(interval, 500);
-      const end = Date.now() + waitMs;
-      while (Date.now() < end) {
-        // Busy-wait (matches locking.js pattern; avoids async dependency)
-      }
-      interval = Math.min(interval * 2, 500);
-    }
-  }
-}
-
-function releaseStoreLock(lockPath) {
-  try {
-    fs.unlinkSync(lockPath);
-  } catch (err) {
-    if (err.code !== 'ENOENT') throw err;
-  }
-}
-
-function withStoreLock(fn) {
-  const lockPath = acquireStoreLock();
-  try {
-    return fn();
-  } finally {
-    releaseStoreLock(lockPath);
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Atomic JSONL append — one line, newline-terminated

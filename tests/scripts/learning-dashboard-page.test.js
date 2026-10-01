@@ -262,3 +262,42 @@ describe('dashboard page — actions that change nothing about behavior', () => 
     expect(statusOf(record.candidate_id)).toBe('approved');
   });
 });
+
+// B-15 / D-036: the page offers what the card's `available_actions` says — the
+// canonical matrix the server read — not a second copy of it, so the two new
+// exits reach the dashboard with the matrix rather than after it.
+describe('dashboard page — the buttons are the card’s legal actions', () => {
+  const { sanitizeDashboardCard } = require('../../scripts/lib/learning-dashboard');
+
+  function buttonsFor(page, status) {
+    const record = makeCandidateRecord(`cand-page-${status}`);
+    const card = sanitizeDashboardCard({ ...record, lifecycle: { status } });
+    const el = page.createCard(card);
+    const actions = el.children.find((child) => child.className === 'actions');
+    return actions.children.map((button) => button.dataset.act);
+  }
+
+  it('offers Dismiss on an approved candidate', async () => {
+    const { page } = await loadPage({ confirmAnswer: true });
+    expect(buttonsFor(page, 'approved')).toContain('dismiss');
+  });
+
+  it('offers Materialize again on a materialized candidate', async () => {
+    const { page } = await loadPage({ confirmAnswer: true });
+    expect(buttonsFor(page, 'materialized')).toEqual(
+      expect.arrayContaining(['materialize', 'activate']),
+    );
+  });
+
+  it('dismisses an approved candidate through the real handler', async () => {
+    const record = makeCandidateRecord('cand-page-dismiss');
+    appendCandidate(record);
+    appendTransitionEvent(record.candidate_id, 'approve', 'approved');
+    const { page, shown } = await loadPage({ confirmAnswer: true });
+
+    await page.performAction(record.candidate_id, 'dismiss', fakeElement());
+
+    expect(shown.alerts).toEqual([]);
+    expect(statusOf(record.candidate_id)).toBe('dismissed');
+  });
+});
