@@ -23,6 +23,26 @@ const scenariosDir = path.join(testDir, 'evals', 'scenarios');
 fs.mkdirSync(scenariosDir, { recursive: true });
 // A scenario that resolves by name but fails lint (no required sections).
 fs.writeFileSync(path.join(scenariosDir, 'broken.md'), '# Eval: broken\n\nnothing else\n');
+// Skill-scope scenarios that skip the preflight gate (whose progress line used
+// to reach stdout before the target check failed).
+const skillScenario = (name, target) =>
+  [
+    `# Eval: ${name}`,
+    '## Scope\nskill',
+    '## Scenario\nDo something.',
+    '## Context\nA fixture.',
+    '## Assertions\n- [ ] A1: It works',
+    '## Grader\ncode',
+    '## Grader Config\ntrue',
+    '## Preflight\nskip',
+    ...(target ? [`## Target\n${target}`] : []),
+    '',
+  ].join('\n\n');
+fs.writeFileSync(path.join(scenariosDir, 'skip-no-target.md'), skillScenario('skip-no-target'));
+fs.writeFileSync(
+  path.join(scenariosDir, 'skip-missing-target.md'),
+  skillScenario('skip-missing-target', 'skills/nope/SKILL.md'),
+);
 
 function runCli(argArray) {
   try {
@@ -59,6 +79,8 @@ const FAILURES = [
   { args: ['eval', 'preflight', 'zzz-nope'], message: /scenario "zzz-nope" not found/ },
   { args: ['eval', 'ab', 'zzz-nope'], message: /scenario "zzz-nope" not found/ },
   { args: ['eval', 'compare', 'zzz-nope'], message: /need both baseline and treatment/ },
+  { args: ['eval', 'ab', 'skip-no-target'], message: /requires --skill-file <path> or ## Target/ },
+  { args: ['eval', 'ab', 'skip-missing-target'], message: /skill file not found/ },
 ];
 
 for (const { args, message } of FAILURES) {
@@ -83,6 +105,15 @@ for (const { args, message } of FAILURES) {
     assert.match(result.stderr, message);
   });
 }
+
+// B-6: a command that takes --json emits JSON on stdout and nothing else —
+// including when there is nothing to report yet.
+test('eval report --json with no results: the empty benchmark as JSON, exit 0', () => {
+  const result = runCli(['eval', 'report', '--json']);
+  assert.strictEqual(result.exitCode, 0, `exit code: ${result.exitCode} ${result.stderr}`);
+  const parsed = JSON.parse(result.stdout);
+  assert.deepStrictEqual(parsed.evals, {});
+});
 
 fs.rmSync(testDir, { recursive: true, force: true });
 

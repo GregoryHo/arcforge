@@ -379,6 +379,21 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     eval_.resolveTrialTimeoutMs(); // refuse a bad ceiling before any Setup or session (B-10)
     const model = args.options.model;
     const effort = args.options.effort;
+    // A skill-scope A/B needs its skill body; refuse before any progress line.
+    const skillFile = args.options['skill-file'] || scenario.target;
+    let skillInstruction;
+    if (scenario.scope !== 'workflow') {
+      if (!skillFile) {
+        throw new Error(
+          'eval ab for skill scope requires --skill-file <path> or ## Target in scenario',
+        );
+      }
+      const resolvedSkillFile = path.resolve(projectRoot, skillFile);
+      if (!fs.existsSync(resolvedSkillFile)) {
+        throw new Error(`skill file not found: ${skillFile}`);
+      }
+      skillInstruction = fs.readFileSync(resolvedSkillFile, 'utf8');
+    }
 
     // Preflight gate: require a PASS preflight for this (scenario, model)
     // before running A/B eval. Gate is keyed by both — a PASS produced
@@ -441,17 +456,6 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
         maxTurns,
       });
     } else {
-      const skillFile = args.options['skill-file'] || scenario.target;
-      if (!skillFile) {
-        throw new Error(
-          'eval ab for skill scope requires --skill-file <path> or ## Target in scenario',
-        );
-      }
-      const resolvedSkillFile = path.resolve(projectRoot, skillFile);
-      if (!fs.existsSync(resolvedSkillFile)) {
-        throw new Error(`skill file not found: ${skillFile}`);
-      }
-      const skillInstruction = fs.readFileSync(resolvedSkillFile, 'utf8');
       console.log(
         `A/B eval (skill): ${scenario.name} (k=${k})${interleave ? ' [interleaved]' : ''}`,
       );
@@ -479,7 +483,6 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
 
     // fr-gr-005: blind-comparator auto-trigger
     const { runBlindAutoTrigger } = require('../lib/eval-blind-autotrigger');
-    const skillFile = args.options['skill-file'] || scenario.target;
     const skillName = skillFile ? skillNameFromFile(skillFile) : undefined;
     const blindResult = runBlindAutoTrigger(
       scenario,
@@ -594,10 +597,10 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
         );
         output(display, false);
       }
-    } else if (Object.keys(benchmark.evals).length === 0) {
-      console.log('No eval results yet. Run: arcforge eval run <scenario>');
     } else if (asJson) {
       output(benchmark, true);
+    } else if (Object.keys(benchmark.evals).length === 0) {
+      console.log('No eval results yet. Run: arcforge eval run <scenario>');
     } else {
       console.log(
         'Note: SHIP outside discriminative-lift only supports that claim type; do not cite it as value lift.',
