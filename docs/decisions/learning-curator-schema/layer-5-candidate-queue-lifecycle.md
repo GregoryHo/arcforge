@@ -1139,6 +1139,15 @@ The first 3.1 implementation slice uses these defaults unless a later reviewed p
    - `trigger`: 600 chars
    - `body`: 6,000 chars
    - rejection `detail`: 500 chars
+
+   `name` is also checked against the Layer 7 draft-filename policy (not blank, no
+   path separator, no `..`, no control character, at most 248 bytes UTF-8) and
+   against the sanitizer: a name the redactor would alter is rejected with
+   `unsafe_content`, one the filename policy refuses with `schema_invalid`, both
+   with `field_path: "name"` and a detail that never contains the name. Layer 5
+   never normalizes a name, so the stored name is the draft filename and the
+   heading Layer 7 and Layer 8 write (D-035). Records queued before this rule are
+   not rewritten.
 5. Dashboard `[Promote]` is enabled in the first slice. A valid project-scoped source candidate may create a new global-scoped candidate with `relationships.promoted_from_candidate_id`; the source project candidate receives `relationships.promoted_to_candidate_id` via a `candidate.related` event. Promotion remains non-runtime and does not imply approval, materialization, or activation.
 6. Duplicate detection compares all non-terminal candidates plus dismissed candidates from the last **30 days**. Older dismissed candidates do not block insertion, but may be surfaced as weak relationship/audit hints only after an explicit design.
 

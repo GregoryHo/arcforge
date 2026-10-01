@@ -1007,7 +1007,7 @@ describe('DH-1: materialize action calls materialize.js module', () => {
       candidate_id: badRecord.candidate_id,
     });
 
-    // materialize.js should reject with path_policy_rejected
+    // Layer 5 now refuses this name at ingestion (B-14), so it is not found
     expect(result.accepted).toBe(false);
   });
 });

@@ -172,6 +172,14 @@ what would be written, and accepting that it changes behavior are different
 decisions. The CLI's `accept` collapses the first two as a convenience — both
 are inert. Nothing collapses activation.
 
+A candidate's name is checked once, when it enters the queue. A proposed name
+that could not be a draft filename — a path separator, `..`, a control
+character, nothing at all, or more than 248 bytes — or that the secret redactor
+would alter is not queued: the proposal is recorded with its reason in
+`rejections.jsonl` instead, like any other proposal the queue declines. So the
+name a card shows is the name the draft file, the draft and the activated
+instinct carry; nothing renames a candidate later.
+
 ### The dashboard
 
 ```bash
@@ -263,11 +271,13 @@ it.
 
 `learn accept` is two moves in one — approve, then materialize — so before it
 starts it checks the two things no re-run can change: the artifact type, and
-whether the candidate's name can be used as a draft filename. On a non-instinct
-candidate, or one the curator named with a path separator, `..`, a control
-character, nothing at all, or more than a filesystem will hold as a filename —
-248 bytes, which a name in a non-Latin script reaches well short of 248
-characters — it refuses without approving anything: no draft, no audit entry,
+whether the candidate's name can be used as a draft filename. The queue refuses
+such a name on the way in, so the second check matters only for a candidate
+queued before that check existed. On a non-instinct candidate, or one queued
+under a name with a path separator, `..`, a control character, nothing at all,
+or more than a filesystem will hold as a filename — 248 bytes, which a name in a
+non-Latin script reaches well short of 248 characters — it refuses without
+approving anything: no draft, no audit entry,
 the candidate exactly as it was — and the refusal names the move that is left.
 The two name it differently. For a non-instinct candidate the move is recording
 the approval on its own, and the dashboard is named alongside it either way —

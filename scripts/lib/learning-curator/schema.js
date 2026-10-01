@@ -38,6 +38,8 @@ const DOMAINS = [
 // Imported from lifecycle.js — single source of truth for the canonical Layer 5
 // CandidateLifecycleStatus enum. Do not redefine this list in schema.js.
 const { LIFECYCLE_STATUSES } = require('./lifecycle');
+// The draft writer's filename policy plus the redactor, checked once here (B-14).
+const { nameRejections } = require('./name-policy');
 
 const EVIDENCE_TYPES = ['observation', 'session_summary', 'diary', 'reflect', 'recall'];
 
@@ -277,6 +279,8 @@ function validateCandidateV1(record) {
         f,
         `${f} exceeds ${FIELD_LIMITS[f]} characters (got ${record[f].length})`,
       );
+    } else if (f === 'name') {
+      for (const [code, detail] of nameRejections(record.name)) add(code, 'name', detail);
     }
   }
 
