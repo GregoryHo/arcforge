@@ -6,7 +6,7 @@ Claude Code 2.1.286。6.1 roadmap（#191）的最後一版；三個版本都在�
 |---|---|---|
 | Release | tag `v6.2.0` → `release.yml` | 成功，GitHub Release body 取自 CHANGELOG |
 | 網站 | `arcforge.greghojob.workers.dev` 的 hero bundle | footer `v6.2.0` |
-| GitHub 來源安裝 → hook | 全新 `CLAUDE_CONFIG_DIR`、`claude plugin marketplace add GregoryHo/arcforge`、一個 `-p` session | 載入；session-tracker 寫出紀錄；debug log 無 unknown-keys，4 處指向 `cache/arcforge-dev/arcforge/6.2.0` |
+| GitHub 來源安裝 → hook | 全新 `CLAUDE_CONFIG_DIR`、`claude plugin marketplace add GregoryHo/arcforge`、`claude plugin install arcforge@arcforge-dev`、在 repo 外的空目錄跑一個 `-p` session | 載入；session-tracker 寫出紀錄；debug log 無 unknown-keys，4 處指向 `cache/arcforge-dev/arcforge/6.2.0` |
 | 新指令 | 安裝版 `scripts/cli.js --help` | `learn instinct deactivate` / `restore` 都在 |
 
 測試狀態（session 紀錄）已移除。
