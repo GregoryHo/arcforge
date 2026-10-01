@@ -361,7 +361,7 @@ describe('doc-refs engine (SRH-4)', () => {
     test('findCliInvocations strips quotes and resolves the command token', () => {
       // biome-ignore lint/suspicious/noTemplateCurlyInString: literal blessed-invocation form the linter must parse
       const inv = findCliInvocations('node "${ARCFORGE_ROOT}/scripts/cli.js" learn --json');
-      expect(inv).toEqual([{ command: 'learn', flags: ['--json'] }]);
+      expect(inv).toEqual([{ command: 'learn', flags: ['--json'], positional: [] }]);
     });
 
     test('fieldExists walks array element shapes', () => {

@@ -28,7 +28,7 @@ paths from `__dirname`, so they must stay cwd-independent.
 | Command | Guards |
 |---|---|
 | `npm run check:versions` | Version string sync across the locations in `scripts/check-version-sync.js` |
-| `npm run check:docs` | Shipped docs don't reference paths/flags the engine doesn't provide |
+| `npm run check:docs` | Scanned docs don't reference paths, commands, subcommands, flags, scenario ids, or npm scripts that don't exist |
 | `npm run check:cli-consumers` | CLI callers match the CLI surface |
 | `npm run check:hooks` | `hooks/claude-code.json` schema + the manifests’ `hooks` declarations |
 | `npm run check:eval-targets` | Eval scenarios don't target things that no longer exist |

@@ -84,6 +84,7 @@ const NPM_SCRIPTS = new Set(
   Object.keys(JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).scripts),
 );
 const npmScriptExists = (name) => NPM_SCRIPTS.has(name);
+const scenarioExists = (id) => fs.existsSync(path.join(repoRoot, 'evals', 'scenarios', `${id}.md`));
 
 function gatherFiles() {
   const files = [];
@@ -105,7 +106,12 @@ function main() {
   for (const abs of files) {
     const rel = path.relative(repoRoot, abs);
     const content = fs.readFileSync(abs, 'utf8');
-    const { findings, stats } = lintDoc(rel, content, { pathExists, skillExists, npmScriptExists });
+    const { findings, stats } = lintDoc(rel, content, {
+      pathExists,
+      skillExists,
+      npmScriptExists,
+      scenarioExists,
+    });
     allFindings.push(...findings);
     r4Probed += stats.r4.total;
   }

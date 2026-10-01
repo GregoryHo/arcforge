@@ -16,6 +16,8 @@
  *      nested keys + array-element keys; values ignored), and assert exact set
  *      equality. No missing keys, no extra keys.
  *
+ *   3. Flag parity and 4. subcommand parity — see those layers below.
+ *
  * Per the SRH-2 stop condition: a command whose live --json is environment
  * dependent / unpinnable is `output: null` in the manifest and skipped by the
  * shape layer here — never silently downgraded to a subset comparison.
@@ -331,5 +333,74 @@ assert.deepStrictEqual(
   `CLI_MANIFEST flag(s) no handler reads: ${unread.join(', ')}`,
 );
 console.log(`    ✓ ${manifestKeys.length} commands: every manifest flag is read by the CLI`);
+
+// ---------------------------------------------------------------------------
+// Layer 4: subcommand PARITY (live dispatch ≡ manifest `subcommands`, both
+// directions). check:docs validates `arcforge <cmd> <sub> [<action>]` against
+// the manifest's subcommand names, so a name the manifest lacks would fail a
+// correct doc and a name the CLI dropped would pass a stale one.
+//
+// The live set is derived from each dispatcher's literal comparisons —
+// `sub === 'x'` / `subcommand === 'x'` / `action === 'x'` — plus, for `learn`,
+// the verb table and the workflow group set the dispatcher reads.
+// ---------------------------------------------------------------------------
+
+console.log('  Layer 4: subcommand parity (live dispatch ≡ manifest, both directions)...');
+
+function dispatchedNames(source, variable) {
+  const re = new RegExp(`\\b${variable} === '([a-z][a-z-]*)'`, 'g');
+  return [...source.matchAll(re)].map((m) => m[1]);
+}
+
+// The body of `function <name>(` up to the next top-level function.
+function functionBody(source, name) {
+  const m = source.match(
+    new RegExp(`\\nfunction ${name}\\(([\\s\\S]*?)\\n(?:function |module\\.)`),
+  );
+  if (!m) throw new Error(`Could not locate function ${name}`);
+  return m[1];
+}
+
+const { ACTION_FOR_VERB } = require(path.join(CLI_DIR, 'learn-candidate-prose'));
+const { WORKFLOW_GROUPS } = require(path.join(CLI_DIR, 'learn-workflow-command'));
+const WORKFLOW_SOURCE = read(CLI_DIR, 'learn-workflow-command.js');
+const capitalize = (s) => s[0].toUpperCase() + s.slice(1);
+
+const liveSubcommands = {
+  worktree: dispatchedNames(read(LIB_DIR, 'worktree-generic.js'), 'sub'),
+  eval: dispatchedNames(read(CLI_DIR, 'eval-command.js'), 'subcommand'),
+  obsidian: dispatchedNames(read(CLI_DIR, 'obsidian-command.js'), 'subcommand'),
+  learn: [
+    ...dispatchedNames(read(CLI_DIR, 'learn-command.js'), 'subcommand'),
+    ...Object.keys(ACTION_FOR_VERB),
+    ...WORKFLOW_GROUPS,
+  ],
+};
+const liveActions = Object.fromEntries(
+  [...WORKFLOW_GROUPS].map((g) => [
+    `learn ${g}`,
+    dispatchedNames(functionBody(WORKFLOW_SOURCE, `run${capitalize(g)}`), 'action'),
+  ]),
+);
+
+const uniqSorted = (names) => [...new Set(names)].sort();
+
+for (const cmd of manifestKeys) {
+  const declared = uniqSorted(Object.keys(CLI_MANIFEST[cmd].subcommands || {}));
+  assert.deepStrictEqual(
+    declared,
+    uniqSorted(liveSubcommands[cmd] || []),
+    `${cmd}: CLI_MANIFEST subcommands differ from the live dispatcher`,
+  );
+}
+console.log(`    ✓ ${manifestKeys.length} commands: subcommand names match the dispatchers`);
+
+for (const [key, live] of Object.entries(liveActions)) {
+  const group = key.split(' ')[1];
+  const declared = uniqSorted(Object.keys(CLI_MANIFEST.learn.subcommands[group].subcommands || {}));
+  assert.ok(live.length > 0, `${key}: no live actions derived`);
+  assert.deepStrictEqual(declared, uniqSorted(live), `${key}: manifest actions differ from live`);
+}
+console.log(`    ✓ ${WORKFLOW_GROUPS.size} learn workflow groups: action names match`);
 
 console.log('\n✅ All cli-manifest contract tests passed!\n');

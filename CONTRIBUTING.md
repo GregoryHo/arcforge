@@ -355,12 +355,12 @@ A PR template is provided at `.github/PULL_REQUEST_TEMPLATE.md`. Fill it out com
 
 ### Doc-reference gate (`npm run check:docs`)
 
-CI runs a doc-reference linter (`scripts/check-doc-refs.js`, engine in `scripts/lib/doc-refs.js`) over the user-facing markdown surface (`skills/`, `docs/guide/`, `hooks/`, and `README.md`). It fails the build when a doc makes a promise the engine does not keep:
+CI runs a doc-reference linter (`scripts/check-doc-refs.js`, engine in `scripts/lib/doc-refs.js`) over the user-facing markdown surface (`skills/`, `docs/guide/`, `hooks/`, `product/`, `README.md`, `CONTRIBUTING.md`, `CLAUDE.md`) plus the contributor surfaces that quote commands (`.claude/skills/releasing/SKILL.md`, `.claude/agents/`). It fails the build when a doc makes a promise the engine does not keep:
 
 | Rule | Catches |
 |------|---------|
 | R1 | A repo-relative path in a code span (under `scripts/`, `skills/`, `hooks/`, `.claude-plugin/`) that does not resolve to a real file or directory. |
-| R2 | A CLI invocation naming a command, or a `--flag`, that the CLI manifest (`scripts/lib/cli-manifest.js`) does not declare. |
+| R2 | A CLI invocation naming a command, a subcommand (`eval report`, `learn instinct status`), or a `--flag` that the CLI manifest (`scripts/lib/cli-manifest.js`) does not declare; an `eval-<name>` scenario id with no file in `evals/scenarios/`; an `npm run <script>` that `package.json` does not declare (outside `skills/`, whose `npm run` means the user's project). |
 | R3 | A `--json` output field promise that is not in that command's pinned manifest output shape. |
 | R4 | A doc's claim that a skill exists, when it does not resolve to a skill directory. |
 

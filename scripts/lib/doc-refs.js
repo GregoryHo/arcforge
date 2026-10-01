@@ -13,8 +13,11 @@
  *                 cli-manifest.js, and every `--flag` it uses must be declared
  *                 for that command (or a subcommand) in the manifest. In
  *                 reverse, a `## \`<cmd>\`` section must name every manifest
- *                 flag of that command (doc-flag-coverage.js). An `npm run <script>`
- *                 must name a package.json script (doc-command-refs.js).
+ *                 flag of that command (doc-flag-coverage.js). The rest of R2 lives
+ *                 in doc-command-refs.js: a subcommand (`eval report`,
+ *                 `learn instinct status`) must be one the manifest names, an
+ *                 `npm run <script>` a package.json script, and an
+ *                 `eval-<name>` scenario id a file in evals/scenarios/.
  *   R3  fields  — a `--json` output field promise (jq path or a doc `.field`
  *                 promise tied to a command) must exist in that command's
  *                 manifest `output` shape (only checked for commands whose
@@ -47,7 +50,14 @@
  */
 
 const { CLI_MANIFEST } = require('./cli-manifest');
-const { scanNpmScripts } = require('./doc-command-refs');
+const {
+  findCliInvocations,
+  flagsForCommand,
+  manifestCommands,
+  scanNpmScripts,
+  scanScenarioIds,
+  subcommandFindings,
+} = require('./doc-command-refs');
 const { scanFlagCoverage } = require('./doc-flag-coverage');
 
 // R4 is gating (WT-6 has merged; the finishing twin no longer dangles).
@@ -157,27 +167,6 @@ function parseIgnore(line) {
 
 function makeFinding(rule, severity, file, line, message) {
   return { rule, severity, file, line, message };
-}
-
-/** Tokens that are CLI command names per the manifest. */
-function manifestCommands() {
-  return new Set(Object.keys(CLI_MANIFEST));
-}
-
-/**
- * Collect every flag valid for a command, folding in subcommand flags so a
- * doc that writes `worktree add --branch x` is not flagged.
- */
-function flagsForCommand(cmd) {
-  const entry = CLI_MANIFEST[cmd];
-  if (!entry) return null;
-  const flags = new Set(entry.flags || []);
-  if (entry.subcommands) {
-    for (const sub of Object.values(entry.subcommands)) {
-      for (const f of sub.flags || []) flags.add(f);
-    }
-  }
-  return flags;
 }
 
 /**
@@ -293,6 +282,8 @@ function scanR2AndR3Cli(file, spans, manifest) {
         );
         continue;
       }
+      // R2 — a subcommand (or learn workflow action) the command does not dispatch.
+      findings.push(...subcommandFindings(file, line, inv));
       // R2 — unknown flag for this command.
       const valid = flagsForCommand(command);
       for (const flag of flags) {
@@ -342,84 +333,6 @@ function scanR2AndR3Cli(file, spans, manifest) {
   }
 
   return findings;
-}
-
-/**
- * Extract CLI invocations from a code span. Recognizes:
- *   node "…cli.js" <cmd> [flags…]
- *   node …/cli.js <cmd> [flags…]
- *   arcforge <cmd> [flags…]
- *   arc <cmd> [flags…]   (only when followed by a manifest-shaped token)
- * Returns [{ command, flags: string[] }]. The command is the first
- * non-flag token after the invocation head. Flags are the `--xxx` tokens.
- */
-function findCliInvocations(text) {
-  const results = [];
-  const commands = manifestCommands();
-
-  // Tokenize on whitespace; we walk the token stream looking for heads.
-  const tokens = text.split(/\s+/).filter(Boolean);
-  // Command-token positions already emitted, so `node …/cli.js status` is not
-  // double-counted by both the `node` head and the `cli.js` head.
-  const seen = new Set();
-  for (let i = 0; i < tokens.length; i++) {
-    const tok = tokens[i];
-    const isCliJs = /cli\.js"?$/.test(tok.replace(/^["']/, ''));
-    const prev = i > 0 ? tokens[i - 1] : '';
-    const isArcforge = tok === 'arcforge' || tok === 'arc';
-    // A `cli.js` token preceded by `node` was already handled by the node head.
-    const isNode = tok === 'node';
-
-    let cmdIdx = -1;
-    if (isCliJs && prev !== 'node') {
-      cmdIdx = i + 1;
-    } else if (isNode) {
-      // find the cli.js token that follows, then the command after it
-      for (let j = i + 1; j < tokens.length; j++) {
-        const t = tokens[j].replace(/^["']/, '').replace(/["']$/, '');
-        if (/cli\.js$/.test(t)) {
-          cmdIdx = j + 1;
-          break;
-        }
-        if (t.startsWith('-')) break; // a flag before cli.js → not our shape
-      }
-    } else if (isArcforge) {
-      cmdIdx = i + 1;
-    }
-
-    if (cmdIdx < 0 || cmdIdx >= tokens.length) continue;
-    if (seen.has(cmdIdx)) continue;
-    seen.add(cmdIdx);
-    const command = tokens[cmdIdx].replace(/^["']/, '').replace(/["']$/, '');
-    if (command.startsWith('-')) continue;
-    // Skip placeholder command tokens (`<cmd>`, `{name}`) — doc templates, not
-    // real invocations.
-    if (/[<>{}]/.test(command)) continue;
-
-    // For the bare `arc`/`arcforge` head, only treat it as an invocation when
-    // the candidate command is actually a manifest command — `arcforge is a
-    // toolkit` must never be read as a CLI call. node/cli.js heads are
-    // unambiguous, so an unknown command there is a real R2 finding.
-    if (isArcforge && !commands.has(command)) continue;
-
-    // Collect flags belonging to this invocation (until the next head token).
-    const flags = [];
-    for (let k = cmdIdx + 1; k < tokens.length; k++) {
-      const t = tokens[k];
-      if (t === 'node' || t === 'arcforge' || t === 'arc') break;
-      if (/cli\.js"?$/.test(t.replace(/^["']/, ''))) break;
-      if (t.startsWith('--')) {
-        // --flag=value → --flag; strip trailing quotes/brackets/punctuation
-        // that leak in from prose like `arcforge status --json>`.
-        const flag = t.split('=')[0].replace(/[>"'.,;:)\]}]+$/, '');
-        if (/[<{}]/.test(flag)) continue; // placeholder flag → skip
-        flags.push(flag);
-      }
-    }
-    results.push({ command, flags });
-  }
-
-  return results;
 }
 
 /**
@@ -593,6 +506,8 @@ function scanR4Skills(file, spans, skillExists) {
  * @param {(skillName: string) => boolean} probes.skillExists - skill dir exists
  * @param {(name: string) => boolean} [probes.npmScriptExists] - package.json
  *   declares that script
+ * @param {(id: string) => boolean} [probes.scenarioExists] - evals/scenarios/<id>.md
+ *   exists
  * @returns {{ findings: Object[], stats: { r4: { legacy: number, slash: number,
  *   total: number } } }} — `stats.r4` counts references PROBED (not findings);
  *   a caller aggregating across the doc surface must fail on a zero total.
@@ -606,6 +521,7 @@ function lintDoc(file, content, probes = {}) {
   const pathExists = (relPath) => rawPathExists(relPath, docDir);
   const skillExists = probes.skillExists || (() => true);
   const npmScriptExists = probes.npmScriptExists || (() => true);
+  const scenarioExists = probes.scenarioExists || (() => true);
 
   const spans = extractCodeSpans(content);
   const lines = content.split('\n');
@@ -616,6 +532,7 @@ function lintDoc(file, content, probes = {}) {
     ...scanR2AndR3Cli(file, spans, CLI_MANIFEST),
     ...scanFlagCoverage(file, content, spans),
     ...scanNpmScripts(file, spans, npmScriptExists),
+    ...scanScenarioIds(file, spans, scenarioExists),
     ...r4.findings,
   ];
 
