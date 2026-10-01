@@ -54,6 +54,14 @@ claim_lock() {
   echo "$SCRIPT_DIR" > "$LOCK_DIR/script"
 }
 
+# Whether PID $1 is a live observer daemon. A daemon that died without removing
+# its lock leaves a PID the OS can hand to an unrelated process, so being alive
+# is not enough: nothing here signals a process, or treats a lock as held,
+# unless its command line runs this script.
+is_daemon_pid() {
+  [ -n "$1" ] && ps -o command= -p "$1" 2>/dev/null | grep -q 'observer-daemon\.sh'
+}
+
 acquire_lock() {
   if mkdir "$LOCK_DIR" 2>/dev/null; then
     claim_lock
@@ -62,7 +70,7 @@ acquire_lock() {
   # Lock exists — check for stale lock from crashed process
   local old_pid
   old_pid=$(cat "$LOCK_DIR/pid" 2>/dev/null)
-  if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
+  if is_daemon_pid "$old_pid"; then
     return 1  # genuinely running
   fi
   # Stale lock — reclaim atomically (mv is atomic; prevents TOCTOU race
@@ -90,8 +98,11 @@ replace_foreign_daemon() {
   owner=$(cat "$LOCK_DIR/script" 2>/dev/null || true)
   [ "$owner" = "$SCRIPT_DIR" ] && return 1
   pid=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
-  log_msg "Replacing daemon (PID ${pid:-unknown}) started from ${owner:-an older version}"
-  [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
+  # acquire_lock has just reclaimed any lock whose PID is not a daemon; a
+  # holder that is not one now is a race, and gets no signal.
+  is_daemon_pid "$pid" || return 1
+  log_msg "Replacing daemon (PID ${pid}) started from ${owner:-an older version}"
+  kill "$pid" 2>/dev/null || true
   local i
   for i in 1 2 3 4 5 6 7 8 9 10; do
     kill -0 "$pid" 2>/dev/null || break
@@ -110,10 +121,7 @@ is_running() {
   fi
   local pid
   pid=$(cat "$LOCK_DIR/pid" 2>/dev/null)
-  if [ -z "$pid" ]; then
-    return 1
-  fi
-  kill -0 "$pid" 2>/dev/null
+  is_daemon_pid "$pid"
 }
 
 # ─────────────────────────────────────────────

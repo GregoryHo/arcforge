@@ -920,13 +920,29 @@ echo "=== UP-T1: start replaces a daemon from another plugin version ==="
 TMPDIR_UP=$(mktemp -d)
 trap 'rm -rf "$TMPDIR_UP"' EXIT
 
-# Runs `cmd_start` against a lock held by a live stand-in daemon. $1 is what the
-# lock's script file says (empty = no file). Prints: old-alive|new-pid|script.
+# A stand-in for a daemon from another plugin copy: its command line names an
+# observer-daemon.sh, which is what the takeover checks before it signals.
+UP_OLD_DIR="${TMPDIR_UP}/old-copy"
+mkdir -p "$UP_OLD_DIR"
+cat > "${UP_OLD_DIR}/observer-daemon.sh" <<'STANDIN'
+trap 'kill $! 2>/dev/null; exit 0' TERM
+sleep 30 &
+wait
+STANDIN
+
+# Runs `cmd_start` against a lock held by a live process. $1 is what the lock's
+# script file says (empty = no file); $3 is the holder: `daemon` (the stand-in
+# above) or `other` (a plain sleep that merely reuses the PID). Prints:
+# old-alive|replaced-or-kept|script.
 up_start_against() {
   local home="${TMPDIR_UP}/$2"
   local lock="${home}/.arcforge/instincts/.observer.lock"
   mkdir -p "$lock"
-  sleep 30 &
+  if [ "$3" = daemon ]; then
+    bash "${UP_OLD_DIR}/observer-daemon.sh" &
+  else
+    sleep 30 &
+  fi
   local old=$!
   echo "$old" > "${lock}/pid"
   [ -n "$1" ] && echo "$1" > "${lock}/script"
@@ -948,21 +964,50 @@ up_start_against() {
 }
 
 DAEMON_DIR="$(dirname "$DAEMON_SCRIPT")"
-UP_LEGACY=$(up_start_against '' legacy)
+UP_LEGACY=$(up_start_against '' legacy daemon)
 assert_eq \
-  'UP-T1: a lock with no recorded script (pre-check daemon) is replaced' \
+  'UP-T1: a live daemon whose lock records no script (pre-check daemon) is replaced' \
   "no|replaced|${DAEMON_DIR}" \
   "$UP_LEGACY"
-UP_OTHER=$(up_start_against '/old/plugins/cache/arcforge/6.1.0/scripts/lib/learning-curator' other)
+UP_OTHER=$(up_start_against "$UP_OLD_DIR" other daemon)
 assert_eq \
-  'UP-T1: a lock naming another script directory is replaced' \
+  'UP-T1: a live daemon whose lock names another script directory is replaced' \
   "no|replaced|${DAEMON_DIR}" \
   "$UP_OTHER"
-UP_SAME=$(up_start_against "$DAEMON_DIR" same)
+UP_SAME=$(up_start_against "$DAEMON_DIR" same daemon)
 assert_eq \
-  'UP-T1: a lock naming this script directory is left running' \
+  'UP-T1: a live daemon whose lock names this script directory is left running' \
   "yes|kept|${DAEMON_DIR}" \
   "$UP_SAME"
+
+# A daemon that died without removing its lock leaves a PID the OS can hand to
+# an unrelated process. That process is never signaled: the lock is stale and
+# is reclaimed around it, whether or not the lock records a script.
+UP_REUSED_LEGACY=$(up_start_against '' reused-legacy other)
+assert_eq \
+  'UP-T1: a legacy lock whose PID is a non-daemon process is reclaimed, process untouched' \
+  "yes|replaced|${DAEMON_DIR}" \
+  "$UP_REUSED_LEGACY"
+UP_REUSED_SAME=$(up_start_against "$DAEMON_DIR" reused-same other)
+assert_eq \
+  'UP-T1: a current lock whose PID is a non-daemon process is reclaimed, process untouched' \
+  "yes|replaced|${DAEMON_DIR}" \
+  "$UP_REUSED_SAME"
+
+# `stop` must not signal a non-daemon process holding a stale lock's PID.
+UP_STOP_LOCK="${TMPDIR_UP}/stop/.arcforge/instincts/.observer.lock"
+mkdir -p "$UP_STOP_LOCK"
+sleep 30 &
+UP_STOP_PID=$!
+echo "$UP_STOP_PID" > "${UP_STOP_LOCK}/pid"
+env -u ARCFORGE_HOME HOME="${TMPDIR_UP}/stop" bash "$DAEMON_SCRIPT" stop > /dev/null 2>&1 || true
+UP_STOP_ALIVE=$(kill -0 "$UP_STOP_PID" 2>/dev/null && echo yes || echo no)
+UP_STOP_LOCKED=$([ -d "$UP_STOP_LOCK" ] && echo yes || echo no)
+kill "$UP_STOP_PID" 2>/dev/null || true
+assert_eq \
+  'UP-T1: stop leaves a non-daemon process alive and clears the stale lock' \
+  'yes|no' \
+  "${UP_STOP_ALIVE}|${UP_STOP_LOCKED}"
 
 # ─────────────────────────────────────────────
 # Results

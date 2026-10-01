@@ -217,7 +217,11 @@ of the daemon script that took it, and starting the daemon replaces a live one
 started from a different directory — after a plugin upgrade, the previous
 version's — instead of leaving that version's behavior running until it stops
 on its own. A lock written before the lock recorded its script counts as
-different. Residual: a daemon that does not exit within about 2 s of being
+different. Nothing is signaled unless the lock's PID is a process running the
+daemon script: a daemon that died without removing its lock leaves a PID the
+system can reuse, and a lock whose PID belongs to any other process is stale —
+it is reclaimed, and that process is left alone, by start and stop alike.
+Residual: a daemon that does not exit within about 2 s of being
 stopped — one waiting on a curator model call — is left running, and the next
 start tries again; and two installed copies of the plugin used in alternation
 replace each other at each session start.

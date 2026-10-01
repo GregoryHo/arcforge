@@ -43,7 +43,9 @@ explicit `false` in the global learning config silences injection.
   that project's opt-in before it analyzes the observations filed under its
   name; with learning off, no daemon is started. A daemon still running from a
   previous plugin version (its lock names a different script directory) is
-  replaced rather than left to run out its 2-hour lifetime
+  replaced rather than left to run out its 2-hour lifetime. Only a process whose
+  command line runs the daemon script is ever signaled; a lock whose PID now
+  belongs to some other process is treated as stale and reclaimed
 - Runs decay cycles on instincts: each elapsed week is charged once, and an
   activated instinct is never archived by decay
 
