@@ -135,9 +135,16 @@ should cost you a sentence to read, not a blocked edit.
 A synchronous hook runs on the critical path — the tool waits for it. The two
 observation registrations are marked async precisely so their disk writes never
 join that path, and the session-start record is built asynchronously for the same
-reason. What is left on the synchronous path is small and bounded: a scan of the
-text you were about to write, a counter increment, a context injection at the
-start.
+reason. What is left on the synchronous path on every event is small and
+bounded: a scan of the text you were about to write, a counter increment, a
+context injection at the start.
+
+Two costs are added each time the diary threshold trips — 10 messages or 50 tool
+calls since the last draft — on the Stop and PreCompact that trip it. The session
+transcript is parsed to stamp the tools and files the diary draft shows, and a
+short subprocess renders the draft (it is killed after 5 seconds). The parse reads
+the whole transcript, not just its end, so its cost grows with the length of the
+session: about 5 ms per MB of transcript.
 
 In practice hooks are not what makes a session feel slow. If one ever is, the
 first thing to check is whether learning is enabled, since that is what turns the

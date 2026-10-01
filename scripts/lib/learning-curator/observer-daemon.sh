@@ -47,15 +47,30 @@ log_msg() {
 # Lock Management (mkdir-based singleton)
 # ─────────────────────────────────────────────
 
+# The lock records which copy of this script holds it, so a daemon left running
+# from the previous plugin version can be told apart (replace_foreign_daemon).
+claim_lock() {
+  echo $$ > "$LOCK_DIR/pid"
+  echo "$SCRIPT_DIR" > "$LOCK_DIR/script"
+}
+
+# Whether PID $1 is a live observer daemon. A daemon that died without removing
+# its lock leaves a PID the OS can hand to an unrelated process, so being alive
+# is not enough: nothing here signals a process, or treats a lock as held,
+# unless its command line runs this script.
+is_daemon_pid() {
+  [ -n "$1" ] && ps -o command= -p "$1" 2>/dev/null | grep -q 'observer-daemon\.sh'
+}
+
 acquire_lock() {
   if mkdir "$LOCK_DIR" 2>/dev/null; then
-    echo $$ > "$LOCK_DIR/pid"
+    claim_lock
     return 0
   fi
   # Lock exists — check for stale lock from crashed process
   local old_pid
   old_pid=$(cat "$LOCK_DIR/pid" 2>/dev/null)
-  if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
+  if is_daemon_pid "$old_pid"; then
     return 1  # genuinely running
   fi
   # Stale lock — reclaim atomically (mv is atomic; prevents TOCTOU race
@@ -65,11 +80,35 @@ acquire_lock() {
   if mv "$LOCK_DIR" "$tmp_stale" 2>/dev/null; then
     rm -rf "$tmp_stale"
     if mkdir "$LOCK_DIR" 2>/dev/null; then
-      echo $$ > "$LOCK_DIR/pid"
+      claim_lock
       return 0
     fi
   fi
   return 1  # lost the race to another instance
+}
+
+# A live daemon started from another copy of this script — the previous plugin
+# version, after an upgrade, since the plugin cache is keyed by version — would
+# otherwise keep running that version's code for up to MAX_AGE. Stop it and take
+# the lock. A lock with no script file predates the check and is foreign too.
+# Returns 1 (leave it running) when the holder is this copy, or when it has not
+# exited within ~2 s — mid-analysis a TERM waits for the model call to return.
+replace_foreign_daemon() {
+  local owner pid
+  owner=$(cat "$LOCK_DIR/script" 2>/dev/null || true)
+  [ "$owner" = "$SCRIPT_DIR" ] && return 1
+  pid=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
+  # acquire_lock has just reclaimed any lock whose PID is not a daemon; a
+  # holder that is not one now is a race, and gets no signal.
+  is_daemon_pid "$pid" || return 1
+  log_msg "Replacing daemon (PID ${pid}) started from ${owner:-an older version}"
+  kill "$pid" 2>/dev/null || true
+  local i
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 0.2
+  done
+  acquire_lock
 }
 
 remove_lock() {
@@ -82,10 +121,7 @@ is_running() {
   fi
   local pid
   pid=$(cat "$LOCK_DIR/pid" 2>/dev/null)
-  if [ -z "$pid" ]; then
-    return 1
-  fi
-  kill -0 "$pid" 2>/dev/null
+  is_daemon_pid "$pid"
 }
 
 # ─────────────────────────────────────────────
@@ -573,7 +609,7 @@ daemon_loop() {
 
 cmd_start() {
   mkdir -p "$INSTINCTS_DIR"
-  if ! acquire_lock; then
+  if ! acquire_lock && ! replace_foreign_daemon; then
     local running_pid
     running_pid=$(cat "$LOCK_DIR/pid" 2>/dev/null)
     echo "Observer daemon already running (PID ${running_pid})"

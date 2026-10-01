@@ -41,7 +41,11 @@ explicit `false` in the global learning config silences injection.
 - Starts the observer daemon **only when learning is enabled in some scope**
   for this project, and records the project's root so the daemon can check
   that project's opt-in before it analyzes the observations filed under its
-  name; with learning off, no daemon is started
+  name; with learning off, no daemon is started. A daemon still running from a
+  previous plugin version (its lock names a different script directory) is
+  replaced rather than left to run out its 2-hour lifetime. Only a process whose
+  command line runs the daemon script is ever signaled; a lock whose PID now
+  belongs to some other process is treated as stale and reclaimed
 - Runs decay cycles on instincts: each elapsed week is charged once, and an
   activated instinct is never archived by decay
 

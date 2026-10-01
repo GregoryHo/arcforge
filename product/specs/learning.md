@@ -155,12 +155,18 @@ was recorded about them.
   it was handed and return a proposal, and can touch nothing on the machine;
   the manifest it writes records the tool access the run actually had (D-023).
   Enrichment no longer runs with permissions switched off: it gets two tools, `Read` and `Write`,
-  and the draft's own directory is added to the ones it may work in. It is not
-  a sandbox, and the spec does not claim one — the run still inherits the
-  directory it was started from, which is the project, and edits inside those
-  directories are auto-approved rather than prompted, because a detached run
-  has nobody to answer a prompt. What it no longer carries is the blanket
-  bypass of every check. State
+  and it starts in the draft's own directory — also added explicitly to the
+  ones it may work in — rather than inheriting the project it was spawned
+  from. What it no longer carries is the blanket bypass of every check, or the
+  user's project as its working directory. Residual: it is not a sandbox, and
+  the spec does not claim one. Edits inside the draft's directory are
+  auto-approved rather than prompted, because a detached run has nobody to
+  answer a prompt, and that directory also holds the same day's other diaries,
+  so a prompt-injected draft can rewrite them. What keeps the run out of
+  everything else is the host tool's own permission check on a run nobody can
+  answer, not an operating-system boundary — the child runs as the user. The
+  working directory is verified against a stub of the host CLI, not a live
+  run. State
   follows its scope: the candidate queue, the audit log, the drafts
   materialization writes and the activated instincts are all home-global under
   `~/.arcforge/`, and the project's own `.arcforge/learning/` holds that
@@ -204,6 +210,21 @@ daemon's enablement check reads it, and a malformed record is rejected rather
 than guessed at. `<project>` is the same sanitized directory basename as the
 rest of the keyspace, so the record shares the collision D-037 records: two
 same-named projects share one record.
+
+One daemon runs per machine, held by `~/.arcforge/instincts/.observer.lock`; it
+stops itself after 30 idle minutes or 2 hours. The lock records the directory
+of the daemon script that took it, and starting the daemon replaces a live one
+started from a different directory — after a plugin upgrade, the previous
+version's — instead of leaving that version's behavior running until it stops
+on its own. A lock written before the lock recorded its script counts as
+different. Nothing is signaled unless the lock's PID is a process running the
+daemon script: a daemon that died without removing its lock leaves a PID the
+system can reuse, and a lock whose PID belongs to any other process is stale —
+it is reclaimed, and that process is left alone, by start and stop alike.
+Residual: a daemon that does not exit within about 2 s of being
+stopped — one waiting on a curator model call — is left running, and the next
+start tries again; and two installed copies of the plugin used in alternation
+replace each other at each session start.
 
 The invariants: state is only ever advanced through the engine (B-5), scope decides
 location (B-9), and one session yields one diary (B-7).

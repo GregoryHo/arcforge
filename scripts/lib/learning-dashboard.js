@@ -369,6 +369,13 @@ function handleDashboardAction({
     return result;
   }
 
+  // Promote and evolve derive a new record from the source. When that record
+  // fails Layer-5 validation, appendCandidate writes only a rejections.jsonl
+  // line — so the action did not happen, and the answer must say so (#159).
+  function rejectInvalidCandidate(appended) {
+    return reject('candidate_invalid', { validation_reasons: appended.reasons });
+  }
+
   // Step 1: validate input shape
   if (!action || !ACTIONS.includes(action)) {
     return reject('action_not_available');
@@ -438,7 +445,8 @@ function handleDashboardAction({
     delete newRecord.scope.project_id;
     delete newRecord.scope.project;
 
-    appendCandidate(newRecord, { actor });
+    const appended = appendCandidate(newRecord, { actor });
+    if (!appended.ok) return rejectInvalidCandidate(appended);
     appendRelatedEvent(candidateId, { promoted_to_candidate_id: newId }, actor);
 
     return accept({ new_candidate_id: newId });
@@ -464,7 +472,8 @@ function handleDashboardAction({
       updated_at: now,
     };
 
-    appendCandidate(newRecord, { actor });
+    const appended = appendCandidate(newRecord, { actor });
+    if (!appended.ok) return rejectInvalidCandidate(appended);
     appendRelatedEvent(candidateId, { evolved_to_candidate_id: newId }, actor);
 
     return accept({ new_candidate_id: newId });

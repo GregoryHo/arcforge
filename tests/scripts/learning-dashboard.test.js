@@ -570,6 +570,42 @@ describe('action handlers — Action × Status matrix (criterion 2)', () => {
     expect(result.reason).toBe('policy_violation');
   });
 
+  // ---------- candidate-producing actions whose new record fails validation (#159) ----------
+
+  /** A source record that predates a schema tightening: empty evidence. */
+  function writeInvalidSource(status) {
+    const record = makeCandidateRecord({ evidence: [] });
+    writeDirectlyToQueue(record);
+    if (status) appendTransitionEvent(record.candidate_id, 'approve', status);
+    return record;
+  }
+
+  function rejectionsLines() {
+    const p = path.join(tmpDir, '.arcforge', 'learning', 'candidates', 'rejections.jsonl');
+    return fs.existsSync(p) ? fs.readFileSync(p, 'utf8').split('\n').filter(Boolean) : [];
+  }
+
+  it.each([
+    ['evolve', 'approved'],
+    ['promote', null],
+  ])('%s answers accepted:false when the derived record fails validation', (action, status) => {
+    const record = writeInvalidSource(status);
+    const before = Object.keys(readCurrentCandidates()).length;
+
+    const result = handleDashboardAction({ action, candidate_id: record.candidate_id });
+
+    expect(result.accepted).toBe(false);
+    expect(result.reason).toBe('candidate_invalid');
+    expect(result.new_candidate_id).toBeUndefined();
+    expect(result.validation_reasons.map((r) => r.code)).toContain('too_few_evidence_refs');
+    // No candidate was created, and the source carries no link to one.
+    const candidates = readCurrentCandidates();
+    expect(Object.keys(candidates).length).toBe(before);
+    expect(candidates[record.candidate_id].relationships?.evolved_to_candidate_id).toBeUndefined();
+    expect(candidates[record.candidate_id].relationships?.promoted_to_candidate_id).toBeUndefined();
+    expect(rejectionsLines()).toHaveLength(1);
+  });
+
   // ---------- candidate not found ----------
 
   it('returns 404 when candidate_id is not found', () => {
@@ -1159,6 +1195,75 @@ describe('DH-6: deactivate action calls deactivate.js module', () => {
       readCurrentCandidates: rcc,
     } = require('../../scripts/lib/learning-curator/queue-writer');
     expect(rcc()[record.candidate_id].lifecycle.status).toBe('deactivated');
+  });
+});
+
+// ===========================================================================
+// #167 — activation and materialize() land on the same manifest
+// ===========================================================================
+
+// The issue's reachable trigger, driven end to end through the dashboard. It
+// leaves an older manifest whose draft is intact beside a newer one whose draft
+// is gone. Activation used to resolve the newest manifest by date
+// (`findLatestMaterialization`) and refuse with materialization_hash_mismatch
+// on a `materialized` candidate, while materialize() had reused the intact one.
+// Both now screen on intact drafts, so the activation succeeds on the manifest
+// materialize() picked.
+describe('#167: activation resolves the manifest materialize() reused', () => {
+  const ACTIVATE_ACK = {
+    reviewer_saw_behavior_change_warning: true,
+    reviewer_saw_target_path_summary: true,
+  };
+  const DEACTIVATE_ACK = { reviewer_saw_behavior_change_warning: true };
+
+  function act(action, candidateId, safetyAck) {
+    const result = handleDashboardAction({
+      action,
+      candidate_id: candidateId,
+      safety_ack: safetyAck,
+    });
+    expect(result).toMatchObject({ action, accepted: true });
+    return result;
+  }
+
+  /** A materialize() reuse is keyed on the manifest's created_at — keep them distinct. */
+  function nextMillisecond() {
+    const start = Date.now();
+    while (Date.now() === start) {
+      /* spin */
+    }
+  }
+
+  it('activates the restored older draft after the newer one is deleted', () => {
+    const record = makeCandidateRecord();
+    appendCandidate(record);
+    appendTransitionEvent(record.candidate_id, 'approve', 'approved');
+    const id = record.candidate_id;
+
+    // accept → activate → deactivate
+    const first = act('materialize', id);
+    const firstDraft = first.draft_paths[0];
+    const firstBody = fs.readFileSync(firstDraft, 'utf8');
+    act('activate', id, ACTIVATE_ACK);
+    act('deactivate', id, DEACTIVATE_ACK);
+
+    // hand-edit the draft → accept writes a second manifest → activate → deactivate
+    fs.writeFileSync(firstDraft, `${firstBody}\nhand edit\n`, 'utf8');
+    nextMillisecond();
+    const second = act('materialize', id);
+    expect(second.materialization_id).not.toBe(first.materialization_id);
+    act('activate', id, ACTIVATE_ACK);
+    act('deactivate', id, DEACTIVATE_ACK);
+
+    // restore the first draft, delete the second → accept reuses the first
+    fs.writeFileSync(firstDraft, firstBody, 'utf8');
+    fs.rmSync(second.draft_paths[0]);
+    const third = act('materialize', id);
+    expect(third.materialization_id).toBe(first.materialization_id);
+
+    const activated = act('activate', id, ACTIVATE_ACK);
+    expect(activated.reason).toBeUndefined();
+    expect(readCurrentCandidates()[id].lifecycle.status).toBe('activated');
   });
 });
 

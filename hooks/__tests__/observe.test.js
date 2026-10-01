@@ -1173,3 +1173,74 @@ describe('observe: keeps the project-root record current', () => {
     assert.strictEqual(fs.existsSync(recordPath()), false);
   });
 });
+
+// A daemon that died without removing its lock leaves a PID the OS can hand to
+// an unrelated process, and SIGUSR1's default action terminates that process.
+// The hook signals only a PID whose command line runs observer-daemon.sh.
+describe('observe: signalDaemon verifies the lock PID is the daemon', () => {
+  const { spawn } = require('node:child_process');
+  const originalEnv = { ...process.env };
+  let testDir;
+  let child;
+
+  beforeEach(() => {
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-observe-signal-'));
+    process.env.HOME = testDir;
+    delete process.env.ARCFORGE_HOME;
+    delete require.cache[require.resolve('../observe/main')];
+    delete require.cache[require.resolve('../../scripts/lib/utils')];
+    delete require.cache[require.resolve('../../scripts/lib/session-utils')];
+  });
+
+  afterEach(() => {
+    if (child) child.kill('SIGKILL');
+    child = undefined;
+    fs.rmSync(testDir, { recursive: true, force: true });
+    for (const key of Object.keys(process.env)) delete process.env[key];
+    Object.assign(process.env, originalEnv);
+  });
+
+  function writeLockPid(pid) {
+    const { getObserverPidFile } = require('../../scripts/lib/session-utils');
+    const pidFile = getObserverPidFile();
+    fs.mkdirSync(path.dirname(pidFile), { recursive: true });
+    fs.writeFileSync(pidFile, String(pid), 'utf-8');
+  }
+
+  async function waitFor(predicate, timeoutMs = 5000) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (predicate()) return true;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    return false;
+  }
+
+  it('does not signal a lock PID that belongs to a non-daemon process', async () => {
+    child = spawn('sleep', ['30'], { stdio: 'ignore' });
+    writeLockPid(child.pid);
+    const { signalDaemon } = require('../observe/main');
+
+    assert.strictEqual(signalDaemon(), 'not-daemon');
+    await new Promise((r) => setTimeout(r, 200));
+    assert.strictEqual(child.exitCode, null, 'the sleep must still be running');
+    assert.strictEqual(child.signalCode, null, 'the sleep must not have been signaled');
+  });
+
+  it('signals a lock PID whose command line runs observer-daemon.sh', async () => {
+    const stub = path.join(testDir, 'observer-daemon.sh');
+    const ready = path.join(testDir, 'ready');
+    const got = path.join(testDir, 'got-usr1');
+    fs.writeFileSync(
+      stub,
+      `trap 'touch "${got}"; exit 0' USR1\ntouch "${ready}"\nwhile true; do sleep 0.1; done\n`,
+    );
+    child = spawn('bash', [stub], { stdio: 'ignore' });
+    assert.ok(await waitFor(() => fs.existsSync(ready)), 'stub never became ready');
+    writeLockPid(child.pid);
+    const { signalDaemon } = require('../observe/main');
+
+    assert.strictEqual(signalDaemon(), 'signaled');
+    assert.ok(await waitFor(() => fs.existsSync(got)), 'stub daemon never received SIGUSR1');
+  });
+});
