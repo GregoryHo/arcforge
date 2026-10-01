@@ -207,7 +207,8 @@ describe('pre-compact: diary-capture fixture (ICL-8)', () => {
     const marker = path.join(binDir, 'spawned.marker');
     fs.writeFileSync(
       path.join(binDir, 'claude'),
-      `#!/bin/sh\ncat > /dev/null\nprintf '%s' "$ARCFORGE_SPAWNED" > "${marker}"\n`,
+      // Write-then-rename, so waitFor() never sees a half-written marker (#176).
+      `#!/bin/sh\ncat > /dev/null\nprintf '%s' "$ARCFORGE_SPAWNED" > "${marker}.tmp"\nmv "${marker}.tmp" "${marker}"\n`,
       { mode: 0o755 },
     );
 
@@ -266,7 +267,8 @@ describe('pre-compact: diary-capture fixture (ICL-8)', () => {
     const marker = path.join(binDir, 'spawned.marker');
     fs.writeFileSync(
       path.join(binDir, 'claude'),
-      `#!/bin/sh\ncat > /dev/null\nprintf '%s' "$ARCFORGE_SPAWNED" > "${marker}"\n`,
+      // Write-then-rename, so waitFor() never sees a half-written marker (#176).
+      `#!/bin/sh\ncat > /dev/null\nprintf '%s' "$ARCFORGE_SPAWNED" > "${marker}.tmp"\nmv "${marker}.tmp" "${marker}"\n`,
       { mode: 0o755 },
     );
 
@@ -482,10 +484,14 @@ describe('pre-compact: diary-capture fixture (ICL-8)', () => {
    * With `promptFile`, the stub enricher writes the prompt it was handed there.
    */
   function compactAboveThreshold(projectDir, promptFile) {
-    const sink = promptFile ? `"${promptFile}"` : '/dev/null';
-    fs.writeFileSync(path.join(binDir, 'claude'), `#!/bin/sh\ncat > ${sink}\nexit 0\n`, {
-      mode: 0o755,
-    });
+    // Write-then-rename: `cat > file` creates the file before the prompt is
+    // copied into it, and waitFor() resolves on existence, so under runner load
+    // the test could read a zero-byte prompt (#176). The rename makes the file
+    // appear only once it is complete.
+    const stub = promptFile
+      ? `#!/bin/sh\ncat > "${promptFile}.tmp"\nmv "${promptFile}.tmp" "${promptFile}"\nexit 0\n`
+      : '#!/bin/sh\ncat > /dev/null\nexit 0\n';
+    fs.writeFileSync(path.join(binDir, 'claude'), stub, { mode: 0o755 });
     fs.writeFileSync(counterPath('user-count'), '12');
     fs.writeFileSync(counterPath('tool-count'), '55');
 
