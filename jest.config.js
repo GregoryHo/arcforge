@@ -2,8 +2,16 @@
 module.exports = {
   testEnvironment: 'node',
   testMatch: ['**/tests/scripts/**/*.test.js'],
-  // Exclude hooks tests - they use Node.js native test runner
-  testPathIgnorePatterns: ['/node_modules/', '/hooks/__tests__/', '/tests/node/'],
+  // Exclude hooks tests - they use Node.js native test runner - and the agent
+  // worktrees under .claude/worktrees/, which are whole checkouts of other
+  // branches: without this, `npm test` from the main checkout runs their
+  // tests/scripts/ too and fails on a branch's own in-progress test.
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/hooks/__tests__/',
+    '/tests/node/',
+    '/.claude/worktrees/',
+  ],
   // Coverage gate (TEST-1): a PARTIAL gate — it guards only the jest runner
   // (test:scripts) over the canonical engine (scripts/lib). The node --test,
   // pytest, and bash runners sit outside jest and are not covered here. The line
