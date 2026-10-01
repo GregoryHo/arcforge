@@ -1134,12 +1134,12 @@ function Install({
       color: t.brass,
       fontFamily: 'monospace'
     }
-  }, "/arcforge:<name>"), ". Skills, hooks, and the ", /*#__PURE__*/React.createElement("span", {
+  }, "/arcforge:<name>"), ". Nothing to configure: skills, hooks, and the ", /*#__PURE__*/React.createElement("span", {
     style: {
       color: t.brass,
       fontFamily: 'monospace'
     }
-  }, "arcforge"), " CLI load together; learning stays off until you enable it per project. Update with ", /*#__PURE__*/React.createElement("span", {
+  }, "arcforge"), " CLI load together, and learning stays off until you enable it, per project or globally. Update with ", /*#__PURE__*/React.createElement("span", {
     style: {
       color: t.brass,
       fontFamily: 'monospace'

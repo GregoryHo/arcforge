@@ -444,7 +444,7 @@ function Install({theme:t}) {
             <div><span style={{color:t.dim}}>$ </span>/arcforge:using</div>
           </div>
           <div style={{color:t.mute,fontSize:13,lineHeight:1.7,marginTop:18}}>
-            Register the marketplace, install, then ask for the router: it prints a table mapping situations to skills. Every skill is invoked the same way, <span style={{color:t.brass,fontFamily:'monospace'}}>/arcforge:&lt;name&gt;</span>. Skills, hooks, and the <span style={{color:t.brass,fontFamily:'monospace'}}>arcforge</span> CLI load together; learning stays off until you enable it per project. Update with <span style={{color:t.brass,fontFamily:'monospace'}}>/plugin update arcforge</span>.
+            Register the marketplace, install, then ask for the router: it prints a table mapping situations to skills. Every skill is invoked the same way, <span style={{color:t.brass,fontFamily:'monospace'}}>/arcforge:&lt;name&gt;</span>. Nothing to configure: skills, hooks, and the <span style={{color:t.brass,fontFamily:'monospace'}}>arcforge</span> CLI load together, and learning stays off until you enable it, per project or globally. Update with <span style={{color:t.brass,fontFamily:'monospace'}}>/plugin update arcforge</span>.
           </div>
         </div>
         <div style={{background:t.card,border:`1px solid ${t.line}`,padding:'36px 36px'}}>
