@@ -65,6 +65,7 @@ function saveLoopState(state, projectRoot) {
  * (the loop-operator can compute budget headroom without re-deriving flags).
  * A fresh run_id scopes stall/retry-storm detection to the current run so a
  * resumed loop is not condemned by a previous run's accumulated errors.
+ * `status` and `finished_at` are reset so a resumed file reads as running.
  * @param {Object} state - Loop state (mutated in place)
  * @param {Object} runConfig - Run configuration
  * @param {string} runConfig.pattern - Execution pattern
@@ -78,6 +79,10 @@ function beginRun(state, { pattern, maxRuns, maxCost = null }) {
   state.max_cost = maxCost;
   state.run_id = crypto.randomUUID();
   state.run_started_iteration = state.iteration;
+  // A resumed state file still carries the previous run's terminal status and
+  // finish time; this run is running until finalizeLoop says otherwise.
+  state.status = 'running';
+  state.finished_at = null;
   return state;
 }
 
@@ -157,9 +162,12 @@ function currentRunErrors(state) {
 function resolveBaseBranch(projectRoot) {
   try {
     const { execFileSync } = require('node:child_process');
+    // stderr is discarded: outside a git repository git prints "fatal: not a
+    // git repository" to the inherited stderr, and null already says so.
     return execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
       cwd: projectRoot,
       encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
   } catch {
     return null;
@@ -204,13 +212,16 @@ function queueLoopNotifications(state, projectRoot) {
 }
 
 /**
- * Finalize loop state: stamp terminal status and persist.
+ * Finalize loop state: stamp terminal status and persist. `max_runs` is only
+ * the fallback for a run the iteration ceiling ended — a status the loop
+ * already decided (complete, failed, cost_limit, ...) is never overwritten,
+ * even when that decision came on the last allowed iteration.
  * @param {Object} state - Loop state
  * @param {number} maxRuns - Maximum iterations configured for the run
  * @param {string} projectRoot - Project root directory
  */
 function finalizeLoop(state, maxRuns, projectRoot) {
-  if (state.iteration >= maxRuns) {
+  if (state.status === 'running' && state.iteration >= maxRuns) {
     state.status = 'max_runs';
   }
   state.finished_at = getTimestamp();

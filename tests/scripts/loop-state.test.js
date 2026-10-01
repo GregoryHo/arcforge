@@ -149,6 +149,22 @@ describe('loop-state', () => {
       expect(loadLoopState(tmpDir).status).toBe('max_runs');
     });
 
+    it.each([
+      'complete',
+      'failed',
+      'blocked',
+      'cost_limit',
+      'stalled',
+      'retry_storm',
+    ])('keeps an already-decided %s status when iteration reaches maxRuns', (status) => {
+      const state = loadLoopState(tmpDir);
+      state.iteration = 50;
+      state.status = status;
+      finalizeLoop(state, 50, tmpDir);
+      expect(state.status).toBe(status);
+      expect(loadLoopState(tmpDir).status).toBe(status);
+    });
+
     it('queues a loop-finished action with status/completed_count/blocked/cost', () => {
       const state = loadLoopState(tmpDir);
       state.status = 'complete';
@@ -176,6 +192,25 @@ describe('loop-state', () => {
       finalizeLoop(state, 50, tmpDir);
       const p = getActions(tmpDir, 'loop-finished')[0].payload;
       expect(p.blocked).toEqual([{ id: 'T-9', reason: 'failed after retries' }]);
+    });
+
+    it('prints nothing from git when the project is not a git repository', () => {
+      // A subprocess, because git writes its "fatal: not a git repository"
+      // straight to the inherited stderr — a jest spy cannot see it.
+      const { spawnSync } = require('node:child_process');
+      const lib = path.join(__dirname, '..', '..', 'scripts', 'lib', 'loop-state');
+      const script = [
+        `const { loadLoopState, finalizeLoop } = require(${JSON.stringify(lib)});`,
+        'const root = process.argv[1];',
+        'const state = loadLoopState(root);',
+        "state.status = 'complete';",
+        'finalizeLoop(state, 50, root);',
+      ].join('\n');
+      const env = { ...process.env, HOME: homeDir, GIT_CEILING_DIRECTORIES: path.dirname(tmpDir) };
+      delete env.ARCFORGE_HOME;
+      const result = spawnSync('node', ['-e', script, tmpDir], { encoding: 'utf-8', env });
+      expect(result.status).toBe(0);
+      expect(result.stderr).not.toMatch(/fatal/);
     });
 
     it('leaves the state file on disk after finalize (AF-5 resume depends on it)', () => {
@@ -207,6 +242,15 @@ describe('loop-state', () => {
       beginRun(state, { pattern: 'sequential', maxRuns: 20 });
       expect(state.max_cost).toBeNull();
       expect(state.run_started_iteration).toBe(7);
+    });
+
+    it("resets the previous run's terminal status and finished_at on resume", () => {
+      const state = loadLoopState(tmpDir);
+      state.status = 'max_runs';
+      state.finished_at = '2026-01-01T00:00:00.000Z';
+      beginRun(state, { pattern: 'tasks', maxRuns: 20 });
+      expect(state.status).toBe('running');
+      expect(state.finished_at).toBeNull();
     });
 
     it('assigns a new run_id on each run (resume gets its own scope)', () => {

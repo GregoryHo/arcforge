@@ -20,7 +20,7 @@ const DEFAULT_TASK_TIMEOUT_MS = 600000;
 const PERMISSION_STALL_GUIDANCE =
   '[loop] Headless sessions cannot answer interactive permission prompts — a session ' +
   'blocked on one stalls until the task timeout kills it. Re-run with --permission-mode ' +
-  'and/or --allowed-tools (see "Headless Permissions" in the arc-looping skill).';
+  'and/or --allowed-tools (see "Step 3 — Pre-authorize, then detach" in the looping skill).';
 
 /**
  * Build the argv for a spawned `claude -p` session.

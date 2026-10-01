@@ -160,6 +160,8 @@ OPTIONS:
 TASK LIST:
   Tasks come from the --tasks file and nowhere else. A task's own \`verify:\`
   line is its acceptance floor; --verify-cmd covers tasks that have none.
+  A task with neither has no floor and is done when its session exits 0;
+  the loop warns at start, naming each such task.
   The loop marks each task [~] while working, then [x] or [!].
 
 STATE:
@@ -479,6 +481,31 @@ function blockReasonFor(state, taskId) {
 }
 
 /**
+ * Warn, before any session is spawned, about every runnable task that has no
+ * acceptance floor — no `verify:` line of its own and no --verify-cmd. Such a
+ * task is done when its session exits 0, which says the session ended, not
+ * that the work happened (worktrees-loop B-6); the warning names each one
+ * while the user can still add a floor.
+ * @param {Array} tasks - Parsed tasks
+ * @param {Object} options - Loop options (verifyCommand)
+ * @returns {string[]} Ids of the tasks without a floor
+ */
+function warnTasksWithoutFloor(tasks, options) {
+  if (options.verifyCommand) return [];
+  const ids = tasks
+    .filter((t) => (t.status === 'pending' || t.status === 'in-progress') && !t.verify)
+    .map((t) => t.id);
+  if (ids.length > 0) {
+    console.error(
+      `[loop] Warning: no verify floor for ${ids.join(', ')} — no \`verify:\` line and no ` +
+        '--verify-cmd, so each is marked done when its session exits 0, whether or not the ' +
+        'work happened. Add a `verify:` line or pass --verify-cmd to make done mean a passing command.',
+    );
+  }
+  return ids;
+}
+
+/**
  * Run the loop over a D3 task list: one task per iteration, stop on the first
  * failure. The list is re-read every iteration so a human editing it mid-run
  * (adding tasks, unblocking one) is picked up on the next pass.
@@ -491,11 +518,16 @@ function runLoop(options) {
   const tasksPath = resolveTasksPath(options.tasksFile, projectRoot);
   // Validate ONCE up front. Per-iteration reads parse only, so the run cannot
   // die halfway on a semantic rule it introduced itself.
-  validateTaskListForRun(readTaskList(tasksPath));
+  const initialContent = readTaskList(tasksPath);
+  validateTaskListForRun(initialContent);
+  warnTasksWithoutFloor(parseTaskList(initialContent).tasks, options);
 
   const state = loadLoopState(projectRoot);
   beginRun(state, { pattern: 'tasks', maxRuns, maxCost });
   state.tasks_file = path.relative(projectRoot, tasksPath);
+  // Persist the reset now: a resumed file must read `running` while the first
+  // session works (and after a kill), not the previous run's terminal status.
+  saveLoopState(state, projectRoot);
 
   console.log(`[loop] Starting loop over ${state.tasks_file} (max ${maxRuns} runs)`);
 

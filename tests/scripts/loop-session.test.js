@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { SKILLS_DIR } = require('./skill-tree');
 
 const {
   buildClaudeArgs,
@@ -104,6 +105,14 @@ describe('appendStallGuidance', () => {
   it('appends headless guidance when stderr mentions permissions', () => {
     const result = { exitCode: 1, stdout: '', stderr: 'Permission to use Bash denied' };
     expect(appendStallGuidance(result).stderr).toContain(PERMISSION_STALL_GUIDANCE);
+  });
+
+  it('points at a skill and a section that exist', () => {
+    const match = PERMISSION_STALL_GUIDANCE.match(/see "([^"]+)" in the (\S+) skill/);
+    expect(match).not.toBeNull();
+    const [, section, skill] = match;
+    const skillMd = fs.readFileSync(path.join(SKILLS_DIR, skill, 'SKILL.md'), 'utf-8');
+    expect(skillMd.split('\n')).toContain(`## ${section}`);
   });
 
   it('leaves unrelated failures untouched', () => {
