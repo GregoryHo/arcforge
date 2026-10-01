@@ -1,6 +1,6 @@
 # learning — spec
 
-> Status: shipped v6.1.2 · extended by 6.2.0 (next) · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.1.2 · extended by 6.2.0 (building) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -61,7 +61,29 @@ was recorded about them.
 - **B-4 Injection is bounded and reversible.** Only activated instincts are
   injected, at SessionStart, capped at the top five by confidence. Disabling
   learning stops accumulation but MUST NOT silently undo what the user
-  accepted — retiring an instinct is its own explicit deactivation.
+  accepted — retiring an instinct is its own explicit deactivation (B-12).
+- **B-12 Deactivation is a command, not only a dashboard button.**
+  `learn instinct deactivate <id>` takes an activated instinct of the project
+  it is run in out of the injected set. It dispatches the same canonical
+  `deactivate` transition as the dashboard's Deactivate, so it passes the same
+  matrix, and its result — done or refused — lands in the audit log naming the
+  instinct, the candidate it came from and who asked (B-5). Like
+  `learn activate`, the typed command is the deliberate act: it prints that
+  future sessions will no longer receive the instinct and carries its own
+  acknowledgement. The active file moves to the deactivation archive rather
+  than being deleted, so the candidate can be materialized or activated again
+  from `deactivated`. An id that names no activated instinct of this project is
+  refused with nothing moved (D-020).
+- **B-13 A saved instinct is a note, not a behavior change.** An instinct
+  written by `learn instinct save` — by hand, or from reflection with
+  `--source reflection` — creates no candidate, so it never enters the
+  activation set: it is not activatable and it is never injected (B-3, B-4).
+  The product says so wherever a user would assume otherwise: the save
+  command's output states that the instinct will not reach future sessions,
+  and the `learning` skill's "remember this" wording says the same before it
+  saves, so no one is left believing a rule they stated will take effect.
+  Cost accepted: a rule the user states outright does not reach a future
+  session through this path (D-038).
 
 ### Integrity
 - **B-5 One queue, one gate, one audit trail.** Every candidate lives in one
@@ -134,12 +156,56 @@ was recorded about them.
   Hand-editing state stays out of contract (B-5), so this is the only
   supported route back; like every change to what may be
   injected, it is audited (D-040).
+- **B-14 A candidate name is checked at the door, once.** Layer 5 ingestion
+  rejects a candidate whose `name` the draft writer could not use as a
+  filename, or that the redactor would alter, and records the rejection with
+  its reason in `rejections.jsonl` like any other declined proposal. The check
+  is the draft writer's own path policy plus the redactor run over the name, so
+  a candidate the queue accepts is never refused `path_policy_rejected` at
+  materialization, and every stored name is one the product can show as it is
+  — in a card, a draft filename, a draft body and an activated instinct. Names
+  are never normalized at materialization: one candidate has one name.
+  Candidates queued under such a name before this check existed are not
+  rewritten; they leave `approved` through the dismiss exit of B-15 (D-035).
+- **B-15 `approved` and `materialized` are not dead ends.** Besides the
+  transitions of B-3, the Action × Status matrix lets an `approved` candidate be dismissed —
+  retiring a verdict that cannot proceed, such as a non-instinct artifact type
+  or a name from before B-14 — and a `materialized` candidate be materialized
+  again, which rewrites its draft from the stored record so the reviewed
+  content and the file agree after a hand edit or a deletion. Both exits are
+  offered on the dashboard and on the CLI (`learn reject`, the CLI's name for
+  dismiss, and `learn materialize`), pass the same gate and land in the same
+  audit log (B-5). `dismissed` and `superseded` stay terminal, as the Layer-5
+  contract defines them. The frozen Layer-5 contract carries both new cells in
+  its canonical matrix, and its version is bumped with them, so a reader can
+  tell this matrix from the one before (D-036).
+- **B-16 A transition is checked and recorded under one lock.** The legality
+  check a transition passes reads the candidate's current state inside the
+  same store lock that appends the transition — on the dashboard, on the CLI,
+  and on the contradict path that deactivates. Two writers acting on one
+  candidate at once are serialized: the second sees the first's result and is
+  refused if its move is no longer legal, so replaying the queue never yields
+  an order the matrix forbids (#178, D-020).
+- **B-17 Declined proposals are kept, and shown.** `rejections.jsonl` rotates
+  to an archive file once it passes any of the Layer-5 contract's retention
+  limits — 30 days, 5,000 records or 10 MB, whichever comes first. Rotation
+  moves records and never deletes one, so the record of what the curator
+  declined and why survives. The dashboard shows the rejections, each with its
+  reason, through the same sanitized view it serves for a card — never a raw
+  proposal body — and no rejection is ever read back as learning evidence
+  (D-041). Residual: the archive itself is unbounded, and `queue.jsonl`
+  rotation stays deferred.
 - **B-7 One session, one record.** When a diary draft exists, it *is* the
   entry — finalizing renames the draft rather than merging, and writing a
   second diary alongside a draft would orphan one of them. The `/learning`
   skill owns knowing when a session is worth recording at all.
-- **B-8 Reflection does not overclaim.** Under three diaries the scan reports
-  not-ready rather than generalizing from noise. Findings are split into
+- **B-8 Reflection does not overclaim.** Only an enriched diary counts: a
+  diary whose sections still carry the draft's unfilled `TO BE ENRICHED`
+  placeholders — a stub written with learning off, or one whose enrichment
+  never ran — counts toward neither the three-diary threshold nor the
+  readiness the scan and the reflection nudge report (D-042). Under three
+  enriched diaries the scan reports not-ready rather than generalizing from
+  noise. Findings are split into
   **patterns** (three or more diaries agree) and **observations** (one or two,
   labelled as such), every finding cites the diaries it came from, and
   processed diaries are marked so the same ground is not re-mined.
@@ -180,6 +246,14 @@ was recorded about them.
   never a raw proposal body. A `--global` read would have printed the canonical
   queue's records as they sit on disk; a global transition would have flipped
   behavior-changing state for every project at once. Both are refused.
+- **B-18 A project is its directory's name.** Observations, instincts,
+  candidates and the project-root record are all keyed on the sanitized
+  basename of the project directory — the name `--project` matches and each
+  card prints. Residual: two project directories with the same name share one
+  observation store, one instincts tree and one candidate set, and nothing in
+  the product tells them apart, `learn --project` included; the learning guide
+  states the collision where it explains scope. Separating them is a keyspace
+  redesign that migrates every user's learning data, not a filter (D-037).
 
 ## Data / domain model
 
@@ -251,16 +325,16 @@ data contracts live in `docs/decisions/learning-curator-schema/`.
 - **D-023** — the curator is a second outbound path — tool-less,
   under the opt-in, and named in B-9 (B-1, B-9).
 - **D-020** — 6.2.0 carries the new instinct commands and every change that
-  moves learning state on disk.
-- **D-035** — *proposed*: a candidate name Layer 7 cannot use is rejected at
-  ingestion (B-5).
-- **D-036** — *proposed*: `approved` may be dismissed and `materialized` may be
-  materialized again (B-3, B-5).
-- **D-037** — *proposed*: the keyspace stays the project directory's basename,
-  collision recorded as a Residual (B-5, B-9).
-- **D-038** — *proposed*: manually saved instincts are not activatable, and the
-  product says so (B-3, B-4).
+  moves learning state on disk (B-12, B-16).
+- **D-035** — a candidate name Layer 7 cannot use is rejected at ingestion
+  (B-5, B-14).
+- **D-036** — `approved` may be dismissed and `materialized` may be
+  materialized again (B-3, B-5, B-15).
+- **D-037** — the keyspace stays the project directory's basename, collision
+  recorded as a Residual (B-5, B-9, B-18).
+- **D-038** — manually saved instincts are not activatable, and the product
+  says so (B-3, B-4, B-13).
 - **D-040** — `learn instinct restore` brings back a decay-archived instinct,
   audited (B-5, B-11).
-- **D-041** — *proposed*: rejections rotate to an archive, never deleted (B-5).
-- **D-042** — *proposed*: reflection counts only enriched diaries (B-8).
+- **D-041** — rejections rotate to an archive, never deleted (B-5, B-17).
+- **D-042** — reflection counts only enriched diaries (B-8).
