@@ -32,9 +32,11 @@ crash, a compaction, or a closed laptop could lose.
   hash comes from the project's absolute path so same-named projects never
   collide. Paths are derived by the engine and reported by `worktree list`;
   nothing else constructs them by hand. The project they derive from is the
-  repository root as `git rev-parse --show-toplevel` reports it, never the
-  directory the command was run in, so a worktree added from a subdirectory
-  is found, listed and removed from the root or any other subdirectory alike.
+  primary repository — the parent of `git rev-parse --git-common-dir`, the
+  identity every linked worktree of a repo shares — never the directory the
+  command was run in nor the checkout it was run from, so a worktree added
+  from a subdirectory or from another worktree is found, listed and removed
+  from the root or anywhere else alike.
   A worktree created under the older working-directory derivation stays
   findable: lookup also checks the path that derivation produced, so an
   upgrade never strands a checkout the user already has (#202, D-020).

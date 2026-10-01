@@ -1,14 +1,76 @@
 const crypto = require('node:crypto');
+const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 
 const {
   getWorktreeRoot,
   hashRepoPath,
   getWorktreePath,
+  getWorktreeLookupPaths,
   parseWorktreePath,
   getEpicBranchName,
+  resolveProjectRoot,
 } = require('../../scripts/lib/worktree-paths');
+
+describe('resolveProjectRoot', () => {
+  let tmp;
+
+  beforeEach(() => {
+    tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'wtp-root-')));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it('returns the git top level when called from a subdirectory', () => {
+    execFileSync('git', ['init', '-q'], { cwd: tmp });
+    const sub = path.join(tmp, 'a', 'b');
+    fs.mkdirSync(sub, { recursive: true });
+    expect(resolveProjectRoot(sub)).toEqual({ root: tmp, fallbackReason: null });
+  });
+
+  it('returns the primary checkout from inside a linked worktree', () => {
+    const repo = path.join(tmp, 'repo');
+    fs.mkdirSync(repo);
+    const git = (args, cwd) => execFileSync('git', args, { cwd, stdio: 'pipe' });
+    git(['init', '-q'], repo);
+    git(
+      ['-c', 'user.email=t@e.com', '-c', 'user.name=T', 'commit', '-q', '--allow-empty', '-m', 'i'],
+      repo,
+    );
+    const linked = path.join(tmp, 'linked');
+    git(['worktree', 'add', '-q', '-b', 'linked', linked], repo);
+    const sub = path.join(linked, 'deep');
+    fs.mkdirSync(sub);
+    expect(resolveProjectRoot(linked)).toEqual(resolveProjectRoot(repo));
+    expect(resolveProjectRoot(sub).root).toBe(repo);
+  });
+
+  it('falls back to the directory itself outside a git repo, with the reason', () => {
+    const result = resolveProjectRoot(tmp);
+    expect(result.root).toBe(tmp);
+    expect(result.fallbackReason).toMatch(/git rev-parse --git-common-dir/);
+  });
+});
+
+describe('getWorktreeLookupPaths', () => {
+  it('lists the root-derived path first, then the old cwd-derived path', () => {
+    const paths = getWorktreeLookupPaths('/repo', '/repo/packages/api', null, 'x');
+    expect(paths).toEqual([
+      getWorktreePath('/repo', null, 'x'),
+      getWorktreePath('/repo/packages/api', null, 'x'),
+    ]);
+  });
+
+  it('returns one path when the command ran at the root', () => {
+    expect(getWorktreeLookupPaths('/repo', '/repo/', null, 'x')).toEqual([
+      getWorktreePath('/repo', null, 'x'),
+    ]);
+  });
+});
 
 describe('getWorktreeRoot', () => {
   it('returns ~/.arcforge/worktrees', () => {
