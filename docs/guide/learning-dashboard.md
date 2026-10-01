@@ -26,7 +26,15 @@ arcforge learn enable --project
 ```
 
 `--project` scopes learning to the repository you are in; `--global` applies it
-everywhere. Check what is on at any time:
+everywhere.
+
+A project is known by its directory's name, not its full path. Two
+repositories in directories with the same name — `~/work/api` and `~/oss/api`,
+say — share one observation store, one set of instincts and one candidate list,
+and nothing in arcforge tells them apart, `learn --project` included. Keep that
+in mind before turning learning on in both.
+
+Check what is on at any time:
 
 ```bash
 arcforge learn status --json
