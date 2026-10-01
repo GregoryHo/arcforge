@@ -149,6 +149,18 @@ describe('loop-state', () => {
       expect(loadLoopState(tmpDir).status).toBe('max_runs');
     });
 
+    it.each(['complete', 'failed', 'blocked', 'cost_limit', 'stalled', 'retry_storm'])(
+      'keeps an already-decided %s status when iteration reaches maxRuns',
+      (status) => {
+        const state = loadLoopState(tmpDir);
+        state.iteration = 50;
+        state.status = status;
+        finalizeLoop(state, 50, tmpDir);
+        expect(state.status).toBe(status);
+        expect(loadLoopState(tmpDir).status).toBe(status);
+      },
+    );
+
     it('queues a loop-finished action with status/completed_count/blocked/cost', () => {
       const state = loadLoopState(tmpDir);
       state.status = 'complete';

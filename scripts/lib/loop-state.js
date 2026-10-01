@@ -204,13 +204,16 @@ function queueLoopNotifications(state, projectRoot) {
 }
 
 /**
- * Finalize loop state: stamp terminal status and persist.
+ * Finalize loop state: stamp terminal status and persist. `max_runs` is only
+ * the fallback for a run the iteration ceiling ended — a status the loop
+ * already decided (complete, failed, cost_limit, ...) is never overwritten,
+ * even when that decision came on the last allowed iteration.
  * @param {Object} state - Loop state
  * @param {number} maxRuns - Maximum iterations configured for the run
  * @param {string} projectRoot - Project root directory
  */
 function finalizeLoop(state, maxRuns, projectRoot) {
-  if (state.iteration >= maxRuns) {
+  if (state.status === 'running' && state.iteration >= maxRuns) {
     state.status = 'max_runs';
   }
   state.finished_at = getTimestamp();
