@@ -44,6 +44,7 @@
     "check:hooks": "node scripts/check-hooks-schema.js",
     "check:eval-targets": "node scripts/check-eval-targets.js",
     "check:product": "node scripts/check-product.js",
+    "check:file-size": "node scripts/check-file-size.js",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",

@@ -10,8 +10,12 @@
 ## File Size
 
 - Soft limit: 400 lines
-- Hard limit: 700 lines
-- Several engine files in `scripts/lib/` currently exceed the hard limit and are tracked for decomposition — don't treat them as license to grow new files past 700
+- Hard limit: 700 lines, enforced by `npm run check:file-size` over every `.js`
+  file in `scripts/`, `hooks/`, and `tests/`
+- The files that already exceeded it are allowlisted in `scripts/check-file-size.js`
+  at their exact line count — a file may shrink, never grow, and its recorded
+  count moves down with it (the check fails until you lower it to the new count);
+  an entry is removed once its file is back under 700. Don't treat them as license to grow new files past 700
 - Extract utilities when a file exceeds 400 lines
 
 ## Function Size

@@ -14,7 +14,7 @@ chore. The working rules:
   the promise deliberately, fix the engine; if the doc was wrong, fix the doc
   and say so in the commit message. Never silently pick whichever is cheaper.
 - Sync is mechanical wherever possible, prose only where it can't be:
-  `check:docs` (paths/commands/flags/skills in every scanned doc resolve
+  `check:docs` (paths/commands/subcommands/flags/skills in every scanned doc resolve
   against the engine), `check:versions`, `check:cli-consumers`, the router
   bijection, and the CLI manifest (`scripts/lib/cli-manifest.js` — docs and
   linters read it; a second hardcoded copy is forbidden).

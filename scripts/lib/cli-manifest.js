@@ -30,6 +30,11 @@
  * Pinning a shape MUST NOT require changing cli.js output — that belongs to a
  * capability package, not this contract.
  *
+ * `subcommands` names every subcommand the command dispatches (and, for the
+ * `learn` workflow groups, every action under one) — check:docs rejects a doc
+ * that names any other, and Layer 4 of the contract test pins the names to
+ * the live dispatchers in both directions.
+ *
  * Skeleton conventions for the `output` value (matching the comparator in
  * the contract test):
  *   - an object literal describes an object's keys
@@ -40,6 +45,16 @@
  *   - `null` as a leaf value pins only the key's presence, not a sub-shape
  *     (the live value may legitimately be null or a scalar)
  */
+
+/**
+ * Subcommands that carry no flags or output of their own — their flags are
+ * declared on the command, because the handler reads them there.
+ * @param {...string} list
+ * @returns {Object<string, {}>}
+ */
+function names(...list) {
+  return Object.fromEntries(list.map((name) => [name, {}]));
+}
 
 const CLI_MANIFEST = {
   // Spawns claude sessions — no JSON contract.
@@ -92,6 +107,18 @@ const CLI_MANIFEST = {
       '--interleave',
       '--json',
     ],
+    subcommands: names(
+      'list',
+      'run',
+      'preflight',
+      'lint',
+      'ab',
+      'compare',
+      'report',
+      'history',
+      'audit',
+      'dashboard',
+    ),
     output: null,
   },
 
@@ -127,6 +154,29 @@ const CLI_MANIFEST = {
       '--query',
       '--instinct-ids',
     ],
+    subcommands: {
+      ...names(
+        'status',
+        'enable',
+        'disable',
+        'analyze',
+        'inbox',
+        'review',
+        'drafts',
+        'inspect',
+        'approve',
+        'reject',
+        'accept',
+        'materialize',
+        'activate',
+        'dashboard',
+      ),
+      // The workflow subgroups take an action as their second positional.
+      diary: { subcommands: names('path', 'save', 'finalize') },
+      reflect: { subcommands: names('scan', 'record') },
+      instinct: { subcommands: names('status', 'check', 'save', 'confirm', 'contradict') },
+      recall: { subcommands: names('record') },
+    },
     output: null,
   },
 
@@ -142,6 +192,7 @@ const CLI_MANIFEST = {
       '--qmd-collection',
       '--json',
     ],
+    subcommands: names('register', 'unregister', 'set-default', 'list-vaults'),
     output: null,
   },
 };

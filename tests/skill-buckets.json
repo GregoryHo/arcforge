@@ -1,0 +1,5 @@
+{
+  "_comment": "Skill lifecycle buckets: skills live at skills/<bucket>/<name>/. Only `shipped` loads (the one bucket .claude-plugin/plugin.json whitelists); the others are on-disk holding areas a doc or guard may still name. tests/scripts/skill-tree.js (jest), scripts/check-doc-refs.js (check:docs) and tests/skills/test_skill_structure.py (pytest) all read THIS file; a second copy of the list is forbidden and tests/scripts/skill-tree.test.js fails on one. Adding a bucket is a one-line edit here.",
+  "shipped": "core",
+  "buckets": ["core", "in-progress", "deprecated"]
+}

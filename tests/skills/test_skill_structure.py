@@ -20,10 +20,13 @@ import pytest
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-# Shipped skills live in the `core` lifecycle bucket — the one bucket
-# `.claude-plugin/plugin.json` whitelists. `in-progress/` and `deprecated/` are
-# on-disk holding areas that never load, so this schema does not govern them.
-SKILLS_DIR = PROJECT_ROOT / "skills" / "core"
+# The lifecycle buckets come from tests/skill-buckets.json, the single source
+# tests/scripts/skill-tree.js (jest) reads too. Shipped skills live in the
+# `shipped` bucket — the one `.claude-plugin/plugin.json` whitelists. The others
+# are on-disk holding areas that never load, so this schema does not govern them.
+_SKILL_BUCKET_MANIFEST = json.loads((PROJECT_ROOT / "tests" / "skill-buckets.json").read_text())
+SKILL_BUCKETS = tuple(_SKILL_BUCKET_MANIFEST["buckets"])
+SKILLS_DIR = PROJECT_ROOT / "skills" / _SKILL_BUCKET_MANIFEST["shipped"]
 ROUTER_MANIFEST = PROJECT_ROOT / "tests" / "router-skill.json"
 
 # Line budget: soft cap warns, hard cap fails.
@@ -74,10 +77,10 @@ _SLASH_INVOCATION_PATTERN = re.compile(
     r"(?<![\w./$<-])/(?:arcforge:)?([a-z][a-z0-9]*(?:-[a-z0-9]+)*)(?![\w/-])(?!\.\w)"
 )
 
-# Router index (schema §3.1 exemption). The router skill carries a `## Skill Map`
+# Router index (schema Rule 2.1 index exemption). The router skill carries a `## Skill Map`
 # table listing every shipped skill. Those rows are an INDEX, not invocations: the
 # table answers "which skills exist and when does each apply", and the execution
-# semantics still require the user to type `/name`. Without this carve-out §3.1
+# semantics still require the user to type `/name`. Without this carve-out Rule 2.1
 # ("a user-invoked skill is never prose-invoked") and the router bijection ("every
 # shipped skill has exactly one row") are mutually exclusive — `writing-skills` is
 # user-invoked, so a row violates one rule and no row violates the other.
@@ -85,7 +88,7 @@ _SLASH_INVOCATION_PATTERN = re.compile(
 # The exemption is scoped as narrowly as it can be: ONLY the leading `/name` cell
 # of a table row inside the Skill Map section. Any other slash token — elsewhere in
 # the router, later cells of a Skill Map row, or any other skill's prose — is a
-# normal INVOCATION and gets the full §3.1 check.
+# normal INVOCATION and gets the full Rule 2.1 check.
 #
 # Router identity is NOT spelled out here. `tests/router-skill.json` is the single
 # source this file and tests/scripts/router-contract.test.js (jest) both read —
@@ -107,7 +110,7 @@ SKILL_MAP_HEADING = _ROUTER_MANIFEST_DATA["skill_map_heading"]
 # The leading cell of a Skill Map row: `| /finishing | ... |` (backticks optional).
 _ROUTER_ROW_PATTERN = re.compile(r"^\|\s*`?/([a-z0-9][a-z0-9-]*)`?\s*\|")
 
-# Cross-skill deep links (schema §5.2): a path reaching into ANOTHER skill's
+# Cross-skill deep links (schema §4.2): a path reaching into ANOTHER skill's
 # directory. Wanting another skill's files means wanting that skill, so the only
 # sanctioned pointer is a `/name` invocation. Matches both spellings the schema
 # names — `skills/<bucket>/<other>/...` and `../<other>/...` — and resolves the
@@ -115,7 +118,9 @@ _ROUTER_ROW_PATTERN = re.compile(r"^\|\s*`?/([a-z0-9][a-z0-9-]*)`?\s*\|")
 # boundary crossing. The bucket segment is optional so a bucket-less
 # `skills/<other>/` spelling is still caught rather than silently ignored.
 _DEEP_LINK_PATTERN = re.compile(
-    r"(?:\.\./|skills/(?:core/|in-progress/|deprecated/)?)([a-z][a-z0-9-]*)/"
+    r"(?:\.\./|skills/(?:"
+    + "|".join(re.escape(f"{bucket}/") for bucket in SKILL_BUCKETS)
+    + r")?)([a-z][a-z0-9-]*)/"
 )
 
 # Claude Code builtin slash commands. Skill prose legitimately names these
@@ -200,7 +205,7 @@ def _markdown_files(skill_dir: Path) -> list[Path]:
 
 
 def _deep_link_violations(text: str, self_name: str) -> list[str]:
-    """Paths reaching into another shipped skill's directory (schema §5.2)."""
+    """Paths reaching into another shipped skill's directory (schema §4.2)."""
     return sorted(
         {
             match.group(0)
@@ -275,7 +280,7 @@ def _is_dmi(data: dict) -> bool:
 
 
 def _invokes_user_invoked(ref_type: str, target_frontmatter: dict) -> bool:
-    """True when a cross-reference calls a user-invoked skill (schema §3.1 violation).
+    """True when a cross-reference calls a user-invoked skill (schema Rule 2.1 violation).
 
     ROUTER_INDEX rows are indexing, not calling, so they never violate.
     """
@@ -321,7 +326,7 @@ def test_has_section_and_body(skill_dir):
 def test_referenced_supporting_files_exist(skill_dir):
     """Every references/scripts/templates/agents pointer resolves inside the skill.
 
-    A skill is a closed unit (schema §5.3), so a pointer is checked against the
+    A skill is a closed unit (schema §4.3), so a pointer is checked against the
     skill directory and nowhere else. One that only resolves at the repo root is
     reaching outside itself, which is exactly the violation this catches.
     """
@@ -338,7 +343,7 @@ def test_referenced_supporting_files_exist(skill_dir):
 
 @pytest.mark.parametrize("skill_dir", SKILL_DIRS, ids=lambda d: d.name)
 def test_no_cross_skill_deep_links(skill_dir):
-    """No markdown in a skill links into another skill's directory (schema §5.2).
+    """No markdown in a skill links into another skill's directory (schema §4.2).
 
     Scans every markdown file under the skill, not just SKILL.md: a deep link is
     most likely to appear in a `references/*.md`, so a SKILL.md-only guard would
@@ -393,7 +398,7 @@ def test_cross_reference_resolves(source, ref_type, target):
     ids=[f"{s}->{t}" for s, _, t in CROSS_REFS],
 )
 def test_user_invoked_skills_are_not_prose_invoked(source, ref_type, target):
-    """A user-invoked skill is an explicit-intent entry point (schema §3.1).
+    """A user-invoked skill is an explicit-intent entry point (schema Rule 2.1).
 
     Another skill's prose calling `/name` on it routes around the gate the flag
     exists to create. The router's Skill Map is exempt (ROUTER_INDEX): that table
@@ -577,7 +582,7 @@ def _router_doc(rows: list[str], tail: str = "") -> str:
 
 
 def test_router_index_rows_are_not_invocations():
-    """A Skill Map row indexes a skill; it does not invoke it (schema §3.1 exemption)."""
+    """A Skill Map row indexes a skill; it does not invoke it (schema Rule 2.1 index exemption)."""
     doc = _router_doc(["| `/writing-skills` | authoring a skill (user-invoked) |"])
     assert _classify_slash_targets(ROUTER_SKILL, doc) == [
         (ROUTER_SKILL, "ROUTER_INDEX", "writing-skills")
@@ -609,7 +614,7 @@ def test_router_exemption_does_not_leak_to_other_skills():
 
 
 def test_invokes_user_invoked_discriminates():
-    """§3.1 fires on an invocation of a user-invoked target and nothing else."""
+    """Rule 2.1 fires on an invocation of a user-invoked target and nothing else."""
     user_invoked = {"name": "writing-skills", "disable-model-invocation": True}
     model_invoked = {"name": "tdd"}
     assert _invokes_user_invoked("INVOCATION", user_invoked) is True
@@ -620,7 +625,7 @@ def test_invokes_user_invoked_discriminates():
 
 
 def test_deep_link_violations_flag_other_skill_paths():
-    """Both spellings the schema names are caught, by skill name (schema §5.2)."""
+    """Both spellings the schema names are caught, by skill name (schema §4.2)."""
     text = "Read skills/tdd/references/examples.md and ../finishing/SKILL.md."
     assert _deep_link_violations(text, "writing-skills") == ["../finishing/", "skills/tdd/"]
 
@@ -631,6 +636,13 @@ def test_deep_link_violations_see_through_the_bucket_segment():
     assert _deep_link_violations(text, "writing-skills") == ["skills/core/tdd/"]
     # ...and a pointer at the skill's OWN dir is still not a boundary crossing.
     assert _deep_link_violations(text, "tdd") == []
+
+
+def test_deep_link_violations_see_through_every_bucket():
+    """Every bucket in tests/skill-buckets.json is seen through, not just `core`."""
+    for bucket in SKILL_BUCKETS:
+        text = f"Read skills/{bucket}/tdd/references/examples.md."
+        assert _deep_link_violations(text, "writing-skills") == [f"skills/{bucket}/tdd/"]
 
 
 def test_deep_link_violations_allow_self_and_local_paths():

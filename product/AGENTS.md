@@ -339,7 +339,7 @@ does not add ceremony.
    way, so the no-op passes and a half-done flip does not (the `Tag` stays `—`
    throughout).
 2. Branch from `main`. Build the spec's **Behavior** items test-first — a failing
-   test per `B-id` → make it pass → refactor. Keep the 5 runners and the 6 static
+   test per `B-id` → make it pass → refactor. Keep the 5 runners and the 7 static
    checks green.
 3. **Keep the spec in sync as you build.** If reality diverges from a `B-` item,
    update the spec in the same PR and record the *why* as a decision. The merged

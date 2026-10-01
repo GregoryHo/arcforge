@@ -48,7 +48,11 @@ const SCAN_DIRS = ['skills', 'docs/guide'];
 // Commands intentionally exempt from the zero-consumer check. Mirrors the
 // `doc-ref-lint: ignore` precedent. Shipped EMPTY — add an entry only with a
 // documented reason (a command that legitimately has no prose consumer).
-const ALLOWLIST = new Set([]);
+const ALLOWLIST = new Set([
+  // Deprecated: the statistical analyzer was retired; the command only prints
+  // a pointer to `learn dashboard`, so no doc or skill should call it.
+  'learn analyze',
+]);
 
 // Flipped to true at v4.0.1: the SDD-6 migration wired sdd-gate's consumers
 // so a zero-consumer command now fails the check.

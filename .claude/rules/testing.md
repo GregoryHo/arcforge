@@ -23,16 +23,17 @@ no `cd hooks && npm install`, and no second lockfile. `test:hooks` runs
 `node --test hooks/__tests__/*.test.js` from the repo root; hook tests resolve
 paths from `__dirname`, so they must stay cwd-independent.
 
-## Static Checks (all 6 run in CI)
+## Static Checks (all 7 run in CI)
 
 | Command | Guards |
 |---|---|
 | `npm run check:versions` | Version string sync across the locations in `scripts/check-version-sync.js` |
-| `npm run check:docs` | Shipped docs don't reference paths/flags the engine doesn't provide |
+| `npm run check:docs` | Scanned docs don't reference paths, commands, subcommands, flags, scenario ids, or npm scripts that don't exist |
 | `npm run check:cli-consumers` | CLI callers match the CLI surface |
 | `npm run check:hooks` | `hooks/claude-code.json` schema + the manifests’ `hooks` declarations |
 | `npm run check:eval-targets` | Eval scenarios don't target things that no longer exist |
 | `npm run check:product` | `product/` stays internally consistent: one `← we are here`, a gap-free Decision Log, every supersession flipped, spec headers matching their governing roadmap row, `Tag` cells matching their row status |
+| `npm run check:file-size` | No `.js` file under `scripts/`, `hooks/`, `tests/` exceeds the 700-line hard limit; the allowlisted files in `scripts/check-file-size.js` may shrink, never grow, and their recorded counts move down with them |
 
 ## Contract Lints
 

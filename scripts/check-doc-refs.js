@@ -24,10 +24,29 @@ const { lintDoc } = require('./lib/doc-refs');
 
 const repoRoot = path.resolve(__dirname, '..');
 
+// The lifecycle buckets, read as data from their single source (the jest and
+// pytest guards read the same file).
+const { buckets: SKILL_BUCKETS } = JSON.parse(
+  fs.readFileSync(path.join(repoRoot, 'tests', 'skill-buckets.json'), 'utf8'),
+);
+
 // Shipped doc surface to lint. Markdown only — code files are checked by their
 // own contract tests, not prose linting.
-const SCAN_DIRS = ['skills', 'docs/guide', 'hooks', 'product'];
-const SCAN_ROOT_FILES = ['README.md', 'CONTRIBUTING.md', 'CLAUDE.md', 'docs/README.md'];
+// The contributor surfaces that quote commands and paths — the releasing skill
+// and the contributor agents — are scanned too: they don't ship, but a renamed
+// command in a release checklist fails just as quietly.
+const SCAN_DIRS = ['skills', 'docs/guide', 'hooks', 'product', '.claude/agents'];
+const SCAN_ROOT_FILES = [
+  'README.md',
+  'CONTRIBUTING.md',
+  'CLAUDE.md',
+  'docs/README.md',
+  '.claude/skills/releasing/SKILL.md',
+  // The website's page copy (the .jsx source; the compiled .js beside it is
+  // generated). A made-up scenario id or subcommand shipped there once (P8).
+  'website/page/sections.jsx',
+  'website/page/hero.jsx',
+];
 
 /** Recursively collect *.md files under a directory (skips node_modules). */
 function collectMarkdown(dir, acc) {
@@ -55,13 +74,11 @@ function pathExists(relPath, docDir) {
   return false;
 }
 
-// Lifecycle buckets a skill dir can sit in (P6.5). Only `core` ships, but a doc
-// may legitimately name a skill parked elsewhere, so all three resolve.
-const SKILL_BUCKETS = ['core', 'in-progress', 'deprecated'];
-
 /**
- * Existence probe for a backticked arc-<name> reference. Resolves against all
- * three component trees a doc may legitimately name: a skill dir, a hook dir,
+ * Existence probe for a backticked arc-<name> reference. A skill dir resolves
+ * in every lifecycle bucket (SKILL_BUCKETS, from tests/skill-buckets.json —
+ * only one ships, but a doc may name a skill parked in another). Resolves
+ * against all three component trees a doc may legitimately name: a skill dir, a hook dir,
  * or an agent file — a referenced component need not live under skills/.
  */
 function skillExists(name) {
@@ -71,6 +88,12 @@ function skillExists(name) {
     fs.existsSync(path.join(repoRoot, 'agents', `${name}.md`))
   );
 }
+
+const NPM_SCRIPTS = new Set(
+  Object.keys(JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).scripts),
+);
+const npmScriptExists = (name) => NPM_SCRIPTS.has(name);
+const scenarioExists = (id) => fs.existsSync(path.join(repoRoot, 'evals', 'scenarios', `${id}.md`));
 
 function gatherFiles() {
   const files = [];
@@ -92,7 +115,12 @@ function main() {
   for (const abs of files) {
     const rel = path.relative(repoRoot, abs);
     const content = fs.readFileSync(abs, 'utf8');
-    const { findings, stats } = lintDoc(rel, content, { pathExists, skillExists });
+    const { findings, stats } = lintDoc(rel, content, {
+      pathExists,
+      skillExists,
+      npmScriptExists,
+      scenarioExists,
+    });
     allFindings.push(...findings);
     r4Probed += stats.r4.total;
   }
@@ -130,4 +158,6 @@ function main() {
   process.exit(0);
 }
 
-main();
+if (require.main === module) main();
+
+module.exports = { gatherFiles };

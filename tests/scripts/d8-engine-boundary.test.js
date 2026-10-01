@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { REPO_ROOT } = require('./skill-tree');
+const { REPO_ROOT, SKILL_BUCKETS } = require('./skill-tree');
 
 // ---------------------------------------------------------------------------
 // D8 — engine/skill boundary lint (v6).
@@ -56,7 +56,7 @@ const CODE_EXTS = new Set(['.js', '.mjs', '.cjs', '.sh', '.json']);
 // generic tree access — the same category as bare `skills/` — while naming a
 // skill INSIDE one is the coupling D8 forbids. Both shapes below therefore
 // capture an optional second segment and resolve through `resolvedSkill()`.
-const BUCKETS = new Set(['core', 'in-progress', 'deprecated']);
+const BUCKETS = new Set(SKILL_BUCKETS);
 
 // `skills/<name>` / `skills/<bucket>/<name>` as a path string. The first
 // lookbehind stops `inject-skills/` from reading as `skills/`; the second
