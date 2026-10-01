@@ -49,8 +49,8 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 - **bound-transcript-parse** — `parseTranscript` reads and splits the whole
   session transcript on every above-threshold Stop and PreCompact even though
   every output it returns is a capped tail (about 5 ms per MB on real transcripts);
-  bound the read, and correct the hooks spec's B-7 cost enumeration, which already
-  omits this parse and the diary subprocess · issue: [#172](https://github.com/GregoryHo/arcforge/issues/172).
+  bound the read. The hooks spec's B-7 now names this parse and the diary
+  subprocess as costs (6.1.2), so what is left is the bound itself · issue: [#172](https://github.com/GregoryHo/arcforge/issues/172).
 - ~~**stale-probe-window-vs-rendered-paths**~~ — graduated into 6.1.2 (D-019).
 - ~~**dashboard-activation-ack**~~ — graduated into 6.1.1 (D-018).
 - ~~**cli-draft-path-redaction**~~ — graduated into 6.2.0 (D-035).

@@ -115,9 +115,15 @@ down, never block the user, and never observe them uninvited.
 ### Performance
 - **B-7 The synchronous path stays small.** Observation writes and
   session-record construction are registered async so disk I/O never joins the
-  path a tool call waits on. What remains synchronous is bounded: a scan of
-  text about to be written, a counter increment, one context injection at
-  session start.
+  path a tool call waits on. What remains synchronous on every event is
+  bounded: a scan of text about to be written, a counter increment, one context
+  injection at session start. Above the diary threshold — 10 user messages or
+  50 tool calls since the last draft — Stop and PreCompact add two costs on top:
+  a parse of the whole session transcript, and the subprocess that renders the
+  diary draft, which is killed after 5 s. The transcript parse is not bounded:
+  it reads and decodes every line of the transcript, however long the session
+  has run, although what it keeps is a capped tail — about 5 ms per MB on real
+  transcripts.
 
 ### Continuity
 - **B-8 The session leaves a record.** Session tracking maintains a durable
