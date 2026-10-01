@@ -36,6 +36,20 @@ docs/description
    not part of `npm test`; see `.claude/rules/testing.md`
 4. No secrets in diff — stop and remove before committing
 
+## Claude GitHub Workflows
+
+Both spend the maintainer's Claude subscription (`CLAUDE_CODE_OAUTH_TOKEN`),
+which is the same usage the eval measurements need — treat a run as a cost.
+
+| Workflow | Fires on | Cost note |
+|---|---|---|
+| `.github/workflows/claude.yml` | an `@claude` mention in an issue, PR comment, or review | one full session per mention |
+| `.github/workflows/claude-code-review.yml` | PR `opened` / `ready_for_review`, only when shipped or measured paths change (the `paths` list in the file) | one review when the PR opens, another when a draft is marked ready; later pushes are not reviewed (D-030) |
+
+There is no draft filter: a PR opened as a draft is reviewed at open *and* again
+when marked ready. Changing either trigger is a product decision — record it
+as a `D-NNN` the way D-030 was.
+
 ## Skill PRs
 
 Document Iron Law compliance in the PR description:
