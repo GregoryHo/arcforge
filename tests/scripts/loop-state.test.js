@@ -194,6 +194,25 @@ describe('loop-state', () => {
       expect(p.blocked).toEqual([{ id: 'T-9', reason: 'failed after retries' }]);
     });
 
+    it('prints nothing from git when the project is not a git repository', () => {
+      // A subprocess, because git writes its "fatal: not a git repository"
+      // straight to the inherited stderr — a jest spy cannot see it.
+      const { spawnSync } = require('node:child_process');
+      const lib = path.join(__dirname, '..', '..', 'scripts', 'lib', 'loop-state');
+      const script = [
+        `const { loadLoopState, finalizeLoop } = require(${JSON.stringify(lib)});`,
+        'const root = process.argv[1];',
+        'const state = loadLoopState(root);',
+        "state.status = 'complete';",
+        'finalizeLoop(state, 50, root);',
+      ].join('\n');
+      const env = { ...process.env, HOME: homeDir, GIT_CEILING_DIRECTORIES: path.dirname(tmpDir) };
+      delete env.ARCFORGE_HOME;
+      const result = spawnSync('node', ['-e', script, tmpDir], { encoding: 'utf-8', env });
+      expect(result.status).toBe(0);
+      expect(result.stderr).not.toMatch(/fatal/);
+    });
+
     it('leaves the state file on disk after finalize (AF-5 resume depends on it)', () => {
       const state = loadLoopState(tmpDir);
       state.status = 'complete';

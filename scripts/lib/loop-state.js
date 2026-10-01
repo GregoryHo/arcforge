@@ -162,9 +162,12 @@ function currentRunErrors(state) {
 function resolveBaseBranch(projectRoot) {
   try {
     const { execFileSync } = require('node:child_process');
+    // stderr is discarded: outside a git repository git prints "fatal: not a
+    // git repository" to the inherited stderr, and null already says so.
     return execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
       cwd: projectRoot,
       encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
   } catch {
     return null;
