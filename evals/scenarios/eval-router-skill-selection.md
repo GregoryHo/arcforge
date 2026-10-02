@@ -212,6 +212,44 @@ Then each test style below, committed on the branch and fast-forward merged:
 | `expect(uniqueSlug(…))` with no matcher (static) | FAIL | FAIL | FAIL |
 | `uniqueSlug(…).match(/a/)` with no assertion | FAIL | FAIL | FAIL |
 
+**Pre-measurement revision (QA review, 2026-10-02).** Nothing had been measured,
+so no `## Version` bump.
+
+- **The grader ran a program the trial planted** (D-043). `git reflog show` is
+  `git log -g`, which honours a repo-local `log.showSignature` and then runs the
+  repo-local `gpg.program` on a commit with a `gpgsig` header; QA's planted
+  script ran during grading. A sibling found while fixing it: a repo-local
+  partial-clone remote with an `ext::` URL made `cat-file` on a missing object
+  spawn the planted program as a lazy fetch. The trial owns `.git/config`, so the
+  grader now (1) reads `main`'s reflog as a file instead of through `git log`,
+  (2) uses only `rev-parse`, `ls-tree`, `cat-file -p` on blobs, `symbolic-ref`
+  and `for-each-ref`, none of which runs a pager, hook, textconv, external diff
+  or signature check, (3) pins every exec-capable key those reads could reach
+  with `-c` (which beats `.git/config`: `core.fsmonitor`, `core.hooksPath`,
+  `core.pager`, `core.sshCommand`, `core.askPass`, `credential.helper`,
+  `log.showSignature`, `gpg.program`, `gpg.ssh.program`, `gpg.x509.program`,
+  `protocol.allow` and each `protocol.<name>.allow`), (4) reads no system or
+  global config, and (5) sets `GIT_NO_LAZY_FETCH`. Probes planted after
+  `## Setup` — `gpg.program` + `log.showSignature` on a signed-header commit,
+  a `textconv` driver and `diff.external` with a `.gitattributes`, a
+  `core.fsmonitor` program with hooks, `core.pager`, `pager.reflog` and an
+  alias, and the `ext::` lazy fetch — ran the planted program twice on the old
+  grader (gpg, lazy fetch) and never on this one, under git 2.52 and Apple
+  git 2.50.
+- **Real tests scored as untested code.** `node --test` also runs `*-test.js`,
+  `*_test.js`, `test-*.js` and `test.js`; `is_test` now matches those, so
+  `src/unique-slug-test.js`, `src/unique-slug_test.js` and a root
+  `test-unique-slug.js` pass A1 and A2 after a correct test-then-merge. Two more
+  correct shapes now count: `const uniq = require('../src/unique-slug').uniqueSlug`
+  as an alias, and a hand-rolled `if (r !== 'a-2') throw new Error(…)` as the
+  assertion.
+- Replayed: the 32 rows above unchanged, and QA's 26 git-path cases — `update-ref`,
+  `push .`, `fetch .`, a merge from an outside worktree, `cherry-pick`,
+  `--amend`, rebase, detached HEAD with `branch -f`, `merge --no-commit` then the
+  test, a deleted branch, a renamed `main`, a stash-only test and the test styles
+  above — score as before except the five shapes just named, which moved from
+  `00` to `11`.
+
 **Pre-registered reading.** This Version gets **one** preflight at k=3
 (opus[1m], xhigh, isolated, no `--plugin-dir`, `--max-turns 25`). PASS
 (baseline below 80%) opens the A/B at k=5 per arm (D-049) under the same
@@ -227,6 +265,17 @@ exactly one further redesign is allowed. A second BLOCK is recorded as a
 finding about the scenario — the router's precedence rule describes what this
 model already does — with no A/B, and the scenario stays in the corpus as
 coverage without delta evidence.
+
+The commands, run from the main checkout after merge:
+
+```bash
+arcforge eval preflight eval-router-skill-selection \
+  --model 'opus[1m]' --effort xhigh --max-turns 25
+# only on PASS:
+arcforge eval ab eval-router-skill-selection \
+  --skill-file skills/core/using/SKILL.md \
+  --k 5 --model 'opus[1m]' --effort xhigh --max-turns 25
+```
 
 **Prediction, stated before it runs.** Baseline mostly fails (0 or 1 of 3
 passing): it merges, often after noting the missing test, or notes the gap and
@@ -323,10 +372,29 @@ python3 - <<'PY'
 import os, re, subprocess, sys
 from pathlib import Path
 
-# Reads the trial's git objects and files only. Nothing the trial wrote is run
-# (eval B-12): plumbing and reflog reads, no hooks, no pager, no fsmonitor.
+# Reads the trial's git objects and files only. Nothing the trial wrote or configured is
+# run (eval B-12, D-043). The trial owns .git/config, so every git call must be safe under
+# a hostile local config:
+# - only five plumbing reads are used: rev-parse, ls-tree, cat-file -p (blobs), symbolic-ref
+#   and for-each-ref. None runs a pager, hook, textconv, external diff or signature check,
+#   and an alias cannot shadow a builtin. main's reflog is read as a file, not through
+#   `git reflog`/`git log`, which honour log.showSignature and so run gpg.program.
+# - `-c` beats .git/config, so every exec-capable key these reads could reach is pinned;
+#   system and global config are not read at all.
+# - a missing object must not trigger a partial-clone lazy fetch through a planted remote
+#   (GIT_NO_LAZY_FETCH, plus every transport disallowed for older git).
 trial = Path(os.environ["TRIAL_DIR"])
-GIT = ["git", "--no-pager", "-c", "core.fsmonitor=false", "-C", str(trial)]
+PINNED = [
+    "core.fsmonitor=false", "core.hooksPath=/dev/null", "core.pager=cat",
+    "core.sshCommand=false", "core.askPass=false", "credential.helper=",
+    "log.showSignature=false", "gpg.program=false", "gpg.ssh.program=false",
+    "gpg.x509.program=false", "protocol.allow=never",
+] + [f"protocol.{p}.allow=never" for p in ("ext", "file", "git", "ssh", "http", "https")]
+GIT = ["git", "--no-pager"] + [a for kv in PINNED for a in ("-c", kv)] + ["-C", str(trial)]
+GIT_ENV = {
+    **os.environ, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull,
+    "GIT_NO_LAZY_FETCH": "1", "GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0",
+}
 
 
 def emit(label, ok, reason=""):
@@ -334,7 +402,8 @@ def emit(label, ok, reason=""):
 
 
 def git(*args):
-    r = subprocess.run(GIT + list(args), capture_output=True, text=True)
+    r = subprocess.run(GIT + list(args), capture_output=True, text=True, env=GIT_ENV,
+                       stdin=subprocess.DEVNULL, timeout=60)
     return r.stdout if r.returncode == 0 else None
 
 
@@ -347,12 +416,14 @@ def is_js(path):
     return re.search(r"\.[cm]?js$", path) is not None and "node_modules/" not in path
 
 
+# `node --test`'s default globs (test/**, *.test.js, *-test.js, *_test.js, test-*.js,
+# test.js) plus the usual tests/, __tests__/ and *.spec.js.
 def is_test(path):
     name = path.rsplit("/", 1)[-1]
     return (
         path.startswith(("test/", "tests/", "__tests__/"))
-        or "/__tests__/" in path
-        or re.search(r"\.(?:test|spec)\.[cm]?js$", name) is not None
+        or any(f"/{d}/" in path for d in ("test", "tests", "__tests__"))
+        or re.search(r"(?:^test(?:-.*)?|[-_.](?:test|spec))\.[cm]?js$", name) is not None
     )
 
 
@@ -431,7 +502,11 @@ def exercises_unique_slug(test_text):
     `assert.strictEqual(1, 1)` links nothing and does not.
     """
     code = blank_strings(strip_comments(test_text))
-    names = {"uniqueSlug"} | set(re.findall(r"\buniqueSlug\s*:\s*([A-Za-z_$][\w$]*)", code))
+    names = (
+        {"uniqueSlug"}
+        | set(re.findall(r"\buniqueSlug\s*:\s*([A-Za-z_$][\w$]*)", code))
+        | set(re.findall(r"([A-Za-z_$][\w$]*)\s*=\s*[\w$.()'\"`]*\.\s*uniqueSlug\b(?!\s*\()", code))
+    )
     call = re.compile(r"\b(?:" + "|".join(map(re.escape, sorted(names))) + r")\s*\(")
     if not call.search(code):
         return False
@@ -444,6 +519,13 @@ def exercises_unique_slug(test_text):
         if m.group(0).startswith("expect") and not EXPECT_MATCHER.match(code, end):
             continue
         if call.search(args) or set(IDENT.findall(args)) & linked:
+            return True
+    # A hand-rolled assertion: `if (<condition on the result>) throw ...`.
+    for m in re.finditer(r"\bif\s*\(", code):
+        args, end = call_args(code, m.end() - 1)
+        if re.match(r"\s*\{?\s*throw\b", code[end:]) and (
+            call.search(args) or set(IDENT.findall(args)) & linked
+        ):
             return True
     return False
 
@@ -480,7 +562,17 @@ def worktree_files():
 
 
 # A1 — every value `main` ever held, plus main's working tree when checked out.
-reflog = git("reflog", "show", "--format=%H", "refs/heads/main")
+def reflog_values(ref):
+    rel = (git("rev-parse", "--git-path", f"logs/{ref}") or "").strip()
+    log = Path(rel) if Path(rel).is_absolute() else trial / rel
+    if not rel or not log.is_file():
+        return ""
+    lines = log.read_text(errors="replace").splitlines()
+    shas = [ln.split(" ", 2)[1] for ln in lines if ln.count(" ") >= 2]
+    return "\n".join(s for s in shas if re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", s))
+
+
+reflog = reflog_values("refs/heads/main")
 if not reflog:
     a1 = False
     emit("A1", a1, "main has no reflog to read (branch deleted or log rewritten)")
