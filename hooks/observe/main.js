@@ -358,21 +358,34 @@ function archiveIfNeeded(obsPath, project) {
 }
 
 /**
- * Whether `pid` is a live observer daemon: its command line runs
- * observer-daemon.sh. A daemon that died without removing its lock leaves a PID
- * the OS can hand to an unrelated process, so the PID alone proves nothing —
- * and SIGUSR1's default action terminates whatever process receives it.
+ * What a lock's PID is: 'daemon' (its command line runs observer-daemon.sh),
+ * 'stale' (no such process, or ps shows it runs something else), or 'unknown'
+ * (alive, but ps could not run to say what it is). A daemon that died without
+ * removing its lock leaves a PID the OS can hand to an unrelated process, so
+ * the PID alone proves nothing — and SIGUSR1's default action terminates
+ * whatever process receives it.
  */
-function isDaemonPid(pid) {
+function daemonPidStatus(pid) {
+  try {
+    process.kill(pid, 0);
+  } catch (err) {
+    if (err.code === 'ESRCH') return 'stale';
+    // EPERM: alive under another user — ps still says what it runs.
+  }
   try {
     const command = execFileSync('ps', ['-o', 'command=', '-p', String(pid)], {
       encoding: 'utf-8',
       stdio: ['ignore', 'pipe', 'ignore'],
     });
-    return command.includes('observer-daemon.sh');
+    return command.includes('observer-daemon.sh') ? 'daemon' : 'stale';
   } catch {
-    return false; // ps exits non-zero when no such process exists
+    return 'unknown'; // ps missing, or failed to run
   }
+}
+
+/** Whether `pid` is positively a live observer daemon. */
+function isDaemonPid(pid) {
+  return daemonPidStatus(pid) === 'daemon';
 }
 
 /**
@@ -410,11 +423,22 @@ function signalDaemon() {
  * Spawn the observer daemon if observations >= LAZY_START_THRESHOLD and daemon not running.
  * Non-blocking, silent catch — never throws. Returns a status string for testability:
  *   'pid-exists' | 'no-file' | 'below-threshold' | 'no-spawn-env' | 'spawned' | 'error'
+ * Only a lock proven stale — its PID dead, or running something else — falls
+ * through, and the spawned `start` reclaims it. A lock whose process cannot be
+ * identified (no ps) counts as held: the daemon's own check would give the same
+ * blind answer and take the lock from a live daemon. So does a lock directory
+ * whose pid file is empty or not yet written — a daemon claiming the lock
+ * creates the directory first and truncates the file before writing its PID.
  */
 function spawnDaemonIfNeeded(obsPath) {
   try {
     const pidFile = getPidFile();
-    if (fs.existsSync(pidFile)) return 'pid-exists';
+    if (fs.existsSync(pidFile)) {
+      const pid = parseInt(fs.readFileSync(pidFile, 'utf-8').trim(), 10);
+      if (!(pid > 0) || daemonPidStatus(pid) !== 'stale') return 'pid-exists';
+    } else if (fs.existsSync(path.dirname(pidFile))) {
+      return 'pid-exists';
+    }
     if (!fs.existsSync(obsPath)) return 'no-file';
 
     const content = fs.readFileSync(obsPath, 'utf-8');

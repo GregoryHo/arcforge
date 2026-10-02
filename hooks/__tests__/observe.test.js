@@ -793,7 +793,8 @@ describe('observe: daemon lazy-start (C6)', () => {
     assert.strictEqual(spawnDaemonIfNeeded(obsPath), 'below-threshold');
   });
 
-  it('returns "pid-exists" when PID file is present (daemon already running)', () => {
+  // The runner's own PID is alive but not a daemon: a stale lock, not a held one.
+  it('does not count a lock whose PID is a live non-daemon process', () => {
     const { spawnDaemonIfNeeded } = require('../observe/main');
     const { getObservationsPath, getObserverPidFile } = require('../../scripts/lib/session-utils');
     const obsPath = getObservationsPath('test-project');
@@ -804,9 +805,8 @@ describe('observe: daemon lazy-start (C6)', () => {
     const pidFile = getObserverPidFile();
     fs.mkdirSync(path.dirname(pidFile), { recursive: true });
     fs.writeFileSync(pidFile, String(process.pid), 'utf-8');
-
-    assert.strictEqual(spawnDaemonIfNeeded(obsPath), 'pid-exists');
-    assert.ok(fs.existsSync(pidFile), 'PID file should still exist');
+    assert.strictEqual(spawnDaemonIfNeeded(obsPath), 'no-spawn-env');
+    assert.ok(fs.existsSync(pidFile), 'the hook leaves the lock for the daemon to reclaim');
   });
 
   it('returns "no-file" when observations file does not exist', () => {

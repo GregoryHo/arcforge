@@ -10,7 +10,7 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
-const { getTimestamp, readFileSafe } = require('./utils');
+const { atomicWriteFile, getTimestamp, readFileSafe } = require('./utils');
 
 const LOOP_STATE_FILE = '.arcforge-loop.json';
 const LOOP_ARCHIVE_DIR = '.arcforge-loop.archive';
@@ -46,14 +46,15 @@ function loadLoopState(projectRoot) {
 }
 
 /**
- * Save loop state
+ * Save loop state. Written to a sibling temp file and renamed into place, so a
+ * crash mid-write leaves the previous state file intact rather than truncated.
  * @param {Object} state - Loop state
  * @param {string} projectRoot - Project root directory
  */
 function saveLoopState(state, projectRoot) {
   const statePath = path.join(projectRoot, LOOP_STATE_FILE);
   try {
-    fs.writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+    atomicWriteFile(statePath, `${JSON.stringify(state, null, 2)}\n`);
   } catch (err) {
     throw new Error(`Failed to write loop state at ${statePath}: ${err.message}`);
   }

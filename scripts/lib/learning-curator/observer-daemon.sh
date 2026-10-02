@@ -47,11 +47,36 @@ log_msg() {
 # Lock Management (mkdir-based singleton)
 # ─────────────────────────────────────────────
 
+# How long a lock with no PID in it, or a reclaim reservation, may stand before
+# it counts as abandoned. A claim writes its PID within milliseconds of the
+# mkdir and a reclaim finishes as fast, so only a crash leaves one this old.
+CLAIM_WINDOW_SECS=60
+# One dated further ahead than this was stamped before the clock went back; it
+# counts as abandoned too, or it would hold for the size of the jump.
+CLAIM_CLOCK_SKEW_SECS=10
+
 # The lock records which copy of this script holds it, so a daemon left running
 # from the previous plugin version can be told apart (replace_foreign_daemon).
+# The script goes in before the PID: a contender that can read the PID can read
+# the owner too, and until the PID is in, the lock reads as a claim in progress.
 claim_lock() {
-  echo $$ > "$LOCK_DIR/pid"
   echo "$SCRIPT_DIR" > "$LOCK_DIR/script"
+  echo $$ > "$LOCK_DIR/pid"
+}
+
+# The PID recorded in lock directory $1 (default: the lock), or nothing when
+# the file is missing or holds anything but a PID — 1 to 10 digits, no leading
+# zero. Every read of a pid file goes through here: the value names a process
+# to signal and a reservation directory, so it is never used unchecked.
+read_lock_pid() {
+  local pid
+  pid=$(cat "${1:-$LOCK_DIR}/pid" 2>/dev/null || true)
+  case "$pid" in
+    '' | 0* | *[!0-9]*) return 0 ;;
+  esac
+  if [ "${#pid}" -le 10 ]; then
+    echo "$pid"
+  fi
 }
 
 # Whether PID $1 is a live observer daemon. A daemon that died without removing
@@ -62,29 +87,99 @@ is_daemon_pid() {
   [ -n "$1" ] && ps -o command= -p "$1" 2>/dev/null | grep -q 'observer-daemon\.sh'
 }
 
+# Whether path $1 is past the claim window: changed more than CLAIM_WINDOW_SECS
+# ago, or dated more than CLAIM_CLOCK_SKEW_SECS in the future. A path whose
+# time cannot be read (it is gone) is not.
+claim_window_expired() {
+  local mtime now
+  mtime=$(stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || true)
+  case "$mtime" in
+    '' | *[!0-9]*) return 1 ;;
+  esac
+  now=$(date +%s)
+  [ $((now - mtime)) -gt "$CLAIM_WINDOW_SECS" ] ||
+    [ $((mtime - now)) -gt "$CLAIM_CLOCK_SKEW_SECS" ]
+}
+
 acquire_lock() {
+  clean_lock_leftovers
   if mkdir "$LOCK_DIR" 2>/dev/null; then
     claim_lock
     return 0
   fi
   # Lock exists — check for stale lock from crashed process
   local old_pid
-  old_pid=$(cat "$LOCK_DIR/pid" 2>/dev/null)
-  if is_daemon_pid "$old_pid"; then
+  old_pid=$(read_lock_pid)
+  if [ -z "$old_pid" ]; then
+    # No valid PID: another start is mid-claim, unless the lock is old enough
+    # to be one that crashed there, or holds something that is not a PID.
+    claim_window_expired "$LOCK_DIR" || return 1
+  elif is_daemon_pid "$old_pid"; then
     return 1  # genuinely running
   fi
-  # Stale lock — reclaim atomically (mv is atomic; prevents TOCTOU race
-  # where two processes both rm + mkdir and both think they won)
+  # Read the PID again: a lock that changed between the two reads is changing
+  # hands, not stale. `start` rewrites the PID from its own to the daemon's
+  # before it exits, so a PID that read as dead because its starter exited has
+  # already been replaced by the time this read runs.
+  [ "$(read_lock_pid)" = "$old_pid" ] || return 1
+  reclaim_stale_lock "${old_pid:-none}"
+}
+
+# Take over a lock classified stale; $1 is the validated PID read from it, or
+# "none". Every contender that read the same stale lock races for one
+# reservation named after that PID, and mkdir lets exactly one through. Without
+# it, a contender that classified the lock before the winner replaced it would
+# move the winner's fresh lock aside, and both would run as the daemon. The
+# reservation outlives the reclaim, so a contender that read the stale PID late
+# still finds it taken; it expires after the claim window, so a contender that
+# died holding it cannot block reclaims for good.
+reclaim_stale_lock() {
+  local stale_id="$1"
+  mkdir "${LOCK_DIR}.reclaim.${stale_id}" 2>/dev/null || return 1  # another start has it
+  # Only a start or the holder's own exit changes a lock, and no other start
+  # can be reclaiming this one, so it is still the lock classified — unless a
+  # manual stop/status removed it and a new start took its place meanwhile.
+  # Check once more as late as possible, right before the move.
+  [ "$(read_lock_pid)" = "${stale_id#none}" ] || return 1
   local tmp_stale="${LOCK_DIR}.stale.$$"
-  log_msg "Reclaiming stale lock (old PID: ${old_pid:-unknown})"
-  if mv "$LOCK_DIR" "$tmp_stale" 2>/dev/null; then
-    rm -rf "$tmp_stale"
-    if mkdir "$LOCK_DIR" 2>/dev/null; then
-      claim_lock
-      return 0
-    fi
+  log_msg "Reclaiming stale lock (old PID: ${stale_id})"
+  mv "$LOCK_DIR" "$tmp_stale" 2>/dev/null || return 1
+  # If even so the lock changed hands between that check and the move, put it
+  # back when the path is still free. A start that took the path in that gap is
+  # a second holder no move can undo; the moved lock is left for
+  # clean_lock_leftovers.
+  if [ "$(read_lock_pid "$tmp_stale")" != "${stale_id#none}" ]; then
+    log_msg "Lock changed hands during reclaim — putting it back"
+    [ -e "$LOCK_DIR" ] || mv "$tmp_stale" "$LOCK_DIR" 2>/dev/null || true
+    return 1
   fi
-  return 1  # lost the race to another instance
+  rm -rf "$tmp_stale"
+  if mkdir "$LOCK_DIR" 2>/dev/null; then
+    claim_lock
+    return 0
+  fi
+  return 1  # lost the race to a fresh start
+}
+
+# Remove what interrupted reclaims leave next to the lock: reservations past
+# the claim window, and moved-aside locks whose reclaiming start (the PID in the
+# name) is gone. A live reclaimer's moved lock is left to it.
+clean_lock_leftovers() {
+  local leftover owner
+  for leftover in "${LOCK_DIR}".reclaim.*; do
+    [ -d "$leftover" ] || continue
+    if claim_window_expired "$leftover"; then
+      rm -rf "$leftover"
+    fi
+  done
+  for leftover in "${LOCK_DIR}".stale.*; do
+    [ -d "$leftover" ] || continue
+    owner="${leftover##*.}"
+    case "$owner" in
+      '' | *[!0-9]*) continue ;;
+    esac
+    kill -0 "$owner" 2>/dev/null || rm -rf "$leftover"
+  done
 }
 
 # A live daemon started from another copy of this script — the previous plugin
@@ -95,9 +190,13 @@ acquire_lock() {
 # exited within ~2 s — mid-analysis a TERM waits for the model call to return.
 replace_foreign_daemon() {
   local owner pid
+  # PID before owner: claim_lock writes them in the other order, so a PID read
+  # here means the owner is already on disk — read the other way round, a start
+  # mid-claim would look foreign and be killed. No PID yet is a claim in progress.
+  pid=$(read_lock_pid)
+  [ -n "$pid" ] || return 1
   owner=$(cat "$LOCK_DIR/script" 2>/dev/null || true)
   [ "$owner" = "$SCRIPT_DIR" ] && return 1
-  pid=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
   # acquire_lock has just reclaimed any lock whose PID is not a daemon; a
   # holder that is not one now is a race, and gets no signal.
   is_daemon_pid "$pid" || return 1
@@ -120,7 +219,7 @@ is_running() {
     return 1
   fi
   local pid
-  pid=$(cat "$LOCK_DIR/pid" 2>/dev/null)
+  pid=$(read_lock_pid)
   is_daemon_pid "$pid"
 }
 
@@ -611,7 +710,7 @@ cmd_start() {
   mkdir -p "$INSTINCTS_DIR"
   if ! acquire_lock && ! replace_foreign_daemon; then
     local running_pid
-    running_pid=$(cat "$LOCK_DIR/pid" 2>/dev/null)
+    running_pid=$(read_lock_pid)
     echo "Observer daemon already running (PID ${running_pid})"
     return 0
   fi
@@ -631,7 +730,7 @@ cmd_stop() {
   fi
 
   local pid
-  pid=$(cat "$LOCK_DIR/pid" 2>/dev/null)
+  pid=$(read_lock_pid)
   echo "Stopping observer daemon (PID ${pid})..."
   kill "$pid" 2>/dev/null || true
   # Daemon's EXIT trap will clean up the lock
@@ -641,7 +740,7 @@ cmd_stop() {
 cmd_status() {
   if is_running; then
     local pid
-    pid=$(cat "$LOCK_DIR/pid" 2>/dev/null)
+    pid=$(read_lock_pid)
     echo "Observer daemon: RUNNING (PID ${pid})"
 
     # Show observation counts per project

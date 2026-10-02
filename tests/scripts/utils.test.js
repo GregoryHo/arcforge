@@ -3,6 +3,7 @@ const path = require('node:path');
 const os = require('node:os');
 
 const {
+  atomicWriteFile,
   sanitizeFilename,
   commandExists,
   execCommand,
@@ -195,5 +196,76 @@ describe('path helpers', () => {
   it('getArcforgeHome should ignore a blank ARCFORGE_HOME and fall back to ~/.arcforge', () => {
     process.env.ARCFORGE_HOME = '   ';
     expect(getArcforgeHome()).toBe(path.join(os.homedir(), '.arcforge'));
+  });
+});
+
+describe('atomicWriteFile', () => {
+  let dir;
+  let dest;
+  let tmp;
+  let sentinel;
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'atomic-write-'));
+    dest = path.join(dir, 'state.json');
+    tmp = `${dest}.tmp`;
+    sentinel = path.join(dir, 'sentinel.txt');
+    fs.writeFileSync(sentinel, 'untouched');
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('never writes through a symlink left at the temp path', () => {
+    fs.symlinkSync(sentinel, tmp);
+    atomicWriteFile(dest, 'new state');
+    expect(fs.readFileSync(sentinel, 'utf8')).toBe('untouched');
+    expect(fs.lstatSync(dest).isFile()).toBe(true);
+    expect(fs.readFileSync(dest, 'utf8')).toBe('new state');
+    expect(fs.existsSync(tmp)).toBe(false);
+  });
+
+  it('replaces a stale regular file left at the temp path', () => {
+    fs.writeFileSync(tmp, 'stale');
+    atomicWriteFile(dest, 'new state');
+    expect(fs.readFileSync(dest, 'utf8')).toBe('new state');
+    expect(fs.existsSync(tmp)).toBe(false);
+  });
+
+  it('fails naming the temp path when a directory stands there, writing nothing', () => {
+    fs.mkdirSync(tmp);
+    expect(() => atomicWriteFile(dest, 'new state')).toThrow(`Cannot create temp file ${tmp}`);
+    expect(fs.existsSync(dest)).toBe(false);
+    expect(fs.statSync(tmp).isDirectory()).toBe(true);
+  });
+
+  it('replaces a symlink at the destination instead of writing through it', () => {
+    fs.symlinkSync(sentinel, dest);
+    atomicWriteFile(dest, 'new state');
+    expect(fs.readFileSync(sentinel, 'utf8')).toBe('untouched');
+    expect(fs.lstatSync(dest).isFile()).toBe(true);
+    expect(fs.readFileSync(dest, 'utf8')).toBe('new state');
+  });
+
+  it('leaves no temp file behind when the write fails', () => {
+    // A full disk fails mid-write, after the temp file exists with part of the data.
+    const realWrite = fs.writeFileSync;
+    jest.spyOn(fs, 'writeFileSync').mockImplementationOnce((target) => {
+      realWrite(target, 'partial');
+      throw new Error('ENOSPC: no space left on device');
+    });
+    expect(() => atomicWriteFile(dest, 'new state')).toThrow('ENOSPC');
+    expect(fs.existsSync(tmp)).toBe(false);
+    expect(fs.existsSync(dest)).toBe(false);
+  });
+
+  it('leaves no temp file behind when the rename fails', () => {
+    jest.spyOn(fs, 'renameSync').mockImplementationOnce(() => {
+      throw new Error('EXDEV: cross-device link not permitted');
+    });
+    expect(() => atomicWriteFile(dest, 'new state')).toThrow('EXDEV');
+    expect(fs.existsSync(tmp)).toBe(false);
   });
 });
