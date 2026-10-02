@@ -1146,6 +1146,106 @@ assert_eq \
   "$(lr_daemons "$LR_CRASHED" | grep -c .)"
 lr_reap "$LR_CRASHED"
 
+# A pid file holding anything but a PID counts as no PID: held while the lock
+# is fresh, reclaimed once it is old. Its content never names a path — a
+# reservation built from `./../../../outside` would land outside instincts/.
+LR_JUNK_NAMES='traversal dotdot overlong empty spaced pair'
+lr_junk() {
+  case "$1" in
+    traversal) printf './../../../outside' ;;
+    dotdot) printf '../x' ;;
+    overlong) printf '1%.0s' $(seq 300) ;;
+    empty) printf '' ;;
+    spaced) printf ' 4242 \n' ;;
+    pair) printf '4242\n4343\n' ;;
+  esac
+}
+
+# Runs one start against a lock whose pid file holds junk $1, aged $2 (fresh or
+# old). Prints daemons|pid file unchanged|anything created outside instincts/.
+lr_junk_case() {
+  local home="${TMPDIR_LR}/junk-$1-$2"
+  local lock="${home}/.arcforge/instincts/.observer.lock"
+  mkdir -p "$lock"
+  lr_junk "$1" > "${lock}/pid"
+  # What an earlier pid file of `.` left behind: with it in place, a reservation
+  # named from `./../../../outside` resolves to <home>/outside.
+  [ "$1" = traversal ] && mkdir "${home}/.arcforge/instincts/.observer.lock.reclaim.."
+  [ "$2" = old ] && touch -t 200001010000 "$lock"
+  lr_start "$home"
+  if [ "$2" = old ]; then lr_settle "$home"; else sleep 0.3; fi
+  local same=no
+  [ "$(cat "${lock}/pid" 2>/dev/null)" = "$(lr_junk "$1")" ] && same=yes
+  local outside
+  outside=$(find "$TMPDIR_LR" -maxdepth 1 -name outside | grep -c .)
+  outside=$((outside + $(find "$home" -mindepth 1 -maxdepth 1 ! -name .arcforge ! -name 'daemon.*' | grep -c .)))
+  echo "$(lr_daemons "$home" | grep -c .)|${same}|${outside}"
+  lr_reap "$home"
+}
+
+LR_JUNK_FRESH="" LR_JUNK_FRESH_WANT="" LR_JUNK_OLD="" LR_JUNK_OLD_WANT=""
+for name in $LR_JUNK_NAMES; do
+  LR_JUNK_FRESH="${LR_JUNK_FRESH}${name}=$(lr_junk_case "$name" fresh) "
+  LR_JUNK_FRESH_WANT="${LR_JUNK_FRESH_WANT}${name}=0|yes|0 "
+  LR_JUNK_OLD="${LR_JUNK_OLD}${name}=$(lr_junk_case "$name" old | cut -d'|' -f1,3) "
+  LR_JUNK_OLD_WANT="${LR_JUNK_OLD_WANT}${name}=1|0 "
+done
+assert_eq \
+  'LR-T1: a fresh lock whose pid file is not a PID is held, untouched, nothing made outside' \
+  "$LR_JUNK_FRESH_WANT" \
+  "$LR_JUNK_FRESH"
+assert_eq \
+  'LR-T1: an old lock whose pid file is not a PID is reclaimed, nothing made outside' \
+  "$LR_JUNK_OLD_WANT" \
+  "$LR_JUNK_OLD"
+
+# A reservation or PID-less lock dated in the future was stamped before the
+# clock went back. Fresh-looking forever, it would hold for the size of the
+# jump; past the skew allowance it counts as abandoned.
+LR_FUTURE_RES="${TMPDIR_LR}/future-reservation"
+LR_FUTURE_RES_PID=$(lr_stale_lock "$LR_FUTURE_RES")
+mkdir "${LR_FUTURE_RES}/.arcforge/instincts/.observer.lock.reclaim.${LR_FUTURE_RES_PID}"
+touch -t 203001010000 "${LR_FUTURE_RES}/.arcforge/instincts/.observer.lock.reclaim.${LR_FUTURE_RES_PID}"
+lr_start "$LR_FUTURE_RES"
+lr_settle "$LR_FUTURE_RES"
+assert_eq \
+  'LR-T1: a future-dated reclaim reservation counts as abandoned' \
+  '1' \
+  "$(lr_daemons "$LR_FUTURE_RES" | grep -c .)"
+lr_reap "$LR_FUTURE_RES"
+
+LR_FUTURE_LOCK="${TMPDIR_LR}/future-pidless"
+mkdir -p "${LR_FUTURE_LOCK}/.arcforge/instincts/.observer.lock"
+touch -t 203001010000 "${LR_FUTURE_LOCK}/.arcforge/instincts/.observer.lock"
+lr_start "$LR_FUTURE_LOCK"
+lr_settle "$LR_FUTURE_LOCK"
+assert_eq \
+  'LR-T1: a future-dated lock with no PID is reclaimed' \
+  '1' \
+  "$(lr_daemons "$LR_FUTURE_LOCK" | grep -c .)"
+lr_reap "$LR_FUTURE_LOCK"
+
+# Interrupted reclaims leave a moved-aside lock (.stale.<reclaimer PID>) and a
+# reservation behind. A later start removes the moved lock once its reclaimer
+# is gone and the reservation once expired, and keeps a live reclaimer's.
+LR_LITTER="${TMPDIR_LR}/leftovers"
+LR_LITTER_DIR="${LR_LITTER}/.arcforge/instincts"
+mkdir -p "$LR_LITTER_DIR"
+true &
+LR_LITTER_GONE=$!
+wait "$LR_LITTER_GONE"
+mkdir "${LR_LITTER_DIR}/.observer.lock.stale.${LR_LITTER_GONE}"
+mkdir "${LR_LITTER_DIR}/.observer.lock.stale.$$"
+mkdir "${LR_LITTER_DIR}/.observer.lock.reclaim.4242"
+touch -t 200001010000 "${LR_LITTER_DIR}/.observer.lock.reclaim.4242"
+lr_start "$LR_LITTER"
+lr_settle "$LR_LITTER"
+assert_eq \
+  'LR-T1: a later start clears a dead reclaimer'"'"'s moved lock and an expired reservation' \
+  "1|no|yes|no" \
+  "$(lr_daemons "$LR_LITTER" | grep -c .)|$([ -d "${LR_LITTER_DIR}/.observer.lock.stale.${LR_LITTER_GONE}" ] && echo yes || echo no)|$([ -d "${LR_LITTER_DIR}/.observer.lock.stale.$$" ] && echo yes || echo no)|$([ -d "${LR_LITTER_DIR}/.observer.lock.reclaim.4242" ] && echo yes || echo no)"
+lr_reap "$LR_LITTER"
+
 # ─────────────────────────────────────────────
 # Results
 # ─────────────────────────────────────────────
