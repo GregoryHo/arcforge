@@ -5,5 +5,6 @@
 | 檔案 | 內容 |
 |---|---|
 | [`PLAN.md`](PLAN.md) | 核可的計畫：兩個版本的範圍、工作包、順序限制、6.3.0 的 eval 額度、執行規則與操作備忘 |
+| [`post-release-6.2.1.md`](post-release-6.2.1.md) | 6.2.1 發版後查核：release、網站、GitHub 來源安裝與 hook、`eval history`、stale lock 回收 |
 
 上一輪的規劃與 120 項盤點在 [`../v6.1/`](../v6.1/)。
