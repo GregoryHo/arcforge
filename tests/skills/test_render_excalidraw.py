@@ -283,6 +283,15 @@ def test_control_characters_in_a_quoted_value_stay_on_the_one_line(tmp_path):
     )
 
 
+@pytest.mark.parametrize("char", ["\x85", "\u2028", "\u2029", "\x1c", "\x1d", "\x1e", "\v", "\f", "\ud800"])
+def test_any_line_break_or_unprintable_character_is_escaped(tmp_path, char):
+    proc = _run(tmp_path, content=json.dumps({"type": f"bad{char}value", "elements": [SCENE["elements"][0]]}))
+    assert proc.returncode == 1
+    (line,) = proc.stderr.splitlines()
+    escaped = f"\\x{ord(char):02x}" if ord(char) < 0x100 else f"\\u{ord(char):04x}"
+    assert line == f"ERROR: Invalid Excalidraw file: Expected type 'excalidraw', got 'bad{escaped}value'"
+
+
 def test_a_huge_quoted_value_is_cut_short(tmp_path):
     proc = _run(tmp_path, content=json.dumps({"type": "x" * 100_000, "elements": [SCENE["elements"][0]]}))
     assert proc.returncode == 1

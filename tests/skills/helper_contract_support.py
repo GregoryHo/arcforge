@@ -15,8 +15,19 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Iterator
 
 # Each field is replaced, in turn, by null, a number, a string, an object, an
-# array, a string carrying control characters, and a very long string.
-REPLACEMENTS = (None, 7, "s", {"k": 1}, [1], "bad\nvalue\r\x00\x1b[31m\x7f", "x" * 100_000)
+# array, strings carrying control characters and line separators, and a very
+# long string. "One line" means exactly what str.splitlines() says it means.
+REPLACEMENTS = (
+    None,
+    7,
+    "s",
+    {"k": 1},
+    [1],
+    "bad\nvalue\r\x00\x1b[31m\x7f",
+    # Every other character str.splitlines() breaks on, and a lone surrogate.
+    "a\x85b\u2028c\u2029d\x1ce\x1df\x1eg\vh\fi\ud800j",
+    "x" * 100_000,
+)
 
 # A failure line may quote input, so it is bounded: the helpers cap the
 # message at 1000 characters, plus the prefix and the truncation marker.

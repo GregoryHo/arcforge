@@ -40,14 +40,32 @@ FORMAT_MARKERS = {
 }
 
 
+def escape_unprintable(text: str) -> str:
+    """Escape every character that is not printable — controls, line and
+    paragraph separators, format characters, lone surrogates — as \\xNN,
+    \\uNNNN or \\UNNNNNNNN, so the text prints as exactly one line."""
+    out = []
+    for ch in text:
+        code = ord(ch)
+        if ch.isprintable():
+            out.append(ch)
+        elif code < 0x100:
+            out.append(f"\\x{code:02x}")
+        elif code < 0x10000:
+            out.append(f"\\u{code:04x}")
+        else:
+            out.append(f"\\U{code:08x}")
+    return "".join(out)
+
+
 MAX_FAILURE_CHARS = 1000
 
 
 def fail(msg: str) -> None:
     """Exit 1 with `VERIFY FAILED: <msg>` as exactly one bounded stderr line.
-    Control characters a path or the renderer's output may carry are escaped,
-    so the line cannot split, and a huge message is cut short."""
-    line = re.sub(r'[\x00-\x1f\x7f]', lambda m: f'\\x{ord(m.group()):02x}', msg)
+    Unprintable characters a path or the renderer's output may carry are
+    escaped, so the line cannot split, and a huge message is cut short."""
+    line = escape_unprintable(msg)
     if len(line) > MAX_FAILURE_CHARS:
         line = line[:MAX_FAILURE_CHARS] + '… (truncated)'
     print(f'VERIFY FAILED: {line}', file=sys.stderr)

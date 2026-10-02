@@ -14,11 +14,28 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import shlex
 import sys
 from pathlib import Path
 from typing import NoReturn
+
+
+def escape_unprintable(text: str) -> str:
+    """Escape every character that is not printable — controls, line and
+    paragraph separators, format characters, lone surrogates — as \\xNN,
+    \\uNNNN or \\UNNNNNNNN, so the text prints as exactly one line."""
+    out = []
+    for ch in text:
+        code = ord(ch)
+        if ch.isprintable():
+            out.append(ch)
+        elif code < 0x100:
+            out.append(f"\\x{code:02x}")
+        elif code < 0x10000:
+            out.append(f"\\u{code:04x}")
+        else:
+            out.append(f"\\U{code:08x}")
+    return "".join(out)
 
 
 MAX_ERROR_CHARS = 1000
@@ -26,9 +43,9 @@ MAX_ERROR_CHARS = 1000
 
 def fail(message: str) -> NoReturn:
     """Exit 1 with `ERROR: <message>` as exactly one bounded stderr line.
-    Control characters a quoted value or path may carry are escaped, so the
-    line cannot split, and a huge value is cut short."""
-    line = re.sub(r"[\x00-\x1f\x7f]", lambda m: f"\\x{ord(m.group()):02x}", message)
+    Unprintable characters a quoted value or path may carry are escaped, so
+    the line cannot split, and a huge value is cut short."""
+    line = escape_unprintable(message)
     if len(line) > MAX_ERROR_CHARS:
         line = line[:MAX_ERROR_CHARS] + "… (truncated)"
     print(f"ERROR: {line}", file=sys.stderr)
