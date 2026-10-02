@@ -153,8 +153,7 @@ def test_shapes_closer_than_30px_are_crowded_and_low_severity(tmp_path):
 
 
 def test_default_output_is_a_formatted_report_not_json(tmp_path):
-    # The docstring says "Output: JSON report"; JSON needs `--json`, which the
-    # skill's Phase 2 command does not pass. Pinned as the formatted text.
+    # JSON needs `--json`, which the skill's Phase 2 command does not pass.
     proc = _run(tmp_path, [rect("box", 0, 0), arrow("arr", -100, 50, [[0, 0], [400, 0]])])
     assert proc.returncode == 0, proc.stderr
     lines = proc.stdout.splitlines()
@@ -195,17 +194,29 @@ def test_help_documents_the_flags():
 
 
 @pytest.mark.parametrize(
-    "raw, error",
+    "raw, message",
     [
-        (json.dumps({"elements": [{"type": "rectangle", "x": 0, "y": 0, "width": 10, "height": 10}]}), "KeyError"),
-        (json.dumps([]), "AttributeError"),
+        (json.dumps([]), "ERROR: Not an Excalidraw scene: top level is an array, not an object"),
+        (json.dumps({"type": "excalidraw"}), "ERROR: Not an Excalidraw scene: missing 'elements' array"),
+        (json.dumps({"elements": {}}), "ERROR: Not an Excalidraw scene: 'elements' is an object, not an array"),
+        (json.dumps({"elements": ["x"]}), "ERROR: Not an Excalidraw scene: element 0 is a string, not an object"),
+        (
+            json.dumps({"elements": [{"type": "rectangle", "x": 0, "y": 0, "width": 10, "height": 10}]}),
+            "ERROR: Not an Excalidraw scene: element 0 has no 'id'",
+        ),
+        (json.dumps({"elements": [{"id": "a"}]}), "ERROR: Not an Excalidraw scene: element 0 ('a') has no 'type'"),
     ],
-    ids=["element-without-id", "top-level-array"],
+    ids=["top-level-array", "no-elements", "elements-not-array", "element-not-object", "element-without-id",
+         "element-without-type"],
 )
-def test_malformed_but_valid_json_crashes_with_a_traceback(tmp_path, raw, error):
-    # KNOWN BUG (6.2.0): valid JSON that is not an Excalidraw scene — an element
-    # with no `id`, or a top-level array — escapes as an uncaught traceback
-    # instead of an `ERROR:` line. Pinned so the fix shows up as a test change.
+def test_valid_json_that_is_not_a_scene_exits_1_with_one_error_line(tmp_path, raw, message):
     proc = _run(tmp_path, None, raw=raw)
     assert proc.returncode == 1
-    assert "Traceback" in proc.stderr and error in proc.stderr
+    assert proc.stderr.strip() == message
+    assert proc.stdout == ""
+
+
+def test_docstring_says_json_output_needs_the_flag():
+    doc = SCRIPT.read_text(encoding="utf-8").split('"""')[1]
+    assert "Output: JSON report" not in doc
+    assert "--json" in doc

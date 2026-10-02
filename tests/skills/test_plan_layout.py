@@ -195,17 +195,23 @@ def test_missing_spec_exits_1_with_a_message(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "raw, error",
+    "raw, message",
     [
-        ("{not json", "JSONDecodeError"),
-        (json.dumps({"zones": [{"elements": [{"type": "flow"}]}]}), "KeyError"),
+        ("{not json", "ERROR: Invalid JSON: "),
+        (json.dumps([]), "ERROR: Not a layout spec: top level is an array, not an object"),
+        (json.dumps({"canvas": 5}), "ERROR: Not a layout spec: 'canvas' is a number, not an object"),
+        (json.dumps({"zones": {}}), "ERROR: Not a layout spec: 'zones' is an object, not an array"),
+        (json.dumps({"zones": ["z"]}), "ERROR: Not a layout spec: zone 0 is a string, not an object"),
+        (json.dumps({"zones": [{"elements": 1}]}), "ERROR: Not a layout spec: zone 0 'elements' is a number, not an array"),
+        (json.dumps({"zones": [{"elements": [1]}]}), "ERROR: Not a layout spec: zone 0 element 0 is a number, not an object"),
+        (json.dumps({"zones": [{"elements": [{"type": "flow"}]}]}), "ERROR: Not a layout spec: zone 0 element 0 has no 'id'"),
     ],
-    ids=["invalid-json", "element-without-id"],
+    ids=["invalid-json", "top-level-array", "canvas-not-object", "zones-not-array", "zone-not-object",
+         "elements-not-array", "element-not-object", "element-without-id"],
 )
-def test_bad_spec_crashes_with_a_traceback(tmp_path, raw, error):
-    # KNOWN BUG (6.2.0): unlike check_overlaps.py, a spec that is not JSON or
-    # an element with no `id` escapes as an uncaught traceback instead of an
-    # `ERROR:` line. Pinned so the fix shows up as a test change.
+def test_bad_spec_exits_1_with_one_error_line(tmp_path, raw, message):
     proc = _run(tmp_path, None, raw=raw)
     assert proc.returncode == 1
-    assert "Traceback" in proc.stderr and error in proc.stderr
+    (line,) = proc.stderr.splitlines()
+    assert line.startswith(message), line
+    assert proc.stdout == ""

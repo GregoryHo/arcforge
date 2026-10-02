@@ -11,10 +11,10 @@ On the manual-fallback path it re-renders by running `uv run python
 render_excalidraw.py` from its own directory. A stub `uv` on PATH stands in for
 that render, so no test here needs Playwright or Chromium.
 
-The verifier's paths are fixed — it writes `/tmp/verify.excalidraw` and
-`/tmp/diagram-post-save.png` and compares against `/tmp/diagram.png` — so an
-autouse fixture moves any existing copy of the three aside for each test and
-puts it back afterwards; ambient `/tmp` state never reaches an assertion.
+The verifier renders into a fresh temporary directory, but compares against
+the skill's fixed pre-save render, `/tmp/diagram.png`, so an autouse fixture
+moves any existing copy aside for each test and puts it back afterwards;
+ambient `/tmp` state never reaches an assertion.
 """
 
 import importlib.util
@@ -39,12 +39,14 @@ MARKERS = (
 SCENE = json.dumps({"type": "excalidraw", "elements": [{"type": "rectangle", "x": 0, "y": 0}]})
 
 # Stands in for `uv run python render_excalidraw.py <in> --output <out> --scale 2`:
-# records its argv and cwd, then fails or writes FAKE_UV_BYTES (default 100) bytes.
+# records its argv, cwd and the scene it was handed, then fails or writes
+# FAKE_UV_BYTES (default 100) bytes.
 FAKE_UV = '''
 import json, os, sys
 from pathlib import Path
 with open(os.environ["FAKE_UV_LOG"], "w") as log:
-    json.dump({"argv": sys.argv[1:], "cwd": os.getcwd()}, log)
+    scene = Path(sys.argv[4]).read_text(encoding="utf-8")
+    json.dump({"argv": sys.argv[1:], "cwd": os.getcwd(), "scene": scene}, log)
 if os.environ.get("FAKE_UV_MODE") == "fail":
     print("render exploded", file=sys.stderr)
     sys.exit(1)
@@ -52,24 +54,21 @@ out = Path(sys.argv[sys.argv.index("--output") + 1])
 out.write_bytes(b"x" * int(os.environ.get("FAKE_UV_BYTES", "100")))
 '''
 
-FIXED_PATHS = tuple(Path(p) for p in ("/tmp/diagram.png", "/tmp/verify.excalidraw", "/tmp/diagram-post-save.png"))
-REFERENCE_PNG = FIXED_PATHS[0]
+REFERENCE_PNG = Path("/tmp/diagram.png")
 
 
 @pytest.fixture(autouse=True)
-def isolated_fixed_paths():
-    # Save and remove whatever an earlier or interrupted run left at the
-    # verifier's fixed paths; restore it once the test is done.
-    saved = {path: path.read_bytes() for path in FIXED_PATHS if path.exists()}
-    for path in FIXED_PATHS:
-        path.unlink(missing_ok=True)
+def isolated_reference_png():
+    # Save and remove whatever an earlier run left at the reference path;
+    # restore it once the test is done.
+    saved = REFERENCE_PNG.read_bytes() if REFERENCE_PNG.exists() else None
+    REFERENCE_PNG.unlink(missing_ok=True)
     try:
         yield
     finally:
-        for path in FIXED_PATHS:
-            path.unlink(missing_ok=True)
-        for path, data in saved.items():
-            path.write_bytes(data)
+        REFERENCE_PNG.unlink(missing_ok=True)
+        if saved is not None:
+            REFERENCE_PNG.write_bytes(saved)
 
 
 def _fake_uv(tmp_path: Path, mode: str, size: int | None = None) -> dict:
@@ -178,12 +177,26 @@ def test_manual_path_renders_from_the_scripts_directory_and_reports_success(tmp_
     assert proc.returncode == 0, proc.stderr
     assert proc.stdout.strip() == "OK: format markers present, JSON parses, post-save render succeeds"
     call = json.loads((tmp_path / "uv-call.json").read_text(encoding="utf-8"))
-    assert call["argv"] == [
-        "run", "python", "render_excalidraw.py",
-        "/tmp/verify.excalidraw", "--output", "/tmp/diagram-post-save.png", "--scale", "2",
-    ]
+    run, python, script, scene, output_flag, png, scale_flag, scale = call["argv"]
+    assert (run, python, script, output_flag, scale_flag, scale) == (
+        "run", "python", "render_excalidraw.py", "--output", "--scale", "2",
+    )
     assert Path(call["cwd"]).resolve() == REFERENCES.resolve()
-    assert Path("/tmp/verify.excalidraw").read_text(encoding="utf-8") == SCENE
+    assert call["scene"] == SCENE
+
+
+def test_manual_path_renders_into_a_fresh_directory_it_removes(tmp_path):
+    # Two runs never share a scratch file, so concurrent verifies cannot collide.
+    env = _fake_uv(tmp_path, "ok")
+    argvs = []
+    for _ in range(2):
+        assert _verify(tmp_path, _manual(SCENE), env).returncode == 0
+        argvs.append(json.loads((tmp_path / "uv-call.json").read_text(encoding="utf-8"))["argv"])
+    (scene_a, png_a), (scene_b, png_b) = ((Path(a[3]), Path(a[5])) for a in argvs)
+    assert scene_a.parent == png_a.parent and scene_b.parent == png_b.parent
+    assert scene_a.parent != scene_b.parent
+    for path in (scene_a, png_a, scene_b, png_b):
+        assert not path.parent.exists()
 
 
 def test_manual_path_render_failure_fails_with_the_renderers_stderr(tmp_path):
@@ -218,13 +231,18 @@ def test_post_save_render_size_must_stay_within_half_to_double_the_reference(
     assert "post-save render size deviates sharply from pre-save" in capsys.readouterr().err
 
 
-def test_manual_path_invalid_json_crashes_with_a_traceback(tmp_path):
-    # KNOWN BUG (6.2.0): the docstring promises "exit 1 on any failure with a
-    # clear message", but an uncompressed block that is not JSON escapes as an
-    # uncaught JSONDecodeError traceback, with no `VERIFY FAILED:` line. Pinned
-    # so the fix shows up as a test change.
+def test_manual_path_invalid_json_fails_with_one_line_before_rendering(tmp_path):
     proc = _verify(tmp_path, _manual("{not json"), _fake_uv(tmp_path, "ok"))
     assert proc.returncode == 1
-    assert "Traceback" in proc.stderr and "JSONDecodeError" in proc.stderr
-    assert "VERIFY FAILED" not in proc.stderr
+    (line,) = proc.stderr.splitlines()
+    assert line.startswith("VERIFY FAILED: drawing block is not valid JSON: ")
     assert not (tmp_path / "uv-call.json").exists()
+
+
+def test_manual_path_without_uv_fails_with_one_line(tmp_path):
+    # PATH holds only an empty directory: `uv` cannot be found.
+    empty = tmp_path / "empty-bin"
+    empty.mkdir()
+    proc = _verify(tmp_path, _manual(SCENE), {**os.environ, "PATH": str(empty)})
+    assert proc.returncode == 1
+    assert proc.stderr.strip() == "VERIFY FAILED: render failed: `uv` not found on PATH"

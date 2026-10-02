@@ -142,15 +142,20 @@ def test_missing_playwright_exits_1_with_setup_steps(tmp_path):
     assert "uv sync && uv run playwright install chromium" in proc.stderr
 
 
-def test_missing_playwright_is_reported_before_an_invalid_scene(tmp_path):
-    # KNOWN BUG (6.2.0): `render()` imports playwright first, under a comment
-    # that says "so validation errors show before import errors". They do not:
-    # without playwright, a broken scene reports the missing import, not the
-    # scene. Pinned so the fix shows up as a test change.
-    proc = _run(tmp_path, content="{not json", sync_api=None, init="raise ImportError('x')")
+@pytest.mark.parametrize(
+    "content, message",
+    [
+        ("{not json", "ERROR: Invalid JSON in "),
+        (json.dumps({**SCENE, "type": "other"}), "Expected type 'excalidraw', got 'other'"),
+    ],
+    ids=["invalid-json", "wrong-type"],
+)
+def test_invalid_scene_is_reported_before_missing_playwright(tmp_path, content, message):
+    # A broken diagram is reported as broken, not as a missing renderer.
+    proc = _run(tmp_path, content=content, sync_api=None, init="raise ImportError('x')")
     assert proc.returncode == 1
-    assert "playwright not installed" in proc.stderr
-    assert "Invalid JSON" not in proc.stderr
+    assert message in proc.stderr
+    assert "playwright" not in proc.stderr
 
 
 @pytest.mark.parametrize(
@@ -161,26 +166,41 @@ def test_missing_playwright_is_reported_before_an_invalid_scene(tmp_path):
         (json.dumps({"type": "excalidraw"}), "Missing 'elements' array"),
         (json.dumps({"type": "excalidraw", "elements": {}}), "'elements' must be an array"),
         (json.dumps({"type": "excalidraw", "elements": []}), "'elements' array is empty"),
+        (json.dumps([]), "ERROR: Invalid Excalidraw file: top level is not an object"),
+        (
+            json.dumps({"type": "excalidraw", "elements": ["x"]}),
+            "ERROR: Invalid Excalidraw file: element 0 is not an object",
+        ),
     ],
-    ids=["invalid-json", "wrong-type", "no-elements", "elements-not-array", "elements-empty"],
+    ids=["invalid-json", "wrong-type", "no-elements", "elements-not-array", "elements-empty",
+         "top-level-array", "element-not-object"],
 )
-def test_invalid_scene_exits_1_before_launching_chromium(tmp_path, content, message):
+def test_invalid_scene_exits_1_with_one_error_line_before_launching_chromium(tmp_path, content, message):
     proc = _run(tmp_path, content=content)
     assert proc.returncode == 1
-    assert message in proc.stderr
+    (line,) = proc.stderr.splitlines()
+    assert line.startswith("ERROR: ") and message in line
     assert "Chromium" not in proc.stderr
 
 
-def test_launch_failure_other_than_a_missing_browser_is_raised(tmp_path):
-    # Only "Executable doesn't exist" maps to the install hint. The second test
-    # in the script, `"browserType.launch" in str(e)`, never matches
-    # Playwright's own capitalised "BrowserType.launch:" prefix, so any other
-    # launch failure surfaces as the original exception.
-    sync_api = LAUNCH_FAILS.format(message="BrowserType.launch: Host system is missing dependencies")
-    proc = _run(tmp_path, sync_api=sync_api)
+def test_every_scene_problem_is_named_on_the_one_error_line(tmp_path):
+    proc = _run(tmp_path, content=json.dumps({"type": "other"}))
     assert proc.returncode == 1
-    assert "Host system is missing dependencies" in proc.stderr
-    assert "Chromium not installed" not in proc.stderr
+    assert proc.stderr.strip() == (
+        "ERROR: Invalid Excalidraw file: Expected type 'excalidraw', got 'other'; Missing 'elements' array"
+    )
+
+
+def test_launch_failure_other_than_a_missing_browser_is_one_error_line(tmp_path):
+    # Only "Executable doesn't exist" maps to the install hint; any other
+    # launch failure is named as one, with Playwright's first line, not a
+    # traceback.
+    message = "BrowserType.launch: Host system is missing dependencies\n  sudo apt-get install libnss3"
+    proc = _run(tmp_path, sync_api=LAUNCH_FAILS.format(message=message))
+    assert proc.returncode == 1
+    assert proc.stderr.strip() == (
+        "ERROR: Chromium failed to launch: BrowserType.launch: Host system is missing dependencies"
+    )
 
 
 @pytest.mark.skipif(

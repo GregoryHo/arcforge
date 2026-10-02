@@ -19,8 +19,11 @@ import sys
 from pathlib import Path
 
 
-def validate_excalidraw(data: dict) -> list[str]:
+def validate_excalidraw(data: object) -> list[str]:
     """Validate Excalidraw JSON structure. Returns list of errors (empty = valid)."""
+    if not isinstance(data, dict):
+        return ["top level is not an object"]
+
     errors: list[str] = []
 
     if data.get("type") != "excalidraw":
@@ -32,6 +35,12 @@ def validate_excalidraw(data: dict) -> list[str]:
         errors.append("'elements' must be an array")
     elif len(data["elements"]) == 0:
         errors.append("'elements' array is empty — nothing to render")
+    else:
+        errors.extend(
+            f"element {i} is not an object"
+            for i, el in enumerate(data["elements"])
+            if not isinstance(el, dict)
+        )
 
     return errors
 
@@ -77,15 +86,8 @@ def render(
     max_width: int = 1920,
 ) -> Path:
     """Render an .excalidraw file to PNG. Returns the output PNG path."""
-    # Import playwright here so validation errors show before import errors
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError:
-        print("ERROR: playwright not installed.", file=sys.stderr)
-        print("Run: cd this skill's references/ directory, then uv sync && uv run playwright install chromium", file=sys.stderr)
-        sys.exit(1)
-
-    # Read and validate
+    # Read and validate before importing playwright, so a broken diagram is
+    # reported as broken, not as a missing renderer.
     raw = excalidraw_path.read_text(encoding="utf-8")
     try:
         data = json.loads(raw)
@@ -95,9 +97,14 @@ def render(
 
     errors = validate_excalidraw(data)
     if errors:
-        print(f"ERROR: Invalid Excalidraw file:", file=sys.stderr)
-        for err in errors:
-            print(f"  - {err}", file=sys.stderr)
+        print(f"ERROR: Invalid Excalidraw file: {'; '.join(errors)}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        print("ERROR: playwright not installed.", file=sys.stderr)
+        print("Run: cd this skill's references/ directory, then uv sync && uv run playwright install chromium", file=sys.stderr)
         sys.exit(1)
 
     # Compute viewport size from element bounding box
@@ -127,12 +134,14 @@ def render(
         try:
             browser = p.chromium.launch(headless=True)
         except Exception as e:
-            if "Executable doesn't exist" in str(e) or "browserType.launch" in str(e):
+            if "Executable doesn't exist" in str(e):
                 print("ERROR: Chromium not installed for Playwright.", file=sys.stderr)
                 references = Path(__file__).resolve().parent
                 print(f"Run: cd {shlex.quote(str(references))} && uv run playwright install chromium", file=sys.stderr)
                 sys.exit(1)
-            raise
+            first_line = str(e).strip().splitlines()[0] if str(e).strip() else type(e).__name__
+            print(f"ERROR: Chromium failed to launch: {first_line}", file=sys.stderr)
+            sys.exit(1)
 
         page = browser.new_page(
             viewport={"width": vp_width, "height": vp_height},

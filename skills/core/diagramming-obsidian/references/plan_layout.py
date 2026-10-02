@@ -70,6 +70,40 @@ def estimate_evidence_size(text: str) -> tuple[int, int]:
     return (width, height)
 
 
+def json_type(value: object) -> str:
+    """Name a parsed JSON value's type the way JSON does, for error messages."""
+    if isinstance(value, bool):
+        return "a boolean"
+    if isinstance(value, (int, float)):
+        return "a number"
+    names = {dict: "an object", list: "an array", str: "a string", type(None): "null"}
+    return names[type(value)]
+
+
+def spec_errors(spec: object) -> str | None:
+    """Return why `spec` is not a layout spec this script can plan, or None if it is."""
+    if not isinstance(spec, dict):
+        return f"top level is {json_type(spec)}, not an object"
+    canvas = spec.get("canvas", {})
+    if not isinstance(canvas, dict):
+        return f"'canvas' is {json_type(canvas)}, not an object"
+    zones = spec.get("zones", [])
+    if not isinstance(zones, list):
+        return f"'zones' is {json_type(zones)}, not an array"
+    for z, zone in enumerate(zones):
+        if not isinstance(zone, dict):
+            return f"zone {z} is {json_type(zone)}, not an object"
+        elements = zone.get("elements", [])
+        if not isinstance(elements, list):
+            return f"zone {z} 'elements' is {json_type(elements)}, not an array"
+        for i, el in enumerate(elements):
+            if not isinstance(el, dict):
+                return f"zone {z} element {i} is {json_type(el)}, not an object"
+            if "id" not in el:
+                return f"zone {z} element {i} has no 'id'"
+    return None
+
+
 def plan_zone(zone: dict, start_y: float, canvas_width: int) -> dict:
     """Plan layout for a single zone. Returns zone layout with element coords."""
     elements = zone.get("elements", [])
@@ -206,7 +240,17 @@ def main() -> None:
         print(f"ERROR: File not found: {args.input}", file=sys.stderr)
         sys.exit(1)
 
-    spec = json.loads(args.input.read_text(encoding="utf-8"))
+    try:
+        spec = json.loads(args.input.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        print(f"ERROR: Invalid JSON: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    problem = spec_errors(spec)
+    if problem:
+        print(f"ERROR: Not a layout spec: {problem}", file=sys.stderr)
+        sys.exit(1)
+
     layout = plan_layout(spec)
 
     output = json.dumps(layout, indent=2)

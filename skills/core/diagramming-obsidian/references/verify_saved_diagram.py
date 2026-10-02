@@ -9,7 +9,8 @@ What is checked depends on the save path, which the drawing block reveals:
 
   Manual-fallback path (uncompressed ```json``` block):
     1. Format markers: catches the silent corruption hand-writing causes.
-    2. The JSON parses and the canvas re-renders.
+    2. The JSON parses and the canvas re-renders, into a fresh temporary
+       directory so concurrent runs never share a file.
     3. The re-rendered PNG's byte size is compared against /tmp/diagram.png
        when present. A large delta signals JSON structural damage.
 
@@ -21,6 +22,7 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -53,25 +55,28 @@ def extract_json_block(content: str) -> tuple[str, bool]:
 
 
 def render_and_compare(json_text: str, reference_png: Path | None) -> None:
-    verify_path = Path('/tmp/verify.excalidraw')
-    verify_path.write_text(json_text)
-    out_png = Path('/tmp/diagram-post-save.png')
-    result = subprocess.run(
-        ['uv', 'run', 'python', 'render_excalidraw.py',
-         str(verify_path), '--output', str(out_png), '--scale', '2'],
-        cwd=Path(__file__).parent, capture_output=True, text=True,
-    )
-    if result.returncode != 0:
-        fail(f'render failed: {result.stderr.strip()}')
-
-    if reference_png and reference_png.exists():
-        ref_size = reference_png.stat().st_size
-        new_size = out_png.stat().st_size
-        ratio = new_size / ref_size if ref_size else 0
-        if not (0.5 <= ratio <= 2.0):
-            fail(f'post-save render size deviates sharply from pre-save '
-                 f'(ref={ref_size}, new={new_size}, ratio={ratio:.2f}) — '
-                 f'likely JSON corruption during save')
+    with tempfile.TemporaryDirectory(prefix='verify-diagram-') as scratch:
+        verify_path = Path(scratch) / 'verify.excalidraw'
+        verify_path.write_text(json_text)
+        out_png = Path(scratch) / 'diagram-post-save.png'
+        try:
+            result = subprocess.run(
+                ['uv', 'run', 'python', 'render_excalidraw.py',
+                 str(verify_path), '--output', str(out_png), '--scale', '2'],
+                cwd=Path(__file__).parent, capture_output=True, text=True,
+            )
+        except FileNotFoundError:
+            fail('render failed: `uv` not found on PATH')
+        if result.returncode != 0:
+            fail(f'render failed: {result.stderr.strip()}')
+        if reference_png and reference_png.exists():
+            ref_size = reference_png.stat().st_size
+            new_size = out_png.stat().st_size
+            ratio = new_size / ref_size if ref_size else 0
+            if not (0.5 <= ratio <= 2.0):
+                fail(f'post-save render size deviates sharply from pre-save '
+                     f'(ref={ref_size}, new={new_size}, ratio={ratio:.2f}) — '
+                     f'likely JSON corruption during save')
 
 
 def main() -> None:
@@ -93,7 +98,10 @@ def main() -> None:
               'rendered (ea.create path: markers only)')
         return
 
-    json.loads(json_text)
+    try:
+        json.loads(json_text)
+    except json.JSONDecodeError as e:
+        fail(f'drawing block is not valid JSON: {e}')
     render_and_compare(json_text, Path('/tmp/diagram.png'))
     print('OK: format markers present, JSON parses, post-save render succeeds')
 

@@ -10,7 +10,8 @@ Detects:
   3. Text-text overlaps (free-floating labels too close)
   4. Text-shape overlaps (label overlaps a shape it's not contained in)
 
-Output: JSON report with overlap details and fix suggestions.
+Output: a formatted report with overlap details and fix suggestions; pass
+--json for the same report as JSON.
 """
 
 from __future__ import annotations
@@ -153,6 +154,35 @@ def _min_gap(a: tuple, b: tuple) -> float:
     if x_gap == 0 and y_gap == 0:
         return 0  # overlapping
     return min(x_gap, y_gap) if x_gap > 0 and y_gap > 0 else max(x_gap, y_gap)
+
+
+def json_type(value: object) -> str:
+    """Name a parsed JSON value's type the way JSON does, for error messages."""
+    if isinstance(value, bool):
+        return "a boolean"
+    if isinstance(value, (int, float)):
+        return "a number"
+    names = {dict: "an object", list: "an array", str: "a string", type(None): "null"}
+    return names[type(value)]
+
+
+def scene_errors(data: object) -> str | None:
+    """Return why `data` is not a scene this script can check, or None if it is."""
+    if not isinstance(data, dict):
+        return f"top level is {json_type(data)}, not an object"
+    if "elements" not in data:
+        return "missing 'elements' array"
+    elements = data["elements"]
+    if not isinstance(elements, list):
+        return f"'elements' is {json_type(elements)}, not an array"
+    for i, el in enumerate(elements):
+        if not isinstance(el, dict):
+            return f"element {i} is {json_type(el)}, not an object"
+        if "id" not in el:
+            return f"element {i} has no 'id'"
+        if "type" not in el:
+            return f"element {i} ({el['id']!r}) has no 'type'"
+    return None
 
 
 def check_overlaps(
@@ -417,6 +447,11 @@ def main() -> None:
         data = json.loads(args.input.read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
         print(f"ERROR: Invalid JSON: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    problem = scene_errors(data)
+    if problem:
+        print(f"ERROR: Not an Excalidraw scene: {problem}", file=sys.stderr)
         sys.exit(1)
 
     report = check_overlaps(data, args.min_overlap, args.padding)
