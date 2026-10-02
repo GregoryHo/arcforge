@@ -188,14 +188,6 @@ stays in force. All three relations point backwards: the named `D-id` is lower t
 entry naming it, and an entry never relates to itself (C3). Folding a superseded entry
 into the `<details>` index is unaffected — the rule compares `D-id`s, not positions.
 
-**From 6.2.1 (D-050).** A `Refines:` or `Extends:` must not name a decision that was
-already dead when the relation was written: C3 reports one whose target's `Status:`
-carries `Superseded-by: D-SSS` with `D-SSS` lower than the relating entry's own `D-id`.
-The order is what matters, because the log is append-only — a relation written while
-its target was live stays legal after a later decision kills the target. A target
-only *partially* superseded still governs its other clauses, and a `Proposed` target is
-still open, so both stay legal targets.
-
 ## How `check:product` reads these files
 
 - **Scope.** Decision entries are `### D-NNN` headings inside the `## Decision Log`
@@ -275,7 +267,7 @@ Fields beyond the base template, and where they are enforced. Everything marked
 | `Verification:` | decision entry | how the decision was proven to have landed: the command, test, or eval that fails if it regresses | prose |
 | `Residual:` | decision entry | what the decision knowingly leaves unsolved, so the next reader doesn't file it as a bug | prose |
 | `Cost accepted:` | decision entry | the price paid, stated up front — a decision that admits its cost survives review; one that hides it gets re-litigated | prose |
-| `Refines:` / `Extends:` | decision entry | narrows or widens an earlier decision without reversing it; the named decision must exist and be earlier — and, from 6.2.1, must not already be wholly superseded by a lower `D-id` (D-050) — and the relation itself adds no flip to it | `check:product` (C3) |
+| `Refines:` / `Extends:` | decision entry | narrows or widens an earlier decision without reversing it; the named decision must exist and be earlier, and the relation itself adds no flip to it | `check:product` (C3) |
 | `Supersedes: D-NNN (clause N)` | decision entry | clause-scoped reversal — only that clause dies | `check:product` (C3) |
 | `Status: Proposed` | decision entry | the choice is recorded but still open; it must resolve to `Accepted` or be superseded before its version ships | prose |
 | graduation tombstone | `BACKLOG.md` | a promoted wish leaves one struck-through line naming the version and `D-id` that took it, so a reader can tell "picked up" from "quietly dropped" | prose |

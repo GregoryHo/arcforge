@@ -52,7 +52,7 @@
 |---|---|---|---|
 | WP-A eval 引擎 | #212、#242 | dashboard 遇到只有 `infraError` / `gradeError` 的 pool 時顯示為儀器失敗，不再退回一般結果；同一天第二次 `eval report` 寫出新的副本而不覆寫，`eval history` 列出所有以日期開頭的副本 | eval B-13、B-9 |
 | WP-B loop 狀態與 observe hook | #244、#243 | loop 的 run-state 檔改成原子替換；observe hook 的 lazy start 遇到死掉行程的 lock 時回收它 | worktrees-loop B-4、learning 資料模型 |
-| WP-C `check:product` C3 | #163 | C3 回報寫入時目標已整筆 superseded 的 `Refines:` / `Extends:` | D-050、`product/AGENTS.md` |
+| WP-C `check:product` C3 | #163 | C3 回報寫入時目標已整筆 superseded 的 `Refines:` / `Extends:`；`product/AGENTS.md` 的段落與 Conventions 表的那一列跟 checker、測試放在同一個 PR，不在 roadmap PR 先寫 | D-050 |
 | WP-D roadmap PR | — | 本 PR：兩個版本的列、D-048 到 D-052、本計畫，以及 `releasing` skill 的措辭（D-052） | — |
 
 關鍵檔案（讀 issue 補充）：`scripts/lib/eval-dashboard/eval-dashboard.js`、`scripts/lib/eval-benchmark.js`、`scripts/cli/eval-command.js`、`scripts/lib/loop-state.js`、`hooks/observe/main.js`、`scripts/check-product.js`、`tests/scripts/check-product.test.js`。
@@ -127,7 +127,7 @@ spec：obsidian B-5、B-8；learning B-19；hooks B-6；sdd B-4；skill-system B
 - **每個工作包**：新增的測試先失敗、修正後轉綠；`npm test` 5 個 runner 全過；7 個 static check 全過；`npm run lint` 無錯誤。
 - **product 狀態**：每次改 `product/` 後執行 `npm run check:product`。
 - **6.2.1 發版前**：`git diff --stat v6.2.0..HEAD -- skills evals/scenarios evals/fixtures` 是空的；`node scripts/check-benchmark-freshness.js` 不需新 snapshot 就 exit 0（D-048）。
-- **C3（WP-C）**：`tests/scripts/check-product.test.js` 原本把「refine 已 superseded 的 entry」當正例，改成反例；另以正例鎖住 refiner 比 kill 早、部分 superseded、`Proposed` 目標，以及收進 `<details>` 的 entry（D-050）。
+- **C3（WP-C）**：`tests/scripts/check-product.test.js` 原本把「refine 已 superseded 的 entry」當正例，改成反例；其餘的反例與正例（`Refines:` 與 `Extends:`、收進 `<details>` 的目標、相同 `D-id` 的 Residual）放在同目錄的 `check-product-relation-liveness.test.js`（D-050）。
 - **6.3.0 量測前**：五支 scenario 的 PR 與 WP-F 都已合併；量測的 commit 記進帳本。
 - **6.3.0 發版前**：量測 commit 之後 `skills/`、`evals/scenarios/`、`evals/fixtures/` 沒有新的差異；trial session 總數不超過 80；未量測與兩次 BLOCK 的 scenario 都記進帳本。
 
