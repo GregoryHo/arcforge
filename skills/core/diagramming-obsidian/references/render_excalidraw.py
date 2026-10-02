@@ -237,6 +237,16 @@ def render(
 
 
 def main() -> None:
+    """Run, and report anything the checks above did not anticipate as one
+    line instead of a traceback. KeyboardInterrupt is not caught."""
+    try:
+        run()
+    except Exception as e:
+        print(f"ERROR: Unexpected {type(e).__name__}: {first_line(e)}", file=sys.stderr)
+        sys.exit(1)
+
+
+def run() -> None:
     parser = argparse.ArgumentParser(description="Render Excalidraw JSON to PNG")
     parser.add_argument("input", type=Path, help="Path to .excalidraw JSON file")
     parser.add_argument("--output", "-o", type=Path, default=None, help="Output PNG path (default: same name with .png)")

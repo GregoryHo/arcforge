@@ -28,6 +28,8 @@ from pathlib import Path
 
 import pytest
 
+from .helper_contract_support import REPLACEMENTS, contract_violations, run_all
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 REFERENCES = PROJECT_ROOT / "skills" / "core" / "diagramming-obsidian" / "references"
 SCRIPT = REFERENCES / "verify_saved_diagram.py"
@@ -317,6 +319,18 @@ def test_unreadable_saved_file_fails_with_one_line(tmp_path, kind):
     assert line.startswith(f"VERIFY FAILED: cannot read {path}: "), line
 
 
+def _running(pid: int) -> bool:
+    """Whether `pid` is still executing. A zombie counts as stopped: where PID 1
+    does not reap adopted children (some containers), a killed process stays
+    in the table and `os.kill(pid, 0)` alone would still succeed."""
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    state = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True).stdout.strip()
+    return bool(state) and not state.startswith("Z")
+
+
 @pytest.mark.parametrize("signum", [signal.SIGTERM, signal.SIGHUP], ids=["SIGTERM", "SIGHUP"])
 def test_signal_mid_render_removes_the_scratch_directory(tmp_path, signum):
     saved = tmp_path / "d.excalidraw.md"
@@ -346,14 +360,12 @@ def test_signal_mid_render_removes_the_scratch_directory(tmp_path, signum):
     assert proc.returncode == 128 + signum, stderr
     assert stderr.strip() == f"VERIFY FAILED: interrupted by {signal.Signals(signum).name}"
     assert not scratch.exists()
-    with pytest.raises(ProcessLookupError):  # the stub `uv` was killed and reaped
-        os.kill(call["pid"], 0)
+    assert not _running(call["pid"])  # the stub `uv`
     # The render under it is gone too: past the moment it would have written,
     # nothing has re-created the scratch directory and the process is dead.
     time.sleep(2)
     assert not scratch.exists()
-    with pytest.raises(ProcessLookupError):
-        os.kill(int(grandchild_log.read_text(encoding="utf-8")), 0)
+    assert not _running(int(grandchild_log.read_text(encoding="utf-8")))
 
 
 def test_without_killpg_an_interrupt_still_stops_the_renderer(monkeypatch):
@@ -367,3 +379,37 @@ def test_without_killpg_an_interrupt_still_stops_the_renderer(monkeypatch):
     finally:
         child.kill()
         child.wait()
+
+
+def test_an_unexpected_exception_is_one_failed_line_not_a_traceback(monkeypatch, capsys):
+    module = _load_module()
+
+    def explode():
+        raise TypeError("unhashable type: 'dict'\nsecond line")
+
+    monkeypatch.setattr(module, "run", explode)
+    with pytest.raises(SystemExit) as exit_info:
+        module.main()
+    assert exit_info.value.code == 1
+    assert capsys.readouterr().err == "VERIFY FAILED: unexpected TypeError: unhashable type: 'dict'\n"
+
+
+def test_mutated_saved_files_never_print_a_traceback(tmp_path):
+    # Every prefix of a valid manual-path file, and its drawing block replaced
+    # by each kind of JSON value.
+    whole = _manual(SCENE)
+    cases = [(f"prefix-{n}", whole[:n]) for n in range(0, len(whole), 7)]
+    cases += [(f"block={json.dumps(v)}", _manual(json.dumps(v))) for v in REPLACEMENTS]
+    env = _fake_uv(tmp_path, "ok")
+
+    def run(case):
+        name, content = case
+        path = tmp_path / f"{abs(hash(name))}.excalidraw.md"
+        path.write_text(content, encoding="utf-8")
+        proc = subprocess.run(
+            [sys.executable, str(SCRIPT), str(path)], capture_output=True, text=True, check=False, env=env
+        )
+        return name, proc
+
+    assert len(cases) > 40
+    assert contract_violations(run_all(cases, run), "VERIFY FAILED: ") == []

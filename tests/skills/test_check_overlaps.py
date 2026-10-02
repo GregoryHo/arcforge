@@ -6,6 +6,7 @@ issue types it detects, the `--json` report shape and verdicts, the
 `--min-overlap` / `--padding` flags, and the error exits on bad input.
 """
 
+import importlib.util
 import json
 import os
 import subprocess
@@ -13,6 +14,8 @@ import sys
 from pathlib import Path
 
 import pytest
+
+from .helper_contract_support import contract_violations, mutations, run_all
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "skills" / "core" / "diagramming-obsidian" / "references" / "check_overlaps.py"
@@ -250,6 +253,10 @@ def test_help_documents_the_flags():
             "ERROR: Not an Excalidraw scene: element 0 ('a') 'boundElements' holds a string, not an object",
         ),
         (
+            json.dumps({"elements": [rect("a", 0, 0, groupIds=[{"k": 1}])]}),
+            "ERROR: Not an Excalidraw scene: element 0 ('a') 'groupIds' holds an object, not a string",
+        ),
+        (
             json.dumps({"elements": [rect("a", 0, 0, groupIds={})]}),
             "ERROR: Not an Excalidraw scene: element 0 ('a') 'groupIds' is an object, not an array or null",
         ),
@@ -264,7 +271,7 @@ def test_help_documents_the_flags():
     ],
     ids=["top-level-array", "no-elements", "elements-not-array", "element-not-object", "element-without-id",
          "element-without-type", "id-null", "x-string", "points-string", "points-short-pair",
-         "bound-elements-string", "bound-element-not-object", "group-ids-object", "binding-string", "text-number"],
+         "bound-elements-string", "bound-element-not-object", "group-id-object", "group-ids-object", "binding-string", "text-number"],
 )
 def test_valid_json_that_is_not_a_scene_exits_1_with_one_error_line(tmp_path, raw, message):
     proc = _run(tmp_path, None, raw=raw)
@@ -277,3 +284,48 @@ def test_docstring_says_json_output_needs_the_flag():
     doc = SCRIPT.read_text(encoding="utf-8").split('"""')[1]
     assert "Output: JSON report" not in doc
     assert "--json" in doc
+
+
+def _load_module():
+    spec = importlib.util.spec_from_file_location(SCRIPT.stem, SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_an_unexpected_exception_is_one_error_line_not_a_traceback(monkeypatch, capsys):
+    # The last-resort guard under the specific checks: whatever escapes is
+    # still one line naming the exception, and a non-zero exit.
+    module = _load_module()
+
+    def explode():
+        raise TypeError("unhashable type: 'dict'\nsecond line")
+
+    monkeypatch.setattr(module, "run", explode)
+    with pytest.raises(SystemExit) as exit_info:
+        module.main()
+    assert exit_info.value.code == 1
+    assert capsys.readouterr().err == "ERROR: Unexpected TypeError: unhashable type: 'dict'\n"
+
+
+FUZZ_SCENE = {
+    "type": "excalidraw",
+    "elements": [
+        rect("r", 0, 0, groupIds=["g"], boundElements=[{"id": "a", "type": "arrow"}]),
+        text("t", 10, 10, value="label"),
+        arrow("a", -50, 20, [[0, 0], [200, 0]], startBinding={"elementId": "r"}),
+    ],
+}
+
+
+def test_mutated_scenes_never_print_a_traceback(tmp_path):
+    def run(case):
+        name, doc = case
+        path = tmp_path / f"{abs(hash(name))}.excalidraw"
+        path.write_text(json.dumps(doc), encoding="utf-8")
+        proc = subprocess.run([sys.executable, str(SCRIPT), str(path)], capture_output=True, text=True, check=False)
+        return name, proc
+
+    cases = mutations(FUZZ_SCENE)
+    assert len(cases) > 100
+    assert contract_violations(run_all(cases, run), "ERROR: ") == []

@@ -146,6 +146,17 @@ def render_and_compare(json_text: str, reference_png: Path | None) -> None:
 
 
 def main() -> None:
+    """Run, and report anything the checks above did not anticipate as one
+    line instead of a traceback. KeyboardInterrupt is not caught."""
+    try:
+        run()
+    except Exception as e:
+        text = str(e).strip()
+        cause = text.splitlines()[0] if text else ''
+        fail(f'unexpected {type(e).__name__}: {cause}')
+
+
+def run() -> None:
     if len(sys.argv) != 2:
         print('Usage: verify_saved_diagram.py <path-to-.excalidraw.md>',
               file=sys.stderr)

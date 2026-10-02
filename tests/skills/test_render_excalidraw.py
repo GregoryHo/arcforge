@@ -13,6 +13,7 @@ environment (`references/.venv`), and it skips when Chromium is not installed
 there.
 """
 
+import importlib.util
 import json
 import os
 import shlex
@@ -22,6 +23,8 @@ import sys
 from pathlib import Path
 
 import pytest
+
+from .helper_contract_support import contract_violations, mutations, run_all
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 REFERENCES = PROJECT_ROOT / "skills" / "core" / "diagramming-obsidian" / "references"
@@ -345,6 +348,42 @@ def test_unwritable_output_is_reported_before_launching_chromium(tmp_path, targe
     (line,) = proc.stderr.splitlines()
     assert line.startswith(f"ERROR: Cannot write {out}: "), line
     assert "launch" not in calls
+
+
+def test_an_unexpected_exception_is_one_error_line_not_a_traceback(tmp_path):
+    # sync_playwright() itself raising is outside every specific check: the
+    # last-resort guard still reports it as one line.
+    proc = _run(tmp_path, sync_api="def sync_playwright():\n    raise RuntimeError('driver gone\\nmore')\n")
+    assert proc.returncode == 1
+    assert proc.stderr == "ERROR: Unexpected RuntimeError: driver gone\n"
+
+
+FUZZ_SCENE = {
+    "type": "excalidraw",
+    "elements": [
+        {"id": "r", "type": "rectangle", "x": 0, "y": 0, "width": 100, "height": 60, "isDeleted": False},
+        {"id": "a", "type": "arrow", "x": -50, "y": 20, "points": [[0, 0], [200, 0]]},
+    ],
+}
+
+
+def test_mutated_scenes_never_print_a_traceback(tmp_path):
+    stub = _stub(tmp_path, RENDERS)
+    (stub / "playwright" / "stub.json").write_text(json.dumps({"fail_at": None}), encoding="utf-8")
+    env = {**os.environ, "PYTHONPATH": str(stub)}
+
+    def run(case):
+        name, doc = case
+        path = tmp_path / f"{abs(hash(name))}.excalidraw"
+        path.write_text(json.dumps(doc), encoding="utf-8")
+        proc = subprocess.run(
+            [sys.executable, str(SCRIPT), str(path)], capture_output=True, text=True, check=False, env=env
+        )
+        return name, proc
+
+    cases = mutations(FUZZ_SCENE)
+    assert len(cases) > 80
+    assert contract_violations(run_all(cases, run), "ERROR: ") == []
 
 
 @pytest.mark.skipif(

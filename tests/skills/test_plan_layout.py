@@ -7,6 +7,7 @@ never share an X-range, zone stacking, connection pass-through, and the error
 exits on bad input.
 """
 
+import importlib.util
 import json
 import os
 import subprocess
@@ -14,6 +15,8 @@ import sys
 from pathlib import Path
 
 import pytest
+
+from .helper_contract_support import contract_violations, mutations, run_all
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "skills" / "core" / "diagramming-obsidian" / "references" / "plan_layout.py"
@@ -246,10 +249,19 @@ def test_output_into_a_missing_directory_exits_1_with_one_error_line(tmp_path):
             "ERROR: Not a layout spec: zone 0 element 0 ('f') 'size' is an array, not a string",
         ),
         ("[" * 200_000, "ERROR: Invalid JSON: "),
+        (
+            json.dumps({"zones": [{"elements": [{"id": {"k": 1}}]}]}),
+            "ERROR: Not a layout spec: zone 0 element 0 'id' is an object, not a string",
+        ),
+        (json.dumps({"zones": [{"connections": None}]}), "ERROR: Not a layout spec: zone 0 'connections' is null, not an array"),
+        (json.dumps({"zones": [{"connections": [1]}]}), "ERROR: Not a layout spec: zone 0 connection 0 is a number, not an object"),
+        (json.dumps({"cross_zone_connections": "x"}), "ERROR: Not a layout spec: 'cross_zone_connections' is a string, not an array"),
+        (json.dumps({"cross_zone_connections": [[]]}), "ERROR: Not a layout spec: cross-zone connection 0 is an array, not an object"),
     ],
     ids=["invalid-json", "top-level-array", "canvas-not-object", "zones-not-array", "zone-not-object",
          "elements-not-array", "element-not-object", "element-without-id", "text-not-string", "size-not-string",
-         "nested-too-deep"],
+         "nested-too-deep", "id-not-string", "connections-null", "connection-not-object",
+         "cross-zone-not-array", "cross-zone-entry-not-object"],
 )
 def test_bad_spec_exits_1_with_one_error_line(tmp_path, raw, message):
     proc = _run(tmp_path, None, raw=raw)
@@ -257,3 +269,58 @@ def test_bad_spec_exits_1_with_one_error_line(tmp_path, raw, message):
     (line,) = proc.stderr.splitlines()
     assert line.startswith(message), line
     assert proc.stdout == ""
+
+
+def _load_module():
+    spec = importlib.util.spec_from_file_location(SCRIPT.stem, SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_an_unexpected_exception_is_one_error_line_not_a_traceback(monkeypatch, capsys):
+    # The last-resort guard under the specific checks: whatever escapes is
+    # still one line naming the exception, and a non-zero exit.
+    module = _load_module()
+
+    def explode():
+        raise TypeError("unhashable type: 'dict'\nsecond line")
+
+    monkeypatch.setattr(module, "run", explode)
+    with pytest.raises(SystemExit) as exit_info:
+        module.main()
+    assert exit_info.value.code == 1
+    assert capsys.readouterr().err == "ERROR: Unexpected TypeError: unhashable type: 'dict'\n"
+
+
+FUZZ_SPEC = {
+    "canvas": {"width": 800, "bg": "#ffffff"},
+    "zones": [
+        {
+            "id": "z",
+            "title": "CLIENT",
+            "elements": [
+                {"id": "f", "type": "flow", "text": "F", "shape": "rectangle", "size": "primary"},
+                {"id": "e", "type": "evidence", "text": "E"},
+            ],
+            "connections": [{"from": "f", "to": "e", "anchor": ["right", "left"]}],
+        }
+    ],
+    "cross_zone_connections": [{"from": "f", "to": "e"}],
+}
+
+
+def test_mutated_specs_never_print_a_traceback(tmp_path):
+    def run(case):
+        name, doc = case
+        path = tmp_path / f"{abs(hash(name))}.json"
+        path.write_text(json.dumps(doc), encoding="utf-8")
+        proc = subprocess.run(
+            [sys.executable, str(SCRIPT), str(path), "--ea-script"], capture_output=True, text=True, check=False
+        )
+        # --ea-script writes its outline to stderr on success; the contract is about failures.
+        return name, proc
+
+    cases = mutations(FUZZ_SPEC)
+    assert len(cases) > 100
+    assert contract_violations(run_all(cases, run), "ERROR: ") == []

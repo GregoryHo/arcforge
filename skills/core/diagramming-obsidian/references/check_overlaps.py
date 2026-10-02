@@ -183,12 +183,18 @@ def element_field_error(el: dict) -> str | None:
     for key in ("groupIds", "boundElements"):
         if el.get(key) is not None and not isinstance(el[key], list):
             return f"{key!r} is {json_type(el[key])}, not an array or null"
+    for group in el.get("groupIds") or []:
+        if not isinstance(group, str):
+            return f"'groupIds' holds {json_type(group)}, not a string"
     for bound in el.get("boundElements") or []:
         if not isinstance(bound, dict):
             return f"'boundElements' holds {json_type(bound)}, not an object"
     for key in ("startBinding", "endBinding"):
         if el.get(key) is not None and not isinstance(el[key], dict):
             return f"{key!r} is {json_type(el[key])}, not an object or null"
+        target = (el.get(key) or {}).get("elementId")
+        if target is not None and not isinstance(target, str):
+            return f"{key!r} 'elementId' is {json_type(target)}, not a string"
     for key in ("type", "text", "originalText"):
         if key in el and not isinstance(el[key], str):
             return f"{key!r} is {json_type(el[key])}, not a string"
@@ -466,6 +472,18 @@ def check_overlaps(
 
 
 def main() -> None:
+    """Run, and report anything the checks above did not anticipate as one
+    line instead of a traceback. KeyboardInterrupt is not caught."""
+    try:
+        run()
+    except Exception as e:
+        text = str(e).strip()
+        cause = text.splitlines()[0] if text else ""
+        print(f"ERROR: Unexpected {type(e).__name__}: {cause}", file=sys.stderr)
+        sys.exit(1)
+
+
+def run() -> None:
     parser = argparse.ArgumentParser(description="Check Excalidraw diagram for overlapping elements")
     parser.add_argument("input", type=Path, help="Path to .excalidraw JSON file")
     parser.add_argument("--min-overlap", type=float, default=100, help="Minimum overlap area (px²) to report for shapes (default: 100)")

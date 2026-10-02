@@ -101,9 +101,26 @@ def spec_errors(spec: object) -> str | None:
                 return f"zone {z} element {i} is {json_type(el)}, not an object"
             if "id" not in el:
                 return f"zone {z} element {i} has no 'id'"
+            if not isinstance(el["id"], str):
+                return f"zone {z} element {i} 'id' is {json_type(el['id'])}, not a string"
             for key in ("text", "size"):
                 if key in el and not isinstance(el[key], str):
                     return f"zone {z} element {i} ({el['id']!r}) {key!r} is {json_type(el[key])}, not a string"
+        problem = connections_error(zone.get("connections", []), f"zone {z} 'connections'", f"zone {z} connection")
+        if problem:
+            return problem
+    return connections_error(
+        spec.get("cross_zone_connections", []), "'cross_zone_connections'", "cross-zone connection"
+    )
+
+
+def connections_error(connections: object, name: str, entry: str) -> str | None:
+    """Return why a connection list is malformed, or None."""
+    if not isinstance(connections, list):
+        return f"{name} is {json_type(connections)}, not an array"
+    for i, conn in enumerate(connections):
+        if not isinstance(conn, dict):
+            return f"{entry} {i} is {json_type(conn)}, not an object"
     return None
 
 
@@ -233,6 +250,18 @@ def format_as_ea_script(layout: dict) -> str:
 
 
 def main() -> None:
+    """Run, and report anything the checks above did not anticipate as one
+    line instead of a traceback. KeyboardInterrupt is not caught."""
+    try:
+        run()
+    except Exception as e:
+        text = str(e).strip()
+        cause = text.splitlines()[0] if text else ""
+        print(f"ERROR: Unexpected {type(e).__name__}: {cause}", file=sys.stderr)
+        sys.exit(1)
+
+
+def run() -> None:
     parser = argparse.ArgumentParser(description="Plan Excalidraw diagram layout")
     parser.add_argument("input", type=Path, help="Path to spec JSON file")
     parser.add_argument("--output", "-o", type=Path, help="Output JSON path (default: stdout)")
