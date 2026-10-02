@@ -156,8 +156,8 @@ function loadInstinctFiles(dir) {
  * touching a pre-opt-in stub does not lift it above the floor — mtime alone
  * would, and every later session would then report a by-design stub as an
  * enricher failure. A copy that preserves NEITHER stamp still does, because the
- * learning config's `updated_at` is embedded and survives the same copy while
- * file stamps do not; ordinary restore tooling keeps mtime and so stays below
+ * learning config's stamps are embedded and survive the same copy while file
+ * stamps do not; ordinary restore tooling keeps mtime and so stays below
  * the floor.
  *
  * Fails open — an unreadable timestamp lets the stub probe decide.

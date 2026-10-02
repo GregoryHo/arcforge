@@ -391,7 +391,7 @@ checks the opt-in before each run and again immediately before each attempt to
 send a batch, so turning learning off mid-run — or off and back on — withdraws
 a batch that has not gone out yet; the next run rebuilds it under the new
 opt-in. It only ever sends what was recorded since
-learning was last turned on — observations by their own timestamp, and the
+learning was last turned on after being off in both scopes — observations by their own timestamp, and the
 diaries, reflections and recalls that go with them by theirs (a diary by the
 date it is filed under and when it was first written — though on a filesystem
 that records no creation time only the last modification is known, so there an
@@ -479,10 +479,15 @@ have to find them by surprise.
   drafts written after you turned learning on, judged by the file's creation and
   last-write times. A copy that resets both (a sync re-download, a naive unzip),
   or a filesystem that records no creation time, can make an older draft look
-  new and get reported. It also misses two cases: a draft first written before
-  you turned learning on and rewritten in place afterwards, and drafts written
-  between two opt-ins when you turn off the scope you enabled first — global on,
-  project on, global off moves the cutoff forward to the project's date.
+  new and get reported. Turning off one scope while the other stays on does
+  not move the cutoff: global on, project on, global off still counts from the
+  global date, because learning was never off in between. It does miss three
+  cases, where the cutoff lands later than it could: a draft first written
+  before you turned learning on and rewritten in place afterwards; a scope
+  turned off and back on, because each scope remembers only its latest
+  stretch — turn global back on and the cutoff moves forward to the project's
+  date; and a stretch that an arcforge older than 6.3 turned off, which is not
+  counted because arcforge cannot tell whether learning stayed on throughout.
 - **Only instincts are built.** The candidate format reserves other artifact
   types — `skill`, `command`, `agent`, `eval` and a repository-convention patch
   — but nothing can materialize or activate them yet, and nothing proposes them
