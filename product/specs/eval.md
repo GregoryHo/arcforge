@@ -1,6 +1,6 @@
 # eval — spec
 
-> Status: shipped v6.2.0 · extended by 6.2.1 (next) · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.2.1 · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
