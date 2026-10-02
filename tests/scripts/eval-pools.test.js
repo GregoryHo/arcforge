@@ -287,6 +287,16 @@ describe('pairArms', () => {
     expect(paired.error).toMatch(/^The treatment arm has no scored trial/);
   });
 
+  it('names both arms when neither has a scored trial', () => {
+    const failed = { passed: false, score: 0, infraError: true };
+    const paired = pairArms(
+      [at('2026-09-30T10:00:00Z', failed)],
+      [at('2026-09-30T10:00:01Z', failed)],
+    );
+    expect(paired.unscoredArm).toBe('baseline and treatment');
+    expect(paired.error).toMatch(/^The baseline and treatment arms have no scored trial/);
+  });
+
   it('makes the benchmark refuse an A/B comparison with no common pair', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'test-pair-bench-'));
     try {

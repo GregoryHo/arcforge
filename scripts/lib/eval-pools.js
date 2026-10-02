@@ -130,7 +130,8 @@ function poolsOf(rows) {
  * instruments, not two arms. A pair counts from when its later-starting arm
  * existed (the older of the two pools' latest rows). Every pool not chosen is
  * listed in `unpaired`; with no common pair at all, `error` says so, and
- * `unscoredArm` names an arm that holds rows but no scored trial.
+ * `unscoredArm` names the arm, or `baseline and treatment`, that holds rows
+ * but no scored trial.
  * @param {Object[]} baselineRows
  * @param {Object[]} treatmentRows
  * @returns {{ baseline: Object[], treatment: Object[], conditions: Object|null, unpaired: Array<{ arm: string, conditions: Object, rows: number }>, error?: string, unscoredArm?: string }}
@@ -160,10 +161,14 @@ function pairArms(baselineRows, treatmentRows) {
   if (!best) {
     // An arm whose every pool is errors has no measurement to pair: say that,
     // not that the conditions differ.
-    const unscoredArm = [
+    const unscored = [
       ['baseline', bPools],
       ['treatment', tPools],
-    ].find(([, pools]) => pools.length > 0 && !pools.some((p) => hasScore(p.rows)))?.[0];
+    ]
+      .filter(([, pools]) => pools.length > 0 && !pools.some((p) => hasScore(p.rows)))
+      .map(([arm]) => arm);
+    const unscoredArm = unscored.join(' and ');
+    const armsHave = unscored.length > 1 ? 'arms have' : 'arm has';
     return {
       baseline: [],
       treatment: [],
@@ -171,7 +176,7 @@ function pairArms(baselineRows, treatmentRows) {
       unpaired,
       ...(unscoredArm ? { unscoredArm } : {}),
       error: unscoredArm
-        ? `The ${unscoredArm} arm has no scored trial: every trial is an infra or grade error, an instrument failure, not a measurement, so no comparison is valid. Fix the failure and rerun eval ab.`
+        ? `The ${unscoredArm} ${armsHave} no scored trial: every trial is an infra or grade error, an instrument failure, not a measurement, so no comparison is valid. Fix the failure and rerun eval ab.`
         : 'The baseline and treatment arms have no run conditions in common (model, effort, ceiling, turn budget), so no comparison is valid. Rerun eval ab so both arms run under the same conditions.',
     };
   }

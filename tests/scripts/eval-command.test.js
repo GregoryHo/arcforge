@@ -234,6 +234,16 @@ describe('eval command', () => {
       expect(message).toContain('The treatment arm has no scored trial');
       expect(message).toContain('Instrument failure, not a measurement (treatment): 1 row(s)');
     });
+
+    it('names an error-only arm even when the other arm has no rows (#212)', async () => {
+      put('treatment', 1, { passed: false, score: 0, infraError: true });
+      const { message } = await runEvalCommand(args(['compare', 'paired']), {
+        projectRoot: tempDir,
+        asJson: false,
+      }).catch((err) => err);
+      expect(message).toContain('The treatment arm has no scored trial');
+      expect(message).toContain('Instrument failure, not a measurement (treatment): 1 row(s)');
+    });
   });
 
   describe('a full-toolkit workflow A/B needs --model and --effort up front', () => {

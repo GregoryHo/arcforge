@@ -406,9 +406,12 @@ plugin dir or the full toolkit. When the newest runs of the two arms don't match
 older matching pair is judged and the rest are listed as "Not combined". When
 the arms share no conditions at all, the comparison is refused and every pool
 is listed; rerun `eval ab` so both arms run under the same conditions. When an
-arm has rows but no scored trial, the refusal names that arm's instrument
-failure instead. The dashboard's A/B view shows a refusal the same way, with
-the reason and the pool lines, and never draws a comparison in its place.
+arm has rows but no scored trial, `compare` and the dashboard's A/B view refuse
+instead, even if the other arm has no rows, and the refusal names that arm's
+instrument failure; the benchmark's `compared` entry does the same when both
+arms have rows, and has no `compared` entry otherwise. The dashboard's A/B view
+shows a refusal with the reason and the pool lines, and never draws a
+comparison in its place.
 
 ## Benchmarks
 
