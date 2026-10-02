@@ -6,6 +6,8 @@ import os
 import hashlib
 from pathlib import Path
 
+import pytest
+
 from .lint_vault_support import (
     DRAFT,
     GAMMA,
@@ -242,6 +244,48 @@ def test_a_comment_opener_inside_a_code_span_crossing_a_line_opens_no_comment(va
     links = _run(vault)["links"]
     assert links["notes"]["Wiki/gamma-orphan.md"]["outbound"] == 1
     assert links["notes"]["Wiki/alpha-note-draft.md"]["inbound"] == 2
+
+
+# #210: an inline code span closes only on a run of its own length in the same
+# paragraph, and a fence opener interrupts the paragraph. Each body carries the
+# example `[[alpha-note]]`, which must not be a link, and the real
+# `[[alpha-note-draft]]`, which must be — often followed by a stray run that
+# would hide it if a fence's closer were read as a new span opener.
+SPAN_THEN_FENCE = {
+    "backtick-fence": "Text ```literal\n```\n[[alpha-note]]\n```\nReal: [[alpha-note-draft]], stray ``` run.\n",
+    "tilde-fence": "Text ```literal\n~~~\n[[alpha-note]]\n~~~\nReal: [[alpha-note-draft]], stray ``` run.\n",
+    "list-item-fence": "- Text ```literal\n  ```\n  [[alpha-note]]\n  ```\n  Real: [[alpha-note-draft]], stray ``` run.\n",
+    "nested-list-fence": "1. Step\n   - Text ```literal\n     ```\n     [[alpha-note]]\n     ```\n"
+    "     Real: [[alpha-note-draft]], stray ``` run.\n",
+    "callout-fence": "> [!note]\n> Text ```literal\n> ```\n> [[alpha-note]]\n> ```\n> Real: [[alpha-note-draft]], stray ``` run.\n",
+    "indented-fence": "Text ```literal\n   ```\n[[alpha-note]]\n   ```\nReal: [[alpha-note-draft]], stray ``` run.\n",
+    "other-run-length": "Text ``literal\n```\n[[alpha-note]]\n```\nReal: [[alpha-note-draft]], stray `` run.\n",
+    "blank-line": "Text ```literal\n\n```\n[[alpha-note]]\n```\nReal: [[alpha-note-draft]], stray ``` run.\n",
+    # Four spaces in a paragraph is continuation text, not a fence: the span
+    # closes there and the text after it is prose.
+    "four-space-run-closes-span": "A span ```crossing\n    ``` ends; [[alpha-note-draft]] is a link.\n",
+    # A backtick fence's info string holds no backtick (CommonMark), so neither
+    # line below is a fence: the `` span closes on the second, and the first is prose.
+    "span-with-backticks": "A span ``with ` and [[alpha-note]]\n```inside`` ends; [[alpha-note-draft]] after.\n",
+    "backticks-in-info": "```js `x` is prose, so [[alpha-note-draft]] is a link.\n",
+}
+
+
+@pytest.mark.parametrize("body", SPAN_THEN_FENCE.values(), ids=SPAN_THEN_FENCE.keys())
+def test_a_fence_after_an_unclosed_span_is_a_fence(vault, body):
+    (vault / "Wiki" / "gamma-orphan.md").write_text(GAMMA + "\n" + body, encoding="utf-8")
+    links = _run(vault)["links"]
+    assert links["notes"]["Wiki/gamma-orphan.md"]["outbound"] == 1
+    assert links["notes"]["Wiki/alpha-note.md"]["inbound"] == 1
+    assert links["notes"]["Wiki/alpha-note-draft.md"]["inbound"] == 2
+
+
+def test_a_fence_after_an_unclosed_span_is_a_fence_with_crlf_endings(vault):
+    body = (GAMMA + "\n" + SPAN_THEN_FENCE["backtick-fence"]).replace("\n", "\r\n")
+    (vault / "Wiki" / "gamma-orphan.md").write_bytes(body.encode("utf-8"))
+    links = _run(vault)["links"]
+    assert links["notes"]["Wiki/gamma-orphan.md"]["outbound"] == 1
+    assert links["notes"]["Wiki/alpha-note.md"]["inbound"] == 1
 
 
 def test_self_links_under_any_spelling_are_not_edges(vault):

@@ -32,10 +32,11 @@ HEADING_RE = re.compile(r"^(#{1,6})\s+(.*\S)")
 # is an indented code block whose backticks are literal text. A fence inside a
 # blockquote or Obsidian callout carries the container's `> ` prefix.
 QUOTE_PREFIX_RE = re.compile(r"^(?: {0,3}> ?)+")
-FENCE_OPEN_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})\s*(\S*)")
+# A backtick fence's info string holds no backtick, so ```js `x` is prose.
+FENCE_OPEN_RE = re.compile(r"^ {0,3}(`{3,}(?=[^`]*$)|~{3,})\s*(\S*)")
 # A code span opens with a run of backticks and closes with a run of the same
 # length: `a`, ``a ` b``, ```a``` — never a run of another length. It may cross
-# a line break but not a blank line (a paragraph end).
+# a line break but not a blank line or a fence (both end the paragraph).
 INLINE_CODE_RE = re.compile(r"(?<!`)(`+)(?!`)((?:(?!\n\n)[\s\S])+?)(?<!`)\1(?!`)")
 # Obsidian comments (`%% hidden %%`) and HTML comments are not rendered, so a
 # [[link]] inside one is not a link.
@@ -181,25 +182,43 @@ def _run_closer(run: str) -> re.Pattern:
     return re.compile(rf"(?<!`){run}(?!`)")
 
 
-def _span_closes(lines: list[str], i: int, run: str, pos: int) -> bool:
+def _line_content(line: str, offsets: list[int]) -> tuple[str, int]:
+    """(the line's content inside its blockquote or list item, its column).
+    `offsets` is the list-item stack (see _list_content), updated for this line."""
+    quoted = QUOTE_PREFIX_RE.match(line)
+    if quoted:
+        offsets.clear()
+        return line[quoted.end():], 0
+    if line.strip():
+        base, content = _list_content(line, offsets)
+        return content, base
+    return line, offsets[-1] if offsets else 0
+
+
+def _span_closes(lines: list[str], i: int, run: str, pos: int, offsets: list[int]) -> bool:
     """Whether a code span opened by `run` at `lines[i][pos:]` closes before the
-    paragraph ends (a blank line). An unclosed run is literal backticks."""
+    paragraph ends — at a blank line, or at a fence opener, which interrupts a
+    paragraph (CommonMark §4.5). `offsets` is the list-item stack at `lines[i]`.
+    An unclosed run is literal backticks."""
     closer = _run_closer(run)
     if closer.search(lines[i], pos):
         return True
+    offsets = list(offsets)
     for line in lines[i + 1 :]:
-        if not line.strip():
+        if not line.strip() or FENCE_OPEN_RE.match(_line_content(line, offsets)[0].rstrip()):
             return False
         if closer.search(line):
             return True
     return False
 
 
-def _comment_after(lines: list[str], i: int, closer: str | None, span: str | None):
+def _comment_after(
+    lines: list[str], i: int, closer: str | None, span: str | None, offsets: list[int]
+):
     """(comment closer, code-span run) still awaited at the end of `lines[i]`.
-    `closer` (`-->` or `%%`) and `span` are what was awaited at its start. An
-    opener inside a code span is code, even when the span crosses a line
-    break, so it opens no comment."""
+    `closer` (`-->` or `%%`) and `span` are what was awaited at its start, and
+    `offsets` is the list-item stack at `lines[i]`. An opener inside a code span
+    is code, even when the span crosses a line break, so it opens no comment."""
     line, pos = lines[i], 0
     while True:
         if span is not None:
@@ -217,7 +236,7 @@ def _comment_after(lines: list[str], i: int, closer: str | None, span: str | Non
             return None, None
         pos = token.end()
         if token.group(0).startswith("`"):
-            if _span_closes(lines, i, token.group(0), pos):
+            if _span_closes(lines, i, token.group(0), pos, offsets):
                 span = token.group(0)
         else:
             closer = COMMENT_CLOSERS[token.group(0)]
@@ -287,29 +306,23 @@ def _walk_fences(text: str):
                     yield "body", info, inner, bool(prefix or base)
                 continue
         if comment is not None:
-            comment, span = _comment_after(lines, i, comment, None)
+            comment, span = _comment_after(lines, i, comment, None, offsets)
             yield ("comment" if comment else "text"), "", line, False
             continue
         if span is not None:
             # Inside a code span that crosses lines: this line is span text.
-            comment, span = _comment_after(lines, i, None, span)
+            comment, span = _comment_after(lines, i, None, span, offsets)
             yield "text", "", line, False
             continue
         quoted = QUOTE_PREFIX_RE.match(line)
         prefix = quoted.group(0) if quoted else ""
-        if prefix:
-            offsets.clear()
-            base, content = 0, line[len(prefix):]
-        elif line.strip():
-            base, content = _list_content(line, offsets)
-        else:
-            base, content = (offsets[-1] if offsets else 0), line
+        content, base = _line_content(line, offsets)
         match = FENCE_OPEN_RE.match(content.rstrip())
         if match:
             marker, info = match.group(1), match.group(2).lower()
             yield "open", info, line, bool(prefix or base)
             continue
-        comment, span = _comment_after(lines, i, None, None)
+        comment, span = _comment_after(lines, i, None, None, offsets)
         yield "text", "", line, False
 
 
@@ -346,5 +359,11 @@ def text_lines(text: str) -> list[str]:
 
 def strip_code(text: str) -> str:
     """The text with fenced code blocks, inline code spans, and Obsidian / HTML
-    comments removed."""
-    return COMMENT_RE.sub("", INLINE_CODE_RE.sub("", "\n".join(text_lines(text))))
+    comments removed. Each fence line leaves a blank line: the fence ended the
+    paragraph before it, so no code span pairs runs across it."""
+    kept = [
+        line if state == "text" else ""
+        for state, _, line, _ in _walk_fences(text)
+        if state != "comment"
+    ]
+    return COMMENT_RE.sub("", INLINE_CODE_RE.sub("", "\n".join(kept)))
