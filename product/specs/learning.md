@@ -45,24 +45,39 @@ was recorded about them.
   capture. Status is always inspectable.
 - **B-19 The effective opt-in is the start of unbroken authorization.** Each
   scope's config records when its latest authorized period began, in
-  `enabled_at`: an enable that changes the state writes it, an enable or
-  disable that changes nothing leaves it as it is, and a disable keeps it —
-  a disable that finds none writes the stamp of the enable it is ending into
-  it, so a config from before the field exists keeps its start through the
-  first disable. The effective opt-in is the start of the unbroken stretch of
-  any-scope authorization that reaches the present, built from each scope's
-  latest period — `enabled_at` up to its disable, or to now while enabled. So
-  global on at T1, project on at T2 and global off at T3 later than T2 leaves
-  it at T1; with T3 earlier than T2 authorization did lapse, and it is T2. A
+  `enabled_at`. An enable that changes the state writes it, and an enable or
+  disable that changes nothing leaves it as it is. A disable writes into it
+  the start of the period it ends — the start the effective opt-in was
+  reading — so a config from before the field exists keeps its start through
+  its first disable. A disable also writes `disabled_at`, the same string as
+  the `updated_at` it stamps. An enabled scope's period runs to now from the
+  later of `enabled_at` and its `updated_at` — the file's mtime when it has no
+  `updated_at` — because an engine that predates `enabled_at` stamps only
+  `updated_at` when it enables. A disabled scope's period runs from
+  `enabled_at` to its disable, and counts only while `disabled_at` is the same
+  string as `updated_at`; otherwise an engine that does not know the marker
+  has changed the scope since, and the scope has no period. The effective
+  opt-in is the start of the unbroken stretch of any-scope authorization that
+  reaches the present, built from these periods. A disabled scope's period
+  joins the stretch only if its disable came strictly after the stretch
+  began; a disable and an enable at the same instant cannot be ordered, so
+  they read as a lapse. So global on at T1, project on at T2 and global off at
+  T3 later than T2 leaves it at T1; with T3 at or before T2 it is T2.
+  Whatever the stored stamps cannot settle resolves later, never earlier. A
   scope with no `enabled_at` reads as before: its `updated_at` while enabled,
   nothing while disabled. That one instant is both the stale-draft floor
   ([hooks](hooks.md) B-6) and the start of what the curator may analyze (B-1),
   which still never reaches back across a lapse. For a project with no
   recorded root only the global opt-in can authorize it, so its effective
   opt-in is read from the global scope alone, and with global off it has
-  none. Residual: only a scope's
-  latest period is kept, so an overlap that ended before that scope's last
-  re-enable is not recovered (D-051).
+  none. Residual: for a config arcforge wrote itself, under a clock that
+  never runs backwards, the instant can land later than the start of unbroken
+  authorization, never earlier. Only a scope's latest period is kept, so an
+  overlap that ended before that scope's last re-enable is not recovered. A
+  period that an engine older than 6.3 ended, or changed after a 6.3 disable,
+  is not counted. Same-instant stamps read as a lapse. Hand edits, a config
+  restored from a backup and a clock that ran backwards are outside that
+  guarantee (D-051, D-053).
 - **B-2 Exactly one automatic step in the candidate pipeline.** Once enabled,
   observations become review-queue candidates automatically — and that is the
   *only* step of that pipeline that happens by itself. Every subsequent arrow
@@ -302,8 +317,9 @@ and the operation record are the three formats pinned by
 `scripts/lib/learning.js` retains only the opt-in config and its `VALID_SCOPES`,
 so the statuses above are the ones both the dashboard and the CLI speak (D-012).
 That opt-in config, one file per scope, carries `enabled`, `updated_at` — the
-latest transition — and `enabled_at`, the start of the latest authorized period
-(B-19); keys the opt-in does not own are merged through, never dropped.
+latest transition — `enabled_at`, the start of the latest authorized period,
+and, once a disable has been recorded, `disabled_at`, the same string as the
+`updated_at` that disable stamped (B-19); keys the opt-in does not own are merged through, never dropped.
 
 The observer daemon finds a project's root through one record per project,
 `~/.arcforge/learning/project-roots/<project>.json`, shaped
@@ -387,3 +403,5 @@ data contracts live in `docs/decisions/learning-curator-schema/`.
   dead daemon's lock, as SessionStart already did (Data / domain model).
 - **D-051** — `enabled_at` keeps an overlapping opt-in, so a disable no longer
   advances the effective opt-in while another scope stays on (B-1, B-19).
+- **D-053** — a disabled scope's period counts only when its own disable
+  recorded it, and every ambiguity moves the instant later (B-19).

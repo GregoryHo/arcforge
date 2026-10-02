@@ -14,7 +14,7 @@ decision *and* every reversal. How to maintain this file: [`product/AGENTS.md`](
 | 6.1.2 | `v6.1.2` | docs-are-the-contract sweep | **shipped** | Where the docs promise what the engine does not do: CLI messages and contract drift, hooks promises the engine never kept, loop state bugs, contributor tooling and repo hygiene. It touches no eval-backed path — nothing under `skills/`, `evals/scenarios/` or `evals/fixtures/` — so it ships without a benchmark regeneration. | [cli](specs/cli.md) · [hooks](specs/hooks.md) · [learning](specs/learning.md) · [worktrees-loop](specs/worktrees-loop.md) · [obsidian](specs/obsidian.md) · [codex-harness](specs/codex-harness.md) |
 | 6.2.0 | `v6.2.0` | learning lifecycle · eval corpus repairs | **shipped** | Exits for candidates stuck at `approved` or `materialized`, `learn instinct deactivate` and `learn instinct restore`, a policy for candidate names, and worktree paths derived from the repo root; plus the scenario rubric fixes, measured in their own, smaller round. A minor because it adds CLI commands. | [learning](specs/learning.md) · [cli](specs/cli.md) · [worktrees-loop](specs/worktrees-loop.md) · [codex-harness](specs/codex-harness.md) · [eval](specs/eval.md) · [sdd](specs/sdd.md) |
 | 6.2.1 | `v6.2.1` | instrument and state repairs, no measurement | **shipped** | Repairs to promises already shipped: same-day benchmark snapshots stop overwriting each other and `eval history` lists them all, the eval dashboard shows an instrument-failure pool instead of hiding it, loop run state is written atomically, the observe hook's lazy daemon start reclaims a dead process's lock, `check:product` rejects a relation aimed at an already-dead decision, and the `releasing` skill describes what a squash-only ruleset does to the flip commit. Nothing under `skills/`, `evals/scenarios/` or `evals/fixtures/`, so it ships without a live eval session. | [eval](specs/eval.md) · [worktrees-loop](specs/worktrees-loop.md) · [learning](specs/learning.md) |
-| 6.3.0 | — | ceiling redesigns · skill-local script fixes · the enable stamp | **next ← we are here** | The five scenarios whose baseline sat at ceiling on the repaired instrument are redesigned and measured in one round capped at about 80 trial sessions; the `diagramming-obsidian` helpers and `lint_vault` fixes ride it because they sit under `skills/`; and the stale-draft floor stops losing an overlapping opt-in, through an additive `enabled_at` in the learning config. | [skill-system](specs/skill-system.md) · [obsidian](specs/obsidian.md) · [sdd](specs/sdd.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) |
+| 6.3.0 | — | ceiling redesigns · skill-local script fixes · the enable stamp | **next ← we are here** | The five scenarios whose baseline sat at ceiling on the repaired instrument are redesigned and measured in one round capped at about 80 trial sessions; the `diagramming-obsidian` helpers and `lint_vault` fixes ride it because they sit under `skills/`; and the stale-draft floor stops losing an overlapping opt-in, through an additive `enabled_at` and `disabled_at` stamps in the learning config. | [skill-system](specs/skill-system.md) · [obsidian](specs/obsidian.md) · [sdd](specs/sdd.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) |
 
 > Un-scheduled ideas live in the [Backlog](BACKLOG.md); a wish graduates into a
 > version (row + spec + Decision Log entry) when picked.
@@ -1362,3 +1362,38 @@ reverse one, append a superseding entry (see AGENTS.md).
   version bump without dragging the product history back with it — no longer
   holds on `main`. Reverting a release commit there reverts the flip too, and
   the flip has to be re-applied by hand.
+
+### D-053 — A disabled scope's period counts only when its own disable recorded it
+- Date: 2026-10-02
+- Version: 6.3.0
+- Refines: D-051
+- Status: Accepted
+- Decision: A 6.3 disable also writes `disabled_at`, equal to the
+  `updated_at` it stamps, and a disabled scope contributes its period only
+  while the two agree; an enabled scope's period starts at the later of
+  `enabled_at` and its `updated_at`, and a disable stores that start as
+  `enabled_at`; a disabled period joins the stretch only when its disable came
+  strictly after the other scope's period began; and every ambiguity resolves
+  the instant later, never earlier.
+- Why: Review of the D-051 branch enumerated mixed 6.2/6.3 histories and found
+  24 of 37,448 that read an instant earlier than the start of unbroken
+  authorization. A 6.2 engine stamps `updated_at` on its own transitions and
+  leaves `enabled_at` behind, so a 6.2 enable followed by a 6.2 disable
+  produced a period spanning an opt-out, and the curator would analyze across
+  it (B-1, D-023). The global config is machine-wide, so any older engine
+  touching it is enough; no deliberate downgrade is needed. Too late only
+  hides a stale-draft warning; too early breaks consent.
+- Verification: with the marker, zero early readings over 37,448 mixed
+  6.2/6.3 runs, 271,452 runs that also mix 6.1.0 (five events), 69,904
+  including 6.0.0 (four events), 18,724 6.3-only runs with tied instants, and
+  60,000 sampled six-event histories; tests in
+  `tests/scripts/learning-enabled-since.test.js` and
+  `tests/scripts/learning-opt-in-period.test.js`.
+- Residual: within the guarantee — configs arcforge wrote itself, a clock that
+  never runs backwards — errors fall on the late side only: a period an older
+  engine ended or changed is not counted, so the stale-draft warning stays
+  silent about drafts in it and the curator's window starts later than it
+  could (2,312 vs 1,532 late readings over the 37,448 mixed runs). Outside it
+  — hand edits, restored backups, a clock that ran backwards — the stamps are
+  read as written and the instant can land earlier.
+- Cost accepted: one more additive key per scope config.
