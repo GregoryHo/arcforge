@@ -14,13 +14,58 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import shlex
 import sys
 from pathlib import Path
+from typing import NoReturn
 
 
-def validate_excalidraw(data: dict) -> list[str]:
+def escape_unprintable(text: str) -> str:
+    """Escape every character that is not printable — controls, line and
+    paragraph separators, format characters, lone surrogates — as \\xNN,
+    \\uNNNN or \\UNNNNNNNN, so the text prints as exactly one line."""
+    out = []
+    for ch in text:
+        code = ord(ch)
+        if ch.isprintable():
+            out.append(ch)
+        elif code < 0x100:
+            out.append(f"\\x{code:02x}")
+        elif code < 0x10000:
+            out.append(f"\\u{code:04x}")
+        else:
+            out.append(f"\\U{code:08x}")
+    return "".join(out)
+
+
+MAX_ERROR_CHARS = 1000
+
+
+def fail(message: str, code: int = 1) -> NoReturn:
+    """Exit `code` (1 unless given) with `ERROR: <message>` as exactly one bounded stderr line.
+    Unprintable characters a quoted value or path may carry are escaped, so
+    the line cannot split, and a huge value is cut short."""
+    line = escape_unprintable(message)
+    if len(line) > MAX_ERROR_CHARS:
+        line = line[:MAX_ERROR_CHARS] + "… (truncated)"
+    print(f"ERROR: {line}", file=sys.stderr)
+    sys.exit(code)
+
+
+class OneLineParser(argparse.ArgumentParser):
+    """argparse, with a usage error as one `ERROR:` line and exit 2 instead
+    of the usage block; --help still prints the full usage and exits 0."""
+
+    def error(self, message: str) -> NoReturn:
+        fail(f"{message} (run with --help for usage)", code=2)
+
+
+def validate_excalidraw(data: object) -> list[str]:
     """Validate Excalidraw JSON structure. Returns list of errors (empty = valid)."""
+    if not isinstance(data, dict):
+        return ["top level is not an object"]
+
     errors: list[str] = []
 
     if data.get("type") != "excalidraw":
@@ -32,8 +77,34 @@ def validate_excalidraw(data: dict) -> list[str]:
         errors.append("'elements' must be an array")
     elif len(data["elements"]) == 0:
         errors.append("'elements' array is empty — nothing to render")
+    else:
+        for i, el in enumerate(data["elements"]):
+            problem = element_error(el)
+            if problem:
+                errors.append(f"element {i} {problem}")
 
     return errors
+
+
+def is_number(value: object) -> bool:
+    """A finite JSON number: not a boolean, and not inf, -inf or nan (which
+    JSON's `1e400`, `Infinity` and `NaN` decode to)."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def element_error(el: object) -> str | None:
+    """Return why an element cannot be measured for the viewport, or None."""
+    if not isinstance(el, dict):
+        return "is not an object"
+    for key in ("x", "y", "width", "height"):
+        if key in el and not is_number(el[key]):
+            return f"{key!r} is not a finite number"
+    points = el.get("points", [])
+    if not isinstance(points, list) or not all(
+        isinstance(p, list) and len(p) == 2 and is_number(p[0]) and is_number(p[1]) for p in points
+    ):
+        return "'points' is not an array of [x, y] finite number pairs"
+    return None
 
 
 def compute_bounding_box(elements: list[dict]) -> tuple[float, float, float, float]:
@@ -70,6 +141,21 @@ def compute_bounding_box(elements: list[dict]) -> tuple[float, float, float, flo
     return (min_x, min_y, max_x, max_y)
 
 
+def first_line(error: Exception) -> str:
+    """The first line of an exception's message, or its type when it has none."""
+    text = str(error).strip()
+    return text.splitlines()[0] if text else type(error).__name__
+
+
+def close_quietly(browser: object) -> None:
+    """Close the browser on every exit path. A browser that already crashed
+    raises on close; the failure that crashed it has been reported."""
+    try:
+        browser.close()
+    except Exception:
+        pass  # already closed or crashed; the original error is what matters
+
+
 def render(
     excalidraw_path: Path,
     output_path: Path | None = None,
@@ -77,28 +163,27 @@ def render(
     max_width: int = 1920,
 ) -> Path:
     """Render an .excalidraw file to PNG. Returns the output PNG path."""
-    # Import playwright here so validation errors show before import errors
+    # Read and validate before importing playwright, so a broken diagram is
+    # reported as broken, not as a missing renderer.
     try:
-        from playwright.sync_api import sync_playwright
-    except ImportError:
-        print("ERROR: playwright not installed.", file=sys.stderr)
-        print("Run: cd this skill's references/ directory, then uv sync && uv run playwright install chromium", file=sys.stderr)
-        sys.exit(1)
+        raw = excalidraw_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as e:
+        fail(f"Cannot read {excalidraw_path}: {e}")
 
-    # Read and validate
-    raw = excalidraw_path.read_text(encoding="utf-8")
     try:
         data = json.loads(raw)
-    except json.JSONDecodeError as e:
-        print(f"ERROR: Invalid JSON in {excalidraw_path}: {e}", file=sys.stderr)
-        sys.exit(1)
+    except (json.JSONDecodeError, RecursionError) as e:
+        fail(f"Invalid JSON in {excalidraw_path}: {e}")
 
     errors = validate_excalidraw(data)
     if errors:
-        print(f"ERROR: Invalid Excalidraw file:", file=sys.stderr)
-        for err in errors:
-            print(f"  - {err}", file=sys.stderr)
-        sys.exit(1)
+        fail(f"Invalid Excalidraw file: {'; '.join(errors)}")
+
+    references = shlex.quote(str(Path(__file__).resolve().parent))
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        fail(f"playwright not installed. Run: cd {references} && uv sync && uv run playwright install chromium")
 
     # Compute viewport size from element bounding box
     elements = [e for e in data["elements"] if not e.get("isDeleted")]
@@ -111,15 +196,18 @@ def render(
     vp_width = min(int(diagram_w), max_width)
     vp_height = max(int(diagram_h), 600)
 
-    # Output path
+    # Output path, checked before Chromium starts
     if output_path is None:
         output_path = excalidraw_path.with_suffix(".png")
+    if output_path.is_dir():
+        fail(f"Cannot write {output_path}: it is a directory")
+    if not output_path.parent.is_dir():
+        fail(f"Cannot write {output_path}: directory {output_path.parent} does not exist")
 
     # Template path (same directory as this script)
     template_path = Path(__file__).parent / "render_template.html"
     if not template_path.exists():
-        print(f"ERROR: Template not found at {template_path}", file=sys.stderr)
-        sys.exit(1)
+        fail(f"Template not found at {template_path}")
 
     template_url = template_path.as_uri()
 
@@ -127,52 +215,63 @@ def render(
         try:
             browser = p.chromium.launch(headless=True)
         except Exception as e:
-            if "Executable doesn't exist" in str(e) or "browserType.launch" in str(e):
-                print("ERROR: Chromium not installed for Playwright.", file=sys.stderr)
-                references = Path(__file__).resolve().parent
-                print(f"Run: cd {shlex.quote(str(references))} && uv run playwright install chromium", file=sys.stderr)
-                sys.exit(1)
-            raise
+            if "Executable doesn't exist" in str(e):
+                fail(f"Chromium not installed for Playwright. Run: cd {references} && uv run playwright install chromium")
+            fail(f"Chromium failed to launch: {first_line(e)}")
 
-        page = browser.new_page(
-            viewport={"width": vp_width, "height": vp_height},
-            device_scale_factor=scale,
-        )
+        stage = "loading the render template"
+        try:
+            page = browser.new_page(
+                viewport={"width": vp_width, "height": vp_height},
+                device_scale_factor=scale,
+            )
+            page.goto(template_url)
 
-        # Load the template
-        page.goto(template_url)
+            # Wait for the ES module to load (imports from esm.sh)
+            stage = "loading the Excalidraw bundle"
+            page.wait_for_function("window.__moduleReady === true", timeout=30000)
 
-        # Wait for the ES module to load (imports from esm.sh)
-        page.wait_for_function("window.__moduleReady === true", timeout=30000)
+            # Inject the diagram data and render
+            stage = "rendering the diagram"
+            json_str = json.dumps(data)
+            result = page.evaluate(f"window.renderDiagram({json_str})")
 
-        # Inject the diagram data and render
-        json_str = json.dumps(data)
-        result = page.evaluate(f"window.renderDiagram({json_str})")
+            if not result or not result.get("success"):
+                error_msg = result.get("error", "Unknown render error") if result else "renderDiagram returned null"
+                fail(f"Render failed: {error_msg}")
 
-        if not result or not result.get("success"):
-            error_msg = result.get("error", "Unknown render error") if result else "renderDiagram returned null"
-            print(f"ERROR: Render failed: {error_msg}", file=sys.stderr)
-            browser.close()
-            sys.exit(1)
+            # Wait for render completion signal
+            page.wait_for_function("window.__renderComplete === true", timeout=15000)
 
-        # Wait for render completion signal
-        page.wait_for_function("window.__renderComplete === true", timeout=15000)
+            # Screenshot the SVG element
+            stage = "capturing the PNG"
+            svg_el = page.query_selector("#root svg")
+            if svg_el is None:
+                fail("No SVG element found after render.")
 
-        # Screenshot the SVG element
-        svg_el = page.query_selector("#root svg")
-        if svg_el is None:
-            print("ERROR: No SVG element found after render.", file=sys.stderr)
-            browser.close()
-            sys.exit(1)
-
-        svg_el.screenshot(path=str(output_path))
-        browser.close()
+            svg_el.screenshot(path=str(output_path))
+        except Exception as e:
+            cause = first_line(e)
+            if stage == "loading the Excalidraw bundle" and "Timeout" in cause:
+                fail(f"Render failed: timed out loading the Excalidraw bundle from esm.sh (network?): {cause}")
+            fail(f"Render failed while {stage}: {cause}")
+        finally:
+            close_quietly(browser)
 
     return output_path
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Render Excalidraw JSON to PNG")
+    """Run, and report anything the checks above did not anticipate as one
+    line instead of a traceback. KeyboardInterrupt is not caught."""
+    try:
+        run()
+    except Exception as e:
+        fail(f"Unexpected {type(e).__name__}: {first_line(e)}")
+
+
+def run() -> None:
+    parser = OneLineParser(description="Render Excalidraw JSON to PNG")
     parser.add_argument("input", type=Path, help="Path to .excalidraw JSON file")
     parser.add_argument("--output", "-o", type=Path, default=None, help="Output PNG path (default: same name with .png)")
     parser.add_argument("--scale", "-s", type=int, default=2, help="Device scale factor (default: 2)")
@@ -180,8 +279,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if not args.input.exists():
-        print(f"ERROR: File not found: {args.input}", file=sys.stderr)
-        sys.exit(1)
+        fail(f"File not found: {args.input}")
 
     png_path = render(args.input, args.output, args.scale, args.width)
     print(str(png_path))

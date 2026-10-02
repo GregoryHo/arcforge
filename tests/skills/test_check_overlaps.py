@@ -6,12 +6,16 @@ issue types it detects, the `--json` report shape and verdicts, the
 `--min-overlap` / `--padding` flags, and the error exits on bad input.
 """
 
+import importlib.util
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+
+from .helper_contract_support import contract_violations, mutations, run_all
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "skills" / "core" / "diagramming-obsidian" / "references" / "check_overlaps.py"
@@ -153,8 +157,7 @@ def test_shapes_closer_than_30px_are_crowded_and_low_severity(tmp_path):
 
 
 def test_default_output_is_a_formatted_report_not_json(tmp_path):
-    # The docstring says "Output: JSON report"; JSON needs `--json`, which the
-    # skill's Phase 2 command does not pass. Pinned as the formatted text.
+    # JSON needs `--json`, which the skill's Phase 2 command does not pass.
     proc = _run(tmp_path, [rect("box", 0, 0), arrow("arr", -100, 50, [[0, 0], [400, 0]])])
     assert proc.returncode == 0, proc.stderr
     lines = proc.stdout.splitlines()
@@ -181,10 +184,35 @@ def test_missing_file_exits_1_with_a_message(tmp_path):
     assert "ERROR: File not found:" in proc.stderr
 
 
-def test_invalid_json_exits_1_with_a_message(tmp_path):
-    proc = _run(tmp_path, None, raw="{not json")
+@pytest.mark.parametrize("raw", ["{not json", "[" * 200_000], ids=["not-json", "nested-too-deep"])
+def test_invalid_json_exits_1_with_one_error_line(tmp_path, raw):
+    proc = _run(tmp_path, None, raw=raw)
     assert proc.returncode == 1
-    assert "ERROR: Invalid JSON:" in proc.stderr
+    (line,) = proc.stderr.splitlines()
+    assert line.startswith("ERROR: Invalid JSON: "), line
+
+
+def _unreadable_input(tmp_path: Path, kind: str) -> Path:
+    if kind == "directory":
+        return tmp_path
+    path = tmp_path / "input"
+    if kind == "binary":
+        path.write_bytes(b"\x89PNG\r\n\x1a\n\x00\xff")
+    else:
+        path.write_text("{}", encoding="utf-8")
+        path.chmod(0)
+    return path
+
+
+@pytest.mark.parametrize("kind", ["binary", "directory", "no-permission"])
+def test_unreadable_input_exits_1_with_one_error_line(tmp_path, kind):
+    if kind == "no-permission" and os.geteuid() == 0:
+        pytest.skip("root reads a chmod 000 file")
+    path = _unreadable_input(tmp_path, kind)
+    proc = subprocess.run([sys.executable, str(SCRIPT), str(path)], capture_output=True, text=True, check=False)
+    assert proc.returncode == 1
+    (line,) = proc.stderr.splitlines()
+    assert line.startswith(f"ERROR: Cannot read {path}: "), line
 
 
 def test_help_documents_the_flags():
@@ -195,17 +223,154 @@ def test_help_documents_the_flags():
 
 
 @pytest.mark.parametrize(
-    "raw, error",
+    "raw, message",
     [
-        (json.dumps({"elements": [{"type": "rectangle", "x": 0, "y": 0, "width": 10, "height": 10}]}), "KeyError"),
-        (json.dumps([]), "AttributeError"),
+        (json.dumps([]), "ERROR: Not an Excalidraw scene: top level is an array, not an object"),
+        (json.dumps({"type": "excalidraw"}), "ERROR: Not an Excalidraw scene: missing 'elements' array"),
+        (json.dumps({"elements": {}}), "ERROR: Not an Excalidraw scene: 'elements' is an object, not an array"),
+        (json.dumps({"elements": ["x"]}), "ERROR: Not an Excalidraw scene: element 0 is a string, not an object"),
+        (
+            json.dumps({"elements": [{"type": "rectangle", "x": 0, "y": 0, "width": 10, "height": 10}]}),
+            "ERROR: Not an Excalidraw scene: element 0 has no 'id'",
+        ),
+        (json.dumps({"elements": [{"id": "a"}]}), "ERROR: Not an Excalidraw scene: element 0 ('a') has no 'type'"),
+        (json.dumps({"elements": [{"id": None, "type": "text"}]}), "ERROR: Not an Excalidraw scene: element 0 'id' is null, not a string"),
+        (json.dumps({"elements": [rect("a", "0", 0)]}), "ERROR: Not an Excalidraw scene: element 0 ('a') 'x' is a string, not a finite number"),
+        (
+            '{"elements": [{"id": "a", "type": "rectangle", "x": 1e400, "y": 0}]}',
+            "ERROR: Not an Excalidraw scene: element 0 ('a') 'x' is inf, not a finite number",
+        ),
+        (
+            '{"elements": [{"id": "a", "type": "rectangle", "x": 0, "y": -1e400}]}',
+            "ERROR: Not an Excalidraw scene: element 0 ('a') 'y' is -inf, not a finite number",
+        ),
+        (
+            '{"elements": [{"id": "a", "type": "arrow", "x": 0, "y": 0, "points": [[0, NaN]]}]}',
+            "ERROR: Not an Excalidraw scene: element 0 ('a') 'points' is not an array of [x, y] finite number pairs",
+        ),
+        (
+            json.dumps({"elements": [rect("a", True, 0)]}),
+            "ERROR: Not an Excalidraw scene: element 0 ('a') 'x' is a boolean, not a finite number",
+        ),
+        (
+            json.dumps({"elements": [arrow("a", 0, 0, "bad")]}),
+            "ERROR: Not an Excalidraw scene: element 0 ('a') 'points' is not an array of [x, y] finite number pairs",
+        ),
+        (
+            json.dumps({"elements": [arrow("a", 0, 0, [[0, 0], [1]])]}),
+            "ERROR: Not an Excalidraw scene: element 0 ('a') 'points' is not an array of [x, y] finite number pairs",
+        ),
+        (
+            json.dumps({"elements": [rect("a", 0, 0, boundElements="x")]}),
+            "ERROR: Not an Excalidraw scene: element 0 ('a') 'boundElements' is a string, not an array or null",
+        ),
+        (
+            json.dumps({"elements": [rect("a", 0, 0, boundElements=["x"])]}),
+            "ERROR: Not an Excalidraw scene: element 0 ('a') 'boundElements' holds a string, not an object",
+        ),
+        (
+            json.dumps({"elements": [rect("a", 0, 0, groupIds=[{"k": 1}])]}),
+            "ERROR: Not an Excalidraw scene: element 0 ('a') 'groupIds' holds an object, not a string",
+        ),
+        (
+            json.dumps({"elements": [rect("a", 0, 0, groupIds={})]}),
+            "ERROR: Not an Excalidraw scene: element 0 ('a') 'groupIds' is an object, not an array or null",
+        ),
+        (
+            json.dumps({"elements": [arrow("a", 0, 0, [[0, 0]], startBinding="b")]}),
+            "ERROR: Not an Excalidraw scene: element 0 ('a') 'startBinding' is a string, not an object or null",
+        ),
+        (
+            json.dumps({"elements": [text("a", 0, 0, value=5)]}),
+            "ERROR: Not an Excalidraw scene: element 0 ('a') 'text' is a number, not a string",
+        ),
     ],
-    ids=["element-without-id", "top-level-array"],
+    ids=["top-level-array", "no-elements", "elements-not-array", "element-not-object", "element-without-id",
+         "element-without-type", "id-null", "x-string", "x-inf", "y-minus-inf", "points-nan", "x-boolean", "points-string", "points-short-pair",
+         "bound-elements-string", "bound-element-not-object", "group-id-object", "group-ids-object", "binding-string", "text-number"],
 )
-def test_malformed_but_valid_json_crashes_with_a_traceback(tmp_path, raw, error):
-    # KNOWN BUG (6.2.0): valid JSON that is not an Excalidraw scene — an element
-    # with no `id`, or a top-level array — escapes as an uncaught traceback
-    # instead of an `ERROR:` line. Pinned so the fix shows up as a test change.
+def test_valid_json_that_is_not_a_scene_exits_1_with_one_error_line(tmp_path, raw, message):
     proc = _run(tmp_path, None, raw=raw)
     assert proc.returncode == 1
-    assert "Traceback" in proc.stderr and error in proc.stderr
+    assert proc.stderr.strip() == message
+    assert proc.stdout == ""
+
+
+def test_docstring_says_json_output_needs_the_flag():
+    doc = SCRIPT.read_text(encoding="utf-8").split('"""')[1]
+    assert "Output: JSON report" not in doc
+    assert "--json" in doc
+
+
+def _load_module():
+    spec = importlib.util.spec_from_file_location(SCRIPT.stem, SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_an_unexpected_exception_is_one_error_line_not_a_traceback(monkeypatch, capsys):
+    # The last-resort guard under the specific checks: whatever escapes is
+    # still one line naming the exception, and a non-zero exit.
+    module = _load_module()
+
+    def explode():
+        raise TypeError("unhashable type: 'dict'\nsecond line")
+
+    monkeypatch.setattr(module, "run", explode)
+    with pytest.raises(SystemExit) as exit_info:
+        module.main()
+    assert exit_info.value.code == 1
+    assert capsys.readouterr().err == "ERROR: Unexpected TypeError: unhashable type: 'dict'\n"
+
+
+FUZZ_SCENE = {
+    "type": "excalidraw",
+    "elements": [
+        rect("r", 0, 0, groupIds=["g"], boundElements=[{"id": "a", "type": "arrow"}]),
+        text("t", 10, 10, value="label"),
+        arrow("a", -50, 20, [[0, 0], [200, 0]], startBinding={"elementId": "r"}),
+    ],
+}
+
+
+def test_mutated_scenes_never_print_a_traceback(tmp_path):
+    def run(case):
+        name, doc = case
+        path = tmp_path / f"{abs(hash(name))}.excalidraw"
+        path.write_text(json.dumps(doc), encoding="utf-8")
+        proc = subprocess.run([sys.executable, str(SCRIPT), str(path)], capture_output=True, text=True, check=False)
+        return name, proc
+
+    cases = mutations(FUZZ_SCENE)
+    assert len(cases) > 100
+    assert contract_violations(run_all(cases, run), "ERROR: ") == []
+
+
+@pytest.mark.parametrize(
+    "args, fragment",
+    [
+        ([], "the following arguments are required: input"),
+        (["in.json", "--bogus"], "unrecognized arguments: --bogus"),
+        (["in.json", "--min-overlap", "abc"], "argument --min-overlap: invalid float value: 'abc'"),
+    ],
+    ids=["missing-input", "unknown-option", "bad-value"],
+)
+def test_usage_error_is_one_line_and_exit_2(tmp_path, args, fragment):
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPT), *args], capture_output=True, text=True, check=False, cwd=tmp_path
+    )
+    assert proc.returncode == 2
+    (line,) = proc.stderr.splitlines()
+    assert line.startswith("ERROR: ") and fragment in line, line
+    assert line.endswith(" (run with --help for usage)")
+    assert "usage:" not in proc.stderr
+
+
+def test_help_prints_usage_on_stdout_and_exits_0(tmp_path):
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPT), "--help"], capture_output=True, text=True, check=False, cwd=tmp_path
+    )
+    assert proc.returncode == 0
+    assert proc.stdout.startswith("usage: ")
+    assert proc.stderr == ""

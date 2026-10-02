@@ -10,15 +10,58 @@ Detects:
   3. Text-text overlaps (free-floating labels too close)
   4. Text-shape overlaps (label overlaps a shape it's not contained in)
 
-Output: JSON report with overlap details and fix suggestions.
+Output: a formatted report with overlap details and fix suggestions; pass
+--json for the same report as JSON.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
+from typing import NoReturn
+
+
+def escape_unprintable(text: str) -> str:
+    """Escape every character that is not printable — controls, line and
+    paragraph separators, format characters, lone surrogates — as \\xNN,
+    \\uNNNN or \\UNNNNNNNN, so the text prints as exactly one line."""
+    out = []
+    for ch in text:
+        code = ord(ch)
+        if ch.isprintable():
+            out.append(ch)
+        elif code < 0x100:
+            out.append(f"\\x{code:02x}")
+        elif code < 0x10000:
+            out.append(f"\\u{code:04x}")
+        else:
+            out.append(f"\\U{code:08x}")
+    return "".join(out)
+
+
+MAX_ERROR_CHARS = 1000
+
+
+def fail(message: str, code: int = 1) -> NoReturn:
+    """Exit `code` (1 unless given) with `ERROR: <message>` as exactly one bounded stderr line.
+    Unprintable characters a quoted value or path may carry are escaped, so
+    the line cannot split, and a huge value is cut short."""
+    line = escape_unprintable(message)
+    if len(line) > MAX_ERROR_CHARS:
+        line = line[:MAX_ERROR_CHARS] + "… (truncated)"
+    print(f"ERROR: {line}", file=sys.stderr)
+    sys.exit(code)
+
+
+class OneLineParser(argparse.ArgumentParser):
+    """argparse, with a usage error as one `ERROR:` line and exit 2 instead
+    of the usage block; --help still prints the full usage and exits 0."""
+
+    def error(self, message: str) -> NoReturn:
+        fail(f"{message} (run with --help for usage)", code=2)
 
 
 def bbox(el: dict) -> tuple[float, float, float, float] | None:
@@ -153,6 +196,79 @@ def _min_gap(a: tuple, b: tuple) -> float:
     if x_gap == 0 and y_gap == 0:
         return 0  # overlapping
     return min(x_gap, y_gap) if x_gap > 0 and y_gap > 0 else max(x_gap, y_gap)
+
+
+def json_type(value: object) -> str:
+    """Name a parsed JSON value's type the way JSON does, for error messages."""
+    if isinstance(value, bool):
+        return "a boolean"
+    if isinstance(value, float) and not math.isfinite(value):
+        return str(value)  # inf, -inf or nan
+    if isinstance(value, (int, float)):
+        return "a number"
+    names = {dict: "an object", list: "an array", str: "a string", type(None): "null"}
+    return names[type(value)]
+
+
+def is_number(value: object) -> bool:
+    """A finite JSON number: not a boolean, and not inf, -inf or nan (which
+    JSON's `1e400`, `Infinity` and `NaN` decode to)."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def element_field_error(el: dict) -> str | None:
+    """Return the first field this script reads that has the wrong type, or None."""
+    for key in ("x", "y", "width", "height"):
+        if key in el and not is_number(el[key]):
+            return f"{key!r} is {json_type(el[key])}, not a finite number"
+    points = el.get("points", [])
+    if not isinstance(points, list) or not all(
+        isinstance(p, list) and len(p) >= 2 and is_number(p[0]) and is_number(p[1]) for p in points
+    ):
+        return "'points' is not an array of [x, y] finite number pairs"
+    for key in ("groupIds", "boundElements"):
+        if el.get(key) is not None and not isinstance(el[key], list):
+            return f"{key!r} is {json_type(el[key])}, not an array or null"
+    for group in el.get("groupIds") or []:
+        if not isinstance(group, str):
+            return f"'groupIds' holds {json_type(group)}, not a string"
+    for bound in el.get("boundElements") or []:
+        if not isinstance(bound, dict):
+            return f"'boundElements' holds {json_type(bound)}, not an object"
+    for key in ("startBinding", "endBinding"):
+        if el.get(key) is not None and not isinstance(el[key], dict):
+            return f"{key!r} is {json_type(el[key])}, not an object or null"
+        target = (el.get(key) or {}).get("elementId")
+        if target is not None and not isinstance(target, str):
+            return f"{key!r} 'elementId' is {json_type(target)}, not a string"
+    for key in ("type", "text", "originalText"):
+        if key in el and not isinstance(el[key], str):
+            return f"{key!r} is {json_type(el[key])}, not a string"
+    return None
+
+
+def scene_errors(data: object) -> str | None:
+    """Return why `data` is not a scene this script can check, or None if it is."""
+    if not isinstance(data, dict):
+        return f"top level is {json_type(data)}, not an object"
+    if "elements" not in data:
+        return "missing 'elements' array"
+    elements = data["elements"]
+    if not isinstance(elements, list):
+        return f"'elements' is {json_type(elements)}, not an array"
+    for i, el in enumerate(elements):
+        if not isinstance(el, dict):
+            return f"element {i} is {json_type(el)}, not an object"
+        if "id" not in el:
+            return f"element {i} has no 'id'"
+        if not isinstance(el["id"], str):
+            return f"element {i} 'id' is {json_type(el['id'])}, not a string"
+        if "type" not in el:
+            return f"element {i} ({el['id']!r}) has no 'type'"
+        problem = element_field_error(el)
+        if problem:
+            return f"element {i} ({el['id']!r}) {problem}"
+    return None
 
 
 def check_overlaps(
@@ -402,7 +518,18 @@ def check_overlaps(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Check Excalidraw diagram for overlapping elements")
+    """Run, and report anything the checks above did not anticipate as one
+    line instead of a traceback. KeyboardInterrupt is not caught."""
+    try:
+        run()
+    except Exception as e:
+        text = str(e).strip()
+        cause = text.splitlines()[0] if text else ""
+        fail(f"Unexpected {type(e).__name__}: {cause}")
+
+
+def run() -> None:
+    parser = OneLineParser(description="Check Excalidraw diagram for overlapping elements")
     parser.add_argument("input", type=Path, help="Path to .excalidraw JSON file")
     parser.add_argument("--min-overlap", type=float, default=100, help="Minimum overlap area (px²) to report for shapes (default: 100)")
     parser.add_argument("--padding", type=float, default=10, help="Padding around text elements for near-miss detection (default: 10)")
@@ -410,14 +537,21 @@ def main() -> None:
     args = parser.parse_args()
 
     if not args.input.exists():
-        print(f"ERROR: File not found: {args.input}", file=sys.stderr)
-        sys.exit(1)
+        fail(f"File not found: {args.input}")
 
     try:
-        data = json.loads(args.input.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as e:
-        print(f"ERROR: Invalid JSON: {e}", file=sys.stderr)
-        sys.exit(1)
+        raw = args.input.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as e:
+        fail(f"Cannot read {args.input}: {e}")
+
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, RecursionError) as e:
+        fail(f"Invalid JSON: {e}")
+
+    problem = scene_errors(data)
+    if problem:
+        fail(f"Not an Excalidraw scene: {problem}")
 
     report = check_overlaps(data, args.min_overlap, args.padding)
 

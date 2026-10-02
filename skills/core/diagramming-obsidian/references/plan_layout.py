@@ -38,6 +38,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import NoReturn
 
 # Size presets (width, height)
 SIZES = {
@@ -60,6 +61,46 @@ MIN_EVIDENCE_HEIGHT = 120
 EVIDENCE_TEXT_LINE_HEIGHT = 16  # approximate height per line of evidence text
 
 
+def escape_unprintable(text: str) -> str:
+    """Escape every character that is not printable — controls, line and
+    paragraph separators, format characters, lone surrogates — as \\xNN,
+    \\uNNNN or \\UNNNNNNNN, so the text prints as exactly one line."""
+    out = []
+    for ch in text:
+        code = ord(ch)
+        if ch.isprintable():
+            out.append(ch)
+        elif code < 0x100:
+            out.append(f"\\x{code:02x}")
+        elif code < 0x10000:
+            out.append(f"\\u{code:04x}")
+        else:
+            out.append(f"\\U{code:08x}")
+    return "".join(out)
+
+
+MAX_ERROR_CHARS = 1000
+
+
+def fail(message: str, code: int = 1) -> NoReturn:
+    """Exit `code` (1 unless given) with `ERROR: <message>` as exactly one bounded stderr line.
+    Unprintable characters a quoted value or path may carry are escaped, so
+    the line cannot split, and a huge value is cut short."""
+    line = escape_unprintable(message)
+    if len(line) > MAX_ERROR_CHARS:
+        line = line[:MAX_ERROR_CHARS] + "… (truncated)"
+    print(f"ERROR: {line}", file=sys.stderr)
+    sys.exit(code)
+
+
+class OneLineParser(argparse.ArgumentParser):
+    """argparse, with a usage error as one `ERROR:` line and exit 2 instead
+    of the usage block; --help still prints the full usage and exits 0."""
+
+    def error(self, message: str) -> NoReturn:
+        fail(f"{message} (run with --help for usage)", code=2)
+
+
 def estimate_evidence_size(text: str) -> tuple[int, int]:
     """Estimate evidence block size from text content."""
     lines = text.count("\\n") + text.count("\n") + 1
@@ -68,6 +109,60 @@ def estimate_evidence_size(text: str) -> tuple[int, int]:
     max_line = max((len(l) for l in text.replace("\\n", "\n").split("\n")), default=20)
     width = max(250, min(350, max_line * 8 + 40))
     return (width, height)
+
+
+def json_type(value: object) -> str:
+    """Name a parsed JSON value's type the way JSON does, for error messages."""
+    if isinstance(value, bool):
+        return "a boolean"
+    if isinstance(value, (int, float)):
+        return "a number"
+    names = {dict: "an object", list: "an array", str: "a string", type(None): "null"}
+    return names[type(value)]
+
+
+def spec_errors(spec: object) -> str | None:
+    """Return why `spec` is not a layout spec this script can plan, or None if it is."""
+    if not isinstance(spec, dict):
+        return f"top level is {json_type(spec)}, not an object"
+    canvas = spec.get("canvas", {})
+    if not isinstance(canvas, dict):
+        return f"'canvas' is {json_type(canvas)}, not an object"
+    zones = spec.get("zones", [])
+    if not isinstance(zones, list):
+        return f"'zones' is {json_type(zones)}, not an array"
+    for z, zone in enumerate(zones):
+        if not isinstance(zone, dict):
+            return f"zone {z} is {json_type(zone)}, not an object"
+        elements = zone.get("elements", [])
+        if not isinstance(elements, list):
+            return f"zone {z} 'elements' is {json_type(elements)}, not an array"
+        for i, el in enumerate(elements):
+            if not isinstance(el, dict):
+                return f"zone {z} element {i} is {json_type(el)}, not an object"
+            if "id" not in el:
+                return f"zone {z} element {i} has no 'id'"
+            if not isinstance(el["id"], str):
+                return f"zone {z} element {i} 'id' is {json_type(el['id'])}, not a string"
+            for key in ("text", "size"):
+                if key in el and not isinstance(el[key], str):
+                    return f"zone {z} element {i} ({el['id']!r}) {key!r} is {json_type(el[key])}, not a string"
+        problem = connections_error(zone.get("connections", []), f"zone {z} 'connections'", f"zone {z} connection")
+        if problem:
+            return problem
+    return connections_error(
+        spec.get("cross_zone_connections", []), "'cross_zone_connections'", "cross-zone connection"
+    )
+
+
+def connections_error(connections: object, name: str, entry: str) -> str | None:
+    """Return why a connection list is malformed, or None."""
+    if not isinstance(connections, list):
+        return f"{name} is {json_type(connections)}, not an array"
+    for i, conn in enumerate(connections):
+        if not isinstance(conn, dict):
+            return f"{entry} {i} is {json_type(conn)}, not an object"
+    return None
 
 
 def plan_zone(zone: dict, start_y: float, canvas_width: int) -> dict:
@@ -196,23 +291,49 @@ def format_as_ea_script(layout: dict) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Plan Excalidraw diagram layout")
+    """Run, and report anything the checks above did not anticipate as one
+    line instead of a traceback. KeyboardInterrupt is not caught."""
+    try:
+        run()
+    except Exception as e:
+        text = str(e).strip()
+        cause = text.splitlines()[0] if text else ""
+        fail(f"Unexpected {type(e).__name__}: {cause}")
+
+
+def run() -> None:
+    parser = OneLineParser(description="Plan Excalidraw diagram layout")
     parser.add_argument("input", type=Path, help="Path to spec JSON file")
     parser.add_argument("--output", "-o", type=Path, help="Output JSON path (default: stdout)")
     parser.add_argument("--ea-script", action="store_true", help="Also print EA script outline")
     args = parser.parse_args()
 
     if not args.input.exists():
-        print(f"ERROR: File not found: {args.input}", file=sys.stderr)
-        sys.exit(1)
+        fail(f"File not found: {args.input}")
 
-    spec = json.loads(args.input.read_text(encoding="utf-8"))
+    try:
+        raw = args.input.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as e:
+        fail(f"Cannot read {args.input}: {e}")
+
+    try:
+        spec = json.loads(raw)
+    except (json.JSONDecodeError, RecursionError) as e:
+        fail(f"Invalid JSON: {e}")
+
+    problem = spec_errors(spec)
+    if problem:
+        fail(f"Not a layout spec: {problem}")
+
     layout = plan_layout(spec)
 
     output = json.dumps(layout, indent=2)
 
     if args.output:
-        args.output.write_text(output, encoding="utf-8")
+        try:
+            args.output.write_text(output, encoding="utf-8")
+        except OSError as e:
+            fail(f"Cannot write {args.output}: {e}")
         print(f"Layout written to {args.output}", file=sys.stderr)
     else:
         print(output)

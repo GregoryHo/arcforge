@@ -91,9 +91,11 @@ work carries provenance a reader can check.
   comparing its size happen only on the manual-fallback path, which saves
   uncompressed JSON. A helper that cannot do its job — a missing file, input
   that is not JSON or not an Excalidraw scene, a renderer dependency that is
-  not installed — exits non-zero with one `ERROR:` line on stderr naming what
-  failed, never a Python traceback, so the agent reading it can act on the
-  cause. A helper validates its input before it checks for an optional
+  not installed — exits non-zero with one line on stderr naming what failed —
+  `VERIFY FAILED:` from the save verifier, `ERROR:` from the other helpers, a
+  missing renderer dependency's line ending in the command that installs it —
+  never a Python traceback (a user interrupt aside), so the agent reading it
+  can act on the cause. A helper validates its input before it checks for an optional
   dependency, so a broken diagram is reported as broken, not as a missing
   renderer (#228, D-049).
 - **B-9 The pair composes by invocation.** Diagram work inside a vault
