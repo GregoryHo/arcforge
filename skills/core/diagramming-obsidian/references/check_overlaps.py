@@ -18,8 +18,24 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
+from typing import NoReturn
+
+
+MAX_ERROR_CHARS = 1000
+
+
+def fail(message: str) -> NoReturn:
+    """Exit 1 with `ERROR: <message>` as exactly one bounded stderr line.
+    Control characters a quoted value or path may carry are escaped, so the
+    line cannot split, and a huge value is cut short."""
+    line = re.sub(r"[\x00-\x1f\x7f]", lambda m: f"\\x{ord(m.group()):02x}", message)
+    if len(line) > MAX_ERROR_CHARS:
+        line = line[:MAX_ERROR_CHARS] + "… (truncated)"
+    print(f"ERROR: {line}", file=sys.stderr)
+    sys.exit(1)
 
 
 def bbox(el: dict) -> tuple[float, float, float, float] | None:
@@ -479,8 +495,7 @@ def main() -> None:
     except Exception as e:
         text = str(e).strip()
         cause = text.splitlines()[0] if text else ""
-        print(f"ERROR: Unexpected {type(e).__name__}: {cause}", file=sys.stderr)
-        sys.exit(1)
+        fail(f"Unexpected {type(e).__name__}: {cause}")
 
 
 def run() -> None:
@@ -492,25 +507,21 @@ def run() -> None:
     args = parser.parse_args()
 
     if not args.input.exists():
-        print(f"ERROR: File not found: {args.input}", file=sys.stderr)
-        sys.exit(1)
+        fail(f"File not found: {args.input}")
 
     try:
         raw = args.input.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as e:
-        print(f"ERROR: Cannot read {args.input}: {e}", file=sys.stderr)
-        sys.exit(1)
+        fail(f"Cannot read {args.input}: {e}")
 
     try:
         data = json.loads(raw)
     except (json.JSONDecodeError, RecursionError) as e:
-        print(f"ERROR: Invalid JSON: {e}", file=sys.stderr)
-        sys.exit(1)
+        fail(f"Invalid JSON: {e}")
 
     problem = scene_errors(data)
     if problem:
-        print(f"ERROR: Not an Excalidraw scene: {problem}", file=sys.stderr)
-        sys.exit(1)
+        fail(f"Not an Excalidraw scene: {problem}")
 
     report = check_overlaps(data, args.min_overlap, args.padding)
 

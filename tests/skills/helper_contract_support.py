@@ -14,8 +14,13 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Iterator
 
-# Each field is replaced, in turn, by null, a number, a string, an object and an array.
-REPLACEMENTS = (None, 7, "s", {"k": 1}, [1])
+# Each field is replaced, in turn, by null, a number, a string, an object, an
+# array, a string carrying control characters, and a very long string.
+REPLACEMENTS = (None, 7, "s", {"k": 1}, [1], "bad\nvalue\r\x00\x1b[31m\x7f", "x" * 100_000)
+
+# A failure line may quote input, so it is bounded: the helpers cap the
+# message at 1000 characters, plus the prefix and the truncation marker.
+MAX_LINE = 1100
 
 
 def _paths(node, prefix: tuple = ()) -> Iterator[tuple]:
@@ -42,7 +47,7 @@ def _replace(doc, path: tuple, value):
 def mutations(doc) -> list[tuple[str, object]]:
     """Every field and array entry of `doc`, each replaced by every REPLACEMENTS value."""
     return [
-        (f"{'/'.join(map(str, path))}={json.dumps(value)}", _replace(doc, path, value))
+        (f"{'/'.join(map(str, path))}={json.dumps(value)[:40]}", _replace(doc, path, value))
         for path in _paths(doc)
         for value in REPLACEMENTS
     ]
@@ -61,6 +66,8 @@ def contract_violations(results: list[tuple[str, subprocess.CompletedProcess]], 
         lines = proc.stderr.splitlines()
         if "Traceback" in proc.stderr:
             bad.append(f"{name}: traceback\n{proc.stderr}")
-        elif proc.returncode != 0 and (len(lines) != 1 or not lines[0].startswith(prefix)):
-            bad.append(f"{name}: exit {proc.returncode}, stderr {proc.stderr!r}")
+        elif proc.returncode != 0 and (
+            len(lines) != 1 or not lines[0].startswith(prefix) or len(lines[0]) > MAX_LINE
+        ):
+            bad.append(f"{name}: exit {proc.returncode}, stderr {proc.stderr[:300]!r}")
     return bad

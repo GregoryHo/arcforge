@@ -40,8 +40,17 @@ FORMAT_MARKERS = {
 }
 
 
+MAX_FAILURE_CHARS = 1000
+
+
 def fail(msg: str) -> None:
-    print(f'VERIFY FAILED: {msg}', file=sys.stderr)
+    """Exit 1 with `VERIFY FAILED: <msg>` as exactly one bounded stderr line.
+    Control characters a path or the renderer's output may carry are escaped,
+    so the line cannot split, and a huge message is cut short."""
+    line = re.sub(r'[\x00-\x1f\x7f]', lambda m: f'\\x{ord(m.group()):02x}', msg)
+    if len(line) > MAX_FAILURE_CHARS:
+        line = line[:MAX_FAILURE_CHARS] + '… (truncated)'
+    print(f'VERIFY FAILED: {line}', file=sys.stderr)
     sys.exit(1)
 
 

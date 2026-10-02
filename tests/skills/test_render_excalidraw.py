@@ -274,6 +274,22 @@ def test_invalid_scene_exits_1_with_one_error_line_before_launching_chromium(tmp
     assert "Chromium" not in proc.stderr
 
 
+def test_control_characters_in_a_quoted_value_stay_on_the_one_line(tmp_path):
+    proc = _run(tmp_path, content=json.dumps({"type": "bad\nvalue", "elements": []}))
+    assert proc.returncode == 1
+    assert proc.stderr == (
+        "ERROR: Invalid Excalidraw file: Expected type 'excalidraw', got 'bad\\x0avalue'; "
+        "'elements' array is empty — nothing to render\n"
+    )
+
+
+def test_a_huge_quoted_value_is_cut_short(tmp_path):
+    proc = _run(tmp_path, content=json.dumps({"type": "x" * 100_000, "elements": [SCENE["elements"][0]]}))
+    assert proc.returncode == 1
+    (line,) = proc.stderr.splitlines()
+    assert line.endswith("… (truncated)") and len(line) <= len("ERROR: ") + 1000 + len("… (truncated)")
+
+
 def test_every_scene_problem_is_named_on_the_one_error_line(tmp_path):
     proc = _run(tmp_path, content=json.dumps({"type": "other"}))
     assert proc.returncode == 1

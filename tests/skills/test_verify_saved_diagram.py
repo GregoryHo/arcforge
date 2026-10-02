@@ -288,6 +288,18 @@ def test_manual_path_render_failure_reports_the_renderers_error_line_only(tmp_pa
     )
 
 
+def test_a_failure_with_control_characters_is_one_bounded_line(capsys):
+    module = _load_module()
+    with pytest.raises(SystemExit) as exit_info:
+        module.fail("render failed: ERROR: got 'a\nb\x1b[31m'")
+    assert exit_info.value.code == 1
+    assert capsys.readouterr().err == "VERIFY FAILED: render failed: ERROR: got 'a\\x0ab\\x1b[31m'\n"
+    with pytest.raises(SystemExit):
+        module.fail("x" * 100_000)
+    (line,) = capsys.readouterr().err.splitlines()
+    assert line == "VERIFY FAILED: " + "x" * 1000 + "… (truncated)"
+
+
 def test_manual_path_silent_render_failure_names_the_exit_status(tmp_path):
     proc = _verify(tmp_path, _manual(SCENE), _fake_uv(tmp_path, "silent"))
     assert proc.returncode == 1
