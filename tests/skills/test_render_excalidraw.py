@@ -256,11 +256,11 @@ def test_invalid_scene_is_reported_before_missing_playwright(tmp_path, content, 
         ("[" * 200_000, "ERROR: Invalid JSON in "),
         (
             json.dumps({"type": "excalidraw", "elements": [{"type": "rectangle", "x": "0"}]}),
-            "ERROR: Invalid Excalidraw file: element 0 'x' is not a number",
+            "ERROR: Invalid Excalidraw file: element 0 'x' is not a finite number",
         ),
         (
             json.dumps({"type": "excalidraw", "elements": [{"type": "arrow", "x": 0, "y": 0, "points": [[0]]}]}),
-            "ERROR: Invalid Excalidraw file: element 0 'points' is not an array of [x, y] number pairs",
+            "ERROR: Invalid Excalidraw file: element 0 'points' is not an array of [x, y] finite number pairs",
         ),
     ],
     ids=["invalid-json", "wrong-type", "no-elements", "elements-not-array", "elements-empty",
@@ -290,6 +290,19 @@ def test_any_line_break_or_unprintable_character_is_escaped(tmp_path, char):
     (line,) = proc.stderr.splitlines()
     escaped = f"\\x{ord(char):02x}" if ord(char) < 0x100 else f"\\u{ord(char):04x}"
     assert line == f"ERROR: Invalid Excalidraw file: Expected type 'excalidraw', got 'bad{escaped}value'"
+
+
+@pytest.mark.parametrize(
+    "value, field", [("1e400", "x"), ("-1e400", "y"), ("NaN", "width"), ("Infinity", "height")]
+)
+def test_a_non_finite_number_is_invalid_input_before_the_playwright_check(tmp_path, value, field):
+    # Reported as a broken diagram, not as a missing renderer and not as an
+    # overflow while sizing the viewport.
+    element = {"type": "rectangle", "x": 0, "y": 0, "width": 10, "height": 10}
+    raw = json.dumps({"type": "excalidraw", "elements": [element]}).replace(f'"{field}": {element[field]}', f'"{field}": {value}')
+    proc = _run(tmp_path, content=raw, sync_api=None, init="raise ImportError('x')")
+    assert proc.returncode == 1
+    assert proc.stderr == f"ERROR: Invalid Excalidraw file: element 0 '{field}' is not a finite number\n"
 
 
 def test_a_huge_quoted_value_is_cut_short(tmp_path):

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 from typing import NoReturn
@@ -201,6 +202,8 @@ def json_type(value: object) -> str:
     """Name a parsed JSON value's type the way JSON does, for error messages."""
     if isinstance(value, bool):
         return "a boolean"
+    if isinstance(value, float) and not math.isfinite(value):
+        return str(value)  # inf, -inf or nan
     if isinstance(value, (int, float)):
         return "a number"
     names = {dict: "an object", list: "an array", str: "a string", type(None): "null"}
@@ -208,19 +211,21 @@ def json_type(value: object) -> str:
 
 
 def is_number(value: object) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+    """A finite JSON number: not a boolean, and not inf, -inf or nan (which
+    JSON's `1e400`, `Infinity` and `NaN` decode to)."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
 def element_field_error(el: dict) -> str | None:
     """Return the first field this script reads that has the wrong type, or None."""
     for key in ("x", "y", "width", "height"):
         if key in el and not is_number(el[key]):
-            return f"{key!r} is {json_type(el[key])}, not a number"
+            return f"{key!r} is {json_type(el[key])}, not a finite number"
     points = el.get("points", [])
     if not isinstance(points, list) or not all(
         isinstance(p, list) and len(p) >= 2 and is_number(p[0]) and is_number(p[1]) for p in points
     ):
-        return "'points' is not an array of [x, y] number pairs"
+        return "'points' is not an array of [x, y] finite number pairs"
     for key in ("groupIds", "boundElements"):
         if el.get(key) is not None and not isinstance(el[key], list):
             return f"{key!r} is {json_type(el[key])}, not an array or null"

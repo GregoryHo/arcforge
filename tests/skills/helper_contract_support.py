@@ -27,6 +27,11 @@ REPLACEMENTS = (
     # Every other character str.splitlines() breaks on, and a lone surrogate.
     "a\x85b\u2028c\u2029d\x1ce\x1df\x1eg\vh\fi\ud800j",
     "x" * 100_000,
+    # Non-finite numbers: json.dumps writes these as Infinity / -Infinity / NaN,
+    # which json.loads (like `1e400`) decodes back to float inf / -inf / nan.
+    float("inf"),
+    float("-inf"),
+    float("nan"),
 )
 
 # A failure line may quote input, so it is bounded: the helpers cap the

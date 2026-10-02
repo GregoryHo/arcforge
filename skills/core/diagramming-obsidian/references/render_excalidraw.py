@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import shlex
 import sys
 from pathlib import Path
@@ -86,7 +87,9 @@ def validate_excalidraw(data: object) -> list[str]:
 
 
 def is_number(value: object) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+    """A finite JSON number: not a boolean, and not inf, -inf or nan (which
+    JSON's `1e400`, `Infinity` and `NaN` decode to)."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
 def element_error(el: object) -> str | None:
@@ -95,12 +98,12 @@ def element_error(el: object) -> str | None:
         return "is not an object"
     for key in ("x", "y", "width", "height"):
         if key in el and not is_number(el[key]):
-            return f"{key!r} is not a number"
+            return f"{key!r} is not a finite number"
     points = el.get("points", [])
     if not isinstance(points, list) or not all(
         isinstance(p, list) and len(p) == 2 and is_number(p[0]) and is_number(p[1]) for p in points
     ):
-        return "'points' is not an array of [x, y] number pairs"
+        return "'points' is not an array of [x, y] finite number pairs"
     return None
 
 

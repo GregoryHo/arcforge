@@ -235,14 +235,30 @@ def test_help_documents_the_flags():
         ),
         (json.dumps({"elements": [{"id": "a"}]}), "ERROR: Not an Excalidraw scene: element 0 ('a') has no 'type'"),
         (json.dumps({"elements": [{"id": None, "type": "text"}]}), "ERROR: Not an Excalidraw scene: element 0 'id' is null, not a string"),
-        (json.dumps({"elements": [rect("a", "0", 0)]}), "ERROR: Not an Excalidraw scene: element 0 ('a') 'x' is a string, not a number"),
+        (json.dumps({"elements": [rect("a", "0", 0)]}), "ERROR: Not an Excalidraw scene: element 0 ('a') 'x' is a string, not a finite number"),
+        (
+            '{"elements": [{"id": "a", "type": "rectangle", "x": 1e400, "y": 0}]}',
+            "ERROR: Not an Excalidraw scene: element 0 ('a') 'x' is inf, not a finite number",
+        ),
+        (
+            '{"elements": [{"id": "a", "type": "rectangle", "x": 0, "y": -1e400}]}',
+            "ERROR: Not an Excalidraw scene: element 0 ('a') 'y' is -inf, not a finite number",
+        ),
+        (
+            '{"elements": [{"id": "a", "type": "arrow", "x": 0, "y": 0, "points": [[0, NaN]]}]}',
+            "ERROR: Not an Excalidraw scene: element 0 ('a') 'points' is not an array of [x, y] finite number pairs",
+        ),
+        (
+            json.dumps({"elements": [rect("a", True, 0)]}),
+            "ERROR: Not an Excalidraw scene: element 0 ('a') 'x' is a boolean, not a finite number",
+        ),
         (
             json.dumps({"elements": [arrow("a", 0, 0, "bad")]}),
-            "ERROR: Not an Excalidraw scene: element 0 ('a') 'points' is not an array of [x, y] number pairs",
+            "ERROR: Not an Excalidraw scene: element 0 ('a') 'points' is not an array of [x, y] finite number pairs",
         ),
         (
             json.dumps({"elements": [arrow("a", 0, 0, [[0, 0], [1]])]}),
-            "ERROR: Not an Excalidraw scene: element 0 ('a') 'points' is not an array of [x, y] number pairs",
+            "ERROR: Not an Excalidraw scene: element 0 ('a') 'points' is not an array of [x, y] finite number pairs",
         ),
         (
             json.dumps({"elements": [rect("a", 0, 0, boundElements="x")]}),
@@ -270,7 +286,7 @@ def test_help_documents_the_flags():
         ),
     ],
     ids=["top-level-array", "no-elements", "elements-not-array", "element-not-object", "element-without-id",
-         "element-without-type", "id-null", "x-string", "points-string", "points-short-pair",
+         "element-without-type", "id-null", "x-string", "x-inf", "y-minus-inf", "points-nan", "x-boolean", "points-string", "points-short-pair",
          "bound-elements-string", "bound-element-not-object", "group-id-object", "group-ids-object", "binding-string", "text-number"],
 )
 def test_valid_json_that_is_not_a_scene_exits_1_with_one_error_line(tmp_path, raw, message):
