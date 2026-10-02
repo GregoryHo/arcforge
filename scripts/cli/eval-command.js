@@ -523,11 +523,12 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     };
     const bRows = eval_.loadResults(`${name}-baseline`, projectRoot, filterOpts);
     const tRows = eval_.loadResults(`${name}-treatment`, projectRoot, filterOpts);
-    if (bRows.length === 0 || tRows.length === 0) {
-      throw new Error('need both baseline and treatment results. Run: arcforge eval ab <name>');
-    }
     // Both arms on the newest pool pair that shares its conditions (B-8).
     const paired = pairArms(bRows, tRows);
+    // An error-only arm is named even when the other arm has no rows (B-13).
+    if ((bRows.length === 0 || tRows.length === 0) && !paired.unscoredArm) {
+      throw new Error('need both baseline and treatment results. Run: arcforge eval ab <name>');
+    }
     const unpairedLines = paired.unpaired.map((p) => otherPoolLines([p], p.arm)[0]);
     if (paired.error) {
       throw new Error([paired.error, ...unpairedLines.map((line) => `  ${line}`)].join('\n'));
@@ -647,22 +648,14 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
       }
     }
   } else if (subcommand === 'history') {
-    const benchmarkPath = path.join(projectRoot, eval_.BENCHMARKS_DIR);
-    if (!fs.existsSync(benchmarkPath)) {
+    if (!fs.existsSync(path.join(projectRoot, eval_.BENCHMARKS_DIR))) {
       console.log('No benchmarks yet. Run: arcforge eval report');
     } else {
-      const snapshots = fs
-        .readdirSync(benchmarkPath)
-        .filter((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f))
-        .sort();
+      const snapshots = benchmark_.listSnapshots(projectRoot);
       if (snapshots.length === 0) {
         console.log('No history snapshots yet. Run: arcforge eval report');
       } else {
-        for (const file of snapshots) {
-          const data = JSON.parse(fs.readFileSync(path.join(benchmarkPath, file), 'utf8'));
-          const evalCount = Object.keys(data.evals).length;
-          console.log(`  ${file.replace('.json', '')} — ${evalCount} evals`);
-        }
+        for (const s of snapshots) console.log(`  ${s.name} — ${s.evalCount} evals`);
       }
     }
   } else if (subcommand === 'dashboard') {

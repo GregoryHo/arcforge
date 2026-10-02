@@ -245,13 +245,81 @@ function generateRawBenchmarkData(projectRoot, generated = getTimestamp(), optio
   };
 }
 
-function writeRawBenchmarkData(projectRoot, rawData) {
-  const rawPath = path.join(projectRoot, BENCHMARKS_DIR, 'raw');
+/**
+ * A history snapshot's file name: `YYYY-MM-DD.json`, or `YYYY-MM-DD-<suffix>.json`.
+ * The writer's suffix is a counter for a later report on the same day; a
+ * hand-kept copy may carry any other suffix (e.g. `-v6.1.1`) and still counts.
+ */
+const SNAPSHOT_NAME_RE = /^\d{4}-\d{2}-\d{2}(?:-.+)?\.json$/;
+
+/** A `generated` value that names one instant: ISO 8601 with `Z` or an offset. */
+const INSTANT_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/;
+
+/**
+ * Write the dated aggregate snapshot and its raw export under one name: the
+ * first of `YYYY-MM-DD.json`, `YYYY-MM-DD-2.json`, `-3`, ... that neither
+ * directory holds. Each file is created exclusively, so a report running at the
+ * same moment moves on to the next name rather than overwriting this one.
+ * @param {string} projectRoot - Project root directory
+ * @param {string} dateStr - YYYY-MM-DD
+ * @param {string} json - Aggregate snapshot content
+ * @param {string} rawJson - Raw export content
+ * @returns {string} The file name both were written under
+ */
+function writeSnapshotPair(projectRoot, dateStr, json, rawJson) {
+  const benchmarkPath = path.join(projectRoot, BENCHMARKS_DIR);
+  const rawPath = path.join(benchmarkPath, 'raw');
   ensureDir(rawPath);
-  const json = `${JSON.stringify(rawData, null, 2)}\n`;
-  fs.writeFileSync(path.join(rawPath, 'latest.json'), json);
-  const dateStr = rawData.generated.split('T')[0];
-  fs.writeFileSync(path.join(rawPath, `${dateStr}.json`), json);
+  const claim = (file, content) => {
+    try {
+      fs.writeFileSync(file, content, { flag: 'wx' });
+      return true;
+    } catch (err) {
+      if (err.code === 'EEXIST') return false;
+      throw new Error(`Failed to write benchmark snapshot ${file}: ${err.message}`);
+    }
+  };
+  for (let n = 1; ; n++) {
+    const name = n === 1 ? `${dateStr}.json` : `${dateStr}-${n}.json`;
+    if (!claim(path.join(benchmarkPath, name), json)) continue;
+    if (claim(path.join(rawPath, name), rawJson)) return name;
+    // Only the raw name was taken: release the aggregate just written and move on.
+    fs.unlinkSync(path.join(benchmarkPath, name));
+  }
+}
+
+/**
+ * Every history snapshot under evals/benchmarks/, oldest first by the instant
+ * in its own `generated` (file name breaks a tie, counters by number).
+ * @param {string} projectRoot - Project root directory
+ * @returns {{name: string, generated: string, evalCount: number}[]}
+ */
+function listSnapshots(projectRoot) {
+  const benchmarkPath = path.join(projectRoot, BENCHMARKS_DIR);
+  if (!fs.existsSync(benchmarkPath)) return [];
+  const stem = (name) => name.replace(/\.json$/, '');
+  return fs
+    .readdirSync(benchmarkPath)
+    .filter((f) => SNAPSHOT_NAME_RE.test(f))
+    .map((f) => {
+      let data;
+      try {
+        data = JSON.parse(fs.readFileSync(path.join(benchmarkPath, f), 'utf8'));
+      } catch (err) {
+        throw new Error(`Failed to read benchmark snapshot ${f}: ${err.message}`);
+      }
+      const generated = data?.generated;
+      const time = INSTANT_RE.test(generated) ? Date.parse(generated) : Number.NaN;
+      const evals = data?.evals;
+      if (Number.isNaN(time) || typeof evals !== 'object' || !evals || Array.isArray(evals)) {
+        throw new Error(
+          `${f} in ${benchmarkPath} is not a benchmark snapshot (needs an ISO timestamp with a zone in generated, and evals); rename or move it`,
+        );
+      }
+      return { name: stem(f), generated, time, evalCount: Object.keys(evals).length };
+    })
+    .sort((a, b) => a.time - b.time || a.name.localeCompare(b.name, 'en', { numeric: true }))
+    .map(({ time, ...snapshot }) => snapshot);
 }
 
 /**
@@ -413,16 +481,12 @@ function generateBenchmark(projectRoot, options = {}) {
   };
 
   const rawData = generateRawBenchmarkData(projectRoot, benchmark.generated, resultFilter);
-  writeRawBenchmarkData(projectRoot, rawData);
-
-  const benchmarkPath = path.join(projectRoot, BENCHMARKS_DIR);
-  ensureDir(benchmarkPath);
+  const rawJson = `${JSON.stringify(rawData, null, 2)}\n`;
   const json = `${JSON.stringify(benchmark, null, 2)}\n`;
+  const benchmarkPath = path.join(projectRoot, BENCHMARKS_DIR);
+  writeSnapshotPair(projectRoot, benchmark.generated.split('T')[0], json, rawJson);
+  fs.writeFileSync(path.join(benchmarkPath, 'raw', 'latest.json'), rawJson);
   fs.writeFileSync(path.join(benchmarkPath, 'latest.json'), json);
-
-  // Write timestamped snapshot for history (same-day runs overwrite)
-  const dateStr = benchmark.generated.split('T')[0];
-  fs.writeFileSync(path.join(benchmarkPath, `${dateStr}.json`), json);
 
   return benchmark;
 }
@@ -491,7 +555,7 @@ module.exports = {
   benchmarkResultFilter,
   rawRowsForScenario,
   generateRawBenchmarkData,
-  writeRawBenchmarkData,
+  listSnapshots,
   comparisonFromAbResults,
   generateBenchmark,
   compareResults,

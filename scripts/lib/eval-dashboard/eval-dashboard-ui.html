@@ -242,8 +242,17 @@ async function api(path) {
   return ct.includes('json') ? res.json() : res.text();
 }
 function statusBadge(status) {
-  const cls = { SHIP:'badge-ship','NEEDS WORK':'badge-needs-work',BLOCKED:'badge-blocked','NO RUNS':'badge-no-runs' };
+  const cls = { SHIP:'badge-ship','NEEDS WORK':'badge-needs-work',BLOCKED:'badge-blocked','NO RUNS':'badge-no-runs','NO SCORED RUNS':'badge-no-runs' };
   return h('span', { className:'badge '+(cls[status]||'badge-no-runs') }, status);
+}
+// The status plus the instrument-failure lines eval list prints under it (#212).
+function statusCell(s) {
+  return h('td',null,statusBadge(s.status),...(s.failureLines||[]).map((line)=>h('div',{className:'mono-muted'},line)));
+}
+// A refused comparison (409) is shown with its reason, never dropped (#212).
+function refusalOrNull(err) {
+  const m = /^409: ([\s\S]*)$/.exec(err.message);
+  return m ? JSON.parse(m[1]) : null;
 }
 function verdictBadge(v) {
   const cls = { IMPROVED:'badge-improved',PASS:'badge-ship',INCONCLUSIVE:'badge-inconclusive',REGRESSED:'badge-regressed',INSUFFICIENT_DATA:'badge-insufficient' };
@@ -362,7 +371,7 @@ async function renderOutputsScenarios() {
         h('td',null,s.scope), h('td',null,s.grader),
         h('td',null,String(s.resultCount)),
         h('td',null,s.resultCount>0?scoreBar(s.passRate):h('span',null,'-')),
-        h('td',null,statusBadge(s.status)),
+        statusCell(s),
         h('td',{style:'font-size:11px;color:var(--text2)'},fmtTime(s.lastRun))
       );
       tbody.appendChild(row);
@@ -642,7 +651,7 @@ function buildBenchmarkHealth(scenarios, benchmark, rows) {
     healthCard(String(scenarios.length),'Active scenarios'),
     healthCard(String(covered),'In latest snapshot'),
     healthCard(String(counts.SHIP || 0),'SHIP'),
-    healthCard(String((counts.BLOCKED || 0)+(counts['NEEDS WORK'] || 0)+(counts['NO RUNS'] || 0)),'Need attention'),
+    healthCard(String((counts.BLOCKED || 0)+(counts['NEEDS WORK'] || 0)+(counts['NO RUNS'] || 0)+(counts['NO SCORED RUNS'] || 0)),'Need attention'),
     healthCard(String(metricRegressionCount),'Metric regressions'),
     healthCard(fmtPct(avgScore),'Avg score'),
     healthCard(String(totalTrials),'Snapshot trials')
@@ -771,9 +780,9 @@ function buildBenchmarkTable(rows) {
       h('td',null,h('a',null,s.name),h('div',{className:'mono-muted'},row.family)),
       h('td',null,s.scope),
       h('td',null,s.grader),
-      h('td',null,statusBadge(s.status)),
+      statusCell(s),
       h('td',null,entry ? fmtPct(entry.pass_rate)+' / '+fmtScore(entry.avg_score) : '-'),
-      h('td',null,entry?.compared ? (entry.compared.refused ? h('span',{className:'mono-muted'},'refused: arms share no run conditions') : h('span',null,entry.compared.verdict+' · '+(entry.compared.verdict_policy || '-'))) : h('span',{className:'mono-muted'},'no A/B')),
+      h('td',null,entry?.compared ? (entry.compared.refused ? h('span',{className:'mono-muted',title:entry.compared.refused},'refused: '+entry.compared.refused.split(/[:(]/)[0].trim()) : h('span',null,entry.compared.verdict+' · '+(entry.compared.verdict_policy || '-'))) : h('span',{className:'mono-muted'},'no A/B')),
       h('td',null,entry?.compared ? fmtDelta(entry.compared.delta, (n)=>n.toFixed(2)) : '-'),
       h('td',null,metricDeltaText(duration, (n)=>(n/1000).toFixed(2)+'s')),
       h('td',null,metricDeltaText(output, (n)=>Math.round(n).toLocaleString())),
@@ -805,7 +814,7 @@ async function showBenchmarkDetail(scenario) {
   content.textContent = 'Loading...';
   try {
     const [compareData, runsData] = await Promise.all([
-      api('/api/compare/'+encodeURIComponent(scenario)).catch(()=>null),
+      api('/api/compare/'+encodeURIComponent(scenario)).catch(refusalOrNull),
       api('/api/runs/'+encodeURIComponent(scenario)),
     ]);
     content.textContent = '';
@@ -813,7 +822,13 @@ async function showBenchmarkDetail(scenario) {
       h('a',{onclick:()=>renderBenchmark()},'Benchmark'),
       h('span',null,' / '+scenario)
     ));
-    if (compareData && (compareData.baseline?.stats||compareData.treatment?.stats)) {
+    if (compareData?.error) {
+      content.appendChild(h('h4',{style:'margin-bottom:12px;font-size:13px'},'A/B Comparison'));
+      content.appendChild(h('div',{className:'card'},
+        h('div',{className:'stat-label'},compareData.error),
+        ...(compareData.poolLines||[]).map((line)=>h('div',{className:'stat-label',style:'margin-top:4px'},line))
+      ));
+    } else if (compareData && (compareData.baseline?.stats||compareData.treatment?.stats)) {
       const bStats=compareData.baseline?.stats; const tStats=compareData.treatment?.stats;
       const dCls = compareData.delta>0?'delta-positive':compareData.delta<0?'delta-negative':'delta-neutral';
       content.appendChild(h('h4',{style:'margin-bottom:12px;font-size:13px'},'A/B Comparison'));
@@ -829,8 +844,7 @@ async function showBenchmarkDetail(scenario) {
         h('div',{className:'delta-value '+dCls},(compareData.delta>0?'+':'')+compareData.delta.toFixed(2)),
         verdictBadge(compareData.verdict),
         compareData.deltaCi?h('div',{className:'stat-label'},'CI: ['+compareData.deltaCi.lower+', '+compareData.deltaCi.upper+']'):null,
-        ...(compareData.otherPools||[]).map((p)=>h('div',{className:'stat-label',style:'margin-top:4px'},
-          'Not combined ('+p.arm+'): '+p.rows+' row(s), model '+(p.conditions.model??'unrecorded')+', effort '+(p.conditions.effort??'unrecorded')+', ceiling '+(p.conditions.trialTimeoutMs??'unrecorded')+' ms, max turns '+(p.conditions.maxTurns??'none')+', plugin dir '+(p.conditions.pluginDir==null?'unrecorded':p.conditions.pluginDir?'yes':'no')))
+        ...(compareData.poolLines||[]).map((line)=>h('div',{className:'stat-label',style:'margin-top:4px'},line))
       ));
       grid.appendChild(h('div',{className:'card'},
         h('div',{className:'card-title'},'Treatment'),

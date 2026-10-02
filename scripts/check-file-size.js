@@ -36,7 +36,7 @@ const ALLOWLIST = {
   'tests/scripts/learning-curator-materialize.test.js': 1186,
   'tests/scripts/learning-curator-proposal-ingestor.test.js': 1111,
   'tests/scripts/learning-curator-activate.test.js': 1109,
-  'tests/scripts/eval-dashboard.test.js': 955,
+  'tests/scripts/eval-dashboard.test.js': 938,
   'tests/scripts/eval-integration.test.js': 900,
   'tests/scripts/eval-stats.test.js': 835,
 };

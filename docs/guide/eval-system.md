@@ -394,8 +394,8 @@ scored pool stays current, and the failed pool is listed separately as
 "Instrument failure, not a measurement" (`instrumentFailure: true` in the JSON).
 When the run you just finished produced no scored trial, `eval run` says the
 verdict it prints belongs to the earlier scored pool, not to this run. `eval
-list` prints the failed pool under the scenario's verdict, and shows
-`NO SCORED RUNS` when nothing was ever scored.
+list` and the dashboard's scenario tables print the failed pool under the
+scenario's verdict, and show `NO SCORED RUNS` when nothing was ever scored.
 
 An A/B comparison (`compare`, the benchmark's `compared` entry, the dashboard's
 A/B view) pairs its arms rather than taking each arm's newest pool on its own.
@@ -405,7 +405,13 @@ the treatment itself: an isolated baseline against a treatment that loads a
 plugin dir or the full toolkit. When the newest runs of the two arms don't match, the
 older matching pair is judged and the rest are listed as "Not combined". When
 the arms share no conditions at all, the comparison is refused and every pool
-is listed; rerun `eval ab` so both arms run under the same conditions.
+is listed; rerun `eval ab` so both arms run under the same conditions. When an
+arm has rows but no scored trial, `compare` and the dashboard's A/B view refuse
+instead, even if the other arm has no rows, and the refusal names that arm's
+instrument failure; the benchmark's `compared` entry does the same when both
+arms have rows, and has no `compared` entry otherwise. The dashboard's A/B view
+shows a refusal with the reason and the pool lines, and never draws a
+comparison in its place.
 
 ## Benchmarks
 
@@ -416,9 +422,13 @@ arcforge eval report
 Aggregates everything on record into a snapshot: per-scenario trial counts, pass
 rates, average scores, 95% confidence intervals, and A/B comparisons where both
 arms exist. Snapshots are written under `evals/benchmarks/` as `latest.json` plus
-a date-stamped copy, so history is kept rather than overwritten.
+a date-stamped copy, so history is kept rather than overwritten. Each report
+takes the first of `YYYY-MM-DD.json`, `YYYY-MM-DD-2.json`, `-3`, ... that is not
+yet used for its date, so no report overwrites another's copy, even when two run
+at once. `latest.json` holds the most recent report.
 
-A per-trial export goes to `evals/benchmarks/raw/` the same way. Each raw row
+A per-trial export goes to `evals/benchmarks/raw/` the same way, under the same
+file name as its aggregate. Each raw row
 carries its run conditions (`model`, `effort`, `trialTimeoutMs`, `maxTurns`,
 `pluginDir`, `isolation`). Its baseline-relative fields (`baseline_score_avg`,
 `score_delta_vs_baseline_avg` and the rest) are computed against the baseline
@@ -436,6 +446,12 @@ hardening a behavior, when older rows from the same version would otherwise hold
 a scenario red for a problem you already fixed — and say so when you report the
 number, because a bounded snapshot and a full-history one are not the same
 measurement.
+
+`history` lists every date-stamped snapshot, oldest first by the time it was
+generated. A copy you keep by hand counts too, as long as its name is the date,
+a `-` and any suffix (`2026-10-01-v6.1.1.json`). A file named that way whose
+`generated` is not an ISO timestamp with a zone, or that has no `evals`, stops
+`history` with an error naming it.
 
 A snapshot is a summary, not a definition. It may name scenarios that were later
 retired; those entries are history, not active tests.
