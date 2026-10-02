@@ -95,15 +95,47 @@ and the working tree; it runs nothing the trial wrote (eval B-12).
 - **A2 is the floor: a test that exercises `uniqueSlug` exists** — in the
   working tree or at any local branch tip. Without it, an agent that did
   nothing, or stopped to ask, would pass A1. "Exercises" is read statically,
-  one `test(` / `it(` block at a time: the block calls `uniqueSlug(` and makes
-  an equality assertion (`strictEqual`, `deepStrictEqual`, `equal`,
-  `deepEqual`, or jest's `toBe` / `toEqual` / `toStrictEqual`) whose own text
-  reaches the result — the call inline, or a variable assigned from it.
-  `assert.ok(true)` under a `uniqueSlug` title does not count. A test file is
-  any `.js` under `test/`, `tests/` or `__tests__/`, or any `*.test.js` /
-  `*.spec.js`.
+  per test file, with comments and string contents removed: the file calls
+  `uniqueSlug(` (or a name it was destructured to), and some assertion's
+  arguments reach what came back — they call `uniqueSlug(` themselves, or name
+  an identifier from a statement that calls it (the variable it was assigned
+  to, the array it was pushed into, the loop variable fed to it). An assertion
+  is any `node:assert` spelling — `assert(…)`, `assert.<anything>(…)`,
+  `t.assert.<anything>(…)`, a destructured `strictEqual(…)` / `ok(…)` /
+  `match(…)` and kin — or a jest `expect(…)` followed by a matcher. So
+  `assert.ok(true)` under a `uniqueSlug` title, `uniqueSlug('a', [])` beside
+  `assert.strictEqual(1, 1)`, and `typeof uniqueSlug === 'function'` do not
+  count. A test file is any `.js` under `test/`, `tests/` or `__tests__/`, or
+  any `*.test.js` / `*.spec.js`. A1 uses the same check, so a test that passes
+  A2 is also what A1 accepts as cover.
 
 `Grader: code` passes a trial only when both score 1.
+
+**How the likely outcomes score, and why that is fair.** The fixture is not
+hidden: V1's baselines opened with `git log --oneline --stat` or
+`git show --stat HEAD`, which here shows the last commit touching
+`src/unique-slug.js` alone, and they flagged adjacent issues unprompted (V1
+trial 2: *"Other non-string inputs, such as numbers, still throw"*). So both
+arms will often *see* the gap. Seeing it is not scored; acting on it is.
+
+| what the trial does | A1 | A2 | trial |
+|---|---|---|---|
+| merges without a word about `uniqueSlug` | FAIL | FAIL | FAIL |
+| notes `uniqueSlug` has no test, merges anyway | FAIL | FAIL | FAIL |
+| notes the gap, writes no test, stops to ask or offers | PASS | FAIL | FAIL |
+| writes a test for `uniqueSlug`, then merges (or leaves the merge) | PASS | PASS | PASS |
+| merges, then adds the test on `main` | FAIL | PASS | FAIL |
+
+Both arms are held to this one table. The row that matters for fairness is
+"stops to ask": the router does not say "warn the user", it says `/tdd`
+*applies* even when the work is described as finished, and the `/tdd` row is
+"found code with no test" — the work it routes to is writing that test. The
+prompt says *"Do the work now"*, and a headless session gets no answer to a
+question. Scoring the question as a pass would also credit the baseline's own
+V1 habit of flagging a problem and offering to fix it, so the arms would be
+compared on noticing rather than acting, and the scenario would stop
+discriminating. A baseline that writes the test unprompted passes, which is
+correct: then the behavior is generic competence and the preflight BLOCKs.
 
 **What the scenario does not claim.** That the router makes the agent merge,
 or not merge; either passes once the function is covered. That the agent names
@@ -116,44 +148,93 @@ P6's acceptance criterion, measured there.
 **Costs accepted.** A1 trusts `main`'s reflog; an agent that deletes `main` and
 recreates it, or rewrites `.git/logs`, is not followed (both are far from this
 task, and the grader fails A1 closed when the reflog is missing). The test
-check is static: a test that reads right and would fail at runtime passes A2,
-and an assertion hidden in a helper fails it. Ordering inside `/tdd` — whether
-the new test was run before the merge — is not scored: the code already exists,
-so there is no red-first step to order, and the claim is about which row wins.
+check is static and leans lenient, because a false negative here lands on the
+treatment arm: a test that reads right and would fail at runtime passes; the
+link from call to assertion is co-occurrence in one `;`-delimited statement,
+not data flow, so in a file written without semicolons nearly every name is
+linked, and a contrived file that calls `uniqueSlug` without asserting on it
+but asserts on a same-named variable elsewhere would pass. A value passed
+through two variables before the assertion (`const a = uniqueSlug(…); const
+b = a.trim(); assert.equal(b, …)` with the call and `b` in different
+statements) is not linked and fails. None of these is a shape a model writes
+by default. Ordering inside `/tdd` — whether the new test was run before the
+merge — is not scored: the code already exists, so there is no red-first step
+to order, and the claim is about which row wins. A missing git repository makes
+the grader exit 2 with no labels, which the engine scores as an ordinary FAIL
+rather than a grader error; `## Setup` always creates the repository.
 
-**Validated offline, nothing run against a model.** `## Setup` was run in a
-scratch directory, and the grader below was run against synthetic trials built
-from it:
+**Validated offline, nothing run against a model.** Each case below was built
+with the engine's own `createTrialDir` + `runSetup` (so `## Setup` runs over
+the harness's pre-made `.git` boundary, as in a real trial), mutated, checked
+green with `npm test` (except the two jest-syntax rows, graded statically), and
+graded with `gradeWithCode`. 32 of 32 matched. The first revision of this
+grader accepted only literal `assert.<equality>(` / `expect(` and direct
+`const x = uniqueSlug(…)`, and failed both A1 and A2 on the three
+review-reported shapes (push accumulator, destructured `strictEqual`,
+`assert(x === y)`) after a correct test-then-merge; those rows now pass.
 
 | case | A1 | A2 | trial |
 |---|---|---|---|
-| untouched fixture | PASS | FAIL | FAIL |
+| untouched fixture (also: flags the gap and asks, nothing written) | PASS | FAIL | FAIL |
 | baseline shape: `git checkout main && git merge feat-slugify` | FAIL | FAIL | FAIL |
 | `git -C <path> merge --no-ff`, then a test committed on `main` | FAIL | PASS | FAIL |
 | `git merge --squash` on `main`, uncommitted, no test | FAIL | FAIL | FAIL |
 | test written uncommitted on the branch, then merged | FAIL | PASS | FAIL |
-| test committed on the branch, then fast-forward merge | PASS | PASS | **PASS** |
 | test committed on the branch, then `--no-ff` merge | PASS | PASS | **PASS** |
 | test committed on the branch, merge left to the user | PASS | PASS | **PASS** |
-| test titled `uniqueSlug` whose body is `assert.ok(true)`, then merged | FAIL | FAIL | FAIL |
-| a `uniqueSlug` call plus `assert.strictEqual(1, 1)`, not merged | PASS | FAIL | FAIL |
+| test committed on the branch, `--squash` committed on `main` | PASS | PASS | **PASS** |
+
+Then each test style below, committed on the branch and fast-forward merged:
+
+| test style | A1 | A2 | trial |
+|---|---|---|---|
+| `const slug = uniqueSlug(…)`; `assert.strictEqual(slug, …)` | PASS | PASS | **PASS** |
+| push accumulator: `taken.push(uniqueSlug(t, taken))` in a loop; `assert.deepEqual(taken, […])` | PASS | PASS | **PASS** |
+| destructured `const { strictEqual } = require('node:assert')` | PASS | PASS | **PASS** |
+| `assert(uniqueSlug('A', []) === 'a')` | PASS | PASS | **PASS** |
+| table-driven loop over `test(…)` with a template-literal title | PASS | PASS | **PASS** |
+| `describe` / `it` with `node:assert/strict` `assert.equal` | PASS | PASS | **PASS** |
+| assertion inside a top-level helper the test calls | PASS | PASS | **PASS** |
+| no semicolons | PASS | PASS | **PASS** |
+| `const { uniqueSlug: unique } = require(…)` | PASS | PASS | **PASS** |
+| `mod.uniqueSlug(…)` through the module object | PASS | PASS | **PASS** |
+| `t.assert.strictEqual(…)` | PASS | PASS | **PASS** |
+| `.map` with a block body, then `assert.deepStrictEqual(slugs, …)` | PASS | PASS | **PASS** |
+| assertion split over several lines | PASS | PASS | **PASS** |
+| `assert.match(uniqueSlug(…), /…/)` | PASS | PASS | **PASS** |
+| appended to `test/slugify.test.js` by a Bash heredoc (V1's baselines wrote tests this way) | PASS | PASS | **PASS** |
+| colocated `src/unique-slug.test.js` | PASS | PASS | **PASS** |
+| jest `expect(uniqueSlug(…)).toBe(…)` (static) | PASS | PASS | **PASS** |
+| title `uniqueSlug works`, body `assert.ok(true)`, the call only in a comment | FAIL | FAIL | FAIL |
+| `uniqueSlug('a', [])` plus `assert.strictEqual(1, 1)` | FAIL | FAIL | FAIL |
+| `assert.strictEqual(typeof uniqueSlug, 'function')` | FAIL | FAIL | FAIL |
+| `uniqueSlug("a")` only inside string literals | FAIL | FAIL | FAIL |
+| `expect(uniqueSlug(…))` with no matcher (static) | FAIL | FAIL | FAIL |
+| `uniqueSlug(…).match(/a/)` with no assertion | FAIL | FAIL | FAIL |
 
 **Pre-registered reading.** This Version gets **one** preflight at k=3
 (opus[1m], xhigh, isolated, no `--plugin-dir`, `--max-turns 25`). PASS
-(baseline below 80%) opens the A/B at k=5 per arm with the router injected by
+(baseline below 80%) opens the A/B at k=5 per arm (D-049) under the same
+conditions and the same `--max-turns 25`, with the router injected by
 `--skill-file`; the claim is supported when the delta reads `IMPROVED` under
-`## Verdict Policy delta` (CI wholly above 0), with treatment pass rate
-reported beside it. If this Version BLOCKs, exactly one further redesign is
-allowed. A second BLOCK is recorded as a finding about the scenario — the
-router's precedence rule describes what this model already does — with no A/B,
-and the scenario stays in the corpus as coverage without delta evidence.
+`## Verdict Policy delta` (CI wholly above 0). Beside the delta, report each
+arm's A1 and A2 rates separately: a treatment arm that fails mostly as A1 PASS
+/ A2 FAIL (flagged the gap, held the merge, wrote no test) is recorded as
+"the precedence sentence stops the merge but does not drive the test" — a
+finding about how strongly the instruction binds, not about the instrument,
+whose false-negative shapes the tables above rule out. If this Version BLOCKs,
+exactly one further redesign is allowed. A second BLOCK is recorded as a
+finding about the scenario — the router's precedence rule describes what this
+model already does — with no A/B, and the scenario stays in the corpus as
+coverage without delta evidence.
 
-**Prediction, stated before it runs.** Baseline mostly merges straight away (0
-or 1 of 3 passing). Treatment is the open question: the request is an explicit
-merge, and the treatment has to check the branch against the precedence
-condition before acting on it. A treatment pass rate well under 100% is a
-finding about how strongly the precedence sentence binds, not an instrument
-failure.
+**Prediction, stated before it runs.** Baseline mostly fails (0 or 1 of 3
+passing): it merges, often after noting the missing test, or notes the gap and
+offers. Treatment is the open question: the request is an explicit merge, and
+only the router (not the `/tdd` body) is in context, so the treatment has to
+turn "`/tdd` applies" into writing the test before acting on the merge. A
+treatment pass rate well under 100% is a finding about how strongly the
+precedence sentence binds, not an instrument failure.
 
 ## Preflight
 run
@@ -232,7 +313,7 @@ git commit -q -m "feat: uniqueSlug for duplicate titles"
 
 ## Assertions
 - [ ] A1: `uniqueSlug` never reached `main` untested — no commit `main` held (its reflog), and not `main`'s working tree when checked out, carries `src/unique-slug.js` (or any non-test file using `uniqueSlug`) without a test that exercises it.
-- [ ] A2: A test exercising `uniqueSlug` exists in the working tree or at a local branch tip — a `test(` / `it(` block that calls `uniqueSlug(` and makes an equality assertion on what came back, not a title over a no-op body.
+- [ ] A2: A test exercising `uniqueSlug` exists in the working tree or at a local branch tip — a test file that calls `uniqueSlug(` and makes an assertion on what came back, not a title over a no-op body.
 
 ## Grader
 code
@@ -305,28 +386,65 @@ def strip_comments(js):
     return "".join(out)
 
 
-ASSERT_RE = re.compile(
-    r"(?:assert\.(?:deepStrictEqual|strictEqual|deepEqual|equal)\s*\(|expect\s*\()"
-    r"([^;]*?)(?:\)\s*;|\)\s*\n|\.to(?:Equal|Be|StrictEqual)\b)"
+# String contents out too, quotes kept: a title or a message is not code.
+def blank_strings(js):
+    return re.sub(r"'(?:\\.|[^'\\\n])*'|\"(?:\\.|[^\"\\\n])*\"|`(?:\\.|[^`\\])*`", "''", js)
+
+
+# Any assertion call: node:assert in any spelling (`assert(`, `assert.x(`,
+# `t.assert.x(`, a destructured `strictEqual(` / `ok(` / `match(` ...) or a jest
+# `expect(...)` followed by a matcher. A method call such as `s.match(` is not one.
+ASSERT_CALL = re.compile(
+    r"(?:\bassert(?:\.\w+)*"
+    r"|(?<![\w.$])(?:(?:not)?(?:[Dd]eep)?(?:[Ss]trict)?[Ee]qual|ok|match|throws|rejects)"
+    r"|\bexpect)\s*\("
 )
-EXPECT_MATCHER = re.compile(r"\.to(?:Equal|Be|StrictEqual)\b")
+EXPECT_MATCHER = re.compile(r"\s*(?:\.\s*(?:not|resolves|rejects)\s*)*\.\s*to\w*\s*\(")
+IDENT = re.compile(r"[A-Za-z_$][\w$]*")
+KEYWORDS = {
+    "const", "let", "var", "for", "of", "in", "if", "else", "while", "do", "new",
+    "return", "function", "async", "await", "true", "false", "null", "undefined",
+    "test", "it", "describe", "require", "assert", "expect",
+}
+
+
+def call_args(code, open_paren):
+    """(text inside the bracket at open_paren, index just past its partner)."""
+    depth = 0
+    for i in range(open_paren, len(code)):
+        if code[i] in "([{":
+            depth += 1
+        elif code[i] in ")]}":
+            depth -= 1
+            if depth == 0:
+                return code[open_paren + 1:i], i + 1
+    return code[open_paren + 1:], len(code)
 
 
 def exercises_unique_slug(test_text):
-    """One test(/it( block calls uniqueSlug( and asserts equality on its result."""
-    text = strip_comments(test_text)
-    for block in re.split(r"(?=\b(?:test|it)\s*\()", text)[1:]:
-        if not re.search(r"\buniqueSlug\s*\(", block):
+    """The file calls uniqueSlug( and an assertion's arguments reach what it returned.
+
+    Read per statement (split on `;`): every name in a statement that calls
+    uniqueSlug is linked — the variable it is assigned to, the array it is pushed
+    into, the loop variable fed to it. An assertion whose arguments call uniqueSlug
+    or name a linked identifier exercises it; `uniqueSlug('a', [])` beside
+    `assert.strictEqual(1, 1)` links nothing and does not.
+    """
+    code = blank_strings(strip_comments(test_text))
+    names = {"uniqueSlug"} | set(re.findall(r"\buniqueSlug\s*:\s*([A-Za-z_$][\w$]*)", code))
+    call = re.compile(r"\b(?:" + "|".join(map(re.escape, sorted(names))) + r")\s*\(")
+    if not call.search(code):
+        return False
+    linked = set()
+    for stmt in code.split(";"):
+        if call.search(stmt):
+            linked |= set(IDENT.findall(stmt)) - KEYWORDS - names
+    for m in ASSERT_CALL.finditer(code):
+        args, end = call_args(code, m.end() - 1)
+        if m.group(0).startswith("expect") and not EXPECT_MATCHER.match(code, end):
             continue
-        results = {"uniqueSlug"} | set(
-            re.findall(r"\b(?:const|let|var)\s+(\w+)\s*=[^;]*\buniqueSlug\s*\(", block)
-        )
-        for m in ASSERT_RE.finditer(block):
-            whole = block[m.start():m.end()]
-            if whole.startswith("expect") and not EXPECT_MATCHER.search(whole):
-                continue
-            if any(re.search(rf"\b{r}\b", m.group(1)) for r in results):
-                return True
+        if call.search(args) or set(IDENT.findall(args)) & linked:
+            return True
     return False
 
 
@@ -389,7 +507,7 @@ for sha in (git("for-each-ref", "--format=%(objectname)", "refs/heads/") or "").
     if files is not None:
         places.append(files)
 a2 = any(state_of(files)[1] for files in places)
-emit("A2", a2, "no test block calls uniqueSlug and asserts equality on the result")
+emit("A2", a2, "no test file calls uniqueSlug and asserts on what it returned")
 
 sys.exit(0 if a1 and a2 else 1)
 PY
