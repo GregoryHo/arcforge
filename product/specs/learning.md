@@ -1,6 +1,6 @@
 # learning — spec
 
-> Status: shipped v6.2.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.2.0 · extended by 6.3.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -43,6 +43,23 @@ was recorded about them.
   Enabling is an explicit, scoped act (`--project` or
   `--global`) but *being* enabled is not scoped: either scope authorizes
   capture. Status is always inspectable.
+- **B-19 The effective opt-in is the start of unbroken authorization.** Each
+  scope's config records when its latest authorized period began, in
+  `enabled_at`: an enable that changes the state writes it, an enable or
+  disable that changes nothing leaves it as it is, and a disable keeps it —
+  a disable that finds none writes the stamp of the enable it is ending into
+  it, so a config from before the field exists keeps its start through the
+  first disable. The effective opt-in is the start of the unbroken stretch of
+  any-scope authorization that reaches the present, built from each scope's
+  latest period — `enabled_at` up to its disable, or to now while enabled. So
+  global on at T1, project on at T2 and global off at T3 later than T2 leaves
+  it at T1; with T3 earlier than T2 authorization did lapse, and it is T2. A
+  scope with no `enabled_at` reads as before: its `updated_at` while enabled,
+  nothing while disabled. That one instant is both the stale-draft floor
+  ([hooks](hooks.md) B-6) and the start of what the curator may analyze (B-1),
+  which still never reaches back across a lapse. Residual: only a scope's
+  latest period is kept, so an overlap that ended before that scope's last
+  re-enable is not recovered (D-051).
 - **B-2 Exactly one automatic step in the candidate pipeline.** Once enabled,
   observations become review-queue candidates automatically — and that is the
   *only* step of that pipeline that happens by itself. Every subsequent arrow
@@ -281,6 +298,9 @@ and the operation record are the three formats pinned by
 `scripts/lib/learning-schemas.js`. There is no second candidate vocabulary:
 `scripts/lib/learning.js` retains only the opt-in config and its `VALID_SCOPES`,
 so the statuses above are the ones both the dashboard and the CLI speak (D-012).
+That opt-in config, one file per scope, carries `enabled`, `updated_at` — the
+latest transition — and `enabled_at`, the start of the latest authorized period
+(B-19); keys the opt-in does not own are merged through, never dropped.
 
 The observer daemon finds a project's root through one record per project,
 `~/.arcforge/learning/project-roots/<project>.json`, shaped
@@ -299,8 +319,12 @@ version's — instead of leaving that version's behavior running until it stops
 on its own. A lock written before the lock recorded its script counts as
 different. Nothing is signaled unless the lock's PID is a process running the
 daemon script: a daemon that died without removing its lock leaves a PID the
-system can reuse, and a lock whose PID belongs to any other process is stale —
-it is reclaimed, and that process is left alone, by start and stop alike.
+system can reuse, and a lock whose PID belongs to any other process, or to no
+process, is stale — it is reclaimed, and that process is left alone, by start
+and stop alike. Every path that may start the daemon reads the lock that way:
+SessionStart, and the observation hook's lazy start once enough observations
+have accumulated, so a dead daemon's lock never keeps the daemon down for the
+rest of a session (#243, D-048).
 Residual: a daemon that does not exit within about 2 s of being
 stopped — one waiting on a curator model call — is left running, and the next
 start tries again; and two installed copies of the plugin used in alternation
@@ -346,3 +370,7 @@ data contracts live in `docs/decisions/learning-curator-schema/`.
   `archive_reason`, keeping `decay_charged_through` (B-11).
 - **D-041** — rejections rotate to an archive, never deleted (B-5, B-17).
 - **D-042** — reflection counts only enriched diaries (B-8).
+- **D-048** — 6.2.1 makes the observation hook's lazy daemon start reclaim a
+  dead daemon's lock, as SessionStart already did (Data / domain model).
+- **D-051** — `enabled_at` keeps an overlapping opt-in, so a disable no longer
+  advances the effective opt-in while another scope stays on (B-1, B-19).

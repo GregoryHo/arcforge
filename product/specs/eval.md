@@ -1,6 +1,6 @@
 # eval — spec
 
-> Status: shipped v6.2.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.2.0 · extended by 6.2.1 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -157,10 +157,25 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   refusal that arrives after the agent has already acted — tool calls made,
   output tokens spent — is not distinguished from a completed turn and scores
   as one.
+- **B-13 A pool that only failed is shown as a failure, on every surface.** A
+  pool whose rows all carry `infraError` or `gradeError` is never the
+  measurement (B-10), and every reader that would have compared it says so
+  rather than going quiet. `eval compare` refuses the comparison and lists the
+  pool as an instrument failure, not a measurement, with its row count and run
+  conditions. The dashboard's scenario view shows the same refusal and the
+  same pool lines in place of the A/B comparison; it never drops the
+  comparison and leaves the run history standing alone, which reads as though
+  nothing had been measured (#212, D-048).
 
 ### Benchmarks
 - **B-9 Snapshots keep history and gate releases.** `eval report` writes
-  `latest.json` plus a date-stamped copy under `evals/benchmarks/`; a release
+  `latest.json` plus a date-stamped copy under `evals/benchmarks/`, and the
+  per-trial export under `evals/benchmarks/raw/` the same way. A copy never
+  overwrites an earlier one: a second report on the same day writes a second
+  copy whose name starts with that date and sorts after the first.
+  `eval history` lists every copy whose name starts with a `YYYY-MM-DD` date — a
+  hand-named one such as `2026-10-01-v6.1.1.json` included — in name order
+  (#242, D-048). A release
   tag is blocked by CI when the benchmark is stale — when eval-backed surface
   (skills, scenarios, fixtures) changed since the previous release tag. A
   `--since`-bounded snapshot is a different measurement from a full-history
@@ -217,3 +232,5 @@ its rationale is inline at B-10.
 - **D-020** — 6.2.0 carries the scenario rubric fixes with their own
   measurement round (B-8).
 - **D-043** — graders never execute trial output (B-6, B-7, B-8, B-12).
+- **D-048** — 6.2.1 makes same-day snapshots additive and shows a failed pool
+  on the dashboard, with no live session spent (B-9, B-13).

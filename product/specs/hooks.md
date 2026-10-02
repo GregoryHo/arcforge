@@ -1,6 +1,6 @@
 # hooks — spec
 
-> Status: shipped v6.1.2 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.1.2 · extended by 6.3.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -101,14 +101,15 @@ down, never block the user, and never observe them uninvited.
   preserves neither stamp — a sync re-download or a naive unzip, where ordinary
   restore tooling keeps the modification time and so stays below the floor — and
   a filesystem that records no creation time, which leaves the floor resting on
-  last-write alone. The floor cuts the other way twice, and both are silences
-  rather than false alarms: a draft first written before the opt-in and
+  last-write alone. The floor cuts the other way once, and it is a silence
+  rather than a false alarm: a draft first written before the opt-in and
   rewritten in place afterwards keeps its original creation time, so a genuine
-  post-opt-in enrichment failure over it is never reported; and disabling the
+  post-opt-in enrichment failure over it is never reported. Disabling the
   scope that carries the earliest opt-in — global on, then project on, then
-  global off — advances the floor to the surviving scope's stamp even though
-  authorization never lapsed, because a scope's config records its latest
-  transition and not the enable it replaced. There is no per-hook switch: the
+  global off — does not advance the floor while the other scope stays on: "the
+  opt-in took effect" means the start of unbroken any-scope authorization,
+  which each scope's `enabled_at` keeps through a disable ([learning](learning.md)
+  B-19, D-051). There is no per-hook switch: the
   single opt-in covers the learning loop in either scope, disabling learning
   stops it, and uninstalling the plugin removes everything.
 
@@ -188,3 +189,5 @@ implements fail-open is pinned in `.claude/rules/coding-standards.md`.
   committed content; a staged-content scan waits as a wish (B-4).
 - **D-031** — B-8 stops promising where the last session left off
   (B-8).
+- **D-051** — the stale-draft floor no longer advances when an overlapping
+  scope is disabled (B-6).

@@ -12,7 +12,9 @@ decision *and* every reversal. How to maintain this file: [`product/AGENTS.md`](
 | 6.1.0 | `v6.1.0` | learning trust · spec-driven method · Codex packaging | **shipped** | Diary enrichment and user-message capture move behind the learning opt-in and the enricher loses blanket permissions; the CLI's candidate commands become a front end onto the canonical queue; the lightweight spec-driven method arcforge runs itself on ships as the `speccing` skill; arcforge installs on Codex as a skills-only plugin over the same tree. | [skill-system](specs/skill-system.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) · [codex-harness](specs/codex-harness.md) · [sdd](specs/sdd.md) |
 | 6.1.1 | `v6.1.1` | eval instrument · learning trust repairs · truthful safety claims | **shipped** | The three fixes merged after `v6.1.0` — the prompt audit's engine and skill findings (#181, #182) and the hook registry's non-schema keys (#188) — plus the repairs the release benchmark depends on: trials isolated from the operator's output style and user hooks (#170), a provider refusal scored as an error trial rather than behavior, grader prompts that no longer resolve empty outside the arcforge repo, and error trials excluded from every verdict. Learning stops undoing what the user accepted: decay no longer re-applies at every SessionStart and archives instincts, the curator daemon — a second outbound path the spec never named — no longer starts after an opt-out, the dashboard's Activate and Deactivate pass their own gate, and `learn enable` stops erasing config. The secrets-guard claim is corrected to what it scans, and every edit under `skills/` lands here, so the benchmark is measured once, on a repaired instrument. | [eval](specs/eval.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) · [skill-system](specs/skill-system.md) · [obsidian](specs/obsidian.md) · [sdd](specs/sdd.md) · [worktrees-loop](specs/worktrees-loop.md) |
 | 6.1.2 | `v6.1.2` | docs-are-the-contract sweep | **shipped** | Where the docs promise what the engine does not do: CLI messages and contract drift, hooks promises the engine never kept, loop state bugs, contributor tooling and repo hygiene. It touches no eval-backed path — nothing under `skills/`, `evals/scenarios/` or `evals/fixtures/` — so it ships without a benchmark regeneration. | [cli](specs/cli.md) · [hooks](specs/hooks.md) · [learning](specs/learning.md) · [worktrees-loop](specs/worktrees-loop.md) · [obsidian](specs/obsidian.md) · [codex-harness](specs/codex-harness.md) |
-| 6.2.0 | `v6.2.0` | learning lifecycle · eval corpus repairs | **shipped ← we are here** | Exits for candidates stuck at `approved` or `materialized`, `learn instinct deactivate` and `learn instinct restore`, a policy for candidate names, and worktree paths derived from the repo root; plus the scenario rubric fixes, measured in their own, smaller round. A minor because it adds CLI commands. | [learning](specs/learning.md) · [cli](specs/cli.md) · [worktrees-loop](specs/worktrees-loop.md) · [codex-harness](specs/codex-harness.md) · [eval](specs/eval.md) · [sdd](specs/sdd.md) |
+| 6.2.0 | `v6.2.0` | learning lifecycle · eval corpus repairs | **shipped** | Exits for candidates stuck at `approved` or `materialized`, `learn instinct deactivate` and `learn instinct restore`, a policy for candidate names, and worktree paths derived from the repo root; plus the scenario rubric fixes, measured in their own, smaller round. A minor because it adds CLI commands. | [learning](specs/learning.md) · [cli](specs/cli.md) · [worktrees-loop](specs/worktrees-loop.md) · [codex-harness](specs/codex-harness.md) · [eval](specs/eval.md) · [sdd](specs/sdd.md) |
+| 6.2.1 | — | instrument and state repairs, no measurement | **next ← we are here** | Repairs to promises already shipped: same-day benchmark snapshots stop overwriting each other and `eval history` lists them all, the eval dashboard shows an instrument-failure pool instead of hiding it, loop run state is written atomically, the observe hook's lazy daemon start reclaims a dead process's lock, `check:product` rejects a relation aimed at an already-dead decision, and the `releasing` skill describes what a squash-only ruleset does to the flip commit. Nothing under `skills/`, `evals/scenarios/` or `evals/fixtures/`, so it ships without a live eval session. | [eval](specs/eval.md) · [worktrees-loop](specs/worktrees-loop.md) · [learning](specs/learning.md) |
+| 6.3.0 | — | ceiling redesigns · skill-local script fixes · the enable stamp | **next** | The five scenarios whose baseline sat at ceiling on the repaired instrument are redesigned and measured in one round of about 80 live sessions; the `diagramming-obsidian` helpers and `lint_vault` fixes ride it because they sit under `skills/`; and the stale-draft floor stops losing an overlapping opt-in, through an additive `enabled_at` in the learning config. | [skill-system](specs/skill-system.md) · [obsidian](specs/obsidian.md) · [sdd](specs/sdd.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) |
 
 > Un-scheduled ideas live in the [Backlog](BACKLOG.md); a wish graduates into a
 > version (row + spec + Decision Log entry) when picked.
@@ -1163,3 +1165,156 @@ reverse one, append a superseding entry (see AGENTS.md).
   2026-10-01; the A/B pools are in the snapshot
   `evals/benchmarks/2026-10-01.json` (= `latest.json`, generated
   2026-10-01T09:13:37Z).
+
+### D-048 — 6.2.1 is its own patch because it touches no eval-backed path
+- Date: 2026-10-02
+- Version: 6.2.1
+- Status: Accepted
+- Decision: The repairs found after `v6.2.0` — the eval dashboard hiding an
+  arm whose pool only failed (#212), `eval report` overwriting a same-day
+  snapshot and `eval history` listing only bare-date files (#242), loop run
+  state written in place (#244), the observe hook's lazy daemon start trusting
+  a dead process's lock (#243), `check:product` C3 rejecting a relation aimed
+  at an already-dead decision (#163, D-050), and the `releasing` skill's flip
+  commit under a squash-only ruleset (D-052) — ship as 6.2.1, a patch that
+  changes nothing under `skills/`, `evals/scenarios/` or `evals/fixtures/` and
+  runs no live eval session.
+- Why: Each item repairs a promise already made — eval B-9 says snapshots
+  keep history, worktrees-loop B-4 says a run survives a crash, learning's
+  domain model says a dead daemon's lock is reclaimed — or repairs the
+  contributor gate and checklist themselves; none adds a command or a skill.
+  Staying out of the three prefixes means `scripts/check-benchmark-freshness.js`
+  demands no new benchmark, so the patch costs no quota — D-019's shape.
+  Folding the items into 6.3.0 would hold them behind a measurement round,
+  and #242 has to land before that round in any case: a round that reports
+  more than once in a day would overwrite its own snapshots, the loss that
+  forced a hand-copied `2026-10-01-v6.1.1.json`.
+- Cost accepted: an item whose honest repair turns out to need a skill edit
+  cannot ship in 6.2.1; it moves to 6.3.0.
+- Verification: at the 6.2.1 release, a `git diff --stat` from `v6.2.0` over
+  `skills/`, `evals/scenarios/` and `evals/fixtures/` is empty, and the
+  freshness check exits 0 without a new snapshot.
+
+### D-049 — 6.3.0 measures the five ceiling redesigns, and carries what re-arms the gate
+- Date: 2026-10-02
+- Version: 6.3.0
+- Status: Accepted
+- Decision: 6.3.0, a minor, graduates the five `redesign-*` wishes —
+  `eval-executing-verify-decides-done`, `eval-router-skill-selection`,
+  `eval-maintaining-obsidian-audit-runs-lint-script`,
+  `eval-maintaining-obsidian-link-rebuilds-index` and
+  `eval-speccing-supersede-not-overwrite` — and measures them in one round,
+  launched from the maintainer's main session on `opus[1m]` / `xhigh`, capped
+  at about 80 live sessions, under a rule fixed before any result is read:
+  each scenario gets a new `## Version` and a preflight at k=3; a PASS goes to
+  an A/B at k=5 (13 sessions); a BLOCK gets exactly one redesign, written down
+  before a second preflight (16 sessions if that one passes); a second BLOCK
+  is recorded as a finding with no A/B, and the scenario is not run again in
+  this round. The same version carries the `diagramming-obsidian` helpers'
+  `ERROR:` lines (#228), `lint_vault`'s fence-versus-code-span fix (#210), and
+  the stale-draft floor's enable stamp (#164, D-051).
+- Why: None of the five has usable A/B evidence on the repaired instrument —
+  four BLOCKed at ceiling in 6.1.1's round (D-045) and the supersede scenario
+  in 6.2.0's (D-047) — so the claims of executing, the router,
+  maintaining-obsidian's audit and LINK mode, and sdd B-4 rest on pre-repair
+  numbers or on none. The cap is the worst case the rule allows: five
+  scenarios at 16 sessions each. Stopping at the second BLOCK is the D-045 /
+  D-047 precedent: re-running a scenario until it passes turns the preflight
+  into a search for a rubric the baseline happens to fail, and a BLOCK is a
+  verdict about the scenario (eval B-3). #228 and #210 are skill-local scripts
+  inside the two obsidian skills, under `skills/`, so they re-arm the benchmark gate and
+  cannot ride 6.2.1; riding a round that runs anyway costs them nothing extra,
+  and neither changes a skill's behavioral claim. #164 changes learning's
+  on-disk config, which D-020 placed in a minor.
+- Residual: these wishes stay in the backlog and are not in 6.3.0:
+  **skill-body-trim**, **diagramming-headless-fallback**, #184, #185,
+  **speccing-spec-in-sync-eval**, **speccing-router-adjacency-eval**,
+  **plugin-eval-corpus-migration**, **eval-trial-sandbox**, and every wish under
+  Harness and Hooks.
+- Cost accepted: up to about 80 live sessions, and a scenario that BLOCKs
+  twice ends the round with no A/B evidence, its skill keeping the evidence it
+  had — the outcome D-045 recorded for four of the same five.
+
+### D-050 — C3 rejects a `Refines:` / `Extends:` written after its target died
+- Date: 2026-10-02
+- Version: 6.2.1
+- Refines: D-006
+- Status: Accepted
+- Decision: C3 reports a `Refines:` or `Extends:` whose target's `Status:`
+  carries a total flip, `Superseded-by: D-SSS`, when `D-SSS` is lower than the
+  `D-id` of the entry carrying the relation — the target was already replaced
+  when the relation was written; a target whose total flip names a higher
+  `D-id` than the relating entry, a target that is only partially superseded,
+  and a `Proposed` target all stay legal.
+- Why: D-006 promised existence and backward direction only, and named
+  liveness as a widening that needs its own decision. A refinement of a dead
+  decision sharpens a choice no longer in force, and a reader who follows the
+  relation lands on a reversed entry with nothing in the log saying so. The
+  rule is order-sensitive because the log is append-only: a relation written
+  while its target was live stays a correct record after a later decision
+  kills the target, and it cannot be edited in hindsight. A partially
+  superseded entry still governs its other clauses, which is exactly what a
+  refinement sharpens, and a `Proposed` entry is still open. Every relation
+  in the log when this entry was written — D-013, D-033, D-035, D-036, D-046,
+  and D-050 to D-052 themselves — names a live target, so the rule lands
+  green. It is a clause of C3, not an eighth rule,
+  the way D-033's widenings were; the constraints are the ones recorded in
+  `docs/plans/check-product-deferred.md` §1.
+- Residual: the comparison is strict. An entry that both supersedes a
+  decision whole and refines or extends the same decision carries an equal
+  `D-id` on both sides, and this rule does not report it.
+- Verification: `tests/scripts/check-product.test.js` — the positive case
+  that today pins a refinement of an already-superseded entry becomes a
+  negative one, and positive cases pin a refiner older than the kill, a
+  partially superseded target, a `Proposed` target, and a superseded entry
+  folded into `<details>` judged by `D-id` rather than position.
+
+### D-051 — The stale-draft floor survives a disable of an overlapping scope
+- Date: 2026-10-02
+- Version: 6.3.0
+- Refines: D-009
+- Status: Accepted
+- Decision: Each scope's learning config records when its latest authorized
+  period began, in an additive `enabled_at` field that an enable which changes
+  the state writes, a no-op leaves alone, and a disable keeps; the effective
+  opt-in becomes the start of the unbroken stretch of any-scope authorization
+  that reaches the present, so global on at T1, project on at T2 and global
+  off at T3 later than T2 leaves it at T1; and a config without `enabled_at`
+  reads as it does today.
+- Why: 6.2.0 shipped the overlap case as an accepted cost — D-009's Residual,
+  hooks B-6 and the comment above `learningEnabledSince` in
+  `scripts/lib/learning.js` — because a scope's `updated_at` records only its
+  latest transition, so the disable overwrote the T1 it replaced. That silence
+  hides a real enrichment failure from a user whose consent never lapsed,
+  which is the warning the healthcheck exists to give. A separate field
+  recovers T1 without changing what `updated_at` means, and an additive field
+  keeps every existing config valid. D-009's Decision is untouched — enrichment
+  stays gated, unprivileged, and silent about stubs written with learning off
+  — so this narrows one of its Residual's silences rather than reversing a
+  clause. The same instant bounds the observer daemon's analysis (learning
+  B-1); that does not reach back across an opt-out, because in the overlap case
+  authorization never lapsed (D-023).
+- Residual: only a scope's latest period is recorded, so an overlap earlier
+  than a scope's last re-enable is not recovered — global on at T1, project on
+  at T2, global off at T3 and on again at T4 leaves the floor at T2. D-009's
+  other floor silences and false alarms stand.
+
+### D-052 — Under a squash-only ruleset the flip is its own commit on the branch, not on `main`
+- Date: 2026-10-02
+- Version: process
+- Refines: D-008
+- Status: Accepted
+- Decision: The `releasing` skill keeps the product-state flip as its own
+  commit on the release branch, ahead of the release commit, so it is reviewed
+  separately, and says that the squash merge the repository ruleset requires
+  lands the flip and the release commit on `main` as one commit.
+- Why: The ruleset allows squash merges only, so all three releases of
+  2026-10-01 reached `main` as one commit each and D-008's separate flip
+  commit survived on none of them; the skill told the releaser a thing the
+  repository makes impossible. The maintainer chose to make the skill follow
+  the ruleset rather than open a merge-commit exception for releases. The
+  review benefit of the separate commit survives on the branch.
+- Cost accepted: D-008's reason for the separate commit — reverting a bad
+  version bump without dragging the product history back with it — no longer
+  holds on `main`. Reverting a release commit there reverts the flip too, and
+  the flip has to be re-applied by hand.

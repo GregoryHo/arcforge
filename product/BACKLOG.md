@@ -91,11 +91,16 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 - **plugin-eval-corpus-migration** — move more routing scenarios onto
   `claude plugin eval` once D-025's isolation check has run and the feature
   leaves `experimental` · needs: D-025.
-- **redesign-executing-verify-decides-done** — redesign `eval-executing-verify-decides-done` for the clean instrument · needs: D-045.
-- **redesign-router-skill-selection** — redesign `eval-router-skill-selection` for the clean instrument · needs: D-045.
-- **redesign-maintaining-obsidian-audit-runs-lint-script** — redesign `eval-maintaining-obsidian-audit-runs-lint-script` for the clean instrument · needs: D-045.
-- **redesign-maintaining-obsidian-link-rebuilds-index** — redesign `eval-maintaining-obsidian-link-rebuilds-index` for the clean instrument · needs: D-045.
-- **redesign-speccing-supersede-not-overwrite** — redesign `eval-speccing-supersede-not-overwrite`'s rubric for the clean instrument, where its Version 8 baseline sits at ceiling · needs: D-047.
+- ~~**redesign-executing-verify-decides-done**~~ — graduated into 6.3.0 (D-049).
+- ~~**redesign-router-skill-selection**~~ — graduated into 6.3.0 (D-049).
+- ~~**redesign-maintaining-obsidian-audit-runs-lint-script**~~ — graduated into 6.3.0 (D-049).
+- ~~**redesign-maintaining-obsidian-link-rebuilds-index**~~ — graduated into 6.3.0 (D-049).
+- ~~**redesign-speccing-supersede-not-overwrite**~~ — graduated into 6.3.0 (D-049).
+- **eval-compare-skip-analyzer** — eval compare on a model/human-graded scenario always spawns the eval-analyzer session; a flag to skip it would let a verdict be read without spending a model call.
+
+## CLI
+
+- **cli-human-output** — commands without --json still print pretty JSON through the shared output() helper; either give status/list commands a human format or say in docs/guide/cli-invocation.md that JSON is the default and --json is a no-op for them.
 
 ## Hooks
 

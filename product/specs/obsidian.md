@@ -1,6 +1,6 @@
 # obsidian — spec
 
-> Status: shipped v6.1.2 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.1.2 · extended by 6.3.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -64,7 +64,11 @@ work carries provenance a reader can check.
   are never fabricated without source backing; thresholds come from the
   vault's schema, and where it declares none the observation is reported
   instead of a number invented. Every audit writes a typed report into the
-  vault.
+  vault. The lint script treats a `[[wikilink]]` inside inline code or a fenced
+  block as an example, not a link; an inline code span closes only on a
+  backtick run of its own length in the same paragraph, so a fence that opens
+  later in the note never closes it, and the fence's contents are not read as
+  links (#210, D-049).
 - **B-6 Every operation leaves a log line.** Each ingest, query, audit, or
   bootstrap appends to the vault's `log.md` and reports the artifacts it
   produced by path — an operation that cannot run says which mode, what
@@ -84,7 +88,11 @@ work carries provenance a reader can check.
   save path the drawing is a compressed-json block, and the verifier checks
   its format markers only; parsing the JSON, re-rendering the canvas and
   comparing its size happen only on the manual-fallback path, which saves
-  uncompressed JSON.
+  uncompressed JSON. A helper that cannot do its job — a missing file, input
+  that is not JSON or not an Excalidraw scene, a renderer dependency that is
+  not installed — exits non-zero with one `ERROR:` line on stderr naming what
+  failed, never a Python traceback, so the agent reading it can act on the
+  cause (#228, D-049).
 - **B-9 The pair composes by invocation.** Diagram work inside a vault
   operation is handed to `/diagramming-obsidian` — after user approval, and
   only by prose invocation, per [skill-system](skill-system.md) B-5.
@@ -127,3 +135,6 @@ live behind the CLI per [cli](cli.md) B-8.
   baseline is at ceiling (B-5).
 - **D-034** — the provenance pair applies where the vault adopts raw
   sources (B-4).
+- **D-049** — 6.3.0 redesigns and re-measures both B-5 scenarios, and carries
+  the lint script's code-span fix and the diagram helpers' `ERROR:` lines
+  (B-5, B-8).

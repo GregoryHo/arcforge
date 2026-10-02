@@ -1,6 +1,6 @@
 # worktrees-loop — spec
 
-> Status: shipped v6.2.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.2.0 · extended by 6.2.1 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -54,7 +54,10 @@ crash, a compaction, or a closed laptop could lose.
   spawns a clean session, works one task, and ends. Nothing carries between
   iterations except what is on disk: the task list holds what is left, git
   holds the work. That is what makes a run restartable across a crash or an
-  interruption — resuming is just reading the file again.
+  interruption — resuming is just reading the file again. The loop's run-state
+  file is replaced atomically, never rewritten in place, so a crash mid-write
+  leaves the previous state whole and resume never meets a truncated file
+  (#244, D-048).
 - **B-5 Every run is bounded.** Iteration, cost, and per-session-time ceilings
   cap an unattended run; an unbounded loop is not offered.
 - **B-6 Done is decided by a command where one is given, and the loop says
@@ -102,3 +105,5 @@ verify-over-self-report choices predate this log; rationale inline above.
   the loop warns at start (B-6).
 - **D-020** — 6.2.0 carries worktree paths derived from the repo root, with
   paths from the older derivation still found (B-1).
+- **D-048** — 6.2.1 makes the run-state write atomic, the crash-safety B-4
+  already promised (B-4).
