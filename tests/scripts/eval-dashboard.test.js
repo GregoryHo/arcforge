@@ -130,7 +130,7 @@ describe('dashboard', () => {
       const { scenarios } = callRouter(createRouter(tempDir, ''), '/api/scenarios').json();
 
       expect(scenarios[0]).toMatchObject({
-        status: 'NO RUNS',
+        status: 'NO SCORED RUNS',
         otherPools: [expect.objectContaining({ rows: 1, instrumentFailure: true })],
       });
     });

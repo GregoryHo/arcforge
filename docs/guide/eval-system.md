@@ -394,8 +394,8 @@ scored pool stays current, and the failed pool is listed separately as
 "Instrument failure, not a measurement" (`instrumentFailure: true` in the JSON).
 When the run you just finished produced no scored trial, `eval run` says the
 verdict it prints belongs to the earlier scored pool, not to this run. `eval
-list` prints the failed pool under the scenario's verdict, and shows
-`NO SCORED RUNS` when nothing was ever scored.
+list` and the dashboard's scenario tables print the failed pool under the
+scenario's verdict, and show `NO SCORED RUNS` when nothing was ever scored.
 
 An A/B comparison (`compare`, the benchmark's `compared` entry, the dashboard's
 A/B view) pairs its arms rather than taking each arm's newest pool on its own.
@@ -405,7 +405,10 @@ the treatment itself: an isolated baseline against a treatment that loads a
 plugin dir or the full toolkit. When the newest runs of the two arms don't match, the
 older matching pair is judged and the rest are listed as "Not combined". When
 the arms share no conditions at all, the comparison is refused and every pool
-is listed; rerun `eval ab` so both arms run under the same conditions.
+is listed; rerun `eval ab` so both arms run under the same conditions. When an
+arm has rows but no scored trial, the refusal names that arm's instrument
+failure instead. The dashboard's A/B view shows a refusal the same way, with
+the reason and the pool lines, and never draws a comparison in its place.
 
 ## Benchmarks
 

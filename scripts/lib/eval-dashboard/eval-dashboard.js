@@ -12,7 +12,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const eval_ = require('../eval');
 const stats = require('../eval-stats');
-const { pairArms } = require('../eval-pools');
+const { pairArms, otherPoolLines } = require('../eval-pools');
 const { classifyAssertions } = require('../eval-graders');
 const { sanitizeFilename } = require('../utils');
 
@@ -218,18 +218,24 @@ function handleApiScenarios(res, projectRoot) {
     const results = pools.current;
     const st = results.length > 0 ? stats.statsFromResults(results) : null;
     const verdictOpts = s.grader === 'model' ? { useCi: true } : {};
+    // Same lines and status as eval list (#212).
+    const failureLines = otherPoolLines(pools.others.filter((p) => p.instrumentFailure));
+    let status = 'NO RUNS';
+    if (results.length > 0) status = eval_.getVerdict(results, verdictOpts);
+    else if (failureLines.length > 0) status = 'NO SCORED RUNS';
     return {
       name: s.name,
       scope: s.scope,
       grader: s.grader,
       target: s.target,
       assertionCount: s.assertions.length,
-      status: results.length > 0 ? eval_.getVerdict(results, verdictOpts) : 'NO RUNS',
+      status,
       resultCount: st ? st.count : 0,
       passRate: st ? st.passRate : 0,
       avgScore: st ? st.avg : 0,
       lastRun: results.length > 0 ? results[results.length - 1].timestamp : null,
       otherPools: pools.others,
+      failureLines,
     };
   });
   sendJson(res, { scenarios });
@@ -330,8 +336,10 @@ function handleApiCompare(res, projectRoot, scenarioName, query) {
   // Both arms on the newest pool pair that shares its conditions (B-8).
   const paired = pairArms(bRows, tRows);
   const otherPools = paired.unpaired;
-  if (bRows.length > 0 && tRows.length > 0 && paired.error) {
-    return sendJson(res, { error: paired.error, otherPools }, 409);
+  // The lines eval compare prints, so a failed pool is never shown as "Not combined".
+  const poolLines = otherPools.map((p) => otherPoolLines([p], p.arm)[0]);
+  if (paired.error && ((bRows.length > 0 && tRows.length > 0) || paired.unscoredArm)) {
+    return sendJson(res, { error: paired.error, otherPools, poolLines }, 409);
   }
   const baseline = bRows.length > 0 && tRows.length > 0 ? paired.baseline : bRows;
   const treatment = bRows.length > 0 && tRows.length > 0 ? paired.treatment : tRows;
@@ -359,6 +367,7 @@ function handleApiCompare(res, projectRoot, scenarioName, query) {
     ...(verdictPolicy ? { verdictPolicy } : {}),
     metricDeltas,
     otherPools,
+    poolLines,
   });
 }
 

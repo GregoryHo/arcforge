@@ -129,10 +129,11 @@ function poolsOf(rows) {
  * paired with an older treatment run under other conditions compares two
  * instruments, not two arms. A pair counts from when its later-starting arm
  * existed (the older of the two pools' latest rows). Every pool not chosen is
- * listed in `unpaired`; with no common pair at all, `error` says so.
+ * listed in `unpaired`; with no common pair at all, `error` says so, and
+ * `unscoredArm` names an arm that holds rows but no scored trial.
  * @param {Object[]} baselineRows
  * @param {Object[]} treatmentRows
- * @returns {{ baseline: Object[], treatment: Object[], conditions: Object|null, unpaired: Array<{ arm: string, conditions: Object, rows: number }>, error?: string }}
+ * @returns {{ baseline: Object[], treatment: Object[], conditions: Object|null, unpaired: Array<{ arm: string, conditions: Object, rows: number }>, error?: string, unscoredArm?: string }}
  */
 function pairArms(baselineRows, treatmentRows) {
   const bPools = poolsOf(baselineRows);
@@ -157,13 +158,21 @@ function pairArms(baselineRows, treatmentRows) {
       }));
   const unpaired = [...list('baseline', bPools), ...list('treatment', tPools)];
   if (!best) {
+    // An arm whose every pool is errors has no measurement to pair: say that,
+    // not that the conditions differ.
+    const unscoredArm = [
+      ['baseline', bPools],
+      ['treatment', tPools],
+    ].find(([, pools]) => pools.length > 0 && !pools.some((p) => hasScore(p.rows)))?.[0];
     return {
       baseline: [],
       treatment: [],
       conditions: null,
       unpaired,
-      error:
-        'The baseline and treatment arms have no run conditions in common (model, effort, ceiling, turn budget), so no comparison is valid. Rerun eval ab so both arms run under the same conditions.',
+      ...(unscoredArm ? { unscoredArm } : {}),
+      error: unscoredArm
+        ? `The ${unscoredArm} arm has no scored trial: every trial is an infra or grade error, an instrument failure, not a measurement, so no comparison is valid. Fix the failure and rerun eval ab.`
+        : 'The baseline and treatment arms have no run conditions in common (model, effort, ceiling, turn budget), so no comparison is valid. Rerun eval ab so both arms run under the same conditions.',
     };
   }
   return {
