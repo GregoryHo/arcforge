@@ -1290,11 +1290,13 @@ reverse one, append a superseding entry (see AGENTS.md).
 - Residual: the comparison is strict. An entry that both supersedes a
   decision whole and refines or extends the same decision carries an equal
   `D-id` on both sides, and this rule does not report it.
-- Verification: `tests/scripts/check-product.test.js` — the positive case
-  that today pins a refinement of an already-superseded entry becomes a
-  negative one, and positive cases pin a refiner older than the kill, a
-  partially superseded target, a `Proposed` target, and a superseded entry
-  folded into `<details>` judged by `D-id` rather than position.
+- Verification: `tests/scripts/check-product.test.js` carries the case that
+  used to pin a refinement of an already-superseded entry as legal, now
+  reported as two C3 errors, and a positive case for a relation written while
+  its target was still live; its neighbour
+  `check-product-relation-liveness.test.js`, in the same directory, carries
+  the rest — negative and positive cases for `Refines:` and `Extends:`, folded
+  targets, and the equal-id Residual.
 
 ### D-051 — The stale-draft floor survives a disable of an overlapping scope
 - Date: 2026-10-02

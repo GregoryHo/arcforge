@@ -188,8 +188,7 @@ stays in force. All three relations point backwards: the named `D-id` is lower t
 entry naming it, and an entry never relates to itself (C3). Folding a superseded entry
 into the `<details>` index is unaffected — the rule compares `D-id`s, not positions.
 
-**Lands with 6.2.1 (D-050); until that version ships, `check:product` does not
-enforce this paragraph.** A `Refines:` or `Extends:` must not name a decision that was
+**From 6.2.1 (D-050).** A `Refines:` or `Extends:` must not name a decision that was
 already dead when the relation was written: C3 reports one whose target's `Status:`
 carries `Superseded-by: D-SSS` with `D-SSS` lower than the relating entry's own `D-id`.
 The order is what matters, because the log is append-only — a relation written while

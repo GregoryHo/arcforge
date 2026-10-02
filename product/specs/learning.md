@@ -321,10 +321,12 @@ different. Nothing is signaled unless the lock's PID is a process running the
 daemon script: a daemon that died without removing its lock leaves a PID the
 system can reuse, and a lock whose PID belongs to any other process, or to no
 process, is stale — it is reclaimed, and that process is left alone, by start
-and stop alike. Every path that may start the daemon reads the lock that way:
-SessionStart, and the observation hook's lazy start once enough observations
-have accumulated, so a dead daemon's lock never keeps the daemon down for the
-rest of a session (#243, D-048).
+and stop alike. The observation hook's lazy start, once enough observations
+have accumulated, reclaims a lock only when it can show the lock is stale — its
+process is gone, or is some other program. A lock it cannot classify, such as
+one a starting daemon has not finished writing, it leaves alone for the next
+SessionStart to judge. A lock shown stale no longer keeps the daemon down for
+the rest of a session (#243, D-048).
 Residual: a daemon that does not exit within about 2 s of being
 stopped — one waiting on a curator model call — is left running, and the next
 start tries again; and two installed copies of the plugin used in alternation
