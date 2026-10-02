@@ -1397,3 +1397,67 @@ reverse one, append a superseding entry (see AGENTS.md).
   — hand edits, restored backups, a clock that ran backwards — the stamps are
   read as written and the instant can land earlier.
 - Cost accepted: one more additive key per scope config.
+
+### D-054 — 6.3.0's round: the router measures, and four scenarios are findings
+- Date: 2026-10-02
+- Version: 6.3.0
+- Refines: D-049
+- Status: Accepted
+- Decision: Of D-049's five scenarios one was measured:
+  `eval-router-skill-selection` Version 2 passed preflight (baseline 0/3) and
+  read **+1.00 CI[1, 1] IMPROVED** at k=5. The other four are findings with no
+  A/B: `eval-maintaining-obsidian-link-rebuilds-index` Version 2 passed
+  preflight (1/3) and its A/B was not run, a deviation from the letter of the
+  pre-registration taken in the conservative direction;
+  `eval-maintaining-obsidian-audit-runs-lint-script` was recorded before any
+  session as needing an engine change, the outcome D-049 permits; and
+  `eval-executing-verify-decides-done` and
+  `eval-speccing-supersede-not-overwrite` were recorded before any session
+  under that same no-session treatment for a different reason — their
+  baselines already do the behavior. The link-rebuilds-index and supersede
+  scenarios are retired as A/B scenarios and kept as corpus coverage.
+- Why: The router reading holds up under audit: every baseline noticed that
+  `uniqueSlug` had no test and merged anyway, and every treatment committed a
+  real passing test before the merge, so no grader blind spot handed out a
+  pass. The link-rebuilds-index PASS came from A4 (note edits), whose premise
+  is false: the fixture carries a plain-text relationship and the skill's LINK
+  step resolves relationships, so all three baselines rebuilt the index
+  correctly and a treatment would have been penalised for following the
+  skill. An A/B would have measured A4, not the rebuild, so none was spent and
+  no improvement is claimed; the one further redesign D-049 allowed was not
+  used, because two designs have now shown the baseline rebuilding unprompted.
+  The executing claim formalizes existing behavior — 26 of 37 recorded
+  baselines mark a real-work task in progress before doing it — and 8 of 8
+  recorded supersede baselines supersede unprompted, with that scenario's
+  redesign spent in 6.2.0 (D-047). The audit-runs-lint-script fixture must put
+  the skill's `references/` inside the trial directory, where the baseline
+  reads it too. A scenario whose baseline does the behavior unprompted across
+  two designs measures the model, not the skill, so retiring it as an A/B
+  beats designing a third trap for the same claim. This narrows D-049's rule
+  in one place — a preflight PASS earned by an assertion that does not measure
+  the behavior is not run as an A/B — and widens its no-session outcome to a
+  baseline already at the behavior; it reverses nothing D-049 decided.
+- Residual: the router result shows what the router's `SKILL.md` text does
+  when injected at skill scope on `opus[1m]` / `xhigh`: the agent turns
+  noticing an untested function into a committed test before merging. It does
+  not show routing under a real plugin load (D-024, D-044), other fixtures,
+  models or efforts, or red-first ordering inside `tdd`. D-028's index rebuild,
+  `executing`'s verify-decides-done claim, sdd B-4's append-only behavior and
+  the audit's lint pass still have no A/B evidence. #228 and #210 ship on
+  contract tests (D-049's Residual), and #164 is engine-only. Instrument gaps
+  the round found are wishes: preflight writes no result rows, records and
+  rows carry neither the Node version nor the scenario hash, and the
+  operator's `PATH` reaches trials; #250 is already filed.
+- Cost accepted: 16 trial sessions of an 80 cap — link-rebuilds-index
+  preflight 3, router preflight 3 and A/B 10 — and no model-grader calls,
+  both scenarios being code-graded. The router treatment's per-trial time rose
+  from 20.2 s to 39.4 s and its output tokens from 1,646 to 3,484, flagged as a
+  cost regression; that is the test-writing the skill asks for.
+- Verification: the preflight records
+  `docs/plans/v6.3/wp-h/preflight.eval-router-skill-selection.json` and
+  `docs/plans/v6.3/wp-h/preflight.eval-maintaining-obsidian-link-rebuilds-index.json`,
+  on `opus[1m]` / `xhigh` at k=3, Node v24.13.1, commit `20edf82e`,
+  2026-10-02; the A/B pool is in the snapshot
+  `evals/benchmarks/2026-10-02.json` (= `latest.json`, generated
+  2026-10-02T17:38:15Z); the operator audit of every row is the 6.3.0 section
+  of `evals/skill-eval-coverage.md`.

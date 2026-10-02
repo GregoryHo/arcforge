@@ -105,6 +105,19 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   skill's files staged outside the trial tree the baseline can list, so
   behavior that depends on a skill's shipped scripts or references can be
   measured without placing them in the baseline's fixture · needs: D-049.
+- **executing-discriminating-claim** — `executing`'s verify-decides-done
+  claim formalizes what baselines already do (26 of 37 mark a real-work task
+  in progress first); name a claim of the skill the baseline fails before
+  designing another scenario for it · needs: D-054.
+- **preflight-result-rows** — preflight writes no result rows, only
+  transcripts and its record, so a preflight trial's grade has to be rebuilt
+  from its end state by hand · needs: D-054.
+- **eval-record-node-and-hash** — preflight records and A/B rows carry neither
+  the Node version nor the scenario hash, though the router scenario says its
+  records carry the Node version; record both · needs: D-054.
+- **eval-trial-path** — the operator's `PATH` reaches trials, since the engine
+  spawns them with the operator's environment; one 6.3.0 trial resolved
+  `arcforge` and ran it. Narrower than **eval-trial-sandbox** · needs: D-054.
 
 ## CLI
 
