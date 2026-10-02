@@ -1,61 +1,15 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
 
 const { createRouter, setupWatchers } = require('../../scripts/lib/eval-dashboard/eval-dashboard');
-const { RESULTS_DIR, SCENARIOS_DIR, BENCHMARKS_DIR } = require('../../scripts/lib/eval');
-
-function makeTempDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'test-dashboard-'));
-}
-
-function writeScenario(dir, filename, content) {
-  const scenariosDir = path.join(dir, SCENARIOS_DIR);
-  fs.mkdirSync(scenariosDir, { recursive: true });
-  fs.writeFileSync(path.join(scenariosDir, filename), content);
-}
-
-function writeResult(dir, scenarioName, runId, condition, results) {
-  const runDir = path.join(dir, RESULTS_DIR, scenarioName, runId);
-  fs.mkdirSync(runDir, { recursive: true });
-  const jsonl = `${results.map((r) => JSON.stringify(r)).join('\n')}\n`;
-  fs.writeFileSync(path.join(runDir, `${condition}.jsonl`), jsonl);
-}
-
-function writeTranscript(dir, scenarioName, runId, filename, content) {
-  const transcriptsDir = path.join(dir, RESULTS_DIR, scenarioName, runId, 'transcripts');
-  fs.mkdirSync(transcriptsDir, { recursive: true });
-  fs.writeFileSync(path.join(transcriptsDir, filename), content);
-}
-
-function mockReqRes(url) {
-  const res = {
-    statusCode: null,
-    headers: {},
-    body: '',
-    writeHead(status, headers) {
-      this.statusCode = status;
-      this.headers = headers;
-    },
-    end(body) {
-      this.body = body || '';
-    },
-    write() {},
-    on() {},
-  };
-  const req = { url, headers: { host: 'localhost:3333' } };
-  return { req, res };
-}
-
-function callRouter(router, url) {
-  const { req, res } = mockReqRes(url);
-  router(req, res);
-  return {
-    status: res.statusCode,
-    json: () => JSON.parse(res.body),
-    text: () => res.body,
-  };
-}
+const { RESULTS_DIR, BENCHMARKS_DIR } = require('../../scripts/lib/eval');
+const {
+  makeTempDir,
+  writeScenario,
+  writeResult,
+  writeTranscript,
+  callRouter,
+} = require('./eval-dashboard-fixtures');
 
 describe('dashboard', () => {
   let tempDir;
@@ -150,6 +104,35 @@ describe('dashboard', () => {
 
       expect(scenarios[0].passRate).toBe(1);
       expect(scenarios[0].status).toBe('SHIP');
+    });
+
+    it('keeps an error-only treatment pool as an instrument failure, as eval list does (#212)', () => {
+      writeScenario(
+        tempDir,
+        'ab-eval.md',
+        '# Eval: ab-eval\n\n## Scope\nskill\n\n## Scenario\nDo it.\n\n## Grader\ncode\n',
+      );
+      const row = (evalName, extra) => ({
+        eval: evalName,
+        trial: 1,
+        k: 1,
+        grader: 'code',
+        timestamp: '2026-03-20T10:00:00Z',
+        ...extra,
+      });
+      writeResult(tempDir, 'ab-eval', '20260320-100000', 'treatment', [
+        row('ab-eval-treatment', { passed: false, score: 0, infraError: true }),
+      ]);
+      writeResult(tempDir, 'ab-eval', '20260319-100000', 'results', [
+        row('ab-eval', { passed: true, score: 1.0 }),
+      ]);
+
+      const { scenarios } = callRouter(createRouter(tempDir, ''), '/api/scenarios').json();
+
+      expect(scenarios[0]).toMatchObject({
+        status: 'NO RUNS',
+        otherPools: [expect.objectContaining({ rows: 1, instrumentFailure: true })],
+      });
     });
   });
 

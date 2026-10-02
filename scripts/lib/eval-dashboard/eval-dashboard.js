@@ -212,7 +212,7 @@ function handleApiScenarios(res, projectRoot) {
     const resultsName = isAb ? `${s.name}-treatment` : s.name;
     // Newest condition pool only (B-8); the others are counted, never combined.
     let pools = eval_.loadResultPools(resultsName, projectRoot, { version: s.version });
-    if (pools.current.length === 0 && isAb) {
+    if (pools.current.length === 0 && pools.others.length === 0 && isAb) {
       pools = eval_.loadResultPools(s.name, projectRoot, { version: s.version });
     }
     const results = pools.current;
