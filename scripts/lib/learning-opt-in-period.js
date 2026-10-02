@@ -7,11 +7,41 @@
  * scope's legacy start — its `updated_at`, else the file's mtime, else 0 — so
  * nothing here touches the filesystem.
  *
+ * Two kinds of bad input get two answers. A bad stamp INSIDE a config is data —
+ * a hand edit, another engine — and yields no period, the conservative
+ * direction. A bad ARGUMENT is a caller bug and throws with context: a NaN
+ * start would otherwise flow out as the effective opt-in, silencing the
+ * stale-draft warning and handing the curator an invalid date.
+ *
  * Every ambiguity resolves the same way: when the stored stamps cannot show
  * that authorization was continuous, the instant moves LATER, never earlier.
  * Too late only hides a stale-draft warning; too early would let the curator
  * analyze what was recorded before an opt-out (learning B-1, D-023).
  */
+
+function assertScopeArgs(name, config, legacyStart) {
+  if (!config || typeof config !== 'object' || Array.isArray(config)) {
+    throw new Error(`${name}: config must be an object (got ${JSON.stringify(config)})`);
+  }
+  if (typeof legacyStart !== 'number' || !Number.isFinite(legacyStart)) {
+    throw new Error(`${name}: legacyStart must be a finite number (got ${String(legacyStart)})`);
+  }
+}
+
+function assertPeriod(period, index) {
+  if (period === null) return;
+  const ok =
+    typeof period === 'object' &&
+    Number.isFinite(period.start) &&
+    (period.end === Infinity || Number.isFinite(period.end)) &&
+    period.end >= period.start;
+  if (!ok) {
+    throw new Error(
+      `effectiveOptIn: period ${index} must be null or { start, end } with a finite start ` +
+        `and an end at or after it (got ${JSON.stringify(period)})`,
+    );
+  }
+}
 
 /** Epoch ms of a string stamp; NaN for anything else, a number included. */
 function parseStamp(value) {
@@ -32,6 +62,7 @@ function parseStamp(value) {
  * @returns {boolean}
  */
 function startsAtEnabledAt(config, legacyStart) {
+  assertScopeArgs('startsAtEnabledAt', config, legacyStart);
   const enabledAt = parseStamp(config.enabled_at);
   return !Number.isNaN(enabledAt) && enabledAt >= legacyStart;
 }
@@ -53,8 +84,10 @@ function startsAtEnabledAt(config, legacyStart) {
  * @param {Object} config - the scope's config, `enabled` already a boolean
  * @param {number} legacyStart - its `updated_at`, else mtime, else 0, in epoch ms
  * @returns {{ start: number, end: number }|null}
+ * @throws when `config` is not an object or `legacyStart` is not finite
  */
 function scopePeriod(config, legacyStart) {
+  assertScopeArgs('scopePeriod', config, legacyStart);
   if (config.enabled === true) {
     const start = startsAtEnabledAt(config, legacyStart)
       ? parseStamp(config.enabled_at)
@@ -82,8 +115,13 @@ function scopePeriod(config, legacyStart) {
  *
  * @param {Array<{ start: number, end: number }|null>} periods
  * @returns {number|null}
+ * @throws when `periods` is not an array or holds a malformed period
  */
 function effectiveOptIn(periods) {
+  if (!Array.isArray(periods)) {
+    throw new Error(`effectiveOptIn: periods must be an array (got ${typeof periods})`);
+  }
+  periods.forEach(assertPeriod);
   const known = periods.filter(Boolean);
   const live = known.filter((period) => period.end === Infinity);
   if (live.length === 0) return null;
