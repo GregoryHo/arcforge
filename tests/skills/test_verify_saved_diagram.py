@@ -20,8 +20,10 @@ ambient `/tmp` state never reaches an assertion.
 import importlib.util
 import json
 import os
+import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -39,17 +41,31 @@ MARKERS = (
 SCENE = json.dumps({"type": "excalidraw", "elements": [{"type": "rectangle", "x": 0, "y": 0}]})
 
 # Stands in for `uv run python render_excalidraw.py <in> --output <out> --scale 2`:
-# records its argv, cwd and the scene it was handed, then fails or writes
+# records its argv, cwd and the scene it was handed, then acts out FAKE_UV_MODE:
+# fails, fails noisily or silently, sleeps, exits 0 without a PNG, or writes
 # FAKE_UV_BYTES (default 100) bytes.
 FAKE_UV = '''
 import json, os, sys
 from pathlib import Path
 with open(os.environ["FAKE_UV_LOG"], "w") as log:
     scene = Path(sys.argv[4]).read_text(encoding="utf-8")
-    json.dump({"argv": sys.argv[1:], "cwd": os.getcwd(), "scene": scene}, log)
-if os.environ.get("FAKE_UV_MODE") == "fail":
+    json.dump({"argv": sys.argv[1:], "cwd": os.getcwd(), "scene": scene, "pid": os.getpid()}, log)
+mode = os.environ.get("FAKE_UV_MODE")
+if mode == "fail":
     print("render exploded", file=sys.stderr)
     sys.exit(1)
+if mode == "noisy":
+    print("Resolved 5 packages in 1ms", file=sys.stderr)
+    print("ERROR: playwright not installed. Run: cd /r && uv sync", file=sys.stderr)
+    print("trailing noise", file=sys.stderr)
+    sys.exit(1)
+if mode == "silent":
+    sys.exit(3)
+if mode == "sleep":
+    import time
+    time.sleep(30)
+if mode == "no-png":
+    sys.exit(0)
 out = Path(sys.argv[sys.argv.index("--output") + 1])
 out.write_bytes(b"x" * int(os.environ.get("FAKE_UV_BYTES", "100")))
 '''
@@ -246,3 +262,74 @@ def test_manual_path_without_uv_fails_with_one_line(tmp_path):
     proc = _verify(tmp_path, _manual(SCENE), {**os.environ, "PATH": str(empty)})
     assert proc.returncode == 1
     assert proc.stderr.strip() == "VERIFY FAILED: render failed: `uv` not found on PATH"
+
+
+def test_manual_path_render_failure_reports_the_renderers_error_line_only(tmp_path):
+    proc = _verify(tmp_path, _manual(SCENE), _fake_uv(tmp_path, "noisy"))
+    assert proc.returncode == 1
+    assert proc.stderr.strip() == (
+        "VERIFY FAILED: render failed: ERROR: playwright not installed. Run: cd /r && uv sync"
+    )
+
+
+def test_manual_path_silent_render_failure_names_the_exit_status(tmp_path):
+    proc = _verify(tmp_path, _manual(SCENE), _fake_uv(tmp_path, "silent"))
+    assert proc.returncode == 1
+    assert proc.stderr.strip() == "VERIFY FAILED: render failed: renderer exited with status 3"
+
+
+def test_manual_path_render_that_writes_no_png_fails(tmp_path):
+    REFERENCE_PNG.write_bytes(b"x" * 100)
+    proc = _verify(tmp_path, _manual(SCENE), _fake_uv(tmp_path, "no-png"))
+    assert proc.returncode == 1
+    assert proc.stderr.strip() == "VERIFY FAILED: render failed: renderer wrote no PNG"
+
+
+@pytest.mark.parametrize("kind", ["binary", "directory", "no-permission"])
+def test_unreadable_saved_file_fails_with_one_line(tmp_path, kind):
+    if kind == "no-permission" and os.geteuid() == 0:
+        pytest.skip("root reads a chmod 000 file")
+    path = tmp_path / "d.excalidraw.md"
+    if kind == "directory":
+        path.mkdir()
+    elif kind == "binary":
+        path.write_bytes(MARKERS.encode("utf-8") + b"\xff\xfe")
+    else:
+        path.write_text(MARKERS, encoding="utf-8")
+        path.chmod(0)
+    proc = subprocess.run([sys.executable, str(SCRIPT), str(path)], capture_output=True, text=True, check=False)
+    assert proc.returncode == 1
+    (line,) = proc.stderr.splitlines()
+    assert line.startswith(f"VERIFY FAILED: cannot read {path}: "), line
+
+
+@pytest.mark.parametrize("signum", [signal.SIGTERM, signal.SIGHUP], ids=["SIGTERM", "SIGHUP"])
+def test_signal_mid_render_removes_the_scratch_directory(tmp_path, signum):
+    saved = tmp_path / "d.excalidraw.md"
+    saved.write_text(_manual(SCENE), encoding="utf-8")
+    log = tmp_path / "uv-call.json"
+    proc = subprocess.Popen(
+        [sys.executable, str(SCRIPT), str(saved)],
+        env=_fake_uv(tmp_path, "sleep"),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        deadline = time.monotonic() + 10
+        while not log.exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert log.exists(), "the stub renderer never started"
+        time.sleep(0.1)  # let the stub finish writing its log
+        call = json.loads(log.read_text(encoding="utf-8"))
+        scratch = Path(call["argv"][3]).parent
+        assert scratch.is_dir()
+        proc.send_signal(signum)
+        _, stderr = proc.communicate(timeout=10)
+    finally:
+        proc.kill()
+    assert proc.returncode == 128 + signum
+    assert stderr.strip() == f"VERIFY FAILED: interrupted by {signal.Signals(signum).name}"
+    assert not scratch.exists()
+    with pytest.raises(ProcessLookupError):  # the renderer was killed and reaped
+        os.kill(call["pid"], 0)

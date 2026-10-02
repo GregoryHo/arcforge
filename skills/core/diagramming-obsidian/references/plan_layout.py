@@ -101,6 +101,9 @@ def spec_errors(spec: object) -> str | None:
                 return f"zone {z} element {i} is {json_type(el)}, not an object"
             if "id" not in el:
                 return f"zone {z} element {i} has no 'id'"
+            for key in ("text", "size"):
+                if key in el and not isinstance(el[key], str):
+                    return f"zone {z} element {i} ({el['id']!r}) {key!r} is {json_type(el[key])}, not a string"
     return None
 
 
@@ -241,8 +244,14 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        spec = json.loads(args.input.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as e:
+        raw = args.input.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as e:
+        print(f"ERROR: Cannot read {args.input}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        spec = json.loads(raw)
+    except (json.JSONDecodeError, RecursionError) as e:
         print(f"ERROR: Invalid JSON: {e}", file=sys.stderr)
         sys.exit(1)
 
@@ -256,7 +265,11 @@ def main() -> None:
     output = json.dumps(layout, indent=2)
 
     if args.output:
-        args.output.write_text(output, encoding="utf-8")
+        try:
+            args.output.write_text(output, encoding="utf-8")
+        except OSError as e:
+            print(f"ERROR: Cannot write {args.output}: {e}", file=sys.stderr)
+            sys.exit(1)
         print(f"Layout written to {args.output}", file=sys.stderr)
     else:
         print(output)

@@ -36,13 +36,31 @@ def validate_excalidraw(data: object) -> list[str]:
     elif len(data["elements"]) == 0:
         errors.append("'elements' array is empty — nothing to render")
     else:
-        errors.extend(
-            f"element {i} is not an object"
-            for i, el in enumerate(data["elements"])
-            if not isinstance(el, dict)
-        )
+        for i, el in enumerate(data["elements"]):
+            problem = element_error(el)
+            if problem:
+                errors.append(f"element {i} {problem}")
 
     return errors
+
+
+def is_number(value: object) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def element_error(el: object) -> str | None:
+    """Return why an element cannot be measured for the viewport, or None."""
+    if not isinstance(el, dict):
+        return "is not an object"
+    for key in ("x", "y", "width", "height"):
+        if key in el and not is_number(el[key]):
+            return f"{key!r} is not a number"
+    points = el.get("points", [])
+    if not isinstance(points, list) or not all(
+        isinstance(p, list) and len(p) == 2 and is_number(p[0]) and is_number(p[1]) for p in points
+    ):
+        return "'points' is not an array of [x, y] number pairs"
+    return None
 
 
 def compute_bounding_box(elements: list[dict]) -> tuple[float, float, float, float]:
@@ -88,10 +106,15 @@ def render(
     """Render an .excalidraw file to PNG. Returns the output PNG path."""
     # Read and validate before importing playwright, so a broken diagram is
     # reported as broken, not as a missing renderer.
-    raw = excalidraw_path.read_text(encoding="utf-8")
+    try:
+        raw = excalidraw_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as e:
+        print(f"ERROR: Cannot read {excalidraw_path}: {e}", file=sys.stderr)
+        sys.exit(1)
+
     try:
         data = json.loads(raw)
-    except json.JSONDecodeError as e:
+    except (json.JSONDecodeError, RecursionError) as e:
         print(f"ERROR: Invalid JSON in {excalidraw_path}: {e}", file=sys.stderr)
         sys.exit(1)
 
@@ -100,11 +123,14 @@ def render(
         print(f"ERROR: Invalid Excalidraw file: {'; '.join(errors)}", file=sys.stderr)
         sys.exit(1)
 
+    references = shlex.quote(str(Path(__file__).resolve().parent))
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
-        print("ERROR: playwright not installed.", file=sys.stderr)
-        print("Run: cd this skill's references/ directory, then uv sync && uv run playwright install chromium", file=sys.stderr)
+        print(
+            f"ERROR: playwright not installed. Run: cd {references} && uv sync && uv run playwright install chromium",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     # Compute viewport size from element bounding box
@@ -135,9 +161,10 @@ def render(
             browser = p.chromium.launch(headless=True)
         except Exception as e:
             if "Executable doesn't exist" in str(e):
-                print("ERROR: Chromium not installed for Playwright.", file=sys.stderr)
-                references = Path(__file__).resolve().parent
-                print(f"Run: cd {shlex.quote(str(references))} && uv run playwright install chromium", file=sys.stderr)
+                print(
+                    f"ERROR: Chromium not installed for Playwright. Run: cd {references} && uv run playwright install chromium",
+                    file=sys.stderr,
+                )
                 sys.exit(1)
             first_line = str(e).strip().splitlines()[0] if str(e).strip() else type(e).__name__
             print(f"ERROR: Chromium failed to launch: {first_line}", file=sys.stderr)

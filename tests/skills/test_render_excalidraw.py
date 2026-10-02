@@ -86,10 +86,11 @@ def _run_without_chromium(tmp_path: Path, script: Path = SCRIPT) -> str:
 
 
 def _cd_target(stderr: str) -> Path:
-    # Parse the hint the way a shell would when the user pastes it.
-    line = next((l for l in stderr.splitlines() if l.startswith("Run: cd ")), None)
-    assert line, f"no `Run: cd <dir> && ...` hint in:\n{stderr}"
-    words = shlex.split(line[len("Run: "):])
+    # The hint ends the one error line; parse it the way a shell would when
+    # the user pastes it.
+    (line,) = stderr.splitlines()
+    assert line.startswith("ERROR: ") and ". Run: cd " in line, line
+    words = shlex.split(line.split(". Run: ", 1)[1])
     assert words[0] == "cd" and words[2] == "&&", words
     return Path(words[1])
 
@@ -135,11 +136,30 @@ def test_missing_input_exits_1_before_touching_playwright(tmp_path):
     assert "playwright" not in proc.stderr
 
 
-def test_missing_playwright_exits_1_with_setup_steps(tmp_path):
+def test_missing_playwright_is_one_error_line_ending_in_the_setup_command(tmp_path):
     proc = _run(tmp_path, sync_api=None, init="raise ImportError('No module named playwright')")
     assert proc.returncode == 1
-    assert "ERROR: playwright not installed." in proc.stderr
-    assert "uv sync && uv run playwright install chromium" in proc.stderr
+    assert proc.stderr.startswith("ERROR: playwright not installed. Run: cd ")
+    assert proc.stderr.rstrip().endswith(" && uv sync && uv run playwright install chromium")
+    assert _cd_target(proc.stderr).resolve() == REFERENCES.resolve()
+
+
+@pytest.mark.parametrize("kind", ["binary", "directory", "no-permission"])
+def test_unreadable_input_exits_1_with_one_error_line(tmp_path, kind):
+    if kind == "no-permission" and os.geteuid() == 0:
+        pytest.skip("root reads a chmod 000 file")
+    path = tmp_path / "input"
+    if kind == "directory":
+        path.mkdir()
+    elif kind == "binary":
+        path.write_bytes(b"\x89PNG\r\n\x1a\n\x00\xff")
+    else:
+        path.write_text("{}", encoding="utf-8")
+        path.chmod(0)
+    proc = _run(tmp_path, str(path))
+    assert proc.returncode == 1
+    (line,) = proc.stderr.splitlines()
+    assert line.startswith(f"ERROR: Cannot read {path}: "), line
 
 
 @pytest.mark.parametrize(
@@ -171,9 +191,18 @@ def test_invalid_scene_is_reported_before_missing_playwright(tmp_path, content, 
             json.dumps({"type": "excalidraw", "elements": ["x"]}),
             "ERROR: Invalid Excalidraw file: element 0 is not an object",
         ),
+        ("[" * 200_000, "ERROR: Invalid JSON in "),
+        (
+            json.dumps({"type": "excalidraw", "elements": [{"type": "rectangle", "x": "0"}]}),
+            "ERROR: Invalid Excalidraw file: element 0 'x' is not a number",
+        ),
+        (
+            json.dumps({"type": "excalidraw", "elements": [{"type": "arrow", "x": 0, "y": 0, "points": [[0]]}]}),
+            "ERROR: Invalid Excalidraw file: element 0 'points' is not an array of [x, y] number pairs",
+        ),
     ],
     ids=["invalid-json", "wrong-type", "no-elements", "elements-not-array", "elements-empty",
-         "top-level-array", "element-not-object"],
+         "top-level-array", "element-not-object", "nested-too-deep", "x-not-number", "points-bad-pair"],
 )
 def test_invalid_scene_exits_1_with_one_error_line_before_launching_chromium(tmp_path, content, message):
     proc = _run(tmp_path, content=content)

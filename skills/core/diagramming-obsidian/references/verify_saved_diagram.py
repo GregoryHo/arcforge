@@ -14,12 +14,15 @@ What is checked depends on the save path, which the drawing block reveals:
     3. The re-rendered PNG's byte size is compared against /tmp/diagram.png
        when present. A large delta signals JSON structural damage.
 
-Exits 0 on success, 1 on any failure with a clear message.
+Exits 0 on success, 1 on any failure with one `VERIFY FAILED:` line on
+stderr naming the cause, 2 on a usage error, and 128+N when stopped by
+signal N (SIGTERM, SIGHUP), after removing its scratch directory.
 """
 from __future__ import annotations
 
 import json
 import re
+import signal
 import subprocess
 import sys
 import tempfile
@@ -37,6 +40,22 @@ FORMAT_MARKERS = {
 def fail(msg: str) -> None:
     print(f'VERIFY FAILED: {msg}', file=sys.stderr)
     sys.exit(1)
+
+
+def interrupted(signum: int, _frame: object) -> None:
+    """Exit through SystemExit so the render's scratch directory unwinds."""
+    print(f'VERIFY FAILED: interrupted by {signal.Signals(signum).name}', file=sys.stderr)
+    sys.exit(128 + signum)
+
+
+def render_failure_cause(result: subprocess.CompletedProcess) -> str:
+    """One line naming why the renderer failed: its ERROR: line, else its
+    last stderr line, else its exit status."""
+    lines = [line for line in result.stderr.splitlines() if line.strip()]
+    errors = [line for line in lines if line.startswith('ERROR:')]
+    if errors or lines:
+        return (errors or lines)[-1].strip()
+    return f'renderer exited with status {result.returncode}'
 
 
 def check_format_markers(content: str) -> None:
@@ -57,7 +76,7 @@ def extract_json_block(content: str) -> tuple[str, bool]:
 def render_and_compare(json_text: str, reference_png: Path | None) -> None:
     with tempfile.TemporaryDirectory(prefix='verify-diagram-') as scratch:
         verify_path = Path(scratch) / 'verify.excalidraw'
-        verify_path.write_text(json_text)
+        verify_path.write_text(json_text, encoding='utf-8')
         out_png = Path(scratch) / 'diagram-post-save.png'
         try:
             result = subprocess.run(
@@ -68,7 +87,9 @@ def render_and_compare(json_text: str, reference_png: Path | None) -> None:
         except FileNotFoundError:
             fail('render failed: `uv` not found on PATH')
         if result.returncode != 0:
-            fail(f'render failed: {result.stderr.strip()}')
+            fail(f'render failed: {render_failure_cause(result)}')
+        if not out_png.is_file():
+            fail('render failed: renderer wrote no PNG')
         if reference_png and reference_png.exists():
             ref_size = reference_png.stat().st_size
             new_size = out_png.stat().st_size
@@ -89,7 +110,10 @@ def main() -> None:
     if not md_path.exists():
         fail(f'file not found: {md_path}')
 
-    content = md_path.read_text()
+    try:
+        content = md_path.read_text(encoding='utf-8')
+    except (OSError, UnicodeDecodeError) as e:
+        fail(f'cannot read {md_path}: {e}')
     check_format_markers(content)
 
     json_text, is_compressed = extract_json_block(content)
@@ -102,6 +126,9 @@ def main() -> None:
         json.loads(json_text)
     except json.JSONDecodeError as e:
         fail(f'drawing block is not valid JSON: {e}')
+    for name in ('SIGTERM', 'SIGHUP'):
+        if hasattr(signal, name):
+            signal.signal(getattr(signal, name), interrupted)
     render_and_compare(json_text, Path('/tmp/diagram.png'))
     print('OK: format markers present, JSON parses, post-save render succeeds')
 

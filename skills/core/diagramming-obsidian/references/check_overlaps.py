@@ -166,6 +166,35 @@ def json_type(value: object) -> str:
     return names[type(value)]
 
 
+def is_number(value: object) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def element_field_error(el: dict) -> str | None:
+    """Return the first field this script reads that has the wrong type, or None."""
+    for key in ("x", "y", "width", "height"):
+        if key in el and not is_number(el[key]):
+            return f"{key!r} is {json_type(el[key])}, not a number"
+    points = el.get("points", [])
+    if not isinstance(points, list) or not all(
+        isinstance(p, list) and len(p) >= 2 and is_number(p[0]) and is_number(p[1]) for p in points
+    ):
+        return "'points' is not an array of [x, y] number pairs"
+    for key in ("groupIds", "boundElements"):
+        if el.get(key) is not None and not isinstance(el[key], list):
+            return f"{key!r} is {json_type(el[key])}, not an array or null"
+    for bound in el.get("boundElements") or []:
+        if not isinstance(bound, dict):
+            return f"'boundElements' holds {json_type(bound)}, not an object"
+    for key in ("startBinding", "endBinding"):
+        if el.get(key) is not None and not isinstance(el[key], dict):
+            return f"{key!r} is {json_type(el[key])}, not an object or null"
+    for key in ("type", "text", "originalText"):
+        if key in el and not isinstance(el[key], str):
+            return f"{key!r} is {json_type(el[key])}, not a string"
+    return None
+
+
 def scene_errors(data: object) -> str | None:
     """Return why `data` is not a scene this script can check, or None if it is."""
     if not isinstance(data, dict):
@@ -180,8 +209,13 @@ def scene_errors(data: object) -> str | None:
             return f"element {i} is {json_type(el)}, not an object"
         if "id" not in el:
             return f"element {i} has no 'id'"
+        if not isinstance(el["id"], str):
+            return f"element {i} 'id' is {json_type(el['id'])}, not a string"
         if "type" not in el:
             return f"element {i} ({el['id']!r}) has no 'type'"
+        problem = element_field_error(el)
+        if problem:
+            return f"element {i} ({el['id']!r}) {problem}"
     return None
 
 
@@ -444,8 +478,14 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        data = json.loads(args.input.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as e:
+        raw = args.input.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as e:
+        print(f"ERROR: Cannot read {args.input}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, RecursionError) as e:
         print(f"ERROR: Invalid JSON: {e}", file=sys.stderr)
         sys.exit(1)
 

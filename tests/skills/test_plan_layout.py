@@ -8,6 +8,7 @@ exits on bad input.
 """
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -194,6 +195,37 @@ def test_missing_spec_exits_1_with_a_message(tmp_path):
     assert "ERROR: File not found:" in proc.stderr
 
 
+def _unreadable_input(tmp_path: Path, kind: str) -> Path:
+    if kind == "directory":
+        return tmp_path
+    path = tmp_path / "input"
+    if kind == "binary":
+        path.write_bytes(b"\x89PNG\r\n\x1a\n\x00\xff")
+    else:
+        path.write_text("{}", encoding="utf-8")
+        path.chmod(0)
+    return path
+
+
+@pytest.mark.parametrize("kind", ["binary", "directory", "no-permission"])
+def test_unreadable_input_exits_1_with_one_error_line(tmp_path, kind):
+    if kind == "no-permission" and os.geteuid() == 0:
+        pytest.skip("root reads a chmod 000 file")
+    path = _unreadable_input(tmp_path, kind)
+    proc = subprocess.run([sys.executable, str(SCRIPT), str(path)], capture_output=True, text=True, check=False)
+    assert proc.returncode == 1
+    (line,) = proc.stderr.splitlines()
+    assert line.startswith(f"ERROR: Cannot read {path}: "), line
+
+
+def test_output_into_a_missing_directory_exits_1_with_one_error_line(tmp_path):
+    out = tmp_path / "no-such-dir" / "layout.json"
+    proc = _run(tmp_path, {}, "--output", str(out))
+    assert proc.returncode == 1
+    (line,) = proc.stderr.splitlines()
+    assert line.startswith(f"ERROR: Cannot write {out}: "), line
+
+
 @pytest.mark.parametrize(
     "raw, message",
     [
@@ -205,9 +237,19 @@ def test_missing_spec_exits_1_with_a_message(tmp_path):
         (json.dumps({"zones": [{"elements": 1}]}), "ERROR: Not a layout spec: zone 0 'elements' is a number, not an array"),
         (json.dumps({"zones": [{"elements": [1]}]}), "ERROR: Not a layout spec: zone 0 element 0 is a number, not an object"),
         (json.dumps({"zones": [{"elements": [{"type": "flow"}]}]}), "ERROR: Not a layout spec: zone 0 element 0 has no 'id'"),
+        (
+            json.dumps({"zones": [{"elements": [{"id": "e", "type": "evidence", "text": 5}]}]}),
+            "ERROR: Not a layout spec: zone 0 element 0 ('e') 'text' is a number, not a string",
+        ),
+        (
+            json.dumps({"zones": [{"elements": [{"id": "f", "size": ["x"]}]}]}),
+            "ERROR: Not a layout spec: zone 0 element 0 ('f') 'size' is an array, not a string",
+        ),
+        ("[" * 200_000, "ERROR: Invalid JSON: "),
     ],
     ids=["invalid-json", "top-level-array", "canvas-not-object", "zones-not-array", "zone-not-object",
-         "elements-not-array", "element-not-object", "element-without-id"],
+         "elements-not-array", "element-not-object", "element-without-id", "text-not-string", "size-not-string",
+         "nested-too-deep"],
 )
 def test_bad_spec_exits_1_with_one_error_line(tmp_path, raw, message):
     proc = _run(tmp_path, None, raw=raw)
