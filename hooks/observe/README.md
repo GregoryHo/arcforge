@@ -28,6 +28,14 @@ that died without removing its lock leaves a PID the system can reuse, and
 daemon is never signaled. The daemon reclaims that stale lock the next time it
 starts.
 
+Once enough observations have built up (50 by default) and no daemon is
+running, the hook starts one itself, so curation does not wait for the next
+session. A lock left by a daemon that died does not count as running: the hook
+starts the daemon and the daemon reclaims the lock. The hook treats the lock as
+stale only when its process is gone or `ps` shows it running something else;
+when it cannot tell — `ps` is not installed, or the lock's pid file is empty
+or not written yet — it leaves the lock alone rather than risk a second daemon.
+
 ## Related
 
 See `docs/guide/learning-dashboard.md` for the full observation → instinct
