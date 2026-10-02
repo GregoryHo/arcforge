@@ -488,6 +488,15 @@ not pooled with V2's: V2 is a different fixture and a fresh pool.
   the index during a link pass, `SKILL.md`'s line formalizes behavior the
   model has, and the scenario stays in the corpus as unmet-but-covered with
   no A/B — the threshold does not move.
+- **Operator audit.** The grader reads the index statically, and the
+  blind-spot list above will never be complete. After the preflight and after
+  the A/B, the operator reads every FAIL row of either arm against its
+  transcript and its final vault. A FAIL that a listed blind spot, or a new
+  one, produced on a genuinely right end state is reported beside the verdict
+  as a mis-scored trial, with its trial id and the reason. The verdict is
+  still computed on the grader's scores and is never re-scored by hand. This
+  is what the blind-spot list is for: to make such a trial recognisable, not
+  to excuse it after the fact.
 - **Direction.** Treatment above baseline on mean score.
 - **Threshold.** The harness verdict is `IMPROVED` at k=5 per arm — the 95% CI
   on the score delta lies entirely above zero (eval B-4). A positive delta
