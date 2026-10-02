@@ -66,7 +66,7 @@ D-048 的驗證：發版時從 `v6.2.0` 對 `skills/`、`evals/scenarios/`、`ev
 | 工作包 | 事項 | 內容 |
 |---|---|---|
 | WP-E scenario 重新設計 | 五支 scenario | `eval-executing-verify-decides-done`、`eval-router-skill-selection`、`eval-maintaining-obsidian-audit-runs-lint-script`、`eval-maintaining-obsidian-link-rebuilds-index`、`eval-speccing-supersede-not-overwrite`，各自 `## Version` 加一；lint-script 的重新設計拿掉 `## Preflight` 現有的 `skip`。流程見下方「重新設計的流程」 |
-| WP-F skill-local script | #228、#210 | `diagramming-obsidian` 的四支 helper（`check_overlaps.py`、`plan_layout.py`、`render_excalidraw.py`、`verify_saved_diagram.py`）遇到錯誤輸入時印一行 `ERROR:` 並以非零結束，不再丟 traceback；`lint_vault` 的 code-span lookahead 遇到 fence 起始行就停 |
+| WP-F skill-local script | #228、#210 | `diagramming-obsidian` 的四支 helper（`check_overlaps.py`、`plan_layout.py`、`render_excalidraw.py`、`verify_saved_diagram.py`）遇到錯誤輸入時印一行 `ERROR:` 並以非零結束，不再丟 traceback；`lint_vault` 的 code-span lookahead 遇到 fence 起始行就停。兩者都是 skill-local script 的確定性修改，`SKILL.md` 不動；證據是 `tests/skills/` 的契約測試（#228 標著 KNOWN BUG (6.2.0) 的斷言翻轉，#210 新增案例），不跑 A/B（D-049） |
 | WP-G `enabled_at` | #164 | 每個 scope 的 learning config 記下最近一次授權從何時開始；有效 opt-in 取任一 scope 連續授權到現在的那段時間從何時開始（D-051） |
 | WP-H 量測與帳本 | — | 依下方預算與 A/B 順序跑完一輪、寫帳本，並以一筆 decision 記錄這一輪的結果，含未量測的 scenario；之後發版 |
 
@@ -139,3 +139,4 @@ spec：obsidian B-5、B-8；learning B-19；hooks B-6；sdd B-4；skill-system B
 4. **grader 呼叫不在上限內。** 兩支 `mixed` scenario 的實際花費會比 trial session 數多；重新設計時可考慮改成程式評分。
 5. **#210 晚於 lint-script 的量測合併。** 量到的會是修正前的 script，結果作廢。
 6. **6.2.1 的某項修正其實需要改 skill。** 依 D-048 的 Cost accepted，該項移到 6.3.0。
+7. **#210 與 #228 出貨時沒有 harness 證據。** 這是 D-049 接受的 Residual：沒有任何量測顯示 agent 怎麼處理新的 script 輸出。本輪也量不到，因為 skill-scope 的 A/B 只注入 `SKILL.md`，skill 的 `references/` 只能由 fixture 複製進 trial，兩臂都看得到；這正是 lint-script scenario 無法區分兩臂、#185 仍未關閉的原因。前例是 D-045 的 Residual。要量測得先做 backlog wish `eval-skill-files-outside-trial`。

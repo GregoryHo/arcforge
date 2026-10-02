@@ -100,6 +100,11 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 - **eval-compare-skip-analyzer** — `eval compare` on a model- or
   human-graded scenario always spawns the eval-analyzer session; a flag to
   skip it would let a verdict be read without spending a model call.
+- **eval-skill-files-outside-trial** — in a skill-scope A/B, give only the
+  treatment arm a host-style "Base directory for this skill" line with that
+  skill's files staged outside the trial tree the baseline can list, so
+  behavior that depends on a skill's shipped scripts or references can be
+  measured without placing them in the baseline's fixture · needs: D-049.
 
 ## CLI
 

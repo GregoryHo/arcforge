@@ -1240,8 +1240,12 @@ reverse one, append a superseding entry (see AGENTS.md).
   into a search for a rubric the baseline happens to fail, and a BLOCK is a
   verdict about the scenario (eval B-3). #228 and #210 are skill-local scripts
   inside the two obsidian skills, under `skills/`, so they re-arm the benchmark gate and
-  cannot ride 6.2.1; riding a round that runs anyway costs them nothing extra,
-  and neither changes a skill's behavioral claim. #164 changes learning's
+  cannot ride 6.2.1; riding a round that runs anyway costs them nothing extra.
+  Both are deterministic changes to skill-local scripts with the `SKILL.md`
+  instructions untouched, and their evidence is the scripts' contract tests
+  under `tests/skills/` — the form `.claude/rules/skills.md` prescribes for a
+  skill-local script: for #228 the pins marked KNOWN BUG (6.2.0) flip, and #210
+  gains a new case — not an A/B. #164 changes learning's
   on-disk config, which D-020 placed in a minor.
 - Residual: not in 6.3.0, and staying where they are — the wishes
   **skill-body-trim**, **diagramming-headless-fallback**,
@@ -1252,6 +1256,14 @@ reverse one, append a superseding entry (see AGENTS.md).
   Harness and Hooks; the issues #184 and #185; and whether Codex's `$`
   mention carries the `arcforge:` namespace, which stays unmeasured by the
   owner's call of 2026-10-01.
+- Residual: #210 and #228 ship without harness evidence of how an agent acts
+  on the new script output, and no scenario in this round can reach it: a
+  skill-scope A/B injects `SKILL.md` alone, so a skill's `references/` reach a
+  trial only when a fixture copies them in, where both arms see them — the
+  limit that stops `eval-maintaining-obsidian-audit-runs-lint-script` from
+  discriminating, and the reason #185 is still open. D-045's Residual is the
+  precedent: D-028's behavior shipped on a structural test without harness
+  evidence. Measuring it is the **eval-skill-files-outside-trial** wish.
 - Cost accepted: up to about 80 trial sessions, plus model-grader calls the
   cap does not count — a scenario with model-graded assertions spawns one
   grader call per graded trial, preflight included. On `main` that is
