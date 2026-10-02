@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { effectiveOptIn, scopePeriod, startsAtEnabledAt } = require('./learning-opt-in-period');
 const { readJsonFile, writeJsonFile, getArcforgeHome, sanitizeProjectName } = require('./utils');
 
 /**
@@ -217,14 +218,14 @@ function isLearningEnabledForProject(project, { homeDir } = {}) {
  *
  * "Took effect" is the start of the unbroken stretch of authorization in EITHER
  * scope that reaches the present. Each scope contributes its latest authorized
- * period (`scopePeriod`): from `enabled_at` to now while it is enabled, and to
- * its disable — the `updated_at` a disable stamps — once it is not. The floor is
- * the earliest start among the enabled scopes, extended back to the start of a
- * disabled scope's period that reaches it; periods that touch join. So global
- * on at T1, project on at T2 and global off at T3 ≥ T2 is T1, and with T3 < T2
- * authorization lapsed and it is T2.
+ * period — `enabled_at` up to now while enabled, up to its disable once it is
+ * not — and the stretch is joined from them; the arithmetic, and the rule that
+ * every ambiguity moves the instant LATER, live in `learning-opt-in-period.js`.
+ * So global on at T1, project on at T2 and global off at T3 > T2 is T1, and
+ * with T3 ≤ T2 authorization lapsed (or cannot be shown not to have) and it
+ * is T2.
  *
- * Both stamps are written by `setLearningEnabled` and nothing else in the
+ * The stamps are written by `setLearningEnabled` and nothing else in the
  * engine. They mark state CHANGES, not writes, so re-running `learn enable` on
  * an enabled scope leaves the floor where the real opt-in put it. A config
  * from before `enabled_at` existed reads as it always did: its `updated_at`
@@ -232,14 +233,15 @@ function isLearningEnabledForProject(project, { homeDir } = {}) {
  * field by the next no-op write so it is not re-derived from a moving mtime —
  * and no period at all while disabled. A config that cannot be stat'd reads as
  * 0, so an unreadable timestamp warns about everything rather than going quiet
- * on a real failure. An unusable stamp gives a disabled scope no period, so a
- * hand-edit can shorten the stretch but never invent one.
+ * on a real failure.
  *
- * Residual: only a scope's LATEST period is kept. Global on at T1, project on
- * at T2, global off at T3 and on again at T4 leaves the floor at T2 — the
- * re-enable overwrites T1 — so drafts left stale in [T1, T2) stop being
- * reported. A missed warning is the cheaper failure than a permanent one about
- * intended behavior (D-051).
+ * Residual, both in the late direction: only a scope's LATEST period is kept,
+ * so global on at T1, project on at T2, global off at T3 and on again at T4
+ * reads T2 — the re-enable overwrites T1; and a period whose disable an engine
+ * without `disabled_at` recorded is not trusted, so it reads as a lapse even
+ * when there was none. Drafts left stale before the instant stop being
+ * reported, and the curator's window starts later than it could: a missed
+ * warning is the cheaper failure than analysis across an opt-out (D-051).
  *
  * @param {Object} [opts]
  * @param {string} [opts.projectRoot] - Project root whose scoped config to read.
@@ -252,66 +254,13 @@ function learningEnabledSince({ projectRoot = process.cwd(), homeDir } = {}) {
   );
 }
 
-/**
- * The start of the stretch of authorization that reaches the present, from
- * the periods of the scopes that can authorize, or null when none is enabled.
- * There are two scopes and at least one is live, so at most one period has
- * ended and a single pass is exact.
- */
-function effectiveOptIn(periods) {
-  const known = periods.filter(Boolean);
-  const live = known.filter((period) => period.end === Infinity);
-  if (live.length === 0) return null;
-  let floor = Math.min(...live.map((period) => period.start));
-  for (const { start, end } of known) {
-    if (start < floor && end >= floor) floor = start;
-  }
-  return floor;
-}
-
 function readScopePeriod({ scope, projectRoot = process.cwd(), homeDir }) {
   const config = readScopeConfig({ scope, projectRoot, homeDir });
-  return scopePeriod(config, getLearningConfigPath({ scope, projectRoot, homeDir }));
+  const configPath = getLearningConfigPath({ scope, projectRoot, homeDir });
+  return scopePeriod(config, scopeEnabledAt(config, configPath));
 }
 
-/**
- * One scope's latest authorized period as `{ start, end }` in epoch ms — `end`
- * is Infinity while the scope is enabled — or null when it has none on record:
- * a disabled scope without a usable `enabled_at` and `updated_at`, or whose
- * `enabled_at` is later than its disable (clock skew), contributes nothing.
- */
-function scopePeriod(config, configPath) {
-  if (config.enabled === true) {
-    const start = startsAtEnabledAt(config)
-      ? parseStamp(config.enabled_at)
-      : scopeEnabledAt(config, configPath);
-    return { start, end: Infinity };
-  }
-  const start = parseStamp(config.enabled_at);
-  const end = Date.parse(config.updated_at ?? '');
-  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return null;
-  return { start, end };
-}
-
-/**
- * Whether an ENABLED scope's period starts at its `enabled_at`. An enable the
- * engine records stamps both fields alike, so `updated_at` is never the later
- * one — unless the enable was recorded by an engine that does not know
- * `enabled_at` (6.2.x), which leaves an older period's start behind. The later
- * stamp is then the real start, and reading the stale one would reach back
- * across the opt-out between the two periods.
- */
-function startsAtEnabledAt(config) {
-  const enabledAt = parseStamp(config.enabled_at);
-  return !Number.isNaN(enabledAt) && !(Date.parse(config.updated_at ?? '') > enabledAt);
-}
-
-/** Epoch ms of a string stamp; NaN for anything else, a number included. */
-function parseStamp(value) {
-  return typeof value === 'string' ? Date.parse(value) : Number.NaN;
-}
-
-/** When one enabled scope was last written — its start without a usable `enabled_at`. */
+/** When one scope was last written — its legacy start, read without `enabled_at`. */
 function scopeEnabledAt(config, configPath) {
   const stamped = Date.parse(config.updated_at ?? '');
   if (!Number.isNaN(stamped)) return stamped;
@@ -344,7 +293,9 @@ function preservedStamp(config, configPath) {
  * there is none.
  */
 function endedPeriodStart(config, configPath) {
-  return startsAtEnabledAt(config) ? config.enabled_at : preservedStamp(config, configPath);
+  return startsAtEnabledAt(config, scopeEnabledAt(config, configPath))
+    ? config.enabled_at
+    : preservedStamp(config, configPath);
 }
 
 /**
@@ -396,9 +347,13 @@ function setLearningEnabled({
   // An enable starts a new one; a disable keeps the start of the one it ends —
   // the period start the floor was reading, which for a config written before
   // the field existed is its `updated_at`, so that start survives the disable.
+  // A disable also marks itself in `disabled_at`, equal to the `updated_at` it
+  // stamps: the reader trusts a disabled period only while the two agree, so a
+  // later transition by an engine that does not know the marker voids it.
   if (changed) {
     const start = next ? now : endedPeriodStart(previous, configPath);
     if (start !== null) config.enabled_at = start;
+    if (!next) config.disabled_at = now;
   }
   writeJsonFile(configPath, config);
   return config;

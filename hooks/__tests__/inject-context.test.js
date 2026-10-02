@@ -415,17 +415,19 @@ describe('inject-context stale-draft warning gate (D-009)', () => {
     );
   });
 
-  /** Write the global-scope config with an `enabled_at` period, by ages in days. */
+  /** Write the global config as a 6.3 disable leaves it, by ages in days. */
   function writeGlobalPeriod({ enabledDaysAgo, disabledDaysAgo }) {
     const configPath = path.join(homeDir, '.arcforge', 'learning', 'config.json');
+    const disabledAt = new Date(Date.now() - disabledDaysAgo * DAY_MS).toISOString();
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
     fs.writeFileSync(
       configPath,
       JSON.stringify({
         scope: 'global',
         enabled: false,
-        updated_at: new Date(Date.now() - disabledDaysAgo * DAY_MS).toISOString(),
+        updated_at: disabledAt,
         enabled_at: new Date(Date.now() - enabledDaysAgo * DAY_MS).toISOString(),
+        disabled_at: disabledAt,
       }),
     );
   }

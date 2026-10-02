@@ -479,12 +479,15 @@ have to find them by surprise.
   drafts written after you turned learning on, judged by the file's creation and
   last-write times. A copy that resets both (a sync re-download, a naive unzip),
   or a filesystem that records no creation time, can make an older draft look
-  new and get reported. It also misses two cases: a draft first written before
-  you turned learning on and rewritten in place afterwards. Turning off one
-  scope while the other stays on does not move the cutoff: global on, project
-  on, global off still counts from the global date, because learning was never
-  off in between. Each scope remembers only its latest stretch, though — turn
-  global back on and the cutoff moves forward to the project's date.
+  new and get reported. Turning off one scope while the other stays on does
+  not move the cutoff: global on, project on, global off still counts from the
+  global date, because learning was never off in between. It does miss three
+  cases, where the cutoff lands later than it could: a draft first written
+  before you turned learning on and rewritten in place afterwards; a scope
+  turned off and back on, because each scope remembers only its latest
+  stretch — turn global back on and the cutoff moves forward to the project's
+  date; and a stretch that an arcforge older than 6.3 turned off, which is not
+  counted because arcforge cannot tell whether learning stayed on throughout.
 - **Only instincts are built.** The candidate format reserves other artifact
   types — `skill`, `command`, `agent`, `eval` and a repository-convention patch
   — but nothing can materialize or activate them yet, and nothing proposes them

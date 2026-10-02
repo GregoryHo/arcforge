@@ -24,6 +24,7 @@ const T1 = '2026-01-01T00:00:00.000Z';
 const T2 = '2026-03-01T00:00:00.000Z';
 const T3 = '2026-06-01T00:00:00.000Z';
 const T4 = '2026-08-01T00:00:00.000Z';
+const T5 = '2026-10-01T00:00:00.000Z';
 // Kept for the cases moved from learning.test.js, which name them this way.
 const EARLY = T1;
 const LATE = T3;
@@ -50,6 +51,20 @@ describe('the effective learning opt-in', () => {
     setLearningEnabled({ scope, enabled, projectRoot, homeDir, now });
   const since = () => learningEnabledSince({ projectRoot, homeDir });
   const readConfig = (scope) => JSON.parse(fs.readFileSync(configPath(scope), 'utf8'));
+
+  /**
+   * A toggle as a 6.1.2–6.2.x engine records it: the config merged, `enabled`
+   * set, `updated_at` stamped on a change and kept on a no-op — and neither
+   * `enabled_at` nor `disabled_at` touched, because that engine does not know them.
+   */
+  function legacyToggle(scope, enabled, now) {
+    const file = configPath(scope);
+    const existing = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
+    const changed = (existing.enabled === true) !== enabled;
+    const updated_at = changed ? now : (existing.updated_at ?? now);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ ...existing, scope, enabled, updated_at }));
+  }
 
   /** Write a scope's config by hand — a legacy or hand-edited file. */
   function writeConfig(scope, config, mtime) {
@@ -156,6 +171,7 @@ describe('the effective learning opt-in', () => {
         enabled: false,
         updated_at: T3,
         enabled_at: T1,
+        disabled_at: T3,
       });
     });
 
@@ -173,12 +189,17 @@ describe('the effective learning opt-in', () => {
       expect(since()).toBe(Date.parse(T3));
     });
 
-    // Periods that touch are one stretch: authorization never lapsed.
-    it('joins a disable at the very instant the other scope came on', () => {
+    // A disable and an enable stamped at the same instant leave the same state
+    // whichever came first, so the engine cannot show they overlapped. It
+    // reads a lapse: too late only hides a warning, too early breaks consent.
+    it.each([
+      ['after', ['project', true, T2], ['global', false, T2]],
+      ['before', ['global', false, T2], ['project', true, T2]],
+    ])('does not join a disable stamped at the instant the other scope came on (%s)', (_order, a, b) => {
       set('global', true, T1);
-      set('project', true, T2);
-      set('global', false, T2);
-      expect(since()).toBe(Date.parse(T1));
+      set(...a);
+      set(...b);
+      expect(since()).toBe(Date.parse(T2));
     });
 
     it('is null when both scopes have been disabled, whatever their periods', () => {
@@ -274,16 +295,24 @@ describe('the effective learning opt-in', () => {
       expect(readConfig('project')).toMatchObject({ updated_at: T1, enabled_at: T1 });
     });
 
-    it('a disable keeps it and stamps the transition', () => {
+    it('a disable keeps it and stamps the transition in updated_at and disabled_at', () => {
       set('project', true, T1);
-      expect(set('project', false, T2)).toMatchObject({ updated_at: T2, enabled_at: T1 });
+      expect(set('project', false, T2)).toMatchObject({
+        updated_at: T2,
+        enabled_at: T1,
+        disabled_at: T2,
+      });
     });
 
     it('an idempotent disable leaves both stamps', () => {
       set('project', true, T1);
       set('project', false, T2);
       set('project', false, T3);
-      expect(readConfig('project')).toMatchObject({ updated_at: T2, enabled_at: T1 });
+      expect(readConfig('project')).toMatchObject({
+        updated_at: T2,
+        enabled_at: T1,
+        disabled_at: T2,
+      });
     });
 
     it('keeps keys it does not own through every kind of write', () => {
@@ -300,25 +329,27 @@ describe('the effective learning opt-in', () => {
     });
 
     // Schema: the opt-in config's owner is learning.js, and this is the whole
-    // shape it writes — the four keys it owns, each a string or a boolean.
-    it('writes exactly scope, enabled, updated_at and enabled_at', () => {
-      for (const [enabled, now] of [
-        [true, T1],
-        [false, T2],
-      ]) {
-        set('project', enabled, now);
-        const config = readConfig('project');
-        expect(Object.keys(config).sort()).toEqual([
-          'enabled',
-          'enabled_at',
-          'scope',
-          'updated_at',
-        ]);
-        expect(config.scope).toBe('project');
-        expect(typeof config.enabled).toBe('boolean');
-        expect(Number.isNaN(Date.parse(config.updated_at))).toBe(false);
-        expect(Number.isNaN(Date.parse(config.enabled_at))).toBe(false);
+    // shape it writes — `disabled_at` from the first disable on, equal to the
+    // `updated_at` that disable stamped.
+    it.each([
+      [[[true, T1]], ['enabled', 'enabled_at', 'scope', 'updated_at']],
+      [
+        [
+          [true, T1],
+          [false, T2],
+        ],
+        ['disabled_at', 'enabled', 'enabled_at', 'scope', 'updated_at'],
+      ],
+    ])('writes exactly the keys it owns (%#)', (writes, keys) => {
+      for (const [enabled, now] of writes) set('project', enabled, now);
+      const config = readConfig('project');
+      expect(Object.keys(config).sort()).toEqual(keys);
+      expect(config.scope).toBe('project');
+      expect(typeof config.enabled).toBe('boolean');
+      for (const key of ['updated_at', 'enabled_at', 'disabled_at'].filter((k) => k in config)) {
+        expect(Number.isNaN(Date.parse(config[key]))).toBe(false);
       }
+      if (!config.enabled) expect(config.disabled_at).toBe(config.updated_at);
     });
   });
 
@@ -332,7 +363,12 @@ describe('the effective learning opt-in', () => {
     });
 
     it('gives a disabled scope with an unusable enabled_at no period', () => {
-      writeConfig('global', { enabled: false, updated_at: T3, enabled_at: 'garbage' });
+      writeConfig('global', {
+        enabled: false,
+        updated_at: T3,
+        enabled_at: 'garbage',
+        disabled_at: T3,
+      });
       set('project', true, T2);
       expect(since()).toBe(Date.parse(T2));
     });
@@ -358,7 +394,7 @@ describe('the effective learning opt-in', () => {
     });
 
     it('gives a disabled scope whose enabled_at is after its disable no period', () => {
-      writeConfig('global', { enabled: false, updated_at: T2, enabled_at: T3 });
+      writeConfig('global', { enabled: false, updated_at: T2, enabled_at: T3, disabled_at: T2 });
       set('project', true, T2);
       expect(since()).toBe(Date.parse(T2));
     });
@@ -372,6 +408,73 @@ describe('the effective learning opt-in', () => {
       expect(since()).toBe(Date.parse(T3));
       set('project', false, T4);
       expect(readConfig('project').enabled_at).toBe(T3);
+    });
+  });
+
+  // A disabled scope's period is trusted only when `disabled_at` equals its
+  // `updated_at`: an engine that does not know the marker stamps `updated_at`
+  // on its transitions and leaves the marker behind, so a mismatch means a
+  // transition 6.3 did not record — and the period it would imply is unproven.
+  describe('a period another engine may have touched', () => {
+    it('trusts the period a 6.3 disable recorded', () => {
+      writeConfig('global', { enabled: false, enabled_at: T1, updated_at: T3, disabled_at: T3 });
+      set('project', true, T2);
+      expect(since()).toBe(Date.parse(T1));
+    });
+
+    it('gives a disabled scope with no disabled_at no period', () => {
+      writeConfig('global', { enabled: false, enabled_at: T1, updated_at: T3 });
+      set('project', true, T2);
+      expect(since()).toBe(Date.parse(T2));
+    });
+
+    it('gives a disabled scope whose disabled_at differs from updated_at no period', () => {
+      writeConfig('global', { enabled: false, enabled_at: T1, updated_at: T3, disabled_at: T2 });
+      set('project', true, T2);
+      expect(since()).toBe(Date.parse(T2));
+    });
+
+    // QA's sequences (#164 review). Truth is T3 — the 6.2 enable after a lapse;
+    // reading T1 would make the pre-lapse observations analyzable (D-023).
+    it('6.3 g+T1, 6.3 g-T2, 6.2 g+T3, 6.3 p+T4, 6.2 g-T5 does not reach back to T1', () => {
+      set('global', true, T1);
+      set('global', false, T2);
+      legacyToggle('global', true, T3);
+      set('project', true, T4);
+      legacyToggle('global', false, T5);
+      expect(since()).toBe(Date.parse(T4));
+    });
+
+    it('6.2 g+T1, 6.3 g-T2, 6.2 g+T3, 6.2 p+T4, 6.2 g-T5 does not reach back to T1', () => {
+      legacyToggle('global', true, T1);
+      set('global', false, T2);
+      legacyToggle('global', true, T3);
+      legacyToggle('project', true, T4);
+      legacyToggle('global', false, T5);
+      expect(since()).toBe(Date.parse(T4));
+    });
+
+    // The enabled branch: a 6.2 enable after a 6.3 disable leaves the old
+    // `enabled_at`, but its own `updated_at` is later and wins.
+    it('6.3 g+T1, 6.3 g-T2, 6.2 g+T3 reads T3, and a 6.3 disable then keeps T3', () => {
+      set('global', true, T1);
+      set('global', false, T2);
+      legacyToggle('global', true, T3);
+      expect(since()).toBe(Date.parse(T3));
+      set('project', true, T4);
+      set('global', false, T5);
+      expect(readConfig('global')).toMatchObject({ enabled_at: T3, disabled_at: T5 });
+      expect(since()).toBe(Date.parse(T3));
+    });
+
+    // L1: a no-op disable materializes `updated_at` from the mtime, but it
+    // writes no marker, so a hand-written start still gains no period.
+    it('a no-op disable does not invent a period for a hand-written enabled_at', () => {
+      writeConfig('global', { enabled: false, enabled_at: T1 }, T5);
+      set('project', true, T4);
+      expect(since()).toBe(Date.parse(T4));
+      set('global', false, T5);
+      expect(since()).toBe(Date.parse(T4));
     });
   });
 
