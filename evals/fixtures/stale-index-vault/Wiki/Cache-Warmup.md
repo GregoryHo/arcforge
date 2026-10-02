@@ -15,4 +15,4 @@ tags: [deploy]
 
 ## Relationships
 
-Runs as a step inside [[Deploy-Pipeline]].
+Runs as a step inside [[Deploy-Pipeline]]. Written after [[Incident-2026-05-Cache-Stampede]].

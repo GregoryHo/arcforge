@@ -15,8 +15,8 @@ tags: [deploy, checkout]
 
 ## Rollback
 
-`./scripts/rollback.sh` points the load balancer back at the previous colour. The old colour stays warm for 30 minutes after every promotion, so this is a pointer swap, not a redeploy.
+`./scripts/rollback.sh` points the load balancer back at the previous colour. The old colour stays warm for 30 minutes after every promotion, so this is a pointer swap, not a redeploy. Reset any flags the release changed with [[Feature-Flag-Reset]].
 
 ## Relationships
 
-Follows the strategy recorded in [[Decision-Blue-Green]]. Warm the new colour first with [[Cache-Warmup]].
+Follows the strategy recorded in [[Decision-Blue-Green]] and the gate in [[Decision-Staging-Gate]]. Warm the new colour first with [[Cache-Warmup]].
