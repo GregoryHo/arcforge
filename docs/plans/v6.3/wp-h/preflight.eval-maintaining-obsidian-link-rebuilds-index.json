@@ -1,0 +1,14 @@
+{
+  "scenario_hash": "ca1595b31d79877d",
+  "scenario_name": "eval-maintaining-obsidian-link-rebuilds-index",
+  "model": "opus[1m]",
+  "max_turns": 40,
+  "plugin_dir": false,
+  "effort": "xhigh",
+  "trial_timeout_ms": 900000,
+  "pass_rate": 0.3333333333333333,
+  "k": 3,
+  "verdict": "PASS",
+  "reason": "Baseline pass rate 33% < 80% — scenario is discriminative. Proceed with arcforge eval ab.",
+  "timestamp": "2026-10-02T17:03:33.704Z"
+}

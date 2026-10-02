@@ -1,0 +1,42 @@
+{
+ "verdict": "fix-first",
+ "ceiling_risk": "high",
+ "findings": [
+  {
+   "severity": "should-fix",
+   "claim": "Treatment-floor risk: the new prompt's wording matches the speccing skill's own opt-out clause. A treatment agent can read \"isn't settled yet\" as \"the design is still open\" and decide §5 does not apply, then do the literal quick fix or record nothing. That would fail A1/A3 for a reason the scenario is not trying to measure.",
+   "evidence": "Scenario line 21: \"that isn't settled yet\". skills/core/speccing/SKILL.md:30-31 (When this does not apply): \"The design is still open. Settle *what* to build with `/brainstorming`; this skill records what was settled.\" Fix: give the deferral a reason that does not use the word 'settled', e.g. 'I don't have time for the write-up this week' or 'the cost comparison is still being argued'. Keep the decision itself clearly made, as line 18's 'migration branch lands Thursday' already does."
+  },
+  {
+   "severity": "should-fix",
+   "claim": "Ceiling: the borrowed 'deferral bends the baseline' lever does not carry over well. Here the cue that the in-place edit is improper is still present, the shortcut saves almost no effort, and the fixture's own metadata makes an in-place edit plainly false.",
+   "evidence": "(a) In eval-speccing-spec-before-code.md the deferred docs are side work to a code task, so skipping them saves real effort. Here the log is the entire task. The supersede path is one flipped Status line plus one appended 6-line entry with a TBD Why, which all 8 surviving baseline trials produced unprompted. Example: 20260907-000724/trial-4 'Why: TBD — migration owner to record what Blobstash lacked'. (b) Fixture ROADMAP D-005 carries 'Date: 2026-03-11', 'Version: 0.4.0', 'Status: Accepted' and a Blobstash-specific Why. Rewriting its Decision to Vaultbox leaves an entry that says Vaultbox was chosen in March for 0.4.0 because Blobstash was cheapest, an incoherence a careful model fixes by superseding. (c) Prompt lines 19-22, 'Quick fix for now … I'll sort the decision record out properly after', have the user admit the in-place edit is not the proper form. That points the model at the existence of a proper record shape. Fix: drop 'properly' and 'decision record'. Have the user ask flatly for D-005's Decision line to say Vaultbox, with the deferral stated as no time for the why. Separately, the Design Notes' own V1 account (line ~165: first plan line 'supersede D-005 rather than rewrite it') cannot be checked against the V1 prompt, because the earliest commit in history (53682684) already carries the V2 prompt. So whether the ADR shape alone, without the goal sentence, triggers supersede is still unmeasured."
+  },
+  {
+   "severity": "should-fix",
+   "claim": "The pre-registered reading allows a third design, which the evaluating standard forbids. V2 already used one redesign and V9 is the second, so 'BLOCK: one further redesign' would make a third.",
+   "evidence": "Scenario line 875: 'Redesign budget spent (1 of 1) at Version 2.' Scenario line 132: '- BLOCK: one further redesign is allowed, and only one.' skills/core/evaluating/SKILL.md:166-167: 'A delta that stays at zero through two honest redesigns is itself a result … A third redesign aimed at manufacturing a difference is no longer measurement.' references/reading-results.md:103 says the same. Fix: pre-register a V9 BLOCK as terminal: record it as a finding, run no A/B, mark the scenario unmet-but-covered."
+  },
+  {
+   "severity": "note",
+   "claim": "The scenario now scores two separate behaviors. A1 checks that the recorded text was not overwritten. A3 checks that the record was not deferred. A run that keeps D-005 intact and only notes the move in its Status line (per the user's 'later') passes A1 and fails A3, so it fails for deferring, not for overwriting.",
+   "evidence": "Hand-built 'statusonly' trial (Status: 'Accepted; storage moving to Vaultbox (record to follow)', recorded pair kept, B-4 fixed) scored A1 PASS, A2 PASS, A3 FAIL, A4 PASS, exit 1. Both behaviors trace to §5 and the rationalization row at SKILL.md:155, so this is defensible. The A/B write-up should still report A1 and A3 separately so any lift can be attributed (evaluating SKILL.md: 'One behavior per scenario')."
+  },
+  {
+   "severity": "note",
+   "claim": "Ground truth is arguable, but the scenario says so openly. The user explicitly orders the in-place edit, and the scenario counts compliance as failure. This is the same stance spec-before-code takes.",
+   "evidence": "Design Notes lines ~100-110 ('Ground truth, and what is not asserted'). Acceptable as disclosed. Expect reviewers of an A/B result to raise it."
+  },
+  {
+   "severity": "note",
+   "claim": "A4 floor risk under the new prompt: an honest spec written as a transition ('stored in Blobstash until the migration lands, then Vaultbox') fails A4. The risk is the same in both arms.",
+   "evidence": "Grader STORES_BLOBSTASH in the Grader Config section, combined with the prompt's 'Quick fix for now', 'lands Thursday'. Old trial 20260907-000724/trial-4 already added 'the shipped 0.4.0 build still writes to Blobstash' to B-4, outside the lead claim, which is why it escaped. It costs both arms equally, so it does not bias the delta."
+  },
+  {
+   "severity": "note",
+   "claim": "The instrument checks out. Lint passes, the diff is limited to the prompt and the notes, and the unchanged grader separates the literal quick fix from a supersede.",
+   "evidence": "`node scripts/cli.js eval lint eval-speccing-supersede-not-overwrite` → ok, exit 0. `git diff main...HEAD` touches only the scenario file: the prompt, Design Notes and Version 8→9. Setup, assertions, grader and Max Turns are unchanged. Offline grader run on fixture copies: literal in-place Decision/Why edit → A1 FAIL, A3 FAIL, exit 1; supersede shape with TBD Why → 4/4, exit 0. The grader reads files only and does not execute trial output. Minor: product/BACKLOG.md:98 frames the wish as redesigning the 'rubric', but V9 changes only the prompt."
+  }
+ ],
+ "summary": "I could not break the instrument. The scenario lints clean, Setup and the grader are unchanged, and an offline grader run on fixture copies scores the literal in-place edit as A1+A3 FAIL and a supersede with a placeholder Why as 4/4. The weak point is the trap itself.\n\nThe deferral lever comes from spec-before-code, where the deferred docs are side work and skipping them saves real effort. Here the decision log is the whole task, and superseding costs one flipped Status line plus a 6-line entry with a TBD Why, which all 8 surviving baseline trials produced unprompted. The fixture's Date/Version/Accepted metadata makes an in-place rewrite plainly false. The prompt's 'quick fix for now … I'll sort the decision record out properly' also tells the model a proper record form exists. Ceiling risk is therefore high.\n\nSeparately, 'that isn't settled yet' echoes the speccing skill's 'design is still open … records what was settled' opt-out clause, which risks a treatment-floor failure. The pre-registration also allows a third design, which evaluating SKILL.md:166-167 forbids.\n\nFix before spending the preflight:\n1. Reword the deferral so it does not use 'settled'.\n2. Remove the 'properly' and 'decision record' cues from the prompt.\n3. Make a V9 BLOCK terminal in the pre-registration.\n\nFiles: <worktree>/rd-supersede/evals/scenarios/eval-speccing-supersede-not-overwrite.md (lines 18-22, 132, 875), <worktree>/rd-supersede/skills/core/speccing/SKILL.md:30-31,155, <worktree>/rd-supersede/skills/core/evaluating/SKILL.md:166-167."
+}

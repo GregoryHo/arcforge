@@ -1,0 +1,47 @@
+{
+ "verdict": "fix-first",
+ "ceiling_risk": "high",
+ "findings": [
+  {
+   "severity": "blocker",
+   "claim": "CEILING through the fixture. The baseline-failure sentence holds only for the prompt, the Context and the vault. It leaves out the trial directory, and the trial directory still spells out the answer. `## Setup` copies the whole `references/` folder to `./maintaining-obsidian/references/`, which puts `audit.md` and `lint_vault.py` right next to `./vault`. `audit.md` is the instruction under test, restated with the SCHEMA mapping: 'The deterministic scans run in code. `lint_vault.py` ships in this skill's references/ ... The four threshold flags take the vault's numbers from its SCHEMA.md `## Audit Thresholds`'. The fixture's SCHEMA.md uses that exact heading. So a baseline that opens audit.md has the full behavior, and only the number substitution is left. This is the evaluating skill's leak-checklist item: 'Does the surrounding context (setup files, comments, fixture names) spell out the answer?'",
+   "evidence": "Scenario lines 233-235 (mkdir maintaining-obsidian; cp -R .../references), line 325 (`## Audit Thresholds`), lines 85-89 (baseline sentence names prompt, Context and vault only); skills/core/maintaining-obsidian/references/audit.md:95-109; skills/core/evaluating/references/scenario-design.md:47."
+  },
+  {
+   "severity": "blocker",
+   "claim": "Both arms are pushed to list the whole trial directory, so the baseline will see the leak. Every contained trial gets the system-prompt advisory 'every file you need is already in it'. All three V2 baseline trials made a full recursive file listing their first call, dotfiles included (`.claude`). That listing shows `maintaining-obsidian/references/audit.md` and `lint_vault.py`, and for a vault health check a folder named `maintaining-obsidian` is the obvious next read. Removing the Context pointer and the word `audit lint` changes what is read second, not what is visible first. Even with only the script copied, `lint_vault.py --help` gives four flags whose descriptions match SCHEMA's four prose bullets one to one ('Field empty in this % of a type or more' against 'A field left empty in 85% or more'). The designer's prediction of '1 of 3 plausible, 3 of 3 not ruled out' undersells this. I expect a BLOCK at 2-3 of 3.",
+   "evidence": "scripts/lib/eval-trial.js:384-390 (isolation advisory); transcripts 20260930-105529/trial-1.txt:1, trial-2.txt:1, trial-3.txt:1 all `find . -path ./.git -prune -o -type f -print | sort && ls -la .claude`; trial-3.txt:7 runs `lint_vault.py --help` before its threshold run; `python3 -B lint_vault.py --help` output (flag help text)."
+  },
+  {
+   "severity": "blocker",
+   "claim": "No scenario-only change can be both honest and discriminative here. Any file the treatment can reach sits inside the trial directory, and a call-1 `find .` lists it. Renaming or burying the copy tests file-finding, as the designer says. The real fix is in the engine and matches the real host. In real use the skill's files are never in the user's project. The host tells only a skill-loaded agent where they are, on the `Base directory for this skill` line, and audit.md:96-98 depends on that line. Fix: in skill-scope A/B (runSkillEval), add a `Base directory for this skill: <dir>` line to the treatment's prepended skillInstruction only. Put that directory outside the listed trial tree, or have the isolation advisory and guard allow it for the treatment. Without that, spend the 3 sessions only if 'baseline finds it unprompted' is the result the maintainer wants. Otherwise go straight to the pre-registered fallback, a treatment-only non-regression guard (Version 1's shape), and skip the preflight.",
+   "evidence": "scripts/lib/eval.js:236-239 (treatment differs only by prepended SKILL.md); audit.md:96-98 ('resolve references/ against that, never against the user's working directory'); scenario Design Notes lines 61-65 and 99-108 (designer acknowledges the line cannot be given to one arm)."
+  },
+  {
+   "severity": "should-fix",
+   "claim": "Treatment-floor risk the designer understated. With no base directory announced, the treatment's own audit.md tells it to resolve `references/` against the base directory and 'never against the user's working directory'. A careful treatment may hesitate to use, or may distrust, the copy in cwd. That makes the treatment less reliable while doing nothing to slow the baseline.",
+   "evidence": "skills/core/maintaining-obsidian/references/audit.md:96-98; scenario lines 186-187."
+  },
+  {
+   "severity": "should-fix",
+   "claim": "Positive regex false-passes. It matches any Bash text line that contains `python3 <path>lint_vault.py` with the four flags, including an echo or a heredoc report line that quotes the command (only the first block before a blank line is parsed). The designer's heredoc test case left out `python3`, so it did not exercise this. Values are word-bounded only on the left of a decimal point, so `--field-empty-pct 85.5` or `--tag-min 5.5` pass.",
+   "evidence": "Node probe of the assertion regex: `cat > vault/_audits/a.md <<EOF\\nRan `python3 maintaining-obsidian/references/lint_vault.py vault --field-empty-pct 85 ...`` → true; `echo \"python3 lint_vault.py vault ...\"` → true; scenario line 437; scripts/lib/eval-transcript.js:79-100 (blocks split on blank lines)."
+  },
+  {
+   "severity": "note",
+   "claim": "Positive regex false-fails on legitimate invocations: `python3 -B path/lint_vault.py`, `python3.12 lint_vault.py`, `uv run lint_vault.py`. Both arms bear this equally, but it can sink a correct treatment trial.",
+   "evidence": "Node probe: all three → false; regex `(?:python3?\\s+\\S*|\\./)lint_vault\\.py` allows no option token between interpreter and path."
+  },
+  {
+   "severity": "note",
+   "claim": "`cp -R` copies the main checkout's gitignored `__pycache__` (cpython-314 .pyc) into the trial dir. That adds more listing noise pointing at the scripts, and it makes the fixture depend on local state. Copy only the tracked files, or delete `__pycache__` after the copy.",
+   "evidence": "scenario line 235; <repo>/skills/core/maintaining-obsidian/references/__pycache__/ (vault_frontmatter.cpython-314.pyc, vault_links.cpython-314.pyc); .gitignore:41."
+  },
+  {
+   "severity": "note",
+   "claim": "Checks that did hold. `eval lint` is ok. All three V2 baseline transcripts, with the values swapped to 85/75/5/0.9, score 1 on all three V3 assertions through the engine's own parser and grader. So the instrument grades the V2 route as a pass: if the baseline takes that route again, V3 scores it at ceiling. The negatives are correctly anchored on the Edit/Write file path. No grader executes trial output.",
+   "evidence": "`node scripts/cli.js eval lint eval-maintaining-obsidian-audit-runs-lint-script` → ok; scratch re-grade via parseActionsFromTranscript + gradeBehavioralAssertion on trial-{1,2,3}.txt → 1,1,1 for each."
+  }
+ ],
+ "summary": "Version 3 fixes the prompt and Context leaks and tightens the grader, but the main leak is the fixture itself. ./maintaining-obsidian/references/audit.md sits next to the vault and restates the instruction under test, down to SCHEMA's exact `## Audit Thresholds` heading. The engine's isolation advisory ('every file you need is already in it') pushes both arms to list the tree, and all three V2 baseline trials did so on call 1. Even the script's --help maps its four flags one to one onto SCHEMA's prose thresholds. The V2 baseline route, with the new numbers, grades 3/3 PASS under the V3 assertions. A preflight is therefore likely to BLOCK again (I expect 2-3 of 3) and spend 3 sessions confirming what the files already show. No honest scenario-only edit closes this, because anything the treatment can reach on disk is in the baseline's `find .`. The fix is either an engine change, adding a treatment-only `Base directory for this skill` line with the references kept out of the baseline's listing, as the real host does, or the pre-registered fallback to a treatment-only non-regression guard. Smaller fixes: the positive regex passes echo/heredoc lines that quote `python3 …lint_vault.py` with the flags, and accepts 85.5 / 5.5. It fails `python3 -B` / `python3.12` / `uv run`. Exclude the copied __pycache__. Scenario reviewed: <worktree>/rd-lint-script/evals/scenarios/eval-maintaining-obsidian-audit-runs-lint-script.md"
+}
