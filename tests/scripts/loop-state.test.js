@@ -77,6 +77,32 @@ describe('loop-state', () => {
       saveLoopState(state, tmpDir);
       expect(loadLoopState(tmpDir)).toEqual(state);
     });
+
+    it('leaves no temp file behind after a save', () => {
+      saveLoopState(loadLoopState(tmpDir), tmpDir);
+      expect(fs.readdirSync(tmpDir)).toEqual([LOOP_STATE_FILE]);
+    });
+
+    it('keeps the previous state file intact when the write fails midway', () => {
+      const previous = loadLoopState(tmpDir);
+      previous.iteration = 3;
+      saveLoopState(previous, tmpDir);
+      const statePath = path.join(tmpDir, LOOP_STATE_FILE);
+      const before = fs.readFileSync(statePath, 'utf8');
+
+      const rename = jest.spyOn(fs, 'renameSync').mockImplementation(() => {
+        throw new Error('simulated crash');
+      });
+      try {
+        expect(() => saveLoopState({ ...previous, iteration: 4 }, tmpDir)).toThrow(
+          `Failed to write loop state at ${statePath}: simulated crash`,
+        );
+      } finally {
+        rename.mockRestore();
+      }
+      expect(fs.readFileSync(statePath, 'utf8')).toBe(before);
+      expect(loadLoopState(tmpDir).iteration).toBe(3);
+    });
   });
 
   describe('recordError', () => {
