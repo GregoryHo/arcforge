@@ -194,11 +194,14 @@ its index.
   - *Not read:* fenced code, inline code spans and HTML comments, blanked in
     that order as a renderer does (a link in any of them does not render, and
     a `<!--` inside code opens no comment).
-- **A2 — no link to a note that is not there.** Every link in the index —
-  entries, prose and blockquotes alike — resolves, by name or vault-relative
-  path (the rule in A1), to a file of the fixture vault (a note, `SCHEMA.md`,
-  `log.md`, …) or to a regular file the run wrote under `vault/_audits/` (its
-  report, an attachment). Heading and block refs, aliases and `scheme://` URLs are fine.
+- **A2 — no link to a note that is not there.** Every wikilink or embed in
+  the index (`[[…]]`, `![[…]]`, whatever its target) and every Markdown link
+  to a `.md` file — in entries, prose and blockquotes alike — resolves, by
+  name or vault-relative path (the rule in A1), to a file of the fixture vault
+  (a note, `SCHEMA.md`, `log.md`, …) or to a regular file the run wrote under
+  `vault/_audits/` (its report, an attachment). Heading and block refs,
+  aliases and `scheme://` URLs are fine. A Markdown link or image to a
+  non-`.md` target (`[diagram](x.png)`, `![](x.png)`) is not checked.
   Any other new file inside `vault/` is one A4 already fails. A link to a
   file the run wrote outside `vault/` fails A2 while A4, which watches only
   `vault/`, passes — the one such split, and the right score, since Obsidian
@@ -246,6 +249,13 @@ the treatment, and none is how the fixture's own index is written):
 credit the arm that rebuilds, mostly the treatment; none is a default shape,
 and the operator audit below reads every PASS row to catch them):
 
+- A Markdown link or image to a non-`.md` target that does not exist
+  (`See [diagram](missing.png).`, `![](missing.png)`): A2 checks wikilinks and
+  links to notes only, so the index scores `1111`. It would credit whichever
+  arm writes a broken attachment link into the index; neither has a reason to
+  in this task. The operator audit's PASS-row read of the final `index.md`
+  against the vault is where it would be seen. (`![[missing.png]]` is a
+  wikilink and fails A2.)
 - A `<!--` never closed: a renderer hides everything after it, the grader
   reads on, so entries only the grader can see count.
 - Precedence by structure: a deeper typed heading, an inner label or a Type
@@ -344,7 +354,8 @@ the five-assertion strings of the time, A5 last.
   read as wrong (a flat table with a `Type` column, `#` and `####` type
   sections, tables without outer pipes, `#anchor` links, lowercase
   wikilinks); A1 now reads them. A dead link in prose or a blockquote passed
-  A2; A2 now checks every link in the index.
+  A2; A2 now checks every wikilink and every Markdown link to a `.md` file in
+  the index.
 
 - **Third QA review.** The stricter A2 failed a correct rebuild that linked
   the audit report it had just written (`[[_audits/audit-2026-10-02-link]]`)
@@ -571,7 +582,7 @@ node "$PROJECT_ROOT/scripts/cli.js" obsidian register --name ops-notes --path "$
 
 ## Assertions
 - [ ] A1: `vault/index.md` lists every typed note of the vault under the section for its type, as the note's own frontmatter gives it — runbook: `Cache-Warmup`, `Credential-Rotation`, `Deploy-Pipeline`, `Feature-Flag-Reset`, `Payment-Retry-Drain`; decision: `Decision-Blue-Green`, `Decision-Idempotency-Keys`, `Decision-Provider-Timeouts`, `Decision-Retry-Budget`, `Decision-Staging-Gate`; incident: `Incident-2026-03-Checkout`, `Incident-2026-05-Cache-Stampede`, `Retry-Storm-Review`.
-- [ ] A2: Every entry in `vault/index.md` names a note that exists in the fixture vault — no entry for a note that is not there, and no stub note created to make one resolve.
+- [ ] A2: Every wikilink in `vault/index.md`, and every Markdown link to a `.md` file, resolves to a file of the fixture vault or to one the run wrote under `vault/_audits/` — no entry or "see also" for a note that is not there, and no stub note created to make one resolve. A Markdown link to a non-`.md` target is not checked.
 - [ ] A3: The index is a pure function of the vault: its (type, title) entries equal the set the grader computes from the fixture — no note listed twice, no note under another type's section (`Retry-Storm-Review` is an incident, not a runbook), and the untyped `Scratch-Oncall-Notes` under no declared type's section.
 - [ ] A4: Nothing outside the index was modified: every other vault file is byte-identical to the fixture, `log.md` was only appended to, and no file was created outside `vault/_audits/`.
 
@@ -872,7 +883,8 @@ for i, line in enumerate(live):
                 section, t = typed_cells[0], cell_type(typed_cells[0])
     entries.append((section, t, title))
 print(f"-- note: index entries {[(s, e) for s, _, e in entries]}")
-# Every link in the index (entries, prose, blockquotes), for A2, by the same resolve().
+# Every wikilink and every Markdown link to a .md file (entries, prose, blockquotes), for A2,
+# by the same resolve(). LINK does not match a Markdown link to a non-.md target.
 dead_links = {
     link_raw(m) for line in live for m in LINK.finditer(unescape_pipes(line)) if resolve(m) is None
 }
@@ -882,7 +894,7 @@ listed = {(t, e) for _, t, e in entries}
 missing = sorted(k for k in golden if k not in listed)
 emit("A1", bool(index_text) and not missing, f"not listed under their type: {missing}")
 
-# ---- A2: no dead link: every entry, and every other link in the index, resolves ----
+# ---- A2: no dead link: every wikilink and Markdown .md link in the index resolves ----
 dead = sorted(dead_links)
 emit("A2", bool(index_text) and not dead, f"links resolving to no fixture file or _audits/ file: {dead}")
 
