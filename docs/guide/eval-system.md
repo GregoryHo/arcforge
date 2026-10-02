@@ -419,9 +419,12 @@ arcforge eval report
 Aggregates everything on record into a snapshot: per-scenario trial counts, pass
 rates, average scores, 95% confidence intervals, and A/B comparisons where both
 arms exist. Snapshots are written under `evals/benchmarks/` as `latest.json` plus
-a date-stamped copy, so history is kept rather than overwritten.
+a date-stamped copy, so history is kept rather than overwritten. The copy is
+`YYYY-MM-DD.json`; a later report on the same day is written as
+`YYYY-MM-DD-2.json`, then `-3`, and `latest.json` always holds the newest.
 
-A per-trial export goes to `evals/benchmarks/raw/` the same way. Each raw row
+A per-trial export goes to `evals/benchmarks/raw/` the same way, under the same
+file name as its aggregate. Each raw row
 carries its run conditions (`model`, `effort`, `trialTimeoutMs`, `maxTurns`,
 `pluginDir`, `isolation`). Its baseline-relative fields (`baseline_score_avg`,
 `score_delta_vs_baseline_avg` and the rest) are computed against the baseline
@@ -439,6 +442,10 @@ hardening a behavior, when older rows from the same version would otherwise hold
 a scenario red for a problem you already fixed — and say so when you report the
 number, because a bounded snapshot and a full-history one are not the same
 measurement.
+
+`history` lists every date-stamped snapshot, oldest first by the time it was
+generated. A copy you keep by hand counts too, as long as its name starts with
+the date (`2026-10-01-v6.1.1.json`).
 
 A snapshot is a summary, not a definition. It may name scenarios that were later
 retired; those entries are history, not active tests.

@@ -245,13 +245,70 @@ function generateRawBenchmarkData(projectRoot, generated = getTimestamp(), optio
   };
 }
 
-function writeRawBenchmarkData(projectRoot, rawData) {
+function writeRawBenchmarkData(projectRoot, rawData, snapshotName) {
   const rawPath = path.join(projectRoot, BENCHMARKS_DIR, 'raw');
   ensureDir(rawPath);
   const json = `${JSON.stringify(rawData, null, 2)}\n`;
   fs.writeFileSync(path.join(rawPath, 'latest.json'), json);
-  const dateStr = rawData.generated.split('T')[0];
-  fs.writeFileSync(path.join(rawPath, `${dateStr}.json`), json);
+  fs.writeFileSync(path.join(rawPath, snapshotName), json);
+}
+
+/**
+ * A history snapshot's file name: `YYYY-MM-DD.json`, or `YYYY-MM-DD-<suffix>.json`.
+ * The writer's suffix is a counter for a later report on the same day; a
+ * hand-kept copy may carry any other suffix (e.g. `-v6.1.1`) and still counts.
+ */
+const SNAPSHOT_NAME_RE = /^\d{4}-\d{2}-\d{2}(?:-.+)?\.json$/;
+
+/**
+ * First snapshot name for this date that neither the aggregate nor the raw
+ * directory holds yet: `YYYY-MM-DD.json`, then `YYYY-MM-DD-2.json`, `-3`, ...
+ * @param {string} projectRoot - Project root directory
+ * @param {string} dateStr - YYYY-MM-DD
+ * @returns {string} File name shared by the aggregate snapshot and its raw export
+ */
+function nextSnapshotName(projectRoot, dateStr) {
+  const benchmarkPath = path.join(projectRoot, BENCHMARKS_DIR);
+  const taken = (name) =>
+    fs.existsSync(path.join(benchmarkPath, name)) ||
+    fs.existsSync(path.join(benchmarkPath, 'raw', name));
+  let name = `${dateStr}.json`;
+  for (let n = 2; taken(name); n++) name = `${dateStr}-${n}.json`;
+  return name;
+}
+
+/**
+ * Every history snapshot under evals/benchmarks/, oldest first by its own
+ * `generated` timestamp (file name breaks a tie, the date-only name first).
+ * @param {string} projectRoot - Project root directory
+ * @returns {{name: string, generated: string, evalCount: number}[]}
+ */
+function listSnapshots(projectRoot) {
+  const benchmarkPath = path.join(projectRoot, BENCHMARKS_DIR);
+  if (!fs.existsSync(benchmarkPath)) return [];
+  const stem = (name) => name.replace(/\.json$/, '');
+  return fs
+    .readdirSync(benchmarkPath)
+    .filter((f) => SNAPSHOT_NAME_RE.test(f))
+    .map((f) => {
+      let data;
+      try {
+        data = JSON.parse(fs.readFileSync(path.join(benchmarkPath, f), 'utf8'));
+      } catch (err) {
+        throw new Error(`Failed to read benchmark snapshot ${f}: ${err.message}`);
+      }
+      if (typeof data?.generated !== 'string' || typeof data.evals !== 'object' || !data.evals) {
+        throw new Error(
+          `${f} in ${benchmarkPath} is not a benchmark snapshot (no generated/evals)`,
+        );
+      }
+      return {
+        name: stem(f),
+        generated: data.generated,
+        evalCount: Object.keys(data.evals).length,
+      };
+    })
+    .sort((a, b) => a.generated.localeCompare(b.generated) || a.name.localeCompare(b.name));
 }
 
 /**
@@ -412,17 +469,16 @@ function generateBenchmark(projectRoot, options = {}) {
     evals: benchmarks,
   };
 
+  // One history name for both files; a later report on the same day gets the next one.
+  const snapshotName = nextSnapshotName(projectRoot, benchmark.generated.split('T')[0]);
   const rawData = generateRawBenchmarkData(projectRoot, benchmark.generated, resultFilter);
-  writeRawBenchmarkData(projectRoot, rawData);
+  writeRawBenchmarkData(projectRoot, rawData, snapshotName);
 
   const benchmarkPath = path.join(projectRoot, BENCHMARKS_DIR);
   ensureDir(benchmarkPath);
   const json = `${JSON.stringify(benchmark, null, 2)}\n`;
   fs.writeFileSync(path.join(benchmarkPath, 'latest.json'), json);
-
-  // Write timestamped snapshot for history (same-day runs overwrite)
-  const dateStr = benchmark.generated.split('T')[0];
-  fs.writeFileSync(path.join(benchmarkPath, `${dateStr}.json`), json);
+  fs.writeFileSync(path.join(benchmarkPath, snapshotName), json);
 
   return benchmark;
 }
@@ -492,6 +548,7 @@ module.exports = {
   rawRowsForScenario,
   generateRawBenchmarkData,
   writeRawBenchmarkData,
+  listSnapshots,
   comparisonFromAbResults,
   generateBenchmark,
   compareResults,

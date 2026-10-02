@@ -647,22 +647,14 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
       }
     }
   } else if (subcommand === 'history') {
-    const benchmarkPath = path.join(projectRoot, eval_.BENCHMARKS_DIR);
-    if (!fs.existsSync(benchmarkPath)) {
+    if (!fs.existsSync(path.join(projectRoot, eval_.BENCHMARKS_DIR))) {
       console.log('No benchmarks yet. Run: arcforge eval report');
     } else {
-      const snapshots = fs
-        .readdirSync(benchmarkPath)
-        .filter((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f))
-        .sort();
+      const snapshots = benchmark_.listSnapshots(projectRoot);
       if (snapshots.length === 0) {
         console.log('No history snapshots yet. Run: arcforge eval report');
       } else {
-        for (const file of snapshots) {
-          const data = JSON.parse(fs.readFileSync(path.join(benchmarkPath, file), 'utf8'));
-          const evalCount = Object.keys(data.evals).length;
-          console.log(`  ${file.replace('.json', '')} — ${evalCount} evals`);
-        }
+        for (const s of snapshots) console.log(`  ${s.name} — ${s.evalCount} evals`);
       }
     }
   } else if (subcommand === 'dashboard') {

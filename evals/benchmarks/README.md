@@ -5,9 +5,11 @@ This directory stores benchmark snapshots generated from eval results.
 The eval harness writes:
 
 - `latest.json` — most recent aggregate benchmark snapshot
-- `YYYY-MM-DD.json` — date-stamped aggregate snapshot
+- `YYYY-MM-DD.json` — date-stamped aggregate snapshot; a later report on the same day is written as `YYYY-MM-DD-2.json`, then `-3`, so none overwrites another
 - `raw/latest.json` — most recent dashboard-oriented per-trial raw metrics export
-- `raw/YYYY-MM-DD.json` — date-stamped raw metrics export
+- `raw/YYYY-MM-DD.json` — date-stamped raw metrics export, under the same file name as its aggregate snapshot
+
+`arcforge eval history` lists every aggregate snapshot whose name starts with its date, including a hand-kept copy such as `2026-10-01-v6.1.1.json`, oldest first by its `generated` timestamp.
 
 Aggregate scenario entries include the behavioral result summary (`trials`, `pass_rate`, `avg_score`, `ci95`) plus execution metrics when present in raw rows:
 
