@@ -14,7 +14,7 @@ decision *and* every reversal. How to maintain this file: [`product/AGENTS.md`](
 | 6.1.2 | `v6.1.2` | docs-are-the-contract sweep | **shipped** | Where the docs promise what the engine does not do: CLI messages and contract drift, hooks promises the engine never kept, loop state bugs, contributor tooling and repo hygiene. It touches no eval-backed path — nothing under `skills/`, `evals/scenarios/` or `evals/fixtures/` — so it ships without a benchmark regeneration. | [cli](specs/cli.md) · [hooks](specs/hooks.md) · [learning](specs/learning.md) · [worktrees-loop](specs/worktrees-loop.md) · [obsidian](specs/obsidian.md) · [codex-harness](specs/codex-harness.md) |
 | 6.2.0 | `v6.2.0` | learning lifecycle · eval corpus repairs | **shipped** | Exits for candidates stuck at `approved` or `materialized`, `learn instinct deactivate` and `learn instinct restore`, a policy for candidate names, and worktree paths derived from the repo root; plus the scenario rubric fixes, measured in their own, smaller round. A minor because it adds CLI commands. | [learning](specs/learning.md) · [cli](specs/cli.md) · [worktrees-loop](specs/worktrees-loop.md) · [codex-harness](specs/codex-harness.md) · [eval](specs/eval.md) · [sdd](specs/sdd.md) |
 | 6.2.1 | — | instrument and state repairs, no measurement | **next ← we are here** | Repairs to promises already shipped: same-day benchmark snapshots stop overwriting each other and `eval history` lists them all, the eval dashboard shows an instrument-failure pool instead of hiding it, loop run state is written atomically, the observe hook's lazy daemon start reclaims a dead process's lock, `check:product` rejects a relation aimed at an already-dead decision, and the `releasing` skill describes what a squash-only ruleset does to the flip commit. Nothing under `skills/`, `evals/scenarios/` or `evals/fixtures/`, so it ships without a live eval session. | [eval](specs/eval.md) · [worktrees-loop](specs/worktrees-loop.md) · [learning](specs/learning.md) |
-| 6.3.0 | — | ceiling redesigns · skill-local script fixes · the enable stamp | **next** | The five scenarios whose baseline sat at ceiling on the repaired instrument are redesigned and measured in one round of about 80 live sessions; the `diagramming-obsidian` helpers and `lint_vault` fixes ride it because they sit under `skills/`; and the stale-draft floor stops losing an overlapping opt-in, through an additive `enabled_at` in the learning config. | [skill-system](specs/skill-system.md) · [obsidian](specs/obsidian.md) · [sdd](specs/sdd.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) |
+| 6.3.0 | — | ceiling redesigns · skill-local script fixes · the enable stamp | **next** | The five scenarios whose baseline sat at ceiling on the repaired instrument are redesigned and measured in one round capped at about 80 trial sessions; the `diagramming-obsidian` helpers and `lint_vault` fixes ride it because they sit under `skills/`; and the stale-draft floor stops losing an overlapping opt-in, through an additive `enabled_at` in the learning config. | [skill-system](specs/skill-system.md) · [obsidian](specs/obsidian.md) · [sdd](specs/sdd.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) |
 
 > Un-scheduled ideas live in the [Backlog](BACKLOG.md); a wish graduates into a
 > version (row + spec + Decision Log entry) when picked.
@@ -1206,23 +1206,36 @@ reverse one, append a superseding entry (see AGENTS.md).
   `eval-speccing-supersede-not-overwrite` — and measures them in one round,
   launched from the maintainer's main session on `opus[1m]` / `xhigh`,
   isolated, without `--plugin-dir`, the skill injected with `--skill-file`, at
-  the 900 s trial ceiling, capped
-  at about 80 live sessions, under a rule fixed before any result is read:
-  each scenario gets a new `## Version` and a preflight at k=3 — so
-  `eval-maintaining-obsidian-audit-runs-lint-script`'s redesign removes the
-  `skip` its `## Preflight` section carries today; a PASS goes to
-  an A/B at k=5 (13 sessions); a BLOCK gets exactly one redesign, written down
-  before a second preflight (16 sessions if that one passes); a second BLOCK
-  is recorded as a finding with no A/B, and the scenario is not run again in
-  this round. The same version carries the `diagramming-obsidian` helpers'
+  the 900 s trial ceiling, capped at about 80 trial sessions, under a rule
+  fixed before any result is read: each scenario gets a new `## Version` and
+  a preflight at k=3 — so `eval-maintaining-obsidian-audit-runs-lint-script`'s
+  redesign removes the `skip` its `## Preflight` section carries today; a PASS
+  goes to an A/B at the scenario's own `## Trials` (k=10, 20 trial sessions,
+  for `eval-executing-verify-decides-done`, whose file documents k=5 reading
+  INCONCLUSIVE; k=5, 10 trial sessions, for the other four); a BLOCK gets
+  exactly one redesign, written down before a second preflight, except
+  `eval-speccing-supersede-not-overwrite`, which spent its redesign in 6.2.0
+  (D-047), so its new Version is its last design and a BLOCK there is final;
+  a second BLOCK is recorded as a finding with no A/B, and the scenario is not
+  run again in this round. A scenario that an offline review, before any live
+  session, finds cannot be made discriminating without an engine change may be
+  recorded as a finding without spending a session. A/Bs start in this order —
+  link-rebuilds-index, router-skill-selection, executing-verify-decides-done,
+  supersede-not-overwrite, audit-runs-lint-script — and an A/B that would take
+  the round past the cap is not started and is recorded as not measured,
+  never run at a smaller k. The same version carries the `diagramming-obsidian` helpers'
   `ERROR:` lines (#228), `lint_vault`'s fence-versus-code-span fix (#210), and
   the stale-draft floor's enable stamp (#164, D-051).
 - Why: None of the five has usable A/B evidence on the repaired instrument —
   four BLOCKed at ceiling in 6.1.1's round (D-045) and the supersede scenario
   in 6.2.0's (D-047) — so the claims of executing, the router,
   maintaining-obsidian's audit and LINK mode, and sdd B-4 rest on pre-repair
-  numbers or on none. The cap is the worst case the rule allows: five
-  scenarios at 16 sessions each. Stopping at the second BLOCK is the D-045 /
+  numbers or on none. The cap counts trial sessions, as D-021's and D-047's
+  totals did, and it is what binds: five preflights and five A/Bs come to 75,
+  and each second preflight adds 3, so the round cannot fund every outcome
+  and the order decides what goes unmeasured. `link-rebuilds-index` leads
+  because D-028's LINK-mode rebuild has no harness evidence at all. Stopping
+  at the second BLOCK is the D-045 /
   D-047 precedent: re-running a scenario until it passes turns the preflight
   into a search for a rubric the baseline happens to fail, and a BLOCK is a
   verdict about the scenario (eval B-3). #228 and #210 are skill-local scripts
@@ -1239,9 +1252,15 @@ reverse one, append a superseding entry (see AGENTS.md).
   Harness and Hooks; the issues #184 and #185; and whether Codex's `$`
   mention carries the `arcforge:` namespace, which stays unmeasured by the
   owner's call of 2026-10-01.
-- Cost accepted: up to about 80 live sessions, and a scenario that BLOCKs
-  twice ends the round with no A/B evidence, its skill keeping the evidence it
-  had — the outcome D-045 recorded for four of the same five.
+- Cost accepted: up to about 80 trial sessions, plus model-grader calls the
+  cap does not count — a scenario with model-graded assertions spawns one
+  grader call per graded trial, preflight included. On `main` that is
+  `eval-router-skill-selection` and
+  `eval-maintaining-obsidian-audit-runs-lint-script` (both `mixed`); the
+  other three grade by code, and a redesign that makes a scenario code-graded
+  removes that cost. A scenario that BLOCKs twice, or whose A/B the cap does
+  not reach, ends the round with no A/B evidence, its skill keeping the
+  evidence it had — the outcome D-045 recorded for four of the same five.
 
 ### D-050 — C3 rejects a `Refines:` / `Extends:` written after its target died
 - Date: 2026-10-02

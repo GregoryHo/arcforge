@@ -125,8 +125,8 @@ roadmap row carries the marker.
   scenario's baseline ceiling, which D-015 recorded as predicted, is now
   measured (V8 preflight BLOCK, 3/3), so B-4 still has no A/B evidence (B-4,
   B-6).
-- **D-049** — 6.3.0 redesigns `eval-speccing-supersede-not-overwrite` and
-  measures it under one pre-registered redesign; a second BLOCK leaves B-4
+- **D-049** — 6.3.0 redesigns `eval-speccing-supersede-not-overwrite` for the
+  last time — it spent its one redesign in 6.2.0 — so a BLOCK leaves B-4
   without A/B evidence (B-4).
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
