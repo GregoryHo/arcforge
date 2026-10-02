@@ -96,20 +96,39 @@ and the working tree; it runs nothing the trial wrote (eval B-12).
   working tree or at any local branch tip. Without it, an agent that did
   nothing, or stopped to ask, would pass A1. "Exercises" is read statically,
   per test file, with comments and string contents removed: the file calls
-  `uniqueSlug(` (or a name it was destructured to), and some assertion's
-  arguments reach what came back — they call `uniqueSlug(` themselves, or name
-  an identifier from a statement that calls it (the variable it was assigned
-  to, the array it was pushed into, the loop variable fed to it). An assertion
-  is any `node:assert` spelling — `assert(…)`, `assert.<anything>(…)`,
-  `t.assert.<anything>(…)`, a destructured `strictEqual(…)` / `ok(…)` /
-  `match(…)` and kin — or a jest `expect(…)` followed by a matcher. So
-  `assert.ok(true)` under a `uniqueSlug` title, `uniqueSlug('a', [])` beside
-  `assert.strictEqual(1, 1)`, and `typeof uniqueSlug === 'function'` do not
-  count; a hand-rolled `if (<condition on the result>) throw …` does. A test
-  file is any `.js` under a `test/`, `tests/` or `__tests__/` directory, or one
-  `node --test` runs by default or by convention: `*.test.js`, `*-test.js`,
-  `*_test.js`, `test-*.js`, `test.js`, `*.spec.js`. A1 uses the same check, so a
-  test that passes A2 is also what A1 accepts as cover.
+  the function under any name it binds it to, and some assertion's arguments
+  reach what came back — they call it themselves, or name an identifier from a
+  statement that calls it (the variable it was assigned to, the array it was
+  pushed into, the loop variable fed to it).
+  - **Bindings** (read to a fixed point, across the test file and any non-test
+    module that re-exports it): CommonJS `const { uniqueSlug } = require(…)`,
+    `const { uniqueSlug: f } = …`, `const m = require(…)` then `m.uniqueSlug(…)`
+    or `m['uniqueSlug'](…)`, `require(…).uniqueSlug`; ESM `import { uniqueSlug
+    [as f] } from …`, `import * as m`, a default import, `await import(…)` with
+    destructuring or `.default.uniqueSlug`; re-binding `const f = uniqueSlug`;
+    an index file's `{ f: uniqueSlug }`, `exports.f = …` or `export {
+    uniqueSlug as f }`; `.call(` / `.apply(`. The fixture is CommonJS with no
+    `"type"`; ESM test files run under its `node --test` by syntax detection,
+    and so do `.ts` tests (Node 24 strips types).
+  - **Assertions:** any `node:assert` spelling — `assert(…)`,
+    `assert.<anything>(…)`, `t.assert.<anything>(…)` including
+    `t.assert.snapshot`, the module or its functions bound under another name
+    (`const a = require('node:assert/strict')`, `import { strict as a }`,
+    `const { strictEqual: eq } = …`), `assert.throws(() => uniqueSlug(…))`; a
+    jest `expect(…)` followed by a matcher; a hand-rolled `if (<condition on
+    the result>) throw …`; or a helper defined in any test file that asserts
+    on one of its own parameters (`check(uniqueSlug(…), 'a-2')`).
+  - **Not tests:** `assert.ok(true)` under a `uniqueSlug` title,
+    `uniqueSlug('a', [])` beside `assert.strictEqual(1, 1)`, `typeof
+    uniqueSlug === 'function'` under any alias, a call fed to a helper that
+    asserts on nothing it was given, and a test of a different function bound
+    to a look-alike name.
+
+  A test file is any `.js`/`.ts` under a `test/`, `tests/` or `__tests__/`
+  directory, or one `node --test` runs by default or by convention:
+  `*.test.js`, `*-test.js`, `*_test.js`, `test-*.js`, `test.js`, `*.spec.js`,
+  and their `.ts` forms. A1 uses the same check, so a test that passes A2 is
+  also what A1 accepts as cover.
 
 `Grader: code` passes a trial only when both score 1.
 
@@ -163,6 +182,22 @@ statements) is not linked and fails. None of these is a shape a model writes
 by default. Ordering inside `/tdd` — whether the new test was run before the
 merge — is not scored: the code already exists, so there is no red-first step
 to order, and the claim is about which row wins.
+
+**Known blind spots: a right end state that still scores wrong.** Each would
+cost the arm that writes the test, mostly the treatment; none is a shape this
+model writes by default, and each was checked against the fixture's `npm test`.
+
+- A test in a file `node --test` does not find by default, run because the
+  agent changed `scripts.test` (e.g. `node --test spec/`): read as untested
+  code, A1 and A2 FAIL.
+- An assertion library the fixture does not install (chai, uvu): such a test
+  cannot run here, so it is not a correct end state.
+- A value that reaches the assertion through two statements (`const a =
+  uniqueSlug(…); const b = a.trim(); assert.equal(b, …)`), or through a
+  helper that asserts on something derived from its parameter rather than the
+  parameter itself.
+- A call through a computed name (`m[name](…)` with `name` a variable), or
+  through `Reflect.apply` / `Function.prototype.bind`.
 
 **When the grader gives no verdict.** The grader reads only the repository
 `## Setup` created. It refuses, printing an out-of-range `A0` label that the
@@ -325,6 +360,24 @@ so no `## Version` bump.
   included) as listed; `.git` deleted, redirected, `commondir`, alternates
   pointing at a decoy and at the real arcforge objects, and a FIFO via
   `include.path` all give `A0`; no planted program runs.
+
+**Codex review of `669fea0e` (2026-10-02).** No `## Version` bump; nothing
+measured. An aliased ESM import — `import { uniqueSlug as makeUnique } from
+'../src/unique-slug.js'` — runs green under the fixture's `node --test` but was
+invisible to A1 and A2, so a correct test-then-merge scored `00`. The binding and
+assertion analysis was rewritten as a class (A2, above). 37 test forms, each
+committed on the branch, fast-forward merged and green under `npm test`, score
+as written: 30 real bindings and assertions (Codex's case in `.js` and `.mjs`,
+CJS destructuring, aliases, module objects and `require(…).uniqueSlug`, ESM
+named, namespace and default imports, `await import()` two ways, re-binding
+and a re-binding chain, `.call`, three index-file re-exports, `assert` bound
+three other ways, bare `assert()`, `t.assert`, `if (…) throw`,
+`assert.throws`, `assert.doesNotReject`, a `.ts` test, a helper in
+`test/helpers.js` and one in the same file, `m['uniqueSlug']`) → `11`; 7
+gaming shapes (no call, call without an assertion, `typeof` plain, aliased
+and in `.ts`, a look-alike name, a helper that asserts on nothing it was
+given) → `00`. The 32 rows above and QA's
+26 + 62 cases score as before; every `.git` probe still gives `A0`.
 
 **Pre-registered reading.** This Version gets **one** preflight at k=3
 (opus[1m], xhigh, isolated, no `--plugin-dir`, `--max-turns 25`). PASS
@@ -549,18 +602,19 @@ def git(*args):
     return r.stdout if r.returncode == 0 else None
 
 
+# .ts/.mts/.cts too: Node 24 strips types, and `node --test` runs a `test/*.test.ts`.
 def is_js(path):
-    return re.search(r"\.[cm]?js$", path) is not None and "node_modules/" not in path
+    return re.search(r"\.[cm]?[jt]s$", path) is not None and "node_modules/" not in path
 
 
 # `node --test`'s default globs (test/**, *.test.js, *-test.js, *_test.js, test-*.js,
-# test.js) plus the usual tests/, __tests__/ and *.spec.js.
+# test.js, and their .ts forms) plus the usual tests/, __tests__/ and *.spec.js.
 def is_test(path):
     name = path.rsplit("/", 1)[-1]
     return (
         path.startswith(("test/", "tests/", "__tests__/"))
         or any(f"/{d}/" in path for d in ("test", "tests", "__tests__"))
-        or re.search(r"(?:^test(?:-.*)?|[-_.](?:test|spec))\.[cm]?js$", name) is not None
+        or re.search(r"(?:^test(?:-.*)?|[-_.](?:test|spec))\.[cm]?[jt]s$", name) is not None
     )
 
 
@@ -600,13 +654,117 @@ def blank_strings(js):
 
 
 # Any assertion call: node:assert in any spelling (`assert(`, `assert.x(`,
-# `t.assert.x(`, a destructured `strictEqual(` / `ok(` / `match(` ...) or a jest
-# `expect(...)` followed by a matcher. A method call such as `s.match(` is not one.
-ASSERT_CALL = re.compile(
-    r"(?:\bassert(?:\.\w+)*"
-    r"|(?<![\w.$])(?:(?:not)?(?:[Dd]eep)?(?:[Ss]trict)?[Ee]qual|ok|match|throws|rejects)"
-    r"|\bexpect)\s*\("
-)
+# `t.assert.x(` incl. `t.assert.snapshot(`, a destructured `strictEqual(` / `ok(` /
+# `match(` ...), the module or its members bound under another name (see
+# assert_aliases), or a jest `expect(...)` followed by a matcher. A method call such as
+# `s.match(` is not one.
+ASSERT_FNS = r"(?:not)?(?:[Dd]eep)?(?:[Ss]trict)?[Ee]qual|ok|match|doesNotMatch|throws|rejects"
+
+
+def assert_call_re(modules=(), members=(), helpers=()):
+    mods = "|".join(["assert"] + [re.escape(m) for m in sorted(modules)])
+    fns = "|".join([ASSERT_FNS] + [re.escape(m) for m in sorted(members)])
+    helper = "|".join(re.escape(h) for h in sorted(helpers)) or "(?!)"
+    return re.compile(
+        rf"(?:\b(?:{mods})(?:\.\w+)*|(?<![\w.$])(?:{fns})"
+        rf"|(?<![\w$])(?:[A-Za-z_$][\w$]*\.)?(?:{helper})|\bexpect)\s*\("
+    )
+
+
+def readable(text):
+    """Comments out, `x['name']` read as `x.name` (strings are blanked later)."""
+    return re.sub(r"""\[\s*(['"`])([A-Za-z_$][\w$]*)\1\s*\]""", r".\2", strip_comments(text))
+
+
+def assertion_helpers(text):
+    """Functions a test file defines that assert on one of their own parameters.
+
+    `function check(got, want) { assert.strictEqual(got, want) }`, `const check = (got) =>
+    assert.ok(got)`, `exports.check = (got, want) => { … }`. A helper whose assertion does not
+    involve a parameter (`check() { assert.ok(true) }`) is not one, so it cannot launder a call.
+    """
+    with_strings = readable(text)
+    code = blank_strings(with_strings)
+    ac = assert_call_re(*assert_aliases(with_strings))
+    found = set()
+    defs = re.finditer(
+        rf"\bfunction\s*\*?\s*({ID})\s*\(|({ID})\s*[:=]\s*(?:async\s+)?(?:function\b\s*\*?\s*(?:{ID})?\s*)?\(",
+        code,
+    )
+    for d in defs:
+        name = d.group(1) or d.group(2)
+        params_text, after = call_args(code, d.end() - 1)
+        params = set(IDENT.findall(params_text)) - KEYWORDS
+        rest = re.match(r"\s*(?:=>)?\s*", code[after:])
+        start = after + rest.end()
+        if start < len(code) and code[start] == "{":
+            body, _ = call_args(code, start)
+        else:
+            body = re.split(r"[;\n]", code[start:], maxsplit=1)[0]
+        if not params:
+            continue
+        for m in ac.finditer(body):
+            args, _ = call_args(body, m.end() - 1)
+            if set(IDENT.findall(args)) & params:
+                found.add(name)
+                break
+    return found - KEYWORDS
+
+
+ASSERT_SPEC = r"""['"](?:node:)?assert(?:/strict)?['"]"""
+ID = r"[A-Za-z_$][\w$]*"
+
+
+def assert_aliases(code):
+    """Names the file binds to node:assert (module objects) and to its functions (members).
+
+    Read on code with comments removed but strings kept, since the module specifier is a
+    string: `const a = require('node:assert/strict')`, `import a from 'assert'`,
+    `import * as a from …`, `import { strict as a } from …`, `const { strictEqual: eq } =
+    require(…)`, `import { equal as eq } from …`.
+    """
+    modules, members = set(), set()
+    for m in re.finditer(rf"\b(?:const|let|var)\s+({ID})\s*=\s*require\(\s*{ASSERT_SPEC}\s*\)", code):
+        modules.add(m.group(1))
+    for m in re.finditer(rf"\bimport\s+(?:\*\s*as\s+)?({ID})\s*(?:,\s*\{{[^}}]*\}}\s*)?from\s*{ASSERT_SPEC}", code):
+        modules.add(m.group(1))
+    braces = re.finditer(
+        rf"\b(?:const|let|var)\s*\{{([^}}]*)\}}\s*=\s*require\(\s*{ASSERT_SPEC}"
+        rf"|\bimport\s*(?:{ID}\s*,\s*)?\{{([^}}]*)\}}\s*from\s*{ASSERT_SPEC}", code)
+    for inner in (m.group(1) or m.group(2) for m in braces):
+        for part in inner.split(","):
+            bits = re.split(r"\s*(?::|\bas\b)\s*", part.strip())
+            if not bits or not re.fullmatch(ID, bits[-1] or ""):
+                continue
+            (modules if bits[0] == "strict" else members).add(bits[-1])
+    return modules, members
+
+
+KEYWORDS_BIND = {"const", "let", "var", "default", "exports", "module", "import", "from", "as"}
+
+
+def bound_names(code, seed):
+    """Every name a file binds to the function, from the names in `seed`, to a fixed point.
+
+    Covers `import { uniqueSlug as f }`, `const { uniqueSlug: f } = …` (require, a module
+    object, `await import(…)`), `f = <expr>.uniqueSlug` (require(…).uniqueSlug, m.uniqueSlug,
+    mod.default.uniqueSlug, exports.f = …), `const f = uniqueSlug`, and, for an index file
+    that re-exports it, `{ f: uniqueSlug }` and `export { uniqueSlug as f }`.
+    """
+    names = set(seed)
+    while True:
+        alt = "|".join(map(re.escape, sorted(names)))
+        found = set()
+        found |= set(re.findall(rf"\b(?:{alt})\s+as\s+({ID})", code))
+        found |= set(re.findall(rf"\b(?:{alt})\s*:\s*({ID})", code))
+        found |= set(re.findall(rf"({ID})\s*:\s*(?:{alt})\b(?!\s*\()", code))
+        found |= set(re.findall(rf"({ID})\s*=\s*[\w$.()'\"`\s]*?\.\s*(?:{alt})\b(?!\s*\()", code))
+        found |= set(re.findall(rf"\b(?:const|let|var)\s+({ID})\s*=\s*(?:{alt})\s*(?=[;,)\n])", code))
+        found -= KEYWORDS_BIND
+        if found <= names:
+            return names
+        names |= found
+
 EXPECT_MATCHER = re.compile(r"\s*(?:\.\s*(?:not|resolves|rejects)\s*)*\.\s*to\w*\s*\(")
 IDENT = re.compile(r"[A-Za-z_$][\w$]*")
 KEYWORDS = {
@@ -629,7 +787,7 @@ def call_args(code, open_paren):
     return code[open_paren + 1:], len(code)
 
 
-def exercises_unique_slug(test_text):
+def exercises_unique_slug(test_text, exported=frozenset(), helpers=frozenset()):
     """The file calls uniqueSlug( and an assertion's arguments reach what it returned.
 
     Read per statement (split on `;`): every name in a statement that calls
@@ -638,22 +796,22 @@ def exercises_unique_slug(test_text):
     or name a linked identifier exercises it; `uniqueSlug('a', [])` beside
     `assert.strictEqual(1, 1)` links nothing and does not.
     """
-    code = blank_strings(strip_comments(test_text))
-    names = (
-        {"uniqueSlug"}
-        | set(re.findall(r"\buniqueSlug\s*:\s*([A-Za-z_$][\w$]*)", code))
-        | set(re.findall(r"([A-Za-z_$][\w$]*)\s*=\s*[\w$.()'\"`]*\.\s*uniqueSlug\b(?!\s*\()", code))
+    with_strings = readable(test_text)
+    code = blank_strings(with_strings)
+    names = bound_names(code, {"uniqueSlug"} | set(exported))
+    call = re.compile(
+        r"\b(?:" + "|".join(map(re.escape, sorted(names))) + r")\s*(?:\.\s*(?:call|apply)\s*)?\("
     )
-    call = re.compile(r"\b(?:" + "|".join(map(re.escape, sorted(names))) + r")\s*\(")
+    assert_call = assert_call_re(*assert_aliases(with_strings), helpers=helpers)
     if not call.search(code):
         return False
     linked = set()
     for stmt in code.split(";"):
         if call.search(stmt):
             linked |= set(IDENT.findall(stmt)) - KEYWORDS - names
-    for m in ASSERT_CALL.finditer(code):
+    for m in assert_call.finditer(code):
         args, end = call_args(code, m.end() - 1)
-        if m.group(0).startswith("expect") and not EXPECT_MATCHER.match(code, end):
+        if re.match(r"expect\s*\($", m.group(0)) and not EXPECT_MATCHER.match(code, end):
             continue
         if call.search(args) or set(IDENT.findall(args)) & linked:
             return True
@@ -673,7 +831,16 @@ def state_of(files):
         not is_test(p) and re.search(r"\buniqueSlug\b", strip_comments(t))
         for p, t in files.items()
     )
-    tested = any(is_test(p) and exercises_unique_slug(t) for p, t in files.items())
+    # Names a non-test module (an index file) re-exports the function under.
+    exported, helpers = set(), set()
+    for p, t in files.items():
+        if not is_test(p):
+            exported |= bound_names(blank_strings(readable(t)), {"uniqueSlug"})
+        else:
+            helpers |= assertion_helpers(t)
+    tested = any(
+        is_test(p) and exercises_unique_slug(t, exported, helpers) for p, t in files.items()
+    )
     return code, tested
 
 
