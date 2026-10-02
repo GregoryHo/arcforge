@@ -69,7 +69,16 @@ def run_render(args: list[str]) -> subprocess.CompletedProcess:
 
 def stop_process_group(proc: subprocess.Popen) -> None:
     """SIGTERM the renderer's group so Playwright can close Chromium, give it
-    five seconds, then SIGKILL whatever is left."""
+    five seconds, then SIGKILL whatever is left. Without process groups
+    (no os.killpg), stop the direct child the same way."""
+    if not hasattr(os, 'killpg'):
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+        return
     try:
         os.killpg(proc.pid, signal.SIGTERM)
         deadline = time.monotonic() + 5

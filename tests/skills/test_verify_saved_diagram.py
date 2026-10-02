@@ -354,3 +354,16 @@ def test_signal_mid_render_removes_the_scratch_directory(tmp_path, signum):
     assert not scratch.exists()
     with pytest.raises(ProcessLookupError):
         os.kill(int(grandchild_log.read_text(encoding="utf-8")), 0)
+
+
+def test_without_killpg_an_interrupt_still_stops_the_renderer(monkeypatch):
+    # Platforms without process groups fall back to the child alone.
+    monkeypatch.delattr(os, "killpg")
+    module = _load_module()
+    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    try:
+        module.stop_process_group(child)
+        assert child.returncode is not None
+    finally:
+        child.kill()
+        child.wait()
