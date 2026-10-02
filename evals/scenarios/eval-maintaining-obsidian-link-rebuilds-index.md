@@ -160,34 +160,35 @@ index is computed by the grader from the **pristine fixture** under
 vault, so a trial that edits a note's `type:` cannot move the target to meet
 its index.
 
-- **A1 — every typed note is listed under its type.** The discriminator. A
-  section maps to a type when its heading, stripped to letters, or any word
-  of it is the type name or its plural (`## Incidents` and
-  `## Incident reviews` → `incident`). An entry's type is the deepest
-  enclosing heading, at any level, that names a type (`## Catalog` ›
-  `#### Incidents` → incident; `# Runbooks` works as well as `## Runbooks`); in
-  a table with a `Type` column, the row's own Type cell wins. An entry is a
-  bullet, a numbered item or a table row (GFM, with or without outer pipes)
-  carrying a `[[wikilink]]` (alias and heading anchor allowed) or a
-  `[Title](Wiki/Title.md)` link (anchor and title attribute allowed). One
-  rule decides which note a link names, here and in A2: a bare target (a
-  wikilink or a markdown link with no folder) resolves by name,
-  case-insensitively, as Obsidian resolves it; a target with a folder must
-  name a real file — a markdown link relative to `index.md` at the vault root
-  (`./`, `../`, `%20`, `<…>` and a leading `/` honoured), a wikilink as a
-  vault path or its trailing segments. `[X](Wrong/X.md)` names no note. Fenced code and HTML
-  comments are not read: a link there does not render. Blind spot: comments
-  are blanked before code is, so a `<!--` and `-->` split across two fences
-  or a code span, or a `<!--` never closed, is misread — a dead entry between
-  split markers passes (toward PASS), and a `<!--` in inline code before a
-  real comment hides right entries (toward FAIL). No rebuild writes either. Setext headings
-  (`Runbooks` over `---`) are not read as sections — `---` under a line is
-  also a thematic break after a list, and a rebuild that copies the fixture's
-  ATX headings never writes one. Each of these is a rendering a rebuild could
-  reasonably produce from the vault's own conventions, and a false FAIL on one
-  would land on the arm that rebuilds. Thirteen notes, three types. The
-  untouched index fails it three ways (two notes missing,
-  `Retry-Storm-Review` under Runbooks).
+- **A1 — every typed note is listed under its type.** The discriminator.
+  Thirteen notes, three types; the untouched index fails it three ways (two
+  notes missing, `Retry-Storm-Review` under Runbooks). The index can be laid
+  out any way a rebuild could reasonably render "a section per type" from the
+  vault's own conventions — a false FAIL on a right layout would land on the
+  arm that rebuilds:
+  - *Sections.* A label names a type when it, stripped to letters, or any word
+    of it is the type name or its plural (`## Incidents`, `## Incident
+    reviews`). Labels are headings at any level (`# Runbooks`, `## Catalog` ›
+    `#### Incidents`), a parent bullet with the entries nested under it
+    (`- **Runbooks**`, `- Runbooks:`), a bold or colon-ended paragraph line
+    (`**Runbooks**`, `Incidents:`), and an Obsidian callout title (`> [!note]
+    Runbooks`). An entry's type is the innermost label that names one; in a
+    table, the row's own Type / Kind / Category cell, or failing a header, a
+    cell that is exactly a type name (`| incident | [[…]] |`), wins.
+  - *Entries.* A bullet, a numbered item (in a callout too) or a table row
+    carrying a link. Tables are GFM, with or without outer pipes, any
+    alignment row (`:--`, `--:`), escaped pipes as cell content — so an
+    aliased wikilink in a cell, `[[Cache-Warmup\|Cache Warmup]]`, is one
+    link — and HTML entities decoded.
+  - *Links.* A `[[wikilink]]` or `![[embed]]` (alias, `#heading` and `^block`
+    allowed) or a `[Title](Wiki/Title.md)` link (anchor and title attribute
+    allowed). One rule decides which note a link names, here and in A2: a bare
+    target (a wikilink or a markdown link with no folder) resolves by name,
+    case-insensitively, as Obsidian resolves it; a target with a folder must
+    name a real file — a markdown link relative to `index.md` at the vault root
+    (`./`, `../`, `%20`, `<…>` and a leading `/` honoured), a wikilink as a
+    vault path or its trailing segments. `[X](Wrong/X.md)` names no note.
+  - *Not read:* fenced code and HTML comments (a link there does not render).
 - **A2 — no link to a note that is not there.** Every link in the index —
   entries, prose and blockquotes alike — resolves, by name or vault-relative
   path (the rule in A1), to a file of the fixture vault (a note, `SCHEMA.md`,
@@ -218,6 +219,25 @@ its index.
   and so does replacing a fixture file with a FIFO, a symlink or a huge file.
   LINK may modify notes when it resolves plain-text relationships, but V2 has
   none to resolve, so any note edit is outside the claim.
+
+**Known blind spots: a right end state that still scores wrong** (from a
+self-review in the reviewer's seat; each costs the arm that rebuilds, mostly
+the treatment, and none is how the fixture's own index is written):
+
+- Setext headings (`Runbooks` over `---`) are not labels: `---` under a line
+  is also a thematic break after a list.
+- A section whose label does not contain the type's name (`## Procedures` for
+  runbooks, `## 操作手冊`): A1 asks for the note under its *type*, and the
+  vault names types in English.
+- An entry without a link (`- Cache-Warmup — …`), or one whose first link is
+  not the note (`- see [[SCHEMA]]: [[Cache-Warmup]]`).
+- An index split across several files (`index.md` linking `index-runbooks.md`):
+  the new files fail A4 too; `SKILL.md` rebuilds `index.md`.
+- HTML comments are blanked before code is, so a `<!--` / `-->` pair split
+  across two fences or a code span, or a `<!--` never closed, is misread: a
+  `<!--` in inline code before a real comment hides right entries (toward
+  FAIL), and a dead entry between split markers passes (toward PASS). No
+  rebuild writes either.
 
 A trial passes when A1–A4 all score 1; its score is their mean, 0.25 each.
 
@@ -270,7 +290,7 @@ would map to it.
 
 ### Pre-measurement revisions (2026-10-02)
 
-Before any V2 trial ran, the design was revised six times without a
+Before any V2 trial ran, the design was revised seven times without a
 `## Version` bump (nothing had been measured). Scores quoted in this list are
 the five-assertion strings of the time, A5 last.
 
@@ -321,6 +341,15 @@ the five-assertion strings of the time, A5 last.
   `[Credential-Rotation](Wrong/Credential-Rotation.md)` for every entry scored
   `1111`. Entries (A1, A3) and A2 now share one resolver: a path must name a
   real file; only a bare target resolves by name.
+
+- **Codex review of the fourth revision.** In a table, an aliased wikilink has
+  to escape its pipe — `[[Cache-Warmup\|Cache Warmup]]` — and the grader read
+  `Cache-Warmup\` as the target and split the cell there, so a complete table
+  index scored `0001`. Escaped pipes are now cell content and links are read
+  on the unescaped line; alignment rows with one hyphen, entities, and a
+  type-first table with no Type header are read too. A self-review then found
+  four more right layouts scored `0101` — entries nested under a parent
+  bullet (bold or `Runbooks:`), bold paragraph labels, and callouts — now read.
 
 The grader was then replayed through the real `## Setup` and `## Grader
 Config` against 314 cases over the V2 fixture, each scoring as expected and
@@ -382,6 +411,18 @@ none emitting an `A5` label; only the `1111` cases exit 0:
   wrong link among right ones, as a markdown link or a wikilink — `0001`; the
   audit report at a path with a space, as `%20`, `<…>` or a wikilink — `1111`,
   a missing one — `1011`; an entry pointing at a stub in `_audits/` — `1101`.
+- **Tables and labels** (36 cases): each table layout (link in column 1 or 2,
+  no outer pipes, flat Type column) with every wikilink aliased through `\|` —
+  right `1111`, missing note `0101`, dead entry `1001`, wrong section `0101`;
+  an escaped pipe in a summary and in a code span, `#heading` and `^block`
+  refs behind `\|`, embeds as entries, trailing whitespace, `:--`/`--:`
+  alignment rows, `&amp;` / `&#124;` in a cell — `1111`; a type-first table
+  with a Type header, with none, and with `**Kind**&nbsp;` cells — `1111`, the
+  first two with `Retry-Storm-Review` typed runbook — `0101`; a dead aliased prose link
+  — `1011`; nested parent bullets (bold and `Runbooks:`), bold paragraph
+  labels and callouts — `1111` right, `0101` with `Retry-Storm-Review` among
+  the runbooks. A dead entry in a blockquote is now an entry (`1001`, was
+  `1011`).
 - **End states:** the ideal rebuild plus an `_audits/` report and an appended
   log line (1111), with the untyped note under `## Other` (1111), with
   `## Incident reviews` (1111) or `## Decision records` (1111); the two missing
@@ -494,7 +535,7 @@ code
 
 ## Grader Config
 python3 -I - <<'PY'
-import os, posixpath, re, stat, sys, urllib.parse
+import html, os, posixpath, re, stat, sys, urllib.parse
 from collections import Counter
 from pathlib import Path
 
@@ -611,7 +652,12 @@ LINK = re.compile(
     r"|\[[^\]]*\]\(([^)#<>\s]+?\.md)(?:#[^)\s]*)?(?:\s+[\"'(][^)]*)?\)"
 )
 URL = object()
-TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)*\|?\s*$")
+TABLE_SEP_ROW = re.compile(r"^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$")
+
+
+def table_sep(line):
+    """A GFM delimiter row (`|---|`, `:--`, `--: | :-:`); a bare `---` is a thematic break."""
+    return bool(TABLE_SEP_ROW.match(line)) and ("|" in line or ":" in line)
 
 
 def link_raw(m):
@@ -649,8 +695,28 @@ def link_title(m):
     return NOTE_PATHS.get(rel, link_raw(m)) if isinstance(rel, str) else link_raw(m)
 
 
+def unescape_pipes(line):
+    """`\\|` is a literal pipe: how a wikilink alias (`[[Note\\|Alias]]`) or a `|` in a
+    summary stays inside a GFM table cell. Read links on the unescaped line."""
+    return line.replace("\\|", "|")
+
+
 def cells(line):
-    return [c.strip() for c in line.strip().strip("|").split("|")]
+    """GFM cells: split on unescaped pipes only (an escaped one is cell content, inside a
+    code span too), outer pipes optional, entities decoded."""
+    row = line.strip()
+    row = row[1:] if row.startswith("|") else row
+    row = row[:-1] if re.search(r"(?<!\\)\|$", row) else row
+    return [html.unescape(c.replace("\\|", "|")).strip() for c in re.split(r"(?<!\\)\|", row)]
+
+
+TYPE_HEADERS = ("type", "kind", "category")
+
+
+def cell_type(cell):
+    """A cell that is exactly a declared type, or its plural, once markup is dropped."""
+    word = re.sub(r"[^a-z]", "", cell.lower())
+    return next((t for t in declared if word in (t, t + "s", t + "es")), None)
 
 
 index_raw = regular_bytes(vault / "index.md")
@@ -671,45 +737,88 @@ for line in lines:
 # carrying a link. Its type is the deepest enclosing heading, at any level, that names a
 # declared type (`## Catalog` > `#### Incidents`); in a table with a Type column, the row's
 # own Type cell wins.
+def label_text(text):
+    """A short label (`**Runbooks**`, `Runbooks:`, `*Incidents*`) with markup dropped, or None."""
+    t = re.sub(r"[*_`]", "", text).strip().rstrip(":").strip()
+    return t if t and len(t.split()) <= 4 and not LINK.search(text) else None
+
+
+# Besides headings, a rebuild can group entries under a label: a parent bullet
+# (`- **Runbooks**` with the entries nested under it), a bold or colon-ended paragraph
+# line (`**Runbooks**`, `Incidents:`), or an Obsidian callout (`> [!note] Runbooks` with
+# `> - [[…]]` lines). The innermost label or heading that names a type wins.
 entries = []
 heads = {}
 in_table, table_type_col = False, None
+groups = []  # (indent, label) of parent bullets that name a type
+callout = para_label = None
 for i, line in enumerate(live):
+    quoted = re.match(r"^\s*(?:>\s?)+", line)
+    if quoted:
+        line = line[quoted.end():]
+        c = re.match(r"^\[!\w+\][+-]?\s*(.*)$", line)
+        if c:
+            callout = c.group(1).strip() or None
+            continue
+    else:
+        callout = None
     h = re.match(r"^(#{1,6})\s+(.*?)\s*#*\s*$", line)
     if h:
         level = len(h.group(1))
         heads = {k: v for k, v in heads.items() if k < level}
         heads[level] = h.group(2)
         in_table = False
+        groups, para_label = [], None
         continue
-    if "|" in line and i + 1 < len(live) and TABLE_SEP.match(live[i + 1]):
-        names = [c.lower() for c in cells(line)]
+    if "|" in line and i + 1 < len(live) and table_sep(live[i + 1]):
+        names = [re.sub(r"[^a-z]", "", c.lower()) for c in cells(line)]
         in_table = True
-        table_type_col = next((j for j, c in enumerate(names) if c in ("type", "kind")), None)
+        table_type_col = next((j for j, c in enumerate(names) if c in TYPE_HEADERS), None)
         continue
-    if in_table and TABLE_SEP.match(line):
+    if in_table and table_sep(line):
         continue
     if in_table and "|" not in line:
         in_table = False
-    is_item = re.match(r"^\s*(?:[-*+]|\d+[.)])\s", line)
+    is_item = re.match(r"^(\s*)(?:[-*+]|\d+[.)])\s+(.*)$", line)
+    if is_item:
+        indent = len(is_item.group(1).expandtabs(4))
+        groups = [(n, g) for n, g in groups if n < indent]
+    elif line.strip() and not in_table:
+        bold = re.match(r"^\s*(\*\*|__)(.+?)\1\s*:?\s*$", line) or re.match(r"^\s*([^:|]+):\s*$", line)
+        label = label_text(bold.group(bold.lastindex)) if bold else None
+        if label and section_type(label):
+            para_label, groups = label, []
+        continue
     if not (is_item or in_table):
         continue
-    m = LINK.search(line)
+    m = LINK.search(unescape_pipes(line))
     if not m:
+        label = label_text(is_item.group(2)) if is_item else None
+        if label and section_type(label):
+            groups.append((indent, label))
         continue
     title = link_title(m)
-    typed = [heads[k] for k in sorted(heads, reverse=True) if section_type(heads[k])]
+    inner = [g for _, g in reversed(groups)] + [callout, para_label]
+    inner += [heads[k] for k in sorted(heads, reverse=True)]
+    typed = [x for x in inner if x and section_type(x)]
     section = typed[0] if typed else (heads[max(heads)] if heads else None)
     t = section_type(section)
-    if in_table and table_type_col is not None:
+    if in_table:
+        # The Type column, by header name; failing that, a cell that is exactly a type
+        # name (a table whose first column is the type, under no Type header).
         row = cells(line)
-        if table_type_col < len(row):
-            section = row[table_type_col]
-            t = section_type(section)
+        if table_type_col is not None and table_type_col < len(row):
+            section, t = row[table_type_col], section_type(row[table_type_col])
+        else:
+            typed_cells = [c for c in row if not LINK.search(unescape_pipes(c)) and cell_type(c)]
+            if len(typed_cells) == 1:
+                section, t = typed_cells[0], cell_type(typed_cells[0])
     entries.append((section, t, title))
 print(f"-- note: index entries {[(s, e) for s, _, e in entries]}")
 # Every link in the index (entries, prose, blockquotes), for A2, by the same resolve().
-dead_links = {link_raw(m) for line in live for m in LINK.finditer(line) if resolve(m) is None}
+dead_links = {
+    link_raw(m) for line in live for m in LINK.finditer(unescape_pipes(line)) if resolve(m) is None
+}
 
 # ---- A1: every typed note under its type ----
 listed = {(t, e) for _, t, e in entries}
