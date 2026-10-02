@@ -25,4 +25,4 @@ A release promoted at 14:02 sent every checkout request to a colour whose paymen
 
 ## Relationships
 
-Rolled back with [[Deploy-Pipeline]]. Led to [[Decision-Idempotency-Keys]] and [[Payment-Retry-Drain]].
+Rolled back with [[Deploy-Pipeline]]. Led to [[Decision-Idempotency-Keys]], [[Payment-Retry-Drain]] and [[Credential-Rotation]].

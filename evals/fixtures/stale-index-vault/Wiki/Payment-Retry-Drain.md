@@ -15,4 +15,4 @@ tags: [payments, checkout]
 
 ## Relationships
 
-Written after [[Incident-2026-03-Checkout]]. Relies on the keys introduced by [[Decision-Idempotency-Keys]].
+Written after [[Incident-2026-03-Checkout]]. Relies on the keys introduced by [[Decision-Idempotency-Keys]]. The worker's limits are set by [[Decision-Retry-Budget]].
