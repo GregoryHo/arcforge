@@ -92,7 +92,9 @@ work carries provenance a reader can check.
   that is not JSON or not an Excalidraw scene, a renderer dependency that is
   not installed — exits non-zero with one `ERROR:` line on stderr naming what
   failed, never a Python traceback, so the agent reading it can act on the
-  cause (#228, D-049).
+  cause. A helper validates its input before it checks for an optional
+  dependency, so a broken diagram is reported as broken, not as a missing
+  renderer (#228, D-049).
 - **B-9 The pair composes by invocation.** Diagram work inside a vault
   operation is handed to `/diagramming-obsidian` — after user approval, and
   only by prose invocation, per [skill-system](skill-system.md) B-5.

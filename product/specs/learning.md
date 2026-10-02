@@ -57,7 +57,10 @@ was recorded about them.
   scope with no `enabled_at` reads as before: its `updated_at` while enabled,
   nothing while disabled. That one instant is both the stale-draft floor
   ([hooks](hooks.md) B-6) and the start of what the curator may analyze (B-1),
-  which still never reaches back across a lapse. Residual: only a scope's
+  which still never reaches back across a lapse. For a project with no
+  recorded root only the global opt-in can authorize it, so its effective
+  opt-in is read from the global scope alone, and with global off it has
+  none. Residual: only a scope's
   latest period is kept, so an overlap that ended before that scope's last
   re-enable is not recovered (D-051).
 - **B-2 Exactly one automatic step in the candidate pipeline.** Once enabled,

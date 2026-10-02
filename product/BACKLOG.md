@@ -42,7 +42,8 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 - ~~**dashboard-rejections**~~ — graduated into 6.2.0 (D-020).
 - ~~**gate-session-capture-depth**~~ — graduated into 6.1.0 (D-010).
 - ~~**gate-diary-enricher**~~ — graduated into 6.1.0 (D-009).
-- ~~**stale-draft-floor-overlapping-opt-in**~~ — graduated into 6.2.0 (D-020).
+- ~~**stale-draft-floor-overlapping-opt-in**~~ — graduated into 6.2.0 (D-020);
+  shipped there as an accepted cost, not the fix, which 6.3.0 carries (D-051).
 - ~~**learn-enable-erases-config**~~ — graduated into 6.1.1 (D-018).
 
 - ~~**unify-candidate-queues**~~ — graduated into 6.1.0 (D-012).

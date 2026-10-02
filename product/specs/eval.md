@@ -160,26 +160,29 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
 - **B-13 A pool that only failed is flagged, never stood in for.** A
   pool whose rows all carry `infraError` or `gradeError` is never the
   measurement (B-10), and no reader puts another pool's verdict in its place.
-  `eval compare` refuses the comparison and lists the pool as an instrument
-  failure, not a measurement, with its row count and run conditions. The
-  dashboard's scenario list keeps such a treatment pool in the scenario's pool
-  list, flagged as an instrument failure, and reports the scenario as having
-  no runs to judge when no scored pool exists; it never substitutes the
-  verdict of the scenario's plain, single-arm results, which would read as a
-  measurement of the change (#212, D-048).
+  `eval compare` refuses the comparison, naming the arm that has no scored
+  trial, and lists the pool as an instrument failure, not a measurement, with
+  its row count and run conditions. The dashboard says what `eval list` and
+  `eval compare` say: the scenario shows `NO SCORED RUNS` — or its scored
+  verdict — with the pool listed as an instrument failure, not a measurement,
+  and an A/B view whose arm has no scored trial shows the refusal and its pool
+  lines in place of a comparison, never another pool's verdict or a run
+  history standing alone (#212, D-048).
 
 ### Benchmarks
 - **B-9 Snapshots keep history and gate releases.** `eval report` writes
   `latest.json`, overwritten each time, plus a date-stamped copy under
   `evals/benchmarks/`, and the per-trial export under `evals/benchmarks/raw/`
-  under the same name as its aggregate. A copy is never overwritten: a day's
-  first report writes `YYYY-MM-DD.json`, and each later report that day writes
-  `YYYY-MM-DD-2.json`, `YYYY-MM-DD-3.json` and so on. `eval history` lists every
-  copy whose name starts with a `YYYY-MM-DD` date — a hand-kept one such as
-  `2026-10-01-v6.1.1.json` included — oldest first by the time each snapshot
-  records it was generated, because names do not sort in that order; a
-  date-named file that is not a snapshot fails the command, naming the file,
-  rather than being skipped (#242, D-048). A release
+  under the same name as its aggregate. A copy is never overwritten: each
+  report takes the first of `YYYY-MM-DD.json`, `YYYY-MM-DD-2.json`,
+  `YYYY-MM-DD-3.json`, … not yet used for its date, for the aggregate and the
+  raw export together, and creates it exclusively, so two concurrent reports
+  never share a name. `eval history` lists every file named for a date, alone
+  or followed by `-` and any suffix — a hand-kept `2026-10-01-v6.1.1.json`
+  included — oldest first by the instant its `generated` field records, since
+  names do not sort in that order. A listed file that is not a snapshot with an
+  ISO 8601 `generated` carrying `Z` or an offset fails the command, naming the
+  file (#242, D-048). A release
   tag is blocked by CI when the benchmark is stale — when eval-backed surface
   (skills, scenarios, fixtures) changed since the previous release tag. A
   `--since`-bounded snapshot is a different measurement from a full-history

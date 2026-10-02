@@ -1305,12 +1305,15 @@ reverse one, append a superseding entry (see AGENTS.md).
 - Status: Accepted
 - Decision: Each scope's learning config records when its latest authorized
   period began, in an additive `enabled_at` field that an enable which changes
-  the state writes, a no-op leaves alone, and a disable keeps; the effective
+  the state writes, a no-op leaves alone, and a disable keeps — a disable
+  that finds none writing into it the stamp of the enable it ends; the effective
   opt-in becomes the start of the unbroken stretch of any-scope authorization
   that reaches the present, so global on at T1, project on at T2 and global
   off at T3 later than T2 leaves it at T1; and a config without `enabled_at`
   reads as it does today.
-- Why: 6.2.0 shipped the overlap case as an accepted cost — D-009's Residual,
+- Why: D-020 graduated the **stale-draft-floor-overlapping-opt-in** wish into
+  6.2.0, but 6.2.0 shipped the overlap case as an accepted cost, not the
+  fix — D-009's Residual,
   hooks B-6 and the comment above `learningEnabledSince` in
   `scripts/lib/learning.js` — because a scope's `updated_at` records only its
   latest transition, so the disable overwrote the T1 it replaced. That silence
