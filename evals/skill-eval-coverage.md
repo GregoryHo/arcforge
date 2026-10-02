@@ -1842,6 +1842,8 @@ gitignore 的快取原樣複製到 `docs/plans/v6.3/wp-h/`。
 |---|---|---|---|---|---|---|
 | router-skill-selection | 2 | `20261002-170600`，baseline 0/3 | `20261002-170824` | avg 0.00 / pass 0%（0/5；A1 0/5、A2 0/5） | avg 1.00 / pass 100%（5/5；A1 5/5、A2 5/5） | **+1.00 CI[1, 1] IMPROVED** |
 
+CI[1, 1] 是引擎照實回報的數字，但 0/5 對 5/5 兩臂都沒有變異，Welch 區間因此縮成一點，不代表精確度。方向有支持（Fisher exact 雙尾 p ≈ 0.008），效果大小在 k=5 下則未確立：差值的 Newcombe 區間約為 [0.39, 1.00]。
+
 每個 trial 的時間 20.2 s → 39.4 s；output tokens 1,646 → 3,484，報表標為 cost regression。
 多出來的是寫測試與 mutation 檢查的工作。
 
@@ -1927,6 +1929,7 @@ transcript 與終局，沒有一列被 grader 盲點誤判。
 - preflight 紀錄與 A/B row 都沒有記 Node 版本，router scenario 的 measurement-host 段落卻說
   會記；本輪的 v24.13.1 只記在這裡。
 - row 不帶 scenario hash；A/B 與 preflight 對得上，只能從 preflight gate 有放行推知。
+- preflight 紀錄與 A/B row 都沒有記 trial 執行時的 commit；`20edf82e` 只來自手寫的執行紀錄。
 - operator 的 `PATH` 會傳進 trial（引擎以 `process.env` 啟動 trial）：link-rebuilds-index
   preflight trial 2 解析得到 `arcforge`，並跑了 `arcforge --help`。兩臂的暴露相同，不影響比較。
 - #250：code grader 以 trial 目錄為 cwd 執行 `python3 -`，trial 放進去的模組會被 import。
