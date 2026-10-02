@@ -310,12 +310,13 @@ function listSnapshots(projectRoot) {
       }
       const generated = data?.generated;
       const time = INSTANT_RE.test(generated) ? Date.parse(generated) : Number.NaN;
-      if (Number.isNaN(time) || typeof data?.evals !== 'object' || !data.evals) {
+      const evals = data?.evals;
+      if (Number.isNaN(time) || typeof evals !== 'object' || !evals || Array.isArray(evals)) {
         throw new Error(
           `${f} in ${benchmarkPath} is not a benchmark snapshot (needs an ISO timestamp with a zone in generated, and evals); rename or move it`,
         );
       }
-      return { name: stem(f), generated, time, evalCount: Object.keys(data.evals).length };
+      return { name: stem(f), generated, time, evalCount: Object.keys(evals).length };
     })
     .sort((a, b) => a.time - b.time || a.name.localeCompare(b.name, 'en', { numeric: true }))
     .map(({ time, ...snapshot }) => snapshot);

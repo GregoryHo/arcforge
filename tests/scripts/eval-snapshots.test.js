@@ -102,6 +102,16 @@ describe('benchmark snapshots', () => {
       expect(() => listSnapshots(tempDir)).toThrow('2026-10-01.json');
     });
 
+    it('refuses a snapshot whose evals is not an object of scenarios', () => {
+      fs.mkdirSync(benchDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(benchDir, '2026-10-01.json'),
+        JSON.stringify({ generated: '2026-10-01T12:00:00.000Z', evals: [] }),
+      );
+
+      expect(() => listSnapshots(tempDir)).toThrow('2026-10-01.json');
+    });
+
     it('orders by instant, not by the text of the timestamp', () => {
       writeSnapshot(benchDir, '2026-10-01.json', '2026-10-01T12:00:00.000Z');
       writeSnapshot(benchDir, '2026-10-01-tz.json', '2026-10-01T13:00:00+08:00');
