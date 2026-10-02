@@ -1204,9 +1204,13 @@ reverse one, append a superseding entry (see AGENTS.md).
   `eval-maintaining-obsidian-audit-runs-lint-script`,
   `eval-maintaining-obsidian-link-rebuilds-index` and
   `eval-speccing-supersede-not-overwrite` — and measures them in one round,
-  launched from the maintainer's main session on `opus[1m]` / `xhigh`, capped
+  launched from the maintainer's main session on `opus[1m]` / `xhigh`,
+  isolated, without `--plugin-dir`, the skill injected with `--skill-file`, at
+  the 900 s trial ceiling, capped
   at about 80 live sessions, under a rule fixed before any result is read:
-  each scenario gets a new `## Version` and a preflight at k=3; a PASS goes to
+  each scenario gets a new `## Version` and a preflight at k=3 — so
+  `eval-maintaining-obsidian-audit-runs-lint-script`'s redesign removes the
+  `skip` its `## Preflight` section carries today; a PASS goes to
   an A/B at k=5 (13 sessions); a BLOCK gets exactly one redesign, written down
   before a second preflight (16 sessions if that one passes); a second BLOCK
   is recorded as a finding with no A/B, and the scenario is not run again in
@@ -1226,11 +1230,15 @@ reverse one, append a superseding entry (see AGENTS.md).
   cannot ride 6.2.1; riding a round that runs anyway costs them nothing extra,
   and neither changes a skill's behavioral claim. #164 changes learning's
   on-disk config, which D-020 placed in a minor.
-- Residual: these wishes stay in the backlog and are not in 6.3.0:
-  **skill-body-trim**, **diagramming-headless-fallback**, #184, #185,
+- Residual: not in 6.3.0, and staying where they are — the wishes
+  **skill-body-trim**, **diagramming-headless-fallback**,
+  **bound-transcript-parse**, **product-cli**, **project-keyspace-collision**,
   **speccing-spec-in-sync-eval**, **speccing-router-adjacency-eval**,
-  **plugin-eval-corpus-migration**, **eval-trial-sandbox**, and every wish under
-  Harness and Hooks.
+  **plugin-eval-corpus-migration**, **eval-trial-sandbox**,
+  **cli-human-output**, **eval-compare-skip-analyzer** and every wish under
+  Harness and Hooks; the issues #184 and #185; and whether Codex's `$`
+  mention carries the `arcforge:` namespace, which stays unmeasured by the
+  owner's call of 2026-10-01.
 - Cost accepted: up to about 80 live sessions, and a scenario that BLOCKs
   twice ends the round with no A/B evidence, its skill keeping the evidence it
   had — the outcome D-045 recorded for four of the same five.

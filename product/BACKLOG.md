@@ -96,11 +96,16 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 - ~~**redesign-maintaining-obsidian-audit-runs-lint-script**~~ — graduated into 6.3.0 (D-049).
 - ~~**redesign-maintaining-obsidian-link-rebuilds-index**~~ — graduated into 6.3.0 (D-049).
 - ~~**redesign-speccing-supersede-not-overwrite**~~ — graduated into 6.3.0 (D-049).
-- **eval-compare-skip-analyzer** — eval compare on a model/human-graded scenario always spawns the eval-analyzer session; a flag to skip it would let a verdict be read without spending a model call.
+- **eval-compare-skip-analyzer** — `eval compare` on a model- or
+  human-graded scenario always spawns the eval-analyzer session; a flag to
+  skip it would let a verdict be read without spending a model call.
 
 ## CLI
 
-- **cli-human-output** — commands without --json still print pretty JSON through the shared output() helper; either give status/list commands a human format or say in docs/guide/cli-invocation.md that JSON is the default and --json is a no-op for them.
+- **cli-human-output** — commands without `--json` still print pretty JSON
+  through the shared `output()` helper; either give the status and list
+  commands a human format, or say in `docs/guide/cli-invocation.md` that JSON
+  is the default and `--json` is a no-op for them.
 
 ## Hooks
 
