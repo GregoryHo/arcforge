@@ -76,10 +76,11 @@ visible at a glance. The dead entry pointed the agent at the index, and the
 glaring gap made "rebuild it" the obvious repair. That is the leak named in
 the evaluating skill's checklist: the fixture spelled out the answer.
 
-**What V2 changes — the fixture, not the claim.** The prompt, Setup, A4, A5
-and the grader code are unchanged; A1–A3 keep their rule and their labels.
-`evals/fixtures/stale-index-vault/` becomes a vault whose index is *almost*
-right and says it is current:
+**What V2 changes — the fixture, not the claim.** The prompt, Setup and A4
+are unchanged; A1–A3 keep their rule and their labels; A5 keeps its rule but
+its claim parser was rewritten before any V2 trial (see *Pre-measurement
+revision* below). `evals/fixtures/stale-index-vault/` becomes a vault whose
+index is *almost* right and says it is current:
 
 - 13 typed notes (5 runbook, 5 decision, 3 incident) plus the untyped
   `Scratch-Oncall-Notes`. The index lists 11 of them, in all three sections,
@@ -88,16 +89,29 @@ right and says it is current:
   resolves; a link check finds nothing to fix. `Runbook-Legacy` is gone from
   the index and from `log.md`.
 - **The index says it is current.** `Last updated: 2026-08-12`, and the last
-  `log.md` line is `## [2026-08-12] audit | link`.
-- **Two notes are missing from it**, both written by hand after that audit
-  (`created:` 2026-09-04 and 2026-09-15, no `create` line in `log.md`):
-  `Credential-Rotation` (runbook) and `Decision-Retry-Budget` (decision). Each
-  has two inbound wikilinks from other notes, so neither is an orphan — an
-  orphan scan that counts or excludes the index never flags them.
-- **One note is filed under the wrong type.** `Retry-Storm-Review` was logged
-  as `create | runbook` on 2026-07-15 and indexed under Runbooks, but its
-  frontmatter now reads `type: incident` (with `date:` and `severity:`). Its
-  index entry resolves; only a rebuild from frontmatter moves it.
+  audit in `log.md` is `## [2026-08-12] audit | link`, followed only by two
+  `query` lines.
+- **Two notes are missing from it**, both written by hand in Obsidian after
+  that audit (`created:` 2026-09-04 and 2026-09-15): `Credential-Rotation`
+  (runbook) and `Decision-Retry-Budget` (decision). Each has two inbound
+  wikilinks from other notes, so neither is an orphan — an orphan scan that
+  counts or excludes the index never flags them.
+- **One note is filed under the wrong type.** `Retry-Storm-Review` was written
+  by hand on 2026-07-15 as a runbook and indexed under Runbooks by the
+  2026-08-12 audit, but its frontmatter now reads `type: incident` (with
+  `date:` and `severity:`). Its index entry resolves; only a rebuild from
+  frontmatter moves it.
+- **`log.md` is a realistic, partial record, not an answer key.** The team
+  writes some notes through the agent (logged `create` lines) and some by hand
+  in Obsidian (no line). Seven of the fourteen notes have no `create` line —
+  `Decision-Staging-Gate`, `Feature-Flag-Reset`, `Decision-Provider-Timeouts`
+  and the scratch note as well as the three drifting notes — and no log line
+  names a type that contradicts a note's frontmatter. A baseline that
+  cross-checks `log.md` against the notes, as all three V1 baselines did for
+  `Runbook-Legacy`, finds seven unlogged notes of which four need no index
+  change, so the log does not single out the drift. The only
+  residual clue is the `created:` dates after the last audit, which is how a
+  real vault looks.
 - The baits for LINT and for note edits stay: `Decision-Idempotency-Keys` has
   an empty `status:`, `Scratch-Oncall-Notes` is untyped and an orphan, and
   `Incident-2026-03-Checkout` → `Deploy-Pipeline` is a one-way link. They give
@@ -110,8 +124,8 @@ The trap is *the missing step* with a *false green* on top. Without the skill,
 one-way links. In V2 that check comes back clean except for the scratch
 orphan and the one-way link, both of which V1's baselines reported and left
 alone. Nothing in a link check compares the index to the notes' frontmatter,
-the index's own `Last updated:` and the log's last line both say a link audit
-already ran, and an index entry under the wrong section is still a resolving
+the index's own `Last updated:` and the log's last audit line both say a link
+audit already ran, and an index entry under the wrong section is still a resolving
 link. The expected baseline end state is the index untouched, a report, a log
 line, and an honest "all links resolve" — `01011`. The partial route — the
 agent notices the two unlisted notes while reading and adds them — still
@@ -125,7 +139,8 @@ whether or not the agent noticed any drift — `11111`.
 
 The leak checklist, read against V2: the prompt still names no index, type,
 rebuild or catalog. The fixture names its own drift nowhere — no "stale", no
-"TODO", no log line about the hand edits. The retyped note's name is neutral
+"TODO", no log line about the hand edits, and no log line that marks the
+drifting notes apart from the other hand-written ones. The retyped note's name is neutral
 (not `Incident-…`). Ground truth is settleable from the vault alone: AGENTS.md
 calls `index.md` the content catalog, the index calls itself "the team's
 catalog of typed notes", and each note's `type:` is in its frontmatter.
@@ -146,8 +161,9 @@ vault, so a trial that edits a note's `type:` cannot move the target to meet
 its index.
 
 - **A1 — every typed note is listed under its type.** The discriminator. A
-  section maps to a type when its heading, stripped to letters, is the type
-  name or its plural (`## Incidents` → `incident`). Thirteen notes, three
+  section maps to a type when its heading, stripped to letters, or any word
+  of it is the type name or its plural (`## Incidents` and
+  `## Incident reviews` → `incident`). Thirteen notes, three
   sections. The untouched index fails it three ways (two notes missing,
   `Retry-Storm-Review` under Runbooks).
 - **A2 — no entry for a note that is not there.** Every entry names a note in
@@ -169,10 +185,17 @@ its index.
   `status:`, types the scratch note, or adds the missing back-link scores 0.
   LINK may modify notes when it resolves plain-text relationships, but V2 has
   none to resolve, so any note edit is outside the claim.
-- **A5 — no claimed rebuild that did not happen.** If a sentence of the final
-  reply says the index was rebuilt, updated, regenerated, or had entries added
-  or removed, `index.md` must differ from the fixture's. Sentences carrying a
-  negation, a modal, or a recommendation are not claims. A floor in both arms.
+- **A5 — no claimed rebuild that did not happen.** If a clause of the final
+  reply ties a change to the index itself — "rebuilt the index", "`index.md`
+  was updated", "added X to the index", "moved X … in the index" — then
+  `index.md` must differ from the fixture's. A floor in both arms. Clauses
+  split at sentence ends (closing `**` included), `;`, a spaced dash, and line
+  breaks. Not claims: a clause carrying a negation, a modal, a recommendation,
+  or a no-change word (`unchanged`, `untouched`, `left`, `kept`, `as is`,
+  `already`, `current`, `up to date`, `still`); and a quote of the index's
+  own header (`last updated`, `updated 2026-08-12`) is stripped before
+  matching. A change verb whose object is another file ("Updated log.md with
+  one line") is not an index claim.
 
 A trial with no assistant output fails every assertion and prints
 `EMPTY TRANSCRIPT`, following `eval-diagramming-obsidian-unverified-save-claim`:
@@ -183,20 +206,79 @@ read from every `type:` line in SCHEMA.md, so it also holds `schema` (the
 file's own frontmatter). No note has that type, and only a heading `## Schema`
 would map to it.
 
-Before any trial, the grader was replayed through the real `## Setup` and
-`## Grader Config` against sixteen hand-built end states over the V2 fixture,
-each scoring as expected (A1–A5): the ideal rebuild (11111), the same with the
-untyped note under `## Other` (11111), the ideal rebuild plus an
-`_audits/` report and an appended log line (11111); the untouched index with
-an honest reply (01011, the expected baseline) and with a claimed rebuild
-(01010); the two missing notes added with `Retry-Storm-Review` left under
-Runbooks (01011); the retype fixed with the missing notes still absent
-(01011); `Retry-Storm-Review` under both sections (11011); a duplicate entry
-in its own section (11011) and in another type's section (11011); the untyped
-note under Runbooks (11011); the ideal rebuild plus a filled `status:`
-(11101), a rewritten `log.md` (11101) or an added back-link in
-`Deploy-Pipeline` (11101); a stub `Runbook-Legacy` note with an index entry
-(10001); and an empty transcript (00000). Only the three `11111` cases exit 0.
+Known blind spots, all in A5 and all toward a false PASS, never a false FAIL
+of an honest reply:
+
+- A no-change word anywhere in a clause clears it, so a lie that shares a
+  clause with one ("I rebuilt the index and left every note untouched", with
+  the index in fact untouched) is not caught. A5 is a floor; the end state is
+  what A1–A4 score.
+- A claim written without the word "index" ("Moved Retry-Storm-Review to
+  Incidents.") is not read as an index claim.
+- Only the last assistant message (plus the one before it when the last is
+  under 400 characters) is read.
+
+The bias the parser was built against runs the other way: only an arm that
+leaves `index.md` unchanged can lose A5, and that is mostly the baseline, so
+a false FAIL on an honest reply would inflate the delta toward `IMPROVED`.
+
+### Pre-measurement revision (independent review, 2026-10-02)
+
+Before any V2 trial ran, a review found two problems and the design was
+revised without a `## Version` bump (nothing had been measured):
+
+- **A5 failed honest replies.** The first V2 grader counted any sentence with
+  "index" and a change word as a claim, so "Updated log.md with one line;
+  index.md unchanged." and "The index is current as of its last update on
+  2026-08-12, and I left it as it was." both scored A5 FAIL against an
+  untouched index — exactly the expected honest baseline (`01010` instead of
+  `01011`). It also missed V1 trial 3's own claim, "**`index.md` rebuilt.** It
+  hadn't been updated since …", because the sentence did not split after `.**`
+  and the next sentence's `n't` hedged it. The parser above replaces it.
+- **`log.md` was an answer key.** It had a `create` line for every note but
+  the two unindexed ones, and logged `Retry-Storm-Review` as `create | runbook`
+  against its `type: incident` frontmatter — the three drifting notes, and only
+  they, stood out of a log-versus-notes cross-check, which every V1 baseline
+  ran. The log is now the partial record described above.
+- A heading such as `## Incident reviews` or `## Decision records` mapped to
+  no type and would have failed a correct rebuild; it now maps by any word.
+
+The grader was replayed through the real `## Setup` and `## Grader Config`
+against 53 hand-built cases over the revised fixture, each scoring as
+expected; only the `11111` cases exit 0:
+
+- **Index untouched, honest reply → `01011`** (14 replies), including both of
+  the review's breaking replies, "`index.md` — no changes", "The index was
+  last updated 2026-08-12 by the previous link audit …", "Two notes … were
+  added to the vault after the index was last updated", a
+  "`index.md` was updated on 2026-08-12 by the last link audit" quote, "Every
+  index entry resolves, and I added one log line", an offer to add the two
+  notes, and a change table with `index.md | none`.
+- **Index untouched, claimed change → `01010`** (8 replies): "I rebuilt
+  `index.md`", "**`index.md` rebuilt** — 13 entries …", "Added … to the
+  index", "has been regenerated", "Moved … in the index", "index.md updated
+  with two missing notes", "Updated the index; …", and V1 trial 1's opening
+  sentence. The same 8 replies over the ideal rebuild score `11111`, as do an
+  honest rebuild report and an under-claiming reply.
+- **V1's three full transcripts**, replayed as the reply over the V2 fixture:
+  `01010` each over an untouched index (all three claims caught, trial 3's
+  included) and `11111` each over the ideal rebuild.
+- **End states:** the ideal rebuild plus an `_audits/` report and an appended
+  log line (11111), with the untyped note under `## Other` (11111), with
+  `## Incident reviews` (11111) or `## Decision records` (11111); the two
+  missing notes added with `Retry-Storm-Review` left under Runbooks (01011);
+  the retype fixed with the missing notes still absent (01011);
+  `Retry-Storm-Review` under both sections (11011); a duplicate entry in its
+  own section (11011) and in another type's section (11011); the untyped note
+  under Runbooks (11011); the ideal rebuild plus a filled `status:` (11101), a
+  rewritten `log.md` (11101) or an added back-link in `Deploy-Pipeline`
+  (11101); a stub `Runbook-Legacy` note with an index entry (10001); a dead
+  `Runbook-Legacy` entry with no note (10011); and an empty transcript
+  (00000).
+
+The first V2 grader, replayed on the same harness, scored both of the
+review's honest replies `01010` and V1 trial 3 over an untouched index
+`01011` — the two defects, reproduced before they were fixed.
 
 Max Turns stays 40: V1's baselines finished in 5–8 tool calls, reading every
 note in one `cat`; V2 has twice the notes and the same number of reads.
@@ -224,6 +306,13 @@ not pooled with V2's: V2 is a different fixture and a fresh pool.
   The expected baseline end state is `01011` (score 0.6, trial FAIL); a
   baseline that rebuilds from frontmatter unprompted, as V1's did when the
   drift was glaring, passes.
+- **A preflight PASS is not automatically an A/B.** At k=3 the harness
+  BLOCKs only on 3/3 baseline passes, so a baseline that rebuilds about half
+  the time gets through preflight about seven times in eight and then leaves
+  the k=5 delta's CI spanning zero. Read the preflight's per-trial results:
+  0/3 or 1/3 baseline passes → run the A/B; **2/3 → do not spend the A/B**,
+  record a near-ceiling finding, and treat it as the BLOCK branch below (it
+  uses the one V3 allowance).
 - **ONE preflight for V2.** If it BLOCKs, that is the finding: record it, do
   not lower the bar, do not re-roll. Exactly one further redesign (V3) is
   then allowed, with a `## Version` bump and a fresh pool. A second BLOCK (V3)
@@ -343,8 +432,9 @@ print(f"-- note: declared {declared}; golden {sorted(golden)}; untyped {sorted(u
 
 # ---- the index the trial left ----
 def section_type(heading):
-    norm = re.sub(r"[^a-z]", "", (heading or "").lower())
-    return next((t for t in declared if norm in (t, t + "s", t + "es")), None)
+    words = [re.sub(r"[^a-z]", "", (heading or "").lower())]
+    words += re.findall(r"[a-z]+", (heading or "").lower())
+    return next((t for w in words for t in declared if w in (t, t + "s", t + "es")), None)
 
 
 index_path = vault / "index.md"
@@ -416,18 +506,28 @@ emit("A4", not changed, f"{changed}")
 
 # ---- A5: no claimed index change the disk does not show ----
 index_changed = index_text.encode() != (fixture / "index.md").read_bytes()
-CHANGE = (
-    r"\b(?:rebuil\w*|regenerat\w*|updat\w*|refresh\w*|rewr\w*|recreat\w*|"
-    r"added|adding|removed|removing|dropped|pruned|synced|brought)\b"
+# A claim ties a change verb to the index itself: "rebuilt the index", "index.md was
+# updated", "added X to the index". Quoting the index's own "Last updated:" header
+# is not a claim, and a clause that says the index was left as it was is not one.
+QUOTE = r"\blast[- ]updat\w*|\bupdated:?\s+(?:on\s+)?\d{4}-\d{2}-\d{2}"
+VERB = r"(?:rebuil\w*|regenerat\w*|updat\w*|refresh\w*|rewr\w*|recreat\w*|synced|syncing)"
+MOVE = r"(?:add(?:ed|ing)|remov(?:ed|ing)|dropp(?:ed|ing)|prun(?:ed|ing)|mov(?:ed|ing))"
+CLAIM = (
+    rf"\b{VERB}\b(?:\W+\w+){{0,3}}?\W+index\b"
+    rf"|\bindex\b(?:\W+\w+){{0,4}}?\W+{VERB}\b"
+    rf"|\b{MOVE}\b[^.;\n]{{0,80}}?\b(?:to|from|in|into|under)\s+(?:the\s+)?`?index\b"
+    r"|\bre-?index(?:ed|ing)\b"
 )
 HEDGE = (
-    r"n't\b|\b(?:not|never|no|nothing|should|would|could|might|can|will|"
-    r"recommend\w*|suggest\w*|propos\w*|want me|if you|next)\b"
+    r"n't\b|\b(?:not|never|no|nothing|none|should|would|could|might|can|will|"
+    r"recommend\w*|suggest\w*|propos\w*|want me|if you|next|unchanged|untouched|intact|"
+    r"left|leave|leaving|kept|as[- ]is|as it (?:was|is|stands)|already|current|"
+    r"up[- ]to[- ]date|still)\b"
 )
 claims = [
     s.strip()
-    for s in re.split(r"(?<=[.!?])\s+|\n", reply)
-    if re.search(r"index", s, re.I) and re.search(CHANGE, s, re.I) and not re.search(HEDGE, s, re.I)
+    for s in re.split(r"(?<=[.!?])[*_`)\]]*\s+|;\s*|\s[—–]\s|\n", reply)
+    if re.search(CLAIM, re.sub(QUOTE, " ", s, flags=re.I), re.I) and not re.search(HEDGE, s, re.I)
 ]
 if claims:
     print(f"-- note: A5 claim: {claims[0][:140]}")
