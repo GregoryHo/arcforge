@@ -42,7 +42,8 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 - ~~**dashboard-rejections**~~ — graduated into 6.2.0 (D-020).
 - ~~**gate-session-capture-depth**~~ — graduated into 6.1.0 (D-010).
 - ~~**gate-diary-enricher**~~ — graduated into 6.1.0 (D-009).
-- ~~**stale-draft-floor-overlapping-opt-in**~~ — graduated into 6.2.0 (D-020).
+- ~~**stale-draft-floor-overlapping-opt-in**~~ — graduated into 6.2.0 (D-020);
+  shipped there as an accepted cost, not the fix, which 6.3.0 carries (D-051).
 - ~~**learn-enable-erases-config**~~ — graduated into 6.1.1 (D-018).
 
 - ~~**unify-candidate-queues**~~ — graduated into 6.1.0 (D-012).
@@ -91,11 +92,26 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 - **plugin-eval-corpus-migration** — move more routing scenarios onto
   `claude plugin eval` once D-025's isolation check has run and the feature
   leaves `experimental` · needs: D-025.
-- **redesign-executing-verify-decides-done** — redesign `eval-executing-verify-decides-done` for the clean instrument · needs: D-045.
-- **redesign-router-skill-selection** — redesign `eval-router-skill-selection` for the clean instrument · needs: D-045.
-- **redesign-maintaining-obsidian-audit-runs-lint-script** — redesign `eval-maintaining-obsidian-audit-runs-lint-script` for the clean instrument · needs: D-045.
-- **redesign-maintaining-obsidian-link-rebuilds-index** — redesign `eval-maintaining-obsidian-link-rebuilds-index` for the clean instrument · needs: D-045.
-- **redesign-speccing-supersede-not-overwrite** — redesign `eval-speccing-supersede-not-overwrite`'s rubric for the clean instrument, where its Version 8 baseline sits at ceiling · needs: D-047.
+- ~~**redesign-executing-verify-decides-done**~~ — graduated into 6.3.0 (D-049).
+- ~~**redesign-router-skill-selection**~~ — graduated into 6.3.0 (D-049).
+- ~~**redesign-maintaining-obsidian-audit-runs-lint-script**~~ — graduated into 6.3.0 (D-049).
+- ~~**redesign-maintaining-obsidian-link-rebuilds-index**~~ — graduated into 6.3.0 (D-049).
+- ~~**redesign-speccing-supersede-not-overwrite**~~ — graduated into 6.3.0 (D-049).
+- **eval-compare-skip-analyzer** — `eval compare` on a model- or
+  human-graded scenario always spawns the eval-analyzer session; a flag to
+  skip it would let a verdict be read without spending a model call.
+- **eval-skill-files-outside-trial** — in a skill-scope A/B, give only the
+  treatment arm a host-style "Base directory for this skill" line with that
+  skill's files staged outside the trial tree the baseline can list, so
+  behavior that depends on a skill's shipped scripts or references can be
+  measured without placing them in the baseline's fixture · needs: D-049.
+
+## CLI
+
+- **cli-human-output** — commands without `--json` still print pretty JSON
+  through the shared `output()` helper; either give the status and list
+  commands a human format, or say in `docs/guide/cli-invocation.md` that JSON
+  is the default and `--json` is a no-op for them.
 
 ## Hooks
 

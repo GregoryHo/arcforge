@@ -197,9 +197,12 @@ git add product/
 git commit -m "docs(product): flip vX.Y.Z to shipped"
 ```
 
-Keeping it separate is deliberate — the release commit in step 7 stays exactly the
-version files plus `CHANGELOG.md`, so reverting a bad bump does not drag the product
-history back with it.
+Keeping it separate on the branch is deliberate — the flip is reviewed on its own, and
+the release commit in step 7 stays exactly the version files plus `CHANGELOG.md`. It
+does not survive as its own commit on `main`: the repository ruleset allows squash
+merges only, so the PR lands the flip and the release commit as one commit. Reverting
+that commit therefore reverts the flip too, and the flip has to be re-applied by hand
+(D-052).
 
 ### 6. Bump the version in every canonical location
 
@@ -242,7 +245,7 @@ For releases that change **shipped surface area** (new skill, removed CLI flag, 
 ### 7. Commit, push, open PR
 
 - Commit message: `chore(release): vX.Y.Z` with a brief body summarizing scope
-- Stage exactly the release files (the version locations + `CHANGELOG.md`) — the product-state flip from step 5 is already its own commit on this branch, so do not fold it in. Avoid `git add -A` — it tends to pull in lock files, editor droppings, and workspace metadata
+- Stage exactly the release files (the version locations + `CHANGELOG.md`) — the product-state flip from step 5 is already its own commit on this branch, so do not fold it in; the squash merge combines the two on `main` (D-052). Avoid `git add -A` — it tends to pull in lock files, editor droppings, and workspace metadata
 - `git push -u origin <branch>`
 - `gh pr create` with a test-plan checklist in the body: 5 runners green, 7 static checks green, lint green, secret scan clean, `check:versions` green and the version grep returned only canonical locations
 
@@ -269,7 +272,7 @@ These are the steps that get skipped when a contributor is in a hurry. The skill
 - **Daily note append.** After the release ships, `obsidian daily:append` with a one-line release summary so the release is preserved in the vault's chronological log, not only in `log.md`.
 - **The product-state flip.** The roadmap row, its `Tag` cell, the spec headers, and the `← we are here` marker are four edits in four files, and a version bump touches none of them. `npm run check:product` proves the first three; where the marker ended up is on you.
 - **Version bump without a CHANGELOG entry.** The marketplace release cache is version-keyed, so a bump with no entry ships to users who have no way to tell what changed. The checklist order (CHANGELOG before bump) pairs them, and `release.yml` fails without the section.
-- **A release commit that carries other work.** `chore(release): vX.Y.Z` is the version files plus `CHANGELOG.md`, nothing else — unrelated fixes bundled in make bisect and rollback painful. Commit work-in-progress separately *before* the release commit.
+- **A release commit that carries other work.** On the branch, `chore(release): vX.Y.Z` is the version files plus `CHANGELOG.md`, nothing else — unrelated fixes bundled in make bisect and rollback painful. Commit work-in-progress separately *before* the release commit. The squash merge still lands it together with the flip as one commit on `main`, so a revert there takes the flip with it.
 - **The post-merge tag.** Merging the PR does not auto-tag, and without the tag the next release can't use `git log vPREV..HEAD` to scope its CHANGELOG. This is the single most commonly skipped step.
 
 ## After the Release

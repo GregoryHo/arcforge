@@ -1,6 +1,6 @@
 # skill-system — spec
 
-> Status: shipped v6.1.1 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.1.1 · extended by 6.3.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -113,6 +113,9 @@ asserted by test (B-3).
 - **D-018** — every edit under `skills/` known when 6.1.1 was planned lands
   there, so its benchmark is measured on a repaired instrument; skill text a
   later decision changes is measured in 6.2.0's round (B-9).
+- **D-049** — 6.3.0 redesigns the router and executing scenarios whose
+  baselines sat at ceiling, and measures each under one pre-registered
+  redesign (B-3, B-9).
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
 

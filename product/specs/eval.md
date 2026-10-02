@@ -1,6 +1,6 @@
 # eval — spec
 
-> Status: shipped v6.2.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.2.0 · extended by 6.2.1 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -157,10 +157,32 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   refusal that arrives after the agent has already acted — tool calls made,
   output tokens spent — is not distinguished from a completed turn and scores
   as one.
+- **B-13 A pool that only failed is flagged, never stood in for.** A
+  pool whose rows all carry `infraError` or `gradeError` is never the
+  measurement (B-10), and no reader puts another pool's verdict in its place.
+  `eval compare` refuses the comparison, naming the arm that has no scored
+  trial, and lists the pool as an instrument failure, not a measurement, with
+  its row count and run conditions. The dashboard says what `eval list` and
+  `eval compare` say: the scenario shows `NO SCORED RUNS` — or its scored
+  verdict — with the pool listed as an instrument failure, not a measurement,
+  and an A/B view whose arm has no scored trial shows the refusal and its pool
+  lines in place of a comparison, never another pool's verdict or a run
+  history standing alone (#212, D-048).
 
 ### Benchmarks
 - **B-9 Snapshots keep history and gate releases.** `eval report` writes
-  `latest.json` plus a date-stamped copy under `evals/benchmarks/`; a release
+  `latest.json`, overwritten each time, plus a date-stamped copy under
+  `evals/benchmarks/`, and the per-trial export under `evals/benchmarks/raw/`
+  under the same name as its aggregate. A copy is never overwritten: each
+  report takes the first of `YYYY-MM-DD.json`, `YYYY-MM-DD-2.json`,
+  `YYYY-MM-DD-3.json`, … not yet used for its date, for the aggregate and the
+  raw export together, and creates it exclusively, so two concurrent reports
+  never share a name. `eval history` lists every file named for a date, alone
+  or followed by `-` and any suffix — a hand-kept `2026-10-01-v6.1.1.json`
+  included — oldest first by the instant its `generated` field records, since
+  names do not sort in that order. A listed file that is not a snapshot with an
+  ISO 8601 `generated` carrying `Z` or an offset fails the command, naming the
+  file (#242, D-048). A release
   tag is blocked by CI when the benchmark is stale — when eval-backed surface
   (skills, scenarios, fixtures) changed since the previous release tag. A
   `--since`-bounded snapshot is a different measurement from a full-history
@@ -217,3 +239,5 @@ its rationale is inline at B-10.
 - **D-020** — 6.2.0 carries the scenario rubric fixes with their own
   measurement round (B-8).
 - **D-043** — graders never execute trial output (B-6, B-7, B-8, B-12).
+- **D-048** — 6.2.1 makes same-day snapshots additive and shows a failed pool
+  on the dashboard, with no live session spent (B-9, B-13).
