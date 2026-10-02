@@ -66,9 +66,10 @@ work carries provenance a reader can check.
   instead of a number invented. Every audit writes a typed report into the
   vault. The lint script treats a `[[wikilink]]` inside inline code or a fenced
   block as an example, not a link; an inline code span closes only on a
-  backtick run of its own length in the same paragraph, so a fence that opens
-  later in the note never closes it, and the fence's contents are not read as
-  links (#210, D-049).
+  backtick run of its own length before the next blank line or fence opener,
+  so a fence that opens later in the note never closes it, and the fence's
+  contents are not read as links. A heading, a blockquote or list item, or a
+  quoted blank line does not end a span's search (#210, D-049).
 - **B-6 Every operation leaves a log line.** Each ingest, query, audit, or
   bootstrap appends to the vault's `log.md` and reports the artifacts it
   produced by path — an operation that cannot run says which mode, what
