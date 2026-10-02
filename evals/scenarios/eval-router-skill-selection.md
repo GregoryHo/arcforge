@@ -121,21 +121,30 @@ and the working tree; it runs nothing the trial wrote (eval B-12).
     `assert.<anything>(…)`, `t.assert.<anything>(…)` including
     `t.assert.snapshot`, the module or its functions bound under another name
     (`const a = require('node:assert/strict')`, `import { strict as a }`,
-    `const { strictEqual: eq } = …`), `assert.throws(() => uniqueSlug(…))`; a
-    jest `expect(…)` followed by a matcher; a hand-rolled `if (<condition on
-    the result>) throw …`; or a helper defined in any test file that asserts
-    on one of its own parameters (`check(uniqueSlug(…), 'a-2')`).
+    `const { strictEqual: eq } = …`, `const { equal } = assert`),
+    `assert.throws(() => uniqueSlug(…))`; a jest `expect(…)` followed by a
+    matcher; a conditional on the result, `if (<condition>) throw …` or
+    `if (<condition>) assert.fail(…)`; or a helper defined in any test file
+    that asserts on one of its own parameters (`check(uniqueSlug(…), 'a-2')`).
+    A call inside a template literal (`` `${uniqueSlug(…)}` ``) counts.
   - **Not tests:** `assert.ok(true)` under a `uniqueSlug` title,
     `uniqueSlug('a', [])` beside `assert.strictEqual(1, 1)`, `typeof
     uniqueSlug === 'function'` under any alias, a call fed to a helper that
-    asserts on nothing it was given, and a test of a different function bound
-    to a look-alike name.
+    asserts on nothing it was given, a test of a different function bound to
+    a look-alike name, `console.assert` (it only prints), a bare `equal(…)` /
+    `ok(…)` not bound from `node:assert`, and a test node:test runs without a
+    verdict (`test.skip`, `it.todo`, `describe.skip`, `{ skip: true }`, a body
+    that calls `t.skip()`). A name is an alias only from a real binding
+    position — a destructuring pattern, import / export braces, an object
+    key — so a ternary branch (`d ? uniqueSlug : slugify`) or an object value
+    makes `slugify` no alias.
 
-  A test file is any `.js`/`.ts` under a `test/`, `tests/` or `__tests__/`
-  directory, or one `node --test` runs by default or by convention:
-  `*.test.js`, `*-test.js`, `*_test.js`, `test-*.js`, `test.js`, `*.spec.js`,
-  and their `.ts` forms. A1 uses the same check, so a test that passes A2 is
-  also what A1 accepts as cover.
+  A test file is exactly what the fixture's `npm test` (`node --test`, no
+  arguments) runs: anything under a `test/` directory, and `*.test.*`,
+  `*-test.*`, `*_test.*`, `test-*.*`, `test.*` anywhere, in `.js`/`.mjs`/`.cjs`
+  and their `.ts` forms. `tests/x.js`, `__tests__/x.js` and `*.spec.js` never
+  run here, so they are not tests. A1 uses the same check, so a test that
+  passes A2 is also what A1 accepts as cover.
 
 `Grader: code` passes a trial only when both score 1.
 
@@ -197,14 +206,33 @@ model writes by default, and each was checked against the fixture's `npm test`.
 - A test in a file `node --test` does not find by default, run because the
   agent changed `scripts.test` (e.g. `node --test spec/`): read as untested
   code, A1 and A2 FAIL.
-- An assertion library the fixture does not install (chai, uvu): such a test
-  cannot run here, so it is not a correct end state.
 - A value that reaches the assertion through two statements (`const a =
   uniqueSlug(…); const b = a.trim(); assert.equal(b, …)`), or through a
   helper that asserts on something derived from its parameter rather than the
   parameter itself.
-- A call through a computed name (`m[name](…)` with `name` a variable), or
-  through `Reflect.apply` / `Function.prototype.bind`.
+- A call through a computed name (`m[name](…)` with `name` a variable),
+  `Reflect.apply`, `Function.prototype.bind`, or an assertion inside
+  `eval(…)`.
+
+**Known blind spots: a wrong end state that still scores right.** Each would
+credit whichever arm writes it — in practice the treatment, the arm expected to
+write tests, so each would inflate the delta. None is a default shape; the
+operator audit below reads every PASS row to catch them.
+
+- A same-name stand-in: a local `function uniqueSlug` in the test, or a module
+  that exports another function under the name `uniqueSlug`.
+- An assertion that can never fail: after `return`, behind `if (false)` or
+  `if (false && r)`, inside a helper whose assertion is guarded off, a
+  home-made `expect(…).toBe` that checks nothing, or a local no-op that
+  shadows an asserting helper of the same name.
+- A loose link from call to assertion: a same-named variable asserted in a
+  different test, a comma-joined declaration (`const r = uniqueSlug(…), s =
+  slugify(…)` then an assertion on `s`), an assertion on the array passed in
+  rather than on the return value.
+- A test that would fail at runtime (calls `uniqueSlug` with no import, or
+  imports it from the wrong module): the grader does not run the suite.
+- A regex literal containing a quote, which desynchronises the comment and
+  string blanking and can expose assertion text to the grader.
 
 **When the grader gives no verdict.** The grader reads only the repository
 `## Setup` created. It refuses, printing an out-of-range `A0` label that the
@@ -397,6 +425,31 @@ ESM and two CJS files → `11`; the default-export module present while the test
 requires `slugify` under a look-alike name, and a re-bound look-alike → `00`.
 Every earlier table scores as before.
 
+**QA review, wrong end states (2026-10-02).** No `## Version` bump; nothing
+measured. A fresh pass asked the opposite question: can a wrong end state pass?
+- **One line made the untouched `slugify` test count as cover.** The
+  destructuring pattern `uniqueSlug: f` also matched a ternary branch (`d ?
+  uniqueSlug : slugify`) and an object value (`{ uniqueSlug: slugify }`), so
+  either, in any file, made `slugify` an alias and scored an untested merge
+  `11`. Aliases now come only from real binding positions (A2, above).
+- **Tests that never run, or run without a verdict, counted:** `tests/x.js`,
+  `__tests__/x.js`, `*.spec.js`, `test.skip`, `it.todo`, `{ skip: true }`.
+  A test file is now exactly what `npm test` runs, and skipped tests are
+  dropped. `console.assert` and a home-made `equal` no longer count.
+- **Two right shapes scored wrong:** a call inside a template literal and
+  `if (!r) assert.fail(…)`; both count now.
+- Replay: QA's 46 shapes moved exactly as intended — the two L1-5 shapes and
+  their two test-file variants, the three never-run files, the three skip/todo forms,
+  `console.assert` and a home-made `equal` from `11` to `00`, the two right
+  shapes from `00` to `11` — and the rest are on the lists above. 22 more
+  cases score as written: L1-5 neighbours (a ternary either way, an object
+  value, a TS annotation and cast, a label, a ternary in a test file) and my
+  own skip / todo / `t.skip()` / never-run / `console.assert` / home-made
+  `equal` variants → `00`; the two right shapes again, `{ skip: false }`, a skipped sibling, a `describe` holding a skipped test
+  beside a real one, `const { strictEqual } = assert`, a `spec/` file named
+  `*.test.js` → `11`. The 51 earlier forms, the 32 rows and QA's 26 + 62 cases
+  score as before; every `.git` probe still gives `A0`.
+
 **Pre-registered reading.** This Version gets **one** preflight at k=3
 (opus[1m], xhigh, isolated, no `--plugin-dir`, `--max-turns 25`). PASS
 (baseline below 80%) opens the A/B at k=5 per arm (D-049) under the same
@@ -424,14 +477,17 @@ arcforge eval ab eval-router-skill-selection \
   --k 5 --model 'opus[1m]' --effort xhigh --max-turns 25
 ```
 
-**Operator audit.** The grader reads tests statically, and the blind-spot list
+**Operator audit.** The grader reads tests statically, and the blind-spot lists
 above will never be complete. After the preflight and after the A/B, the
-operator reads every FAIL row of either arm against its transcript and its final
-repository. A FAIL that a listed blind spot, or a new one, produced on a
-genuinely right end state is reported beside the verdict as a mis-scored trial,
-with its trial id and the reason. The verdict is still computed on the grader's
-scores and is never re-scored by hand. This is what the blind-spot list is for:
-to make such a trial recognisable, not to excuse it after the fact.
+operator reads every row of either arm. For a FAIL: the transcript and the final
+repository, for a right end state the grader missed. For a PASS: the test
+file(s) the trial wrote and the transcript's `npm test` output, confirming a
+real test of `uniqueSlug` ran and passed before anything reached `main`. A row a
+grader blind spot mis-scored, either way, is reported beside the verdict as a
+mis-scored trial with its trial id and the reason. The verdict is still
+computed on the grader's scores and is never re-scored by hand. This is what
+the blind-spot lists are for: to make such a trial recognisable, not to excuse
+it after the fact.
 
 A preflight the harness BLOCKs because a trial errored (`infraError` /
 `gradeError`, `A0` included) measured nothing: it is not this Version's one
@@ -634,14 +690,15 @@ def is_js(path):
     return re.search(r"\.[cm]?[jt]s$", path) is not None and "node_modules/" not in path
 
 
-# `node --test`'s default globs (test/**, *.test.js, *-test.js, *_test.js, test-*.js,
-# test.js, and their .ts forms) plus the usual tests/, __tests__/ and *.spec.js.
+# Exactly what the fixture's `npm test` (`node --test`, no arguments) runs: its default globs
+# `**/test/**`, `*.test.*`, `*-test.*`, `*_test.*`, `test-*.*`, `test.*`, for js and ts. A
+# `tests/x.js`, `__tests__/x.js` or `*.spec.js` never runs here, so it is no test.
 def is_test(path):
     name = path.rsplit("/", 1)[-1]
     return (
-        path.startswith(("test/", "tests/", "__tests__/"))
-        or any(f"/{d}/" in path for d in ("test", "tests", "__tests__"))
-        or re.search(r"(?:^test(?:-.*)?|[-_.](?:test|spec))\.[cm]?[jt]s$", name) is not None
+        path.startswith("test/")
+        or "/test/" in path
+        or re.search(r"(?:^test(?:-.*)?|[-_.]test)\.[cm]?[jt]s$", name) is not None
     )
 
 
@@ -677,7 +734,22 @@ def strip_comments(js):
 
 # String contents out too, quotes kept: a title or a message is not code.
 def blank_strings(js):
-    return re.sub(r"'(?:\\.|[^'\\\n])*'|\"(?:\\.|[^\"\\\n])*\"|`(?:\\.|[^`\\])*`", "''", js)
+    """Strings become '' — but a template literal keeps its `${…}` expressions, which run."""
+    def repl(m):
+        text = m.group(0)
+        if text[0] != "`":
+            return "''"
+        exprs, i = [], 0
+        while True:
+            i = text.find("${", i)
+            if i < 0:
+                break
+            inner, end = call_args(text, i + 1)
+            exprs.append(blank_strings(inner))
+            i = end
+        return "(" + ", ".join(exprs) + ")" if exprs else "''"
+
+    return re.sub(r"'(?:\\.|[^'\\\n])*'|\"(?:\\.|[^\"\\\n])*\"|`(?:\\.|[^`\\])*`", repl, js)
 
 
 # Any assertion call: node:assert in any spelling (`assert(`, `assert.x(`,
@@ -685,15 +757,14 @@ def blank_strings(js):
 # `match(` ...), the module or its members bound under another name (see
 # assert_aliases), or a jest `expect(...)` followed by a matcher. A method call such as
 # `s.match(` is not one.
-ASSERT_FNS = r"(?:not)?(?:[Dd]eep)?(?:[Ss]trict)?[Ee]qual|ok|match|doesNotMatch|throws|rejects"
-
-
 def assert_call_re(modules=(), members=(), helpers=()):
+    """`console.assert` only prints, so it is not one; a bare `equal(` / `ok(` counts only
+    when the file bound that name from node:assert (members)."""
     mods = "|".join(["assert"] + [re.escape(m) for m in sorted(modules)])
-    fns = "|".join([ASSERT_FNS] + [re.escape(m) for m in sorted(members)])
+    fns = "|".join(re.escape(m) for m in sorted(members)) or "(?!)"
     helper = "|".join(re.escape(h) for h in sorted(helpers)) or "(?!)"
     return re.compile(
-        rf"(?:\b(?:{mods})(?:\.\w+)*|(?<![\w.$])(?:{fns})"
+        rf"(?:(?<!console\.)\b(?:{mods})(?:\.\w+)*|(?<![\w.$])(?:{fns})"
         rf"|(?<![\w$])(?:[A-Za-z_$][\w$]*\.)?(?:{helper})|\bexpect)\s*\("
     )
 
@@ -758,7 +829,11 @@ def assert_aliases(code):
     braces = re.finditer(
         rf"\b(?:const|let|var)\s*\{{([^}}]*)\}}\s*=\s*require\(\s*{ASSERT_SPEC}"
         rf"|\bimport\s*(?:{ID}\s*,\s*)?\{{([^}}]*)\}}\s*from\s*{ASSERT_SPEC}", code)
-    for inner in (m.group(1) or m.group(2) for m in braces):
+    inners = [m.group(1) or m.group(2) for m in braces]
+    # `const { equal } = assert` — destructured from a module object already bound above.
+    alt = "|".join(re.escape(m) for m in sorted(modules | {"assert"}))
+    inners += re.findall(rf"\{{([^{{}}]*)\}}\s*=\s*(?:{alt})(?:\.strict)?\b(?!\s*[.(])", code)
+    for inner in inners:
         for part in inner.split(","):
             bits = re.split(r"\s*(?::|\bas\b)\s*", part.strip())
             if not bits or not re.fullmatch(ID, bits[-1] or ""):
@@ -782,9 +857,17 @@ def bound_names(code, seed):
     while True:
         alt = "|".join(map(re.escape, sorted(names)))
         found = set()
-        found |= set(re.findall(rf"\b(?:{alt})\s+as\s+({ID})", code))
-        found |= set(re.findall(rf"\b(?:{alt})\s*:\s*({ID})", code))
-        found |= set(re.findall(rf"({ID})\s*:\s*(?:{alt})\b(?!\s*\()", code))
+        # `as` only inside import / export braces (not a TS cast); `uniqueSlug: f` only
+        # inside a destructuring pattern `{…} =` (not an object value or a ternary branch);
+        # `f: uniqueSlug` only as an object-literal key outside one.
+        for group in re.findall(r"\b(?:import|export)\b[^;{}]*\{([^{}]*)\}", code):
+            found |= set(re.findall(rf"\b(?:{alt})\s+as\s+({ID})", group))
+        patterns = list(re.finditer(r"\{([^{}]*)\}\s*=(?![=>])", code))
+        for pat in patterns:
+            found |= set(re.findall(rf"\b(?:{alt})\s*:\s*({ID})", pat.group(1)))
+        for m in re.finditer(rf"[{{,]\s*({ID})\s*:\s*(?:{alt})\b(?!\s*[(.?])", code):
+            if not any(pat.start() <= m.start() < pat.end() for pat in patterns):
+                found.add(m.group(1))
         found |= set(re.findall(rf"({ID})\s*=\s*[\w$.()'\"`\s]*?\.\s*(?:{alt})\b(?!\s*\()", code))
         found |= set(re.findall(rf"\b(?:const|let|var)\s+({ID})\s*=\s*(?:{alt})\s*(?=[;,)\n])", code))
         found |= set(re.findall(rf"\b(?:module\.)?exports\.({ID})\s*=\s*(?:{alt})\b(?!\s*[.(])", code))
@@ -849,6 +932,27 @@ def default_bindings(path, with_strings, defaults):
     return found
 
 
+def drop_unrun(code):
+    """Blank tests node:test runs without a verdict: `test.skip(…)`, `it.todo(…)`,
+    `describe.skip(…)`, `test('t', { skip: true }, …)`, and a body that calls `t.skip()` /
+    `t.todo()`. Their assertions decide nothing."""
+    spans = []
+    for m in re.finditer(r"\b(?:test|it|describe|suite)\s*(\.\s*(?:skip|todo)\s*)?\(", code):
+        args, end = call_args(code, m.end() - 1)
+        head = re.split(r"=>|\bfunction\b", args, maxsplit=1)[0]
+        options = re.search(r"\b(?:skip|todo)\s*:(?!\s*false\b)", head)
+        marks = (
+            not re.match(r"\b(?:describe|suite)", m.group(0))
+            and re.search(r"\b\w+\s*\.\s*(?:skip|todo)\s*\(\s*(?:'')?\s*\)", args)
+            and not re.search(r"\b(?:test|it)\s*[.(]", args)
+        )
+        if m.group(1) or options or marks:
+            spans.append((m.end(), end - 1))
+    for start, end in sorted(spans, reverse=True):
+        code = code[:start] + " " * (end - start) + code[end:]
+    return code
+
+
 def exercises_unique_slug(test_text, exported=frozenset(), helpers=frozenset(), path="", defaults=frozenset()):
     """The file calls uniqueSlug( and an assertion's arguments reach what it returned.
 
@@ -859,7 +963,7 @@ def exercises_unique_slug(test_text, exported=frozenset(), helpers=frozenset(), 
     `assert.strictEqual(1, 1)` links nothing and does not.
     """
     with_strings = readable(test_text)
-    code = blank_strings(with_strings)
+    code = drop_unrun(blank_strings(with_strings))
     seed = {"uniqueSlug"} | set(exported) | default_bindings(path, with_strings, defaults)
     names = bound_names(code, seed)
     call = re.compile(
@@ -878,12 +982,14 @@ def exercises_unique_slug(test_text, exported=frozenset(), helpers=frozenset(), 
             continue
         if call.search(args) or set(IDENT.findall(args)) & linked:
             return True
-    # A hand-rolled assertion: `if (<condition on the result>) throw ...`.
+    # A conditional assertion on the result: `if (<condition>) throw …` or
+    # `if (<condition>) assert.fail(…)`.
     for m in re.finditer(r"\bif\s*\(", code):
         args, end = call_args(code, m.end() - 1)
-        if re.match(r"\s*\{?\s*throw\b", code[end:]) and (
-            call.search(args) or set(IDENT.findall(args)) & linked
-        ):
+        lead = re.match(r"\s*\{?\s*", code[end:])
+        at = end + lead.end()
+        acts = code.startswith("throw", at) or assert_call.match(code, at)
+        if acts and (call.search(args) or set(IDENT.findall(args)) & linked):
             return True
     return False
 
