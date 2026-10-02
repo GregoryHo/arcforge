@@ -314,26 +314,33 @@ than guessed at. `<project>` is the same sanitized directory basename as the
 rest of the keyspace, so the record shares the collision D-037 records: two
 same-named projects share one record.
 
-One daemon runs per machine, held by `~/.arcforge/instincts/.observer.lock`; it
-stops itself after 30 idle minutes or 2 hours. The lock records the directory
-of the daemon script that took it, and starting the daemon replaces a live one
-started from a different directory — after a plugin upgrade, the previous
-version's — instead of leaving that version's behavior running until it stops
-on its own. A lock written before the lock recorded its script counts as
-different. Nothing is signaled unless the lock's PID is a process running the
-daemon script: a daemon that died without removing its lock leaves a PID the
-system can reuse, and a lock whose PID belongs to any other process, or to no
-process, is stale — it is reclaimed, and that process is left alone, by start
-and stop alike. The observation hook's lazy start, once enough observations
-have accumulated, reclaims a lock only when it can show the lock is stale — its
-process is gone, or is some other program. A lock it cannot classify, such as
-one a starting daemon has not finished writing, it leaves alone for the next
-SessionStart to judge. A lock shown stale no longer keeps the daemon down for
-the rest of a session (#243, D-048).
+One daemon runs per machine, held by `~/.arcforge/instincts/.observer.lock`: however
+many starts race, at most one becomes the daemon. It stops itself after 30 idle
+minutes or 2 hours. Nothing is signaled unless the lock's PID is a process
+running the daemon script, because a daemon that died without removing its lock
+leaves a PID the system can reuse. A start reclaims at once a lock whose PID is
+dead or belongs to some other program, and leaves that program alone. A lock
+with no valid PID yet — a start still writing it — is held while it is under a
+minute old and reclaimed once older; a stale lock another start has just
+reserved for reclaim is left to that start for up to a minute; a lock with no
+valid PID, or a reservation, dated more than a few seconds in the future counts
+as expired. Stop removes any lock whose
+PID is not a live daemon. The lock also records the directory of the daemon
+script that took it, and a start asks a live daemon from a different directory —
+after a plugin upgrade, the previous version's — to stop, and takes its place if
+it exits, instead of leaving that version's behavior running until it stops on
+its own; a lock written before the lock recorded its script counts as different.
+The observation hook's lazy start, once enough observations have accumulated,
+starts the daemon only when it can show the lock is stale — its process is
+gone, or is some other program — and leaves a lock it cannot classify for the
+next SessionStart (#243, D-048).
 Residual: a daemon that does not exit within about 2 s of being
 stopped — one waiting on a curator model call — is left running, and the next
-start tries again; and two installed copies of the plugin used in alternation
-replace each other at each session start.
+start tries again; two installed copies of the plugin used in alternation
+replace each other at each session start; without a usable `ps` a live daemon
+can read as stale to a start (#247); and stop and status take no part in the
+reclaim reservation, so a manual stop racing a start can still leave two
+daemons (#252).
 
 The invariants: state is only ever advanced through the engine (B-5), scope decides
 location (B-9), and one session yields one diary (B-7).
