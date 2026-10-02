@@ -219,6 +219,11 @@ credit whichever arm writes it — in practice the treatment, the arm expected t
 write tests, so each would inflate the delta. None is a default shape; the
 operator audit below reads every PASS row to catch them.
 
+- A `.ts`-only test on a Node that does not strip types by default (20, and 22
+  before 22.18): the trial's `npm test` never runs it, but the grader counts it.
+  This Version is measured on Node 24, where it runs (see the host requirement
+  under the pre-registered reading); the operator's PASS-row read of the
+  trial's `npm test` output is where it would show.
 - A same-name stand-in: a local `function uniqueSlug` in the test, or a module
   that exports another function under the name `uniqueSlug`.
 - An assertion that can never fail: after `return`, behind `if (false)` or
@@ -449,6 +454,14 @@ measured. A fresh pass asked the opposite question: can a wrong end state pass?
   beside a real one, `const { strictEqual } = assert`, a `spec/` file named
   `*.test.js` → `11`. The 51 earlier forms, the 32 rows and QA's 26 + 62 cases
   score as before; every `.git` probe still gives `A0`.
+
+**Measurement host.** This Version is measured on Node 24 (v24.13.1 on the
+maintainer's host), where the trial's `npm test` — `node --test` — runs a
+`test/*.test.ts` by type stripping, so the grader's counting a `.ts` test is
+right there. The preflight and A/B records carry the Node version. On a Node
+that does not strip types by default (20, and 22 before 22.18) a `.ts`-only
+test would not run and the grader would credit a test that never executed; a
+run on such a host is not this Version's measurement.
 
 **Pre-registered reading.** This Version gets **one** preflight at k=3
 (opus[1m], xhigh, isolated, no `--plugin-dir`, `--max-turns 25`). PASS
