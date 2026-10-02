@@ -63,7 +63,14 @@
  *         short of that is no exemption either — `product-decisions.js`'s
  *         `STATUS_FIELD_RE` reads the ` {0,3}` band a bullet still renders in, so
  *         a flip one space in is counted rather than hidden. `Refines:` and
- *         `Extends:` require no flip;
+ *         `Extends:` require no flip, but must not name a decision already dead
+ *         when the relation was written (D-050): a target whose `Status:`
+ *         carries `Superseded-by: D-SSS` with `D-SSS` lower than the relating
+ *         entry's own `D-id` is reported. The comparison is by `D-id`, so a
+ *         target folded into `<details>` is judged the same; it is strict, so an
+ *         entry that supersedes a target whole and relates to it as well is not
+ *         reported; and a target superseded later (a higher `D-id`), one only
+ *         partially superseded, or one still `Proposed` stays legal;
  *   - C4  every spec's `Status:` header matches its governing roadmap row, and
  *         the row ↔ spec links resolve in both directions — every row links at
  *         least one spec, every spec is linked from some row, and every link
