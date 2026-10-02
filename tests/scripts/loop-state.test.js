@@ -83,6 +83,17 @@ describe('loop-state', () => {
       expect(fs.readdirSync(tmpDir)).toEqual([LOOP_STATE_FILE]);
     });
 
+    it('never writes through a symlink planted at the temp path', () => {
+      const sentinel = path.join(tmpDir, 'sentinel.txt');
+      fs.writeFileSync(sentinel, 'untouched');
+      fs.symlinkSync(sentinel, path.join(tmpDir, `${LOOP_STATE_FILE}.tmp`));
+      const state = loadLoopState(tmpDir);
+      saveLoopState(state, tmpDir);
+      expect(fs.readFileSync(sentinel, 'utf8')).toBe('untouched');
+      expect(fs.lstatSync(path.join(tmpDir, LOOP_STATE_FILE)).isFile()).toBe(true);
+      expect(loadLoopState(tmpDir)).toEqual(state);
+    });
+
     it('keeps the previous state file intact when the write fails midway', () => {
       const previous = loadLoopState(tmpDir);
       previous.iteration = 3;

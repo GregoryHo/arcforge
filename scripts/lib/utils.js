@@ -88,29 +88,29 @@ function writeFileSafe(filePath, content, options = {}) {
 }
 
 /**
- * Atomic file write — write to a sibling tmp path, then rename.
- * Sibling tmp guarantees same-filesystem rename (real atomicity, not a copy).
- * Cleans up the tmp file on rename failure to avoid leaving orphans in the
- * destination directory. Throws on any I/O failure — callers that prefer a
- * boolean-result wrapper should catch and convert.
- *
- * @param {string} destPath - Final destination path (absolute recommended).
- * @param {string} content - Content to write.
- * @param {object} [options] - Write options (encoding etc.); default utf8.
- * @returns {string} The destination path.
+ * Atomic write: unlink any leftover `<dest>.tmp` (never following a link), create it exclusively
+ * (`wx` fails rather than follow a link planted since), rename it over `dest` (replacing a symlink
+ * there, not writing through it). A created temp is removed on any failure. Returns `destPath`.
  */
 function atomicWriteFile(destPath, content, options = { encoding: 'utf8' }) {
   const tmpPath = `${destPath}.tmp`;
   fs.mkdirSync(path.dirname(destPath), { recursive: true });
-  fs.writeFileSync(tmpPath, content, options);
+  let fd;
   try {
+    fs.rmSync(tmpPath, { force: true });
+    fd = fs.openSync(tmpPath, 'wx');
+  } catch (err) {
+    throw new Error(`Cannot create temp file ${tmpPath}: ${err.message}`);
+  }
+  try {
+    try {
+      fs.writeFileSync(fd, content, options);
+    } finally {
+      fs.closeSync(fd);
+    }
     fs.renameSync(tmpPath, destPath);
   } catch (err) {
-    try {
-      fs.unlinkSync(tmpPath);
-    } catch {
-      // best-effort cleanup; ignore.
-    }
+    fs.rmSync(tmpPath, { force: true });
     throw err;
   }
   return destPath;
