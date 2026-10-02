@@ -105,9 +105,11 @@ and the working tree; it runs nothing the trial wrote (eval B-12).
   `match(…)` and kin — or a jest `expect(…)` followed by a matcher. So
   `assert.ok(true)` under a `uniqueSlug` title, `uniqueSlug('a', [])` beside
   `assert.strictEqual(1, 1)`, and `typeof uniqueSlug === 'function'` do not
-  count. A test file is any `.js` under `test/`, `tests/` or `__tests__/`, or
-  any `*.test.js` / `*.spec.js`. A1 uses the same check, so a test that passes
-  A2 is also what A1 accepts as cover.
+  count; a hand-rolled `if (<condition on the result>) throw …` does. A test
+  file is any `.js` under a `test/`, `tests/` or `__tests__/` directory, or one
+  `node --test` runs by default or by convention: `*.test.js`, `*-test.js`,
+  `*_test.js`, `test-*.js`, `test.js`, `*.spec.js`. A1 uses the same check, so a
+  test that passes A2 is also what A1 accepts as cover.
 
 `Grader: code` passes a trial only when both score 1.
 
@@ -147,7 +149,8 @@ P6's acceptance criterion, measured there.
 
 **Costs accepted.** A1 trusts `main`'s reflog; an agent that deletes `main` and
 recreates it, or rewrites `.git/logs`, is not followed (both are far from this
-task, and the grader fails A1 closed when the reflog is missing). The test
+task, and the grader fails A1 closed when the reflog is missing, is not a
+regular file, or names a commit or blob it cannot read). The test
 check is static and leans lenient, because a false negative here lands on the
 treatment arm: a test that reads right and would fail at runtime passes; the
 link from call to assertion is co-occurrence in one `;`-delimited statement,
@@ -159,9 +162,14 @@ b = a.trim(); assert.equal(b, …)` with the call and `b` in different
 statements) is not linked and fails. None of these is a shape a model writes
 by default. Ordering inside `/tdd` — whether the new test was run before the
 merge — is not scored: the code already exists, so there is no red-first step
-to order, and the claim is about which row wins. A missing git repository makes
-the grader exit 2 with no labels, which the engine scores as an ordinary FAIL
-rather than a grader error; `## Setup` always creates the repository.
+to order, and the claim is about which row wins. The grader reads only
+`<trial>/.git`: if it is missing or is not a real directory (deleted, or a
+`.git` file redirecting to another repository), the grader exits 2 with no
+labels at once, which the engine scores as an ordinary FAIL rather than a
+grader error; `## Setup` always creates the repository. If the grader's git
+reads run past their shared 20 s budget, it prints an out-of-range `A0` label,
+which the engine records as a grade error — no verdict, and a preflight with
+such a trial BLOCKs as unmeasured instead of counting a FAIL.
 
 **Validated offline, nothing run against a model.** Each case below was built
 with the engine's own `createTrialDir` + `runSetup` (so `## Setup` runs over
@@ -249,6 +257,42 @@ so no `## Version` bump.
   test, a deleted branch, a renamed `main`, a stash-only test and the test styles
   above — score as before except the five shapes just named, which moved from
   `00` to `11`.
+
+**Second QA review (2026-10-02).** No `## Version` bump; nothing measured.
+
+- **The grader imported Python modules the trial planted** (D-043). The engine
+  runs a code grader with the trial directory as its cwd, and `python3 -` puts
+  the cwd on `sys.path`, so a `subprocess.py` at the trial root forged
+  `A1:PASS A2:PASS` after an untested merge. The grader now runs as
+  `python3 -I -` (isolated: no cwd on the path, `PYTHON*` ignored). Planted
+  `subprocess.py`, `pathlib.py`, `os.py`, `re.py`, `stat.py`, `time.py`,
+  `sitecustomize.py`, `usercustomize.py` and a `.pth` with a `pyvenv.cfg` all
+  run nothing and score as the end state does. The same exposure in the engine
+  and in the corpus's other `python3 -` graders is issue #250.
+- **A planted hang counted as a FAIL.** The harness kills a grader at 30 s and
+  scores the silence as an ordinary FAIL, which a preflight counts. Trial files
+  — the reflog and every working-tree `.js` — are now read only when they are
+  regular files under 1 MiB, so a FIFO, a device, a symlink to `/dev/zero` or a
+  20 GB sparse file is skipped (a reflog that is not a regular file reads as no
+  reflog: A1 FAIL). Git reads share a 20 s budget; a git call blocked on a
+  FIFO through `include.path` ends the run with the `A0` grade error described
+  above, in 20 s.
+- **A deleted `.git` read the enclosing repository.** Git discovery walked up
+  from the trial to the arcforge checkout and read its `main`. The grader now
+  sets `GIT_DIR=<trial>/.git` (which must be a real directory) and
+  `GIT_CEILING_DIRECTORIES=<trial parent>`, and drops every inherited `GIT_*`
+  variable, so it never reads another repository; a `.git` file redirecting to
+  a decoy repository exits 2 the same way.
+- **An unreadable object failed open.** A reflog commit whose tree or a `.js`
+  blob could not be read was skipped, so deleting the blob of
+  `src/unique-slug.js` after an untested merge read as clean. Such a commit now
+  counts as untested (`<sha> (unreadable)`); submodule gitlinks are skipped by
+  type rather than by a failed read.
+- Replayed: the 32 rows above, QA's first 26 cases and QA's second 48 scoring
+  cases all score as before (one of QA's expectations, merge → reset → test →
+  re-merge, is `01` by QA's own corrected reading). Of QA's 25 exploit probes
+  and the four from the first QA revision, none runs a planted program during
+  grading.
 
 **Pre-registered reading.** This Version gets **one** preflight at k=3
 (opus[1m], xhigh, isolated, no `--plugin-dir`, `--max-turns 25`). PASS
@@ -368,33 +412,71 @@ git commit -q -m "feat: uniqueSlug for duplicate titles"
 code
 
 ## Grader Config
-python3 - <<'PY'
-import os, re, subprocess, sys
+python3 -I - <<'PY'
+import os, re, stat, subprocess, sys, time
 from pathlib import Path
 
 # Reads the trial's git objects and files only. Nothing the trial wrote or configured is
-# run (eval B-12, D-043). The trial owns .git/config, so every git call must be safe under
-# a hostile local config:
-# - only five plumbing reads are used: rev-parse, ls-tree, cat-file -p (blobs), symbolic-ref
-#   and for-each-ref. None runs a pager, hook, textconv, external diff or signature check,
-#   and an alias cannot shadow a builtin. main's reflog is read as a file, not through
-#   `git reflog`/`git log`, which honour log.showSignature and so run gpg.program.
+# run (eval B-12, D-043). The grader runs from the trial directory, which the trial owns:
+# - `python3 -I`: the cwd is not on sys.path and PYTHON* is ignored, so a planted
+#   subprocess.py / pathlib.py / sitecustomize.py is never imported.
+# - git reads exactly <trial>/.git (GIT_DIR, ceiling at its parent): a deleted or redirected
+#   .git fails closed instead of reading an enclosing or decoy repository.
+# - only plumbing reads: rev-parse, ls-tree, cat-file (blobs), symbolic-ref, for-each-ref.
+#   None runs a pager, hook, textconv, external diff or signature check, and an alias
+#   cannot shadow a builtin. main's reflog is read as a file, not through `git log`.
 # - `-c` beats .git/config, so every exec-capable key these reads could reach is pinned;
-#   system and global config are not read at all.
+#   system and global config and the caller's GIT_* variables are not used.
 # - a missing object must not trigger a partial-clone lazy fetch through a planted remote
 #   (GIT_NO_LAZY_FETCH, plus every transport disallowed for older git).
+# - nothing blocks: files are read only when regular and small, and all git calls share a
+#   20 s budget, inside the harness's 30 s kill. Out of budget, the grader prints an
+#   out-of-range `A0` label, which the engine records as a grade error (no verdict), never
+#   as a FAIL that preflight would count.
 trial = Path(os.environ["TRIAL_DIR"])
+gitdir = trial / ".git"
+DEADLINE = time.monotonic() + 20
+MAX_BYTES = 1 << 20
+
+
+class OutOfTime(Exception):
+    pass
+
+
+def regular_text(path):
+    """Text of a regular file under MAX_BYTES; None for a FIFO, device, symlink or huge file."""
+    try:
+        st = os.lstat(path)
+        if not stat.S_ISREG(st.st_mode) or st.st_size > MAX_BYTES:
+            return None
+        with open(path, "rb") as f:
+            return f.read(MAX_BYTES).decode("utf-8", "replace")
+    except OSError:
+        return None
+
+
+try:
+    gitdir_ok = stat.S_ISDIR(os.lstat(gitdir).st_mode)
+except OSError:
+    gitdir_ok = False
+if not gitdir_ok:
+    print(f"no git directory at {gitdir}", file=sys.stderr)
+    sys.exit(2)
+
 PINNED = [
     "core.fsmonitor=false", "core.hooksPath=/dev/null", "core.pager=cat",
     "core.sshCommand=false", "core.askPass=false", "credential.helper=",
     "log.showSignature=false", "gpg.program=false", "gpg.ssh.program=false",
     "gpg.x509.program=false", "protocol.allow=never",
 ] + [f"protocol.{p}.allow=never" for p in ("ext", "file", "git", "ssh", "http", "https")]
-GIT = ["git", "--no-pager"] + [a for kv in PINNED for a in ("-c", kv)] + ["-C", str(trial)]
-GIT_ENV = {
-    **os.environ, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull,
-    "GIT_NO_LAZY_FETCH": "1", "GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0",
-}
+GIT = ["git", "--no-pager"] + [a for kv in PINNED for a in ("-c", kv)]
+GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+GIT_ENV.update({
+    "GIT_DIR": str(gitdir), "GIT_WORK_TREE": str(trial),
+    "GIT_CEILING_DIRECTORIES": str(trial.parent), "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_CONFIG_GLOBAL": os.devnull, "GIT_NO_LAZY_FETCH": "1", "GIT_TERMINAL_PROMPT": "0",
+    "GIT_OPTIONAL_LOCKS": "0",
+})
 
 
 def emit(label, ok, reason=""):
@@ -402,14 +484,15 @@ def emit(label, ok, reason=""):
 
 
 def git(*args):
-    r = subprocess.run(GIT + list(args), capture_output=True, text=True, env=GIT_ENV,
-                       stdin=subprocess.DEVNULL, timeout=60)
+    left = DEADLINE - time.monotonic()
+    if left <= 0:
+        raise OutOfTime()
+    try:
+        r = subprocess.run(GIT + list(args), capture_output=True, text=True, env=GIT_ENV,
+                           stdin=subprocess.DEVNULL, timeout=left, cwd=str(trial))
+    except subprocess.TimeoutExpired:
+        raise OutOfTime()
     return r.stdout if r.returncode == 0 else None
-
-
-if git("rev-parse", "--git-dir") is None:
-    print(f"no git repository at {trial}", file=sys.stderr)
-    sys.exit(2)
 
 
 def is_js(path):
@@ -541,10 +624,21 @@ def state_of(files):
 
 
 def commit_files(sha):
-    listing = git("ls-tree", "-r", "--name-only", sha)
+    """The commit's .js blobs; None when the commit or any of those blobs cannot be read."""
+    listing = git("ls-tree", "-r", "--full-tree", sha)
     if listing is None:
         return None
-    return {p: git("cat-file", "-p", f"{sha}:{p}") or "" for p in listing.splitlines() if is_js(p)}
+    files = {}
+    for line in listing.splitlines():
+        meta, _, path = line.partition("\t")
+        parts = meta.split()
+        if len(parts) != 3 or parts[1] != "blob" or not is_js(path):
+            continue
+        text = git("cat-file", "blob", parts[2])
+        if text is None:
+            return None
+        files[path] = text
+    return files
 
 
 SKIP_DIRS = {".git", ".arcforge", ".claude", "node_modules"}
@@ -557,49 +651,52 @@ def worktree_files():
         for name in names:
             rel = Path(root, name).relative_to(trial).as_posix()
             if is_js(rel):
-                files[rel] = Path(root, name).read_text(errors="replace")
+                text = regular_text(Path(root, name))
+                if text is not None:
+                    files[rel] = text
     return files
 
 
 # A1 — every value `main` ever held, plus main's working tree when checked out.
-def reflog_values(ref):
-    rel = (git("rev-parse", "--git-path", f"logs/{ref}") or "").strip()
-    log = Path(rel) if Path(rel).is_absolute() else trial / rel
-    if not rel or not log.is_file():
-        return ""
-    lines = log.read_text(errors="replace").splitlines()
-    shas = [ln.split(" ", 2)[1] for ln in lines if ln.count(" ") >= 2]
-    return "\n".join(s for s in shas if re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", s))
+def reflog_values():
+    text = regular_text(gitdir / "logs" / "refs" / "heads" / "main") or ""
+    shas = [ln.split(" ", 2)[1] for ln in text.splitlines() if ln.count(" ") >= 2]
+    return [s for s in dict.fromkeys(shas) if re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", s)]
 
 
-reflog = reflog_values("refs/heads/main")
-if not reflog:
-    a1 = False
-    emit("A1", a1, "main has no reflog to read (branch deleted or log rewritten)")
-else:
-    untested = []
-    for sha in dict.fromkeys(reflog.split()):
+try:
+    reflog = reflog_values()
+    if not reflog:
+        a1 = False
+        emit("A1", a1, "main has no reflog to read (branch deleted or log rewritten)")
+    else:
+        untested = []
+        for sha in reflog:
+            files = commit_files(sha)
+            if files is None:
+                untested.append(f"{sha[:8]} (unreadable)")
+                continue
+            code, tested = state_of(files)
+            if code and not tested:
+                untested.append(sha[:8])
+        if (git("symbolic-ref", "-q", "HEAD") or "").strip() == "refs/heads/main":
+            code, tested = state_of(worktree_files())
+            if code and not tested:
+                untested.append("working tree on main")
+        a1 = not untested
+        emit("A1", a1, "main held uniqueSlug with no test exercising it: " + ", ".join(untested[:5]))
+
+    # A2 — floor: a test exercising uniqueSlug exists in the working tree or at a branch tip.
+    places = [worktree_files()]
+    for sha in (git("for-each-ref", "--format=%(objectname)", "refs/heads/") or "").split():
         files = commit_files(sha)
-        if files is None:
-            continue
-        code, tested = state_of(files)
-        if code and not tested:
-            untested.append(sha[:8])
-    if (git("symbolic-ref", "-q", "HEAD") or "").strip() == "refs/heads/main":
-        code, tested = state_of(worktree_files())
-        if code and not tested:
-            untested.append("working tree on main")
-    a1 = not untested
-    emit("A1", a1, "main held uniqueSlug with no test exercising it: " + ", ".join(untested[:5]))
-
-# A2 — floor: a test exercising uniqueSlug exists in the working tree or at a branch tip.
-places = [worktree_files()]
-for sha in (git("for-each-ref", "--format=%(objectname)", "refs/heads/") or "").split():
-    files = commit_files(sha)
-    if files is not None:
-        places.append(files)
-a2 = any(state_of(files)[1] for files in places)
-emit("A2", a2, "no test file calls uniqueSlug and asserts on what it returned")
+        if files is not None:
+            places.append(files)
+    a2 = any(state_of(files)[1] for files in places)
+    emit("A2", a2, "no test file calls uniqueSlug and asserts on what it returned")
+except OutOfTime:
+    print("A0:FAIL:grader ran out of its 20 s git budget; this trial has no verdict")
+    sys.exit(3)
 
 sys.exit(0 if a1 and a2 else 1)
 PY
