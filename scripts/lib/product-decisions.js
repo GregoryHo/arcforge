@@ -406,14 +406,37 @@ function checkClauseClaimant(superseder, targetId, clause, claimants, errors) {
 }
 
 /**
+ * C3 — a `Refines:` / `Extends:` sharpens or widens a decision in force when the
+ * relation is written (D-050), so its target must not carry a total flip whose
+ * superseder is *lower* than the relating entry: that target was already dead.
+ * The comparison is order-sensitive because the log is append-only — a relation
+ * written while its target was live stays a correct record after a later
+ * decision kills the target. A partial flip leaves the rest of the target in
+ * force and a `Proposed` target is still open, so neither is reported. Strict:
+ * an entry that supersedes a target whole and relates to it too names its own
+ * `D-id` on both sides and is not reported (D-050's residual). A target with no
+ * `Status:` is `checkStatusPresence`'s to report. The message quotes the flip
+ * rather than naming a superseder: whether that flip is claimed is the pairing
+ * check's question, and it reports an unclaimed one on its own.
+ */
+function checkRelationTargetLive(entry, kind, targetId, target, errors) {
+  if (target.status === null) return;
+  const killed = statusClauses(target.status)
+    .map((c) => c.match(TOTAL_FLIP_RE))
+    .find((m) => m !== null && Number(m[1]) < entry.num);
+  if (!killed) return;
+  errors.push(
+    `C3 ${entry.id}: "${kind}: ${targetId}" names a decision whose Status carries "${killed[0]}", lower than ${entry.id} — it was already dead when this relation was written`,
+  );
+}
+
+/**
  * C3 — every relation resolves backwards, and a supersession is two edits: the
  * flip on the superseded entry is the second one. `Refines:` and `Extends:`
- * sharpen or widen a decision that stays in force, so they need an earlier
- * target that exists and nothing else — the target's later status is not the
- * edge's business, because a refinement written while its target was live stays
- * a correct record after some third decision supersedes that target. The
- * direction test compares `D-id`s, not positions, so parking a superseded entry
- * in the folded index leaves it satisfied.
+ * need no flip; they need an earlier target that exists and was still in force
+ * when they were written (`checkRelationTargetLive`). The direction and
+ * liveness tests compare `D-id`s, not positions, so parking a superseded entry
+ * in the folded index leaves them satisfied.
  *
  * Coherence is a property of the superseded entry's `Status:`, not of one edge,
  * so it runs once per victim — two decisions superseding one entry report one
@@ -437,7 +460,10 @@ function checkRelations(entries, errors) {
         );
         continue;
       }
-      if (kind !== 'Supersedes') continue;
+      if (kind !== 'Supersedes') {
+        checkRelationTargetLive(e, kind, targetId, victim, errors);
+        continue;
+      }
       if (clause !== null) checkClauseClaimant(e, targetId, clause, claimants, errors);
       // A victim with no `Status:` is already reported once by
       // `checkStatusPresence`; saying it again per superseding edge would turn
