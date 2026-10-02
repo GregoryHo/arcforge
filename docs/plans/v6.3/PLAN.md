@@ -13,7 +13,7 @@
 
 1. 分兩版：6.2.1（patch，0 個 live session）、6.3.0（minor，一輪量測）。
 2. 6.2.1 不動 `skills/`、`evals/scenarios/`、`evals/fixtures/`（D-048）。
-3. 6.3.0 重新設計並量測五支 baseline 在天花板的 scenario，上限約 80 個 live session，規則在讀任何結果之前定好（D-049）。
+3. 6.3.0 重新設計並量測五支 baseline 在天花板的 scenario，上限約 80 個 trial session，規則在讀任何結果之前定好（D-049）。
 4. `check:product` C3 拒絕指向「寫入時已整筆 superseded」的 `Refines:` / `Extends:`（D-050）。
 5. learning config 新增 `enabled_at`，重疊的 opt-in 不再因停用一個 scope 而遺失（D-051）。
 6. `releasing` skill 改寫成符合 squash-only ruleset：flip 在 release 分支上仍是獨立 commit，在 `main` 上與 release commit 併成一個（D-052）。
@@ -36,7 +36,7 @@
 | 版本 | 層級 | 主題 | 工作包 | live session | 連結的 spec |
 |---|---|---|---|---|---|
 | 6.2.1 | patch | eval 儀器、loop 狀態與 observe hook、C3 liveness、發版流程 | WP-A 到 WP-D | 0 | eval、worktrees-loop、learning |
-| 6.3.0 | minor | 五支 scenario 重新設計、skill-local script 修正、`enabled_at` | WP-E 到 WP-H | 上限約 80 | skill-system、obsidian、sdd、learning、hooks |
+| 6.3.0 | minor | 五支 scenario 重新設計、skill-local script 修正、`enabled_at` | WP-E 到 WP-H | 上限約 80 個 trial session | skill-system、obsidian、sdd、learning、hooks |
 
 **順序限制**
 
@@ -65,28 +65,43 @@ D-048 的驗證：發版時從 `v6.2.0` 對 `skills/`、`evals/scenarios/`、`ev
 
 | 工作包 | 事項 | 內容 |
 |---|---|---|
-| WP-E scenario 重新設計 | 五支 scenario | `eval-executing-verify-decides-done`、`eval-router-skill-selection`、`eval-maintaining-obsidian-audit-runs-lint-script`、`eval-maintaining-obsidian-link-rebuilds-index`、`eval-speccing-supersede-not-overwrite`，各自 `## Version` 加一 |
+| WP-E scenario 重新設計 | 五支 scenario | `eval-executing-verify-decides-done`、`eval-router-skill-selection`、`eval-maintaining-obsidian-audit-runs-lint-script`、`eval-maintaining-obsidian-link-rebuilds-index`、`eval-speccing-supersede-not-overwrite`，各自 `## Version` 加一；lint-script 的重新設計拿掉 `## Preflight` 現有的 `skip`。流程見下方「重新設計的流程」 |
 | WP-F skill-local script | #228、#210 | `diagramming-obsidian` 的四支 helper（`check_overlaps.py`、`plan_layout.py`、`render_excalidraw.py`、`verify_saved_diagram.py`）遇到錯誤輸入時印一行 `ERROR:` 並以非零結束，不再丟 traceback；`lint_vault` 的 code-span lookahead 遇到 fence 起始行就停 |
 | WP-G `enabled_at` | #164 | 每個 scope 的 learning config 記下最近一次授權從何時開始；有效 opt-in 取任一 scope 連續授權到現在的那段時間從何時開始（D-051） |
-| WP-H 量測與帳本 | — | 依下方預算跑完一輪、寫帳本，並以一筆 decision 記錄這一輪的結果；之後發版 |
+| WP-H 量測與帳本 | — | 依下方預算與 A/B 順序跑完一輪、寫帳本，並以一筆 decision 記錄這一輪的結果，含未量測的 scenario；之後發版 |
 
 spec：obsidian B-5、B-8；learning B-19；hooks B-6；sdd B-4；skill-system B-3、B-9。
 
 關鍵檔案（讀 issue 補充）：`skills/core/diagramming-obsidian/references/*.py`、`skills/core/maintaining-obsidian/references/vault_frontmatter.py`、`scripts/lib/learning.js`、`hooks/session-tracker/inject-context.js`、`evals/scenarios/eval-*.md`。測試：`tests/skills/test_lint_vault.py`、`test_verify_saved_diagram.py`。
 
+## 重新設計的流程（WP-E）
+
+每支 scenario 的新 Version 都先離線寫好，再交給獨立的審查者攻擊、修訂，通過 go/no-go 關卡之後才花 preflight 的 session。離線審查若判定某支 scenario 不改引擎就無法區分兩臂，該支記為發現，一個 session 都不花（D-049）。
+
 ## eval 額度預算（6.3.0）
 
 **量測條件**與 6.2.0 那一輪相同：`--model 'opus[1m]' --effort xhigh`、隔離、不帶 `--plugin-dir`、以 `--skill-file` 注入 skill、trial 上限 900 秒。
 
-每支 scenario 的規則（讀結果之前定好）：
+**計數單位是 trial session**，與前兩輪相同（D-021 的 107、D-047 的 55）。上限約 80 個 trial session，綁住整輪的是這個數字。
 
-| 路徑 | 步驟 | session |
-|---|---|---|
-| 一次通過 | preflight k=3 → PASS → `arcforge eval ab` k=5 | 13 |
-| 重新設計後通過 | preflight k=3 → BLOCK → 一次事先寫下的重新設計 → 第二次 preflight k=3 → PASS → A/B k=5 | 16 |
-| 兩次 BLOCK | preflight k=3 → BLOCK → 重新設計 → 第二次 preflight → BLOCK，記為發現，不跑 A/B，本輪不再跑這支 | 6 |
+每支 scenario 的規則（讀結果之前定好，D-049）：
 
-最壞情況是五支都走第二條路：5 × 16 = 80。這就是上限，沒有替 `infraError` 重跑留的備用額度。
+- preflight 一律 k=3（3 個 trial session）。
+- PASS 之後的 A/B 用該 scenario 自己的 `## Trials`，不統一用 k=5。`eval-executing-verify-decides-done` 宣告 k=10，是檔案裡記載的檢定力下限（k=5 讀出 INCONCLUSIVE），A/B 是 20 個 trial session；其餘四支宣告 k=5，A/B 是 10 個。
+- BLOCK 之後只能有一次事先寫下的重新設計，再跑第二次 preflight（多 3 個）；第二次仍 BLOCK 就記為發現，不跑 A/B，本輪不再跑這支。
+- `eval-speccing-supersede-not-overwrite` 在 6.2.0 已用掉它的重新設計（D-047），這次的新 Version 是最後一版，BLOCK 即定案。
+
+| scenario | `## Trials` | preflight | A/B | 一次通過時的合計 |
+|---|---|---|---|---|
+| `eval-maintaining-obsidian-link-rebuilds-index` | 5 | 3 | 10 | 13 |
+| `eval-router-skill-selection` | 5 | 3 | 10 | 13 |
+| `eval-executing-verify-decides-done` | 10 | 3 | 20 | 23 |
+| `eval-speccing-supersede-not-overwrite` | 5 | 3 | 10 | 13 |
+| `eval-maintaining-obsidian-audit-runs-lint-script` | 5 | 3 | 10 | 13 |
+
+五支都一次通過就是 75；每多一次第二次 preflight 加 3。這輪的預算付不起每一種結果，所以 A/B 依上表的順序開跑：link-rebuilds-index（D-028 的 LINK 模式重建完全沒有 harness 證據）、router-skill-selection、executing-verify-decides-done、supersede-not-overwrite、audit-runs-lint-script。會讓總數超過上限的 A/B 不開跑，記為未量測，絕不改用較小的 k。
+
+**上限不含 grader 呼叫。** 含 model 評分 assertion 的 scenario，每個被評分的 trial 另外會呼叫一次 grader（`scripts/lib/eval-graders.js` 約第 165 行），preflight 也算。main 上是 `eval-router-skill-selection` 與 `eval-maintaining-obsidian-audit-runs-lint-script`（`## Grader` 是 `mixed`）；其餘三支用程式評分。重新設計若改成程式評分，這筆成本就消失。
 
 量測結束後執行 `arcforge eval report`，再確認 `git diff --stat <量測 commit>..HEAD -- skills evals/scenarios evals/fixtures` 是空的。
 
@@ -114,12 +129,13 @@ spec：obsidian B-5、B-8；learning B-19；hooks B-6；sdd B-4；skill-system B
 - **6.2.1 發版前**：`git diff --stat v6.2.0..HEAD -- skills evals/scenarios evals/fixtures` 是空的；`node scripts/check-benchmark-freshness.js` 不需新 snapshot 就 exit 0（D-048）。
 - **C3（WP-C）**：`tests/scripts/check-product.test.js` 原本把「refine 已 superseded 的 entry」當正例，改成反例；另以正例鎖住 refiner 比 kill 早、部分 superseded、`Proposed` 目標，以及收進 `<details>` 的 entry（D-050）。
 - **6.3.0 量測前**：五支 scenario 的 PR 與 WP-F 都已合併；量測的 commit 記進帳本。
-- **6.3.0 發版前**：量測 commit 之後 `skills/`、`evals/scenarios/`、`evals/fixtures/` 沒有新的差異；live session 總數不超過 80。
+- **6.3.0 發版前**：量測 commit 之後 `skills/`、`evals/scenarios/`、`evals/fixtures/` 沒有新的差異；trial session 總數不超過 80；未量測與兩次 BLOCK 的 scenario 都記進帳本。
 
 ## 風險
 
-1. **某支 scenario 兩次 BLOCK。** 依規則記為發現，該 skill 維持原有的證據，與 D-045 記錄的結果相同。不得為了湊出 A/B 再加一次重新設計。
+1. **某支 scenario 兩次 BLOCK（supersede 一次就算）。** 依規則記為發現，該 skill 維持原有的證據，與 D-045 記錄的結果相同。不得為了湊出 A/B 再加一次重新設計。
 2. **量測快照之後又有人改了 `skills/`。** freshness gate 只比時間戳，抓不到；靠發版前的 diff 檢查。
-3. **預算沒有備用。** 80 是最壞情況的總數；trial 被判 `infraError` 時沒有額度可補。超出上限前先停下來回報，不自行加跑。
-4. **#210 晚於 lint-script 的量測合併。** 量到的會是修正前的 script，結果作廢。
-5. **6.2.1 的某項修正其實需要改 skill。** 依 D-048 的 Cost accepted，該項移到 6.3.0。
+3. **預算付不起每一種結果。** 75 加上每次第二次 preflight 的 3，隨時可能碰到 80；順序排在後面的 A/B 可能因此未量測，trial 被判 `infraError` 時也沒有額度可補。超出上限前先停下來回報，不自行加跑。
+4. **grader 呼叫不在上限內。** 兩支 `mixed` scenario 的實際花費會比 trial session 數多；重新設計時可考慮改成程式評分。
+5. **#210 晚於 lint-script 的量測合併。** 量到的會是修正前的 script，結果作廢。
+6. **6.2.1 的某項修正其實需要改 skill。** 依 D-048 的 Cost accepted，該項移到 6.3.0。
