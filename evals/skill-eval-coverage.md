@@ -47,21 +47,21 @@ p7-benchmark-evidence.md「協定修正案」）。
 **84.2% ≥ 80% ✓**（線下：brainstorming 0.40、diagramming 0.00、tdd 0.40——三支 delta
 皆 IMPROVED；低 pass 反映 0.8 trial bar 的嚴格性，非技能無效）。
 
-## 每支 skill 的現行 delta 證據（P7 收官，6.1.1、6.2.0 更新）
+## 每支 skill 的現行 delta 證據（P7 收官，6.1.1、6.2.0、6.3.0 更新）
 
-未標 6.1.1 或 6.2.0 的列皆為修復前池（unrecorded 條件），見文末「6.1.1 量測輪」與「6.2.0 量測輪」。
+未標 6.1.1、6.2.0 或 6.3.0 的列皆為修復前池（unrecorded 條件），見文末「6.1.1 量測輪」、「6.2.0 量測輪」與「6.3.0 量測輪」。
 
 | skill | 現行證據 | 出處 |
 |---|---|---|
-| speccing | spec-before-code V3 **+0.60 CI[0.51, 0.68] IMPROVED**（注入模態；V2 的 +0.67 CI[0.67, 0.67] 為修復前讀數）；no-bootstrap-unasked V2（sdd B-6，D-020）**+0.20 CI[0.06, 0.34] IMPROVED**，B-6 的第一筆 harness 證據；supersede-not-overwrite V8 preflight **BLOCK**（baseline 100%），仍為 unmet-but-covered（baseline ceiling）；plugin 路由下自行觸發 **0/10**（routing-control 5/5 為對照，#179 確認），請以 `/arcforge:speccing` 呼叫 | 6.2.0 ab k=10／k=5 + preflight（見 6.2.0 量測輪）；6.1.1 WP-E `claude plugin eval`（見 6.1.1 量測輪） |
+| speccing | spec-before-code V3 **+0.60 CI[0.51, 0.68] IMPROVED**（注入模態；V2 的 +0.67 CI[0.67, 0.67] 為修復前讀數）；no-bootstrap-unasked V2（sdd B-6，D-020）**+0.20 CI[0.06, 0.34] IMPROVED**，B-6 的第一筆 harness 證據；supersede-not-overwrite V8 preflight **BLOCK**（baseline 100%），仍為 unmet-but-covered（baseline ceiling）；6.3.0 離線關卡再確認：既有 8/8 個 baseline 自行 supersede，重新設計額度已在 6.2.0 用掉，D-054 將它退出 A/B、留作語料覆蓋；plugin 路由下自行觸發 **0/10**（routing-control 5/5 為對照，#179 確認），請以 `/arcforge:speccing` 呼叫 | 6.2.0 ab k=10／k=5 + preflight（見 6.2.0 量測輪）；6.3.0 離線關卡（見 6.3.0 量測輪）；6.1.1 WP-E `claude plugin eval`（見 6.1.1 量測輪） |
 | tdd | +0.63 CI[0.41, 0.86] | P7 ab |
 | finishing | **+0.71 CI[0.71, 0.71]** | 6.1.1 ab k=5（修復後儀器；P7 +0.54 為修復前池） |
 | code-review | two-axis +0.40；range-fidelity +0.27 non-reg PASS；answering-feedback +0.05 但 non-reg **REGRESSED**（4/5，D-026） | P7 ab ×3 |
-| executing | 6.1.1 preflight **BLOCK**（乾淨儀器上 baseline 100%）；+0.40 CI[0.03, 0.77] 為修復前池 | 6.1.1 preflight；P7 ab k=10 |
-| using（router） | 6.1.1 preflight **BLOCK**（乾淨儀器上 baseline 100%）；+0.36 CI[0.25, 0.47] 為修復前池；另 e2e 矩陣 16/16（P6） | 6.1.1 preflight；P7 ab（v6.1.0 有較新的 non-regression 覆蓋，見下節） |
+| executing | 6.1.1 preflight **BLOCK**（乾淨儀器上 baseline 100%）；6.3.0 離線關卡判定 skill 只是把既有行為寫成規則（既有紀錄 26/37 個 baseline 動手前就先標 `[~]`），未花 session；+0.40 CI[0.03, 0.77] 為修復前池 | 6.1.1 preflight；6.3.0 離線關卡（見 6.3.0 量測輪）；P7 ab k=10 |
+| using（router） | router-skill-selection V2 **+1.00 CI[1, 1] IMPROVED**（注入模態，不是 plugin 路由）；V1 的 6.1.1 preflight **BLOCK**（baseline 100%）；+0.36 CI[0.25, 0.47] 為修復前池；另 e2e 矩陣 16/16（P6） | 6.3.0 ab k=5 + preflight（見 6.3.0 量測輪）；6.1.1 preflight；P7 ab（v6.1.0 有較新的 non-regression 覆蓋，見下節） |
 | brainstorming | +0.35 CI[0.11, 0.59] | P7 ab（P6 +0.50 同向） |
 | sessions | +0.29（吸收 compacting：non-reg 1.00） | P7 ab |
-| maintaining-obsidian | vault-only-answer **+0.20 CI[0.2, 0.2]**；audit-runs-lint-script、link-rebuilds-index preflight **BLOCK**（baseline 100%） | 6.1.1 ab k=5 + preflight（P7 +0.28 為修復前池） |
+| maintaining-obsidian | vault-only-answer **+0.20 CI[0.2, 0.2]**；link-rebuilds-index V2 preflight 引擎判 PASS（1/3），但 baseline 重建 index 3/3，未跑 A/B，記為發現（V1 為 6.1.1 BLOCK）；audit-runs-lint-script 6.1.1 preflight **BLOCK**，6.3.0 離線關卡判定需引擎修改才能量，未花 session。LINK 重建 index（D-028）仍無 A/B 證據 | 6.1.1 ab k=5 + preflight（P7 +0.28 為修復前池）；6.3.0 preflight 與離線關卡（見 6.3.0 量測輪） |
 | diagramming-obsidian | **+0.20 CI[0.01, 0.39]**（1800 s ceiling） | 6.1.1 ab k=5（P7 +0.23 為修復前合池） |
 | learning | marker-preservation **+1.00 CI[1, 1] IMPROVED**（D-038 的一句修改之後；e2e 全鏈路 PASS） | 6.2.0 ab k=5（P5 +0.25 為修復前讀數） |
 | looping | +0.19 CI[0.07, 0.31]；loop e2e PASS | P6 |
@@ -1819,3 +1819,119 @@ WP-S 修的是儀器，不是 skill。spec-before-code 從 +0.67 變成 +0.60，
 錯在新增的 A7）。no-bootstrap-unasked 從 V1 的 BLOCK 到 V2 的 IMPROVED，說明 V1 的天花板
 來自斷言太鬆，不是 baseline 本來就會做對。supersede-not-overwrite 在修好的 grader 上仍是
 BLOCK，證實了預期中的 baseline 天花板。以上讀法的定案見 D-047。
+
+## 6.3.0 量測輪（2026-10-02，修復後儀器）
+
+本輪依 D-049 量 6.1.1、6.2.0 兩輪在天花板 BLOCK 的五支重新設計 scenario。快照
+`evals/benchmarks/2026-10-02.json`（= `latest.json`，`raw/` 下同名兩份）於
+**2026-10-02T17:38:15Z** 生成，未帶 `--since`。檔名取 UTC 日期，這是 2026-10-02 的第一份
+快照，所以沒有用到 #242 的 `-2` 後綴。三次 run 都在 commit `20edf82e`（2026-10-02 UTC）。
+之後 main 上 `skills/`、`evals/scenarios/`、`evals/fixtures/` 唯一的變動是 #257
+（diagramming-obsidian helper script），受測的 scenario 都沒有用到；#258 已含在 `20edf82e`。
+
+**條件**：與 6.2.0 量測輪相同——`--model 'opus[1m]' --effort xhigh`、isolation
+`isolated`、`--setting-sources project,local`、`--dangerously-skip-permissions`、不帶
+`--plugin-dir`（skill 以 `--skill-file` 注入）、trial ceiling 900 s，Node v24.13.1。本輪共
+**16 個 live session**（上限約 80）：link-rebuilds-index preflight 3、router-skill-selection
+preflight 3 + A/B 10。兩支都是 code grader，沒有 model grader 呼叫。兩份 preflight 讀數從被
+gitignore 的快取原樣複製到 `docs/plans/v6.3/wp-h/`。
+
+### A/B 結果（先過 preflight k=3 PASS）
+
+| scenario | Version | preflight | A/B run id | baseline | treatment | delta |
+|---|---|---|---|---|---|---|
+| router-skill-selection | 2 | `20261002-170600`，baseline 0/3 | `20261002-170824` | avg 0.00 / pass 0%（0/5；A1 0/5、A2 0/5） | avg 1.00 / pass 100%（5/5；A1 5/5、A2 5/5） | **+1.00 CI[1, 1] IMPROVED** |
+
+CI[1, 1] 是引擎照實回報的數字，但 0/5 對 5/5 兩臂都沒有變異，Welch 區間因此縮成一點，不代表精確度。方向有支持（Fisher exact 雙尾 p ≈ 0.008），效果大小在 k=5 下則未確立：差值的 Newcombe 區間約為 [0.39, 1.00]。
+
+每個 trial 的時間 20.2 s → 39.4 s；output tokens 1,646 → 3,484，報表標為 cost regression。
+多出來的是寫測試與 mutation 檢查的工作。
+
+**2026-10-02 註**：新 Version 開新池，所以快照中 router 只剩 V2 的 10 列；6.1.1 量測輪
+表中所說「快照中的列」（V1 的修復前池，+0.34 CI[0.27, 0.41]，30 列）已不在現行快照，只留在
+`evals/benchmarks/2026-10-01.json` 等舊快照裡。
+
+**這個結果證明什麼**：以 `--skill-file` 注入 `skills/core/using/SKILL.md` 本文（skill
+scope），在 `opus[1m]`／`xhigh`／`--max-turns 25`、每臂 k=5 下，面對「suite 綠燈，但最後一個
+commit 新增的 exported function 沒有測試」的合併要求，treatment 5/5 在合併前先在 branch 上
+commit 真正測到 `uniqueSlug` 的測試，baseline 0/5。兩臂都看見了缺口：五個 baseline 都在回覆
+裡指出 `uniqueSlug` 沒有測試，然後照樣合併。差別在於看見之後有沒有先補測試。treatment 的
+transcript 沒有一個提到 router、`/tdd` 或 precedence 那一句；沒有一個停在宣告 skill、留下未
+commit 的測試，或改成詢問使用者。五個都完成合併，並在回覆中說明多加的 commit。
+
+**這個結果不證明什麼**：
+
+- 真正載入 plugin 時 router 會不會被路由觸發。trial 沒有 `Skill` 工具，量的是注入的文字，
+  不是 description 路由；D-024／D-044 區分的正是這兩件事，`speccing` 就是在後者失敗。
+- 這個 fixture、這個 model 與 effort 以外的情形。
+- `/tdd` 內部的 red-first 順序。程式碼本來就存在，沒有可以排順序的紅燈步驟，rubric 也不計。
+
+### link-rebuilds-index V2：preflight PASS，未跑 A/B（偏離預登記）
+
+preflight `20261002-165758`：baseline 1/3，引擎判定 PASS。三個 baseline 都從 frontmatter
+完整重建了 `index.md`：補上 `Credential-Rotation` 與 `Decision-Retry-Budget`，把
+`Retry-Storm-Review` 移到 Incidents，A1 3/3。兩個 FAIL（`1110`）都只錯在 A4：trial 1 在兩支
+note 加了互連，trial 2 在三支 note 加了四條連結。trial 3 只提議、沒有套用，得 `1111`。
+
+A4 的前提不成立。design notes 說 V2 沒有可解析的 plain-text 關係，但
+`Decision-Staging-Gate` 的 Reasoning 以純文字寫了「the March outage」，指的就是
+`Incident-2026-03-Checkout`；兩個 FAIL 的 trial 正是把它改成 wikilink。`SKILL.md` 的 LINK
+那一行也明寫 LINK「resolves relationships」。所以這次的 PASS 來自一個不量 index 重建的斷言，
+而受測的行為（link pass 重建 index）在 baseline 已經是天花板。
+
+**這是對預登記的偏離。** scenario 自己的規則是「有產出的 trial 中 pass 0 或 1 → 跑 A/B」，
+照字面應該跑。本輪沒有跑，偏向保守：不花 session，也不宣稱任何改善。如果跑了，delta 量到的
+會是 A4（會不會改 note），而 treatment 讀到「resolves relationships」，可能比 baseline 更常改
+note。這支 scenario 唯一的重新設計額度（V3）本輪沒有用。
+
+決策紀錄 D-054 將 link-rebuilds-index 與 supersede-not-overwrite 退出 A/B scenario，留在語料中作為覆蓋。
+
+### 不花 session 的發現（D-049 的離線關卡）
+
+以下三支在任何 live session 之前就被離線設計關卡擋下；D-049 允許不花 session 直接記為發現。
+三個 scenario 檔在 main 上都沒有改。證據是離線審查的四份紀錄
+`docs/plans/v6.3/wp-h/design-review/<key>.{design,attack,revise,gate}.json`（key 為
+`executing`、`supersede`、`lint-script`；同目錄另有本輪實測的 `router` 與 `link-index`
+兩支的審查紀錄），本機路徑已換成 `<repo>`、`<worktree>`、`<scratch>`。下表引用的 run id
+與 transcript 在 `evals/results/` 底下（gitignore，只在 maintainer 的 checkout）。
+
+| scenario | 發現 |
+|---|---|
+| executing-verify-decides-done | 既有紀錄中，baseline 在 37 個 trial 有 26 個在動手前就把需要實際工作的任務標成 `[~]`；最近一次 no-skill preflight `20260930-105529` 是 3/3。skill 在這裡只是把既有行為寫成規則。就算 treatment 5/5，baseline 也要不超過 1/5 才讀得到 IMPROVED |
+| speccing-supersede-not-overwrite | 留存的 8 份 baseline transcript（`20261001-091023` 3 份、`20260907-000724` 5 份）全部自行 supersede，並拒絕重新編號。重新設計額度已在 6.2.0 用掉（D-047），V8 就是最後的設計 |
+| maintaining-obsidian-audit-runs-lint-script | fixture 必須把 skill 的 `references/` 放進 trial 目錄。`20260930-105529` 的三個 baseline 第一個指令都列出整個目錄樹，接著讀 `references/audit.md`。treatment 與 baseline 只差注入的 `SKILL.md`，所以光改 scenario 解決不了，需要改引擎：backlog wish `eval-skill-files-outside-trial` |
+
+### Operator audit：本輪每一列都讀過
+
+本輪 16 個 session 的列（link-rebuilds-index preflight baseline 3 列、router preflight
+baseline 3 列、router A/B 10 列），operator 都依 scenario 的 operator-audit 段落讀過
+transcript 與終局，沒有一列被 grader 盲點誤判。
+
+| 列 | 標籤 | 判讀 |
+|---|---|---|
+| link-rebuilds-index preflight trial 1、2 | `1110` | 正確。index 重建無誤；A4 因改 note 而 FAIL，前提問題見上 |
+| link-rebuilds-index preflight trial 3 | `1111` | 正確。13 支 typed note 各在自己的型別下、各列一次，沒有死連結，untyped note 未列入 |
+| router preflight trial 1–3 | `00` | 正確。都指出缺口後照樣 fast-forward 合併，沒有寫測試檔 |
+| router A/B baseline 1–5 | `00` | 正確。同上；其中 4 個先用 `node -e` 手動試過 `uniqueSlug` |
+| router A/B treatment 1–5 | `11` | 正確。測試都是 `assert.strictEqual(uniqueSlug(…), '…')` 這類真實斷言；從各列 artifacts 重建終局，`node --test` 為 7／6／6／5／7 全過，`src/unique-slug.js` 與 fixture 相同（mutation 已還原）；測試都先 commit 在 branch 再合併 |
+
+### Release gate 第 3 條：失敗列已分類
+
+自 v6.2.1 以來改動的 scenario 只有這兩支。快照中兩支的失敗列只有 router A/B 的 5 個 baseline
+列，是 baseline 臂的預期失敗（沒有 skill 時合併未測試的程式碼），也就是 delta 本身的訊號，
+不是回歸。link-rebuilds-index 沒有 A/B，快照中沒有它的列。raw row 沒有分類欄位，本段就是
+這些列的分類。
+
+### 儀器缺口
+
+- preflight 不寫 result row，只留 transcript 與 preflight 紀錄；本輪 preflight 各列的標籤是
+  operator 從終局推出來的。
+- preflight 紀錄與 A/B row 都沒有記 Node 版本，router scenario 的 measurement-host 段落卻說
+  會記；本輪的 v24.13.1 只記在這裡。
+- row 不帶 scenario hash；A/B 與 preflight 對得上，只能從 preflight gate 有放行推知。
+- preflight 紀錄與 A/B row 都沒有記 trial 執行時的 commit；`20edf82e` 只來自手寫的執行紀錄。
+- operator 的 `PATH` 會傳進 trial（引擎以 `process.env` 啟動 trial）：link-rebuilds-index
+  preflight trial 2 解析得到 `arcforge`，並跑了 `arcforge --help`。兩臂的暴露相同，不影響比較。
+- #250：code grader 以 trial 目錄為 cwd 執行 `python3 -`，trial 放進去的模組會被 import。
+  本輪兩支 scenario 都用 `python3 -I`，引擎層面仍未修。
+- #228 與 #210 隨 6.3.0 出貨，但沒有 harness 證據（D-049 Residual）。

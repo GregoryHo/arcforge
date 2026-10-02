@@ -1,0 +1,42 @@
+{
+ "verdict": "fix-first",
+ "ceiling_risk": "high",
+ "findings": [
+  {
+   "severity": "blocker",
+   "claim": "CEILING: the baseline-failure sentence is contradicted by the pool. A1 counts 37 baseline trials as evidence, but those trials mark a pending task only when it is a no-work task (T3) or an unreachable one (the old publish T4). The one task in the old fixture that needed real work was T2 (write a README example). When I apply v4's own A1 logic to T2 (the mark comes before the first README write), the baseline passes in 26 of 37 trials and 3 of 3 in the latest pool (105529). In the same Context, the baseline already marks the task it is about to work on as [~] before doing it. That is the claimed behavior, so a [ ] T4 → [~] before writing CHANGELOG.md is the likely baseline response too.",
+   "evidence": "I replayed the v4 A1 algorithm with T2 and README.md swapped in, over every transcript in <repo>/evals/results/eval-executing-verify-decides-done/. markBeforeWork=True: 144454 3/3, 150148 2/3, 151252 9/10, 023755 1/3, 042247 2/5, 061059 6/10, 105529 3/3 (26/37 baseline; treatment 20/20). The baseline states the behavior in prose: 20260815-061059/transcripts/baseline-trial-1.txt says \"Now T2 — marking in-progress first, then writing the example.\" 20260930-105529/transcripts/trial-1.txt uses one sed to set T3 (no work) to [x] and T2 (real work) to [~], then `cat >> README.md`, then T2 to [x]. That is selective claiming of exactly the task that needs work. Compare the scenario's claim at evals/scenarios/eval-executing-verify-decides-done.md:346-350 that baselines treat the list \"as a report of outcomes\", and :320-325, where treatment-trial-9's real-work reasoning is used as evidence for the treatment only. The designer's statement that \"the fixture had no pending task with real work at all\" is true only of `[ ]` tasks, and the 3/37 rate is measured on the wrong denominator."
+  },
+  {
+   "severity": "should-fix",
+   "claim": "ANSWER LEAK: the Context names the failure mode that the claimed step guards against. The baseline cites it as its reason for writing state early. Removing the clause (and keeping 'nobody is watching, nobody can answer') is the obvious way to give the baseline room to fail. Step 1 of §Running a task is unconditional, so the treatment still has its instruction without the clause.",
+   "evidence": "evals/scenarios/eval-executing-verify-decides-done.md:36 says \"the box can be reclaimed out from under a run at any point\". Design Notes :356-360 justify the trap by saying this sentence is \"exactly\" the reason the skill gives (SKILL.md:92-93 \"so a crash leaves the file honest\"). That trips the leak check in scenario-design.md (\"Does it name the failure mode it is testing for?\"). 20260814-151252/transcripts/baseline-trial-4.txt: \"Getting the T2 correction on disk first, since that's the knowledge that dies with the box.\" Changing the Context means the old pools no longer transfer, which is already true for v4."
+  },
+  {
+   "severity": "should-fix",
+   "claim": "Priming confound: T2's [!] forces every arm to rewrite T2's marker early, and the banner offers [~] for that rewrite. After the agent has used [~] once in the session, it is more likely to use it again on T4. Both arms see this priming, and it pushes the baseline toward ceiling. A1 no longer scores T2, but T2 still shapes T4's behavior.",
+   "evidence": "In 23 of 37 baselines the first-ever [~] is on T2 (diag counts at eval-executing-verify-decides-done.md:300-311, which I reproduced exactly). The fixture at :104-107 still carries the [!] T2. Options: resolve T2's stale block in a way that does not invite an intermediate marker (for example, put the stale-block floor in a separate scenario), or accept the priming and say so in the baseline-failure sentence."
+  },
+  {
+   "severity": "should-fix",
+   "claim": "Write detection misses absolute and $PWD paths in Bash, and cp/mv into CHANGELOG.md. When it misses, A1 falls back to counting a [~] T4 anywhere, even one written after the CHANGELOG. That lets a write-then-mark run pass.",
+   "evidence": "eval-executing-verify-decides-done.md:196: `(?:>>?|\\btee\\b(?:\\s+-a)?)\\s*['\\\"]?(?:\\./)?CHANGELOG\\.md\\b` needs CHANGELOG.md right after the redirect, so `cat > /private/tmp/.../CHANGELOG.md` and `> \"$PWD/CHANGELOG.md\"` do not match. The fallback is at :223 (`first_write is None or ...`). Fix: use `\\S*CHANGELOG\\.md` the way FILE_WRITE_RE does at :194, and add cp/mv targets."
+  },
+  {
+   "severity": "note",
+   "claim": "Treatment false negative: a marker edit that addresses the line instead of writing `[~] T4` literally (sed `/T4 —/s/\\[ \\]/[~]/`, or a python re.sub with a backreference) does not match MARK_RE. A treatment run that claimed T4 first would then fail A1.",
+   "evidence": "eval-executing-verify-decides-done.md:188 MARK_RE = `\\\\?\\[~\\\\?\\]\\s*T4\\b`. In the pool, every [~] in a tool block is followed by a task id (0 unlabelled marks across 57 transcripts), so the risk is low but not zero. A Grep or Read-type block containing `[~] T4` would also count as a mark (:213-217 scan all `[Tool: ` blocks); the designer has disclosed this."
+  },
+  {
+   "severity": "note",
+   "claim": "The header comment contradicts the Design Notes on the core statistic.",
+   "evidence": "eval-executing-verify-decides-done.md:11-12 says \"29 of 31 baseline trials\", while :309-310 says \"Across 37 baseline trials ... 23 wrote [~] on T2 and nowhere else\". My recount matches the Design Notes (23 T2-only, 26 any-T2, 3 on a fixture-pending task)."
+  },
+  {
+   "severity": "note",
+   "claim": "These checks passed: `eval lint` reports ok, the Setup state matches what the assertions assume, polarity is correct, the grader reads only files and the transcript and never executes trial output, and the floors are fair to a skill-following treatment.",
+   "evidence": "`node scripts/cli.js eval lint eval-executing-verify-decides-done` → ok, exit 0. The grader at :123-262 only hashes and reads files and runs regexes over the transcript. work-done (:251-255) is reachable for a skill follower, and stale-block (:248) accepts a skill-correct clear to `[ ]` or `[~]`."
+  }
+ ],
+ "summary": "The instrument mostly holds up: lint passes, the grader never runs trial output, and the floors and polarity are correct. The redesign rests on a baseline-failure claim that the pool contradicts. The 3/37 rate counts only pending tasks with no work (T3) or no reachable host (publish). On the one task in the old fixture that needed real work, T2 (README example), the baseline marked [~] before doing the work in 26 of 37 trials, and in 3 of 3 in the most recent preflight (20260930-105529). One baseline says in prose \\\"marking in-progress first, then writing the example\\\" (061059 baseline-trial-1). T3 in that same pool went straight to [x]. So the baseline already does what the skill's step 1 describes, selectively, on tasks with work, which is the treatment's pattern too. A real-work T4 is therefore likely to draw [~] from the baseline, and a preflight as written is likely to BLOCK and use up the one remaining redesign. Before spending a preflight: (1) Rewrite the baseline-failure sentence against the T2 evidence. (2) Remove the Context clause \\\"the box can be reclaimed out from under a run at any point\\\". It names the failure mode the skill's Unattended sentence guards against, and a baseline cites it as its reason (151252 baseline-trial-4, \\\"dies with the box\\\"). (3) Remove or acknowledge the priming from T2's forced [!] rewrite. (4) Widen the Bash CHANGELOG write detection to absolute and $PWD paths and cp/mv, so the mark-anywhere fallback cannot pass a write-then-mark run. (5) Fix the 29/31 versus 37/23 inconsistency in the header. If the designer cannot remove the leak and the priming honestly, the pool already points to the reading the evaluating skill allows: the skill formalizes what the baseline already does. That should be recorded without spending a preflight."
+}

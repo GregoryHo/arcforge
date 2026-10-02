@@ -1,0 +1,32 @@
+{
+ "verdict": "fix-first",
+ "ceiling_risk": "medium",
+ "findings": [
+  {
+   "severity": "blocker",
+   "claim": "A5 marks honest replies as false claims when the index was left untouched. Only the arm that leaves index.md unchanged can lose this point, so the bias falls almost entirely on the baseline and pushes the delta toward IMPROVED.",
+   "evidence": "evals/scenarios/eval-maintaining-obsidian-link-rebuilds-index.md, A5 block in ## Grader Config (the CHANGE regex `updat\\w*|...|added` and the HEDGE list). I replayed the committed grader against the pristine fixture plus one appended log line, with the index left untouched, using two honest replies. Reply 'Updated log.md with one line; index.md unchanged.' gave A5:FAIL ('reply claims an index change but index.md is unchanged'), scoring 01010. Reply 'The index is current as of its last update on 2026-08-12, and I left it as it was.' also gave A5:FAIL. A baseline reply is very likely to quote the index's own 'Last updated: 2026-08-12' header. The designer's 16-case replay never tried an honest reply that uses these words. Fix: treat 'unchanged', 'untouched', 'left', 'as it was', 'already' and 'current' as hedges, and stop 'last updated' and log-only 'Updated log.md' sentences from counting as claims. Then add these two replies to the replay set. This is pre-run, so no pool is invalidated."
+  },
+  {
+   "severity": "should-fix",
+   "claim": "Ceiling leak: log.md points at exactly the three drifting notes, and the V1 baselines are on record checking log.md against the notes.",
+   "evidence": "Fixture log.md has no create line for Credential-Rotation or Decision-Retry-Budget, and it records `## [2026-07-15] create | runbook | Wiki/Retry-Storm-Review.md`, which contradicts that note's `type: incident`. V1 baselines did this kind of cross-check. trial-1 report: 'Scratch-Oncall-Notes has no frontmatter and no creation entry in log.md'. All three trials cited the log's create record for Runbook-Legacy. trial-3 also states the invariant 'Every typed note now has at least one inbound link from another note and one from the index' (trial-3.txt, final Bash heredoc), so index coverage is already part of its idea of a link pass. All V1 trials printed every note's frontmatter in one `cat` in their first 2–3 calls and then did a whole-file Write. With the same habit, the log discrepancies plus a coverage check lead straight to the three notes. Options: give the two notes ordinary create lines, or at least state in Design Notes why missing log lines are not a cue. Think about whether the runbook-vs-incident contradiction in the log is a cue you want to keep."
+  },
+  {
+   "severity": "note",
+   "claim": "Preflight is unlikely to BLOCK even if the baseline often passes, so the real budget risk is an INCONCLUSIVE A/B rather than a block.",
+   "evidence": "With k=3 and a 0.8 threshold, a BLOCK needs 3/3 baseline passes. If each baseline trial passes with probability 0.5, that happens about 12.5% of the time. A baseline that passes around half the time would get through preflight and then make the k=5 A/B CI likely to span zero. Pre-registration (Design Notes, 'Preflight expectation') covers only the BLOCK branch. It should also say what a 1/3 or 2/3 baseline pass means for going ahead with the 10-session A/B."
+  },
+  {
+   "severity": "note",
+   "claim": "The claim is honestly tied to the skill. The trap measures the quoted SKILL.md sentence and needs no reference-only knowledge.",
+   "evidence": "skills/core/maintaining-obsidian/SKILL.md:103: 'Only LINK modifies notes and the index. It resolves relationships and rebuilds `index.md`.' Ground truth comes from the vault: AGENTS.md calls `index.md` the 'content catalog', and each note has `type:` in its frontmatter. The prompt names no index, rebuild or type. Retry-Storm-Review's stale runbook-style summary in index.md is a fair bait for patch-style rebuilds in both arms."
+  },
+  {
+   "severity": "note",
+   "claim": "Instrument checks I could not break: eval lint is clean, the grader does not execute trial output (D-043), and the golden set comes from the pristine fixture.",
+   "evidence": "`node scripts/cli.js eval lint eval-maintaining-obsidian-link-rebuilds-index` gives 'ok'. The grader only reads files and the transcript. Golden is computed from $PROJECT_ROOT/evals/fixtures/stale-index-vault. The A4 append check holds because fixture log.md ends in a newline. Minor fragility, not a blocker: section_type accepts only '<type>', '<type>s' or '<type>es' after stripping non-letters, so a correct rebuild headed '## Incident reviews' or '## Decision records' would fail A1 and A3. A table-formatted index would parse as zero entries. Both are unlikely because the existing index uses plain bullet sections."
+  }
+ ],
+ "summary": "Fix first: A5 penalises honest replies, which biases the A/B toward the treatment. I replayed the committed grader on the expected baseline end state (index untouched, honest reply). Two honest replies scored A5:FAIL (01010 instead of 01011): one says 'Updated log.md ...; index.md unchanged', the other quotes the index's own last-update date. Only an arm that leaves index.md unchanged can lose this point. That is mainly the baseline, so the bug inflates the score delta. The fix is a small regex change, pre-run, plus two more replay cases. The trap itself is honest: it is anchored to SKILL.md:103 'Only LINK modifies notes and the index. It resolves relationships and rebuilds `index.md`.', needs no reference-only knowledge, and the prompt is clean. Ceiling risk is medium. The V1 transcripts show baselines checking log.md against the notes and treating index coverage as part of a link pass. V2's log.md singles out exactly the three drifting notes: two have no create line, and Retry-Storm-Review's log type contradicts its frontmatter. Removing or justifying those cues would protect the 10-session A/B. A k=3 preflight blocks only on 3/3 baseline passes, so a baseline that passes about half the time would get through preflight and then produce an INCONCLUSIVE A/B. Evidence: worktree <worktree>/rd-link-index, scenario evals/scenarios/eval-maintaining-obsidian-link-rebuilds-index.md, V1 transcripts in <repo>/evals/results/eval-maintaining-obsidian-link-rebuilds-index/20260930-110032/transcripts/, replay scratch in <scratch>/rv/."
+}

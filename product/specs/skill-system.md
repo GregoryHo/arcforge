@@ -113,9 +113,12 @@ asserted by test (B-3).
 - **D-018** — every edit under `skills/` known when 6.1.1 was planned lands
   there, so its benchmark is measured on a repaired instrument; skill text a
   later decision changes is measured in 6.2.0's round (B-9).
-- **D-049** — 6.3.0 redesigns the router and executing scenarios whose
-  baselines sat at ceiling, and measures each under one pre-registered
-  redesign (B-3, B-9).
+- **D-049** — 6.3.0 schedules the router and executing scenarios whose
+  baselines sat at ceiling, each under one pre-registered redesign (B-3,
+  B-9).
+- **D-054** — the router's text measured +1.00 CI[1, 1] IMPROVED at skill
+  scope; executing's claim is a finding, its baseline already at the
+  behavior (B-3, B-9).
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
 

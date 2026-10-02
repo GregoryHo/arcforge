@@ -1,0 +1,42 @@
+{
+ "verdict": "fix-first",
+ "ceiling_risk": "medium",
+ "findings": [
+  {
+   "severity": "blocker",
+   "claim": "BROKEN INSTRUMENT: the static check for 'a test exercises uniqueSlug' rejects ordinary, correct tests. A1 uses the same check, so a treatment run that writes a real test and then merges scores as if it had merged untested code: it fails A1 and A2 together. These false negatives land almost entirely on the treatment arm and push the delta down.",
+   "evidence": "evals/scenarios/eval-router-skill-selection.md:308-330 (ASSERT_RE requires the literal `assert.<fn>(` or `expect(`, and `results` only tracks `const/let/var x = ...uniqueSlug(`); A1 at :375-376 reuses state_of -> exercises_unique_slug. I reproduced this offline with the engine's own createTrialDir + runSetup + gradeWithCode (scratchpad/rv/h.js). In each case the test was committed on feat-slugify, the branch was fast-forward merged and `npm test` was green, yet the grader printed 'A1:FAIL main held uniqueSlug with no test exercising it' and 'A2:FAIL' for: (a) the natural sequential-duplicates test `const taken=[]; for (const t of ['Post','Post','Post']) taken.push(uniqueSlug(t, taken)); assert.deepEqual(taken, ['post','post-2','post-3'])`; (b) `const { strictEqual } = require('node:assert'); strictEqual(uniqueSlug('Hello',['hello']), 'hello-2')`; (c) `assert(uniqueSlug('A', []) === 'a')`. Fix: count destructured `(?:deep)?(?:Strict)?[Ee]qual(` and `assert(`/`assert.ok(` with `===`. Track identifiers that receive uniqueSlug output through `.push(uniqueSlug(` / `x[i] = uniqueSlug(` / `.map(... uniqueSlug(`. Or loosen 'exercises' to 'the block calls uniqueSlug( and makes any assert/expect call', which accepts the small `strictEqual(1,1)` gaming risk. Then add these three shapes to the offline validation table."
+  },
+  {
+   "severity": "should-fix",
+   "claim": "CEILING: the baseline's own exploration habit puts the gap on screen in its first or second tool call, so 'merges without noticing' is not guaranteed. The baseline-failure sentence depends on the baseline acting on the user's 'finished' rather than on what it has already seen.",
+   "evidence": "V1 transcripts 20260930-105806: trial-1 and trial-3 open with `git log --oneline --stat`, and trial-2 runs `git show --stat HEAD`. In V2, HEAD is exactly 'feat: uniqueSlug for duplicate titles' touching only src/unique-slug.js (scenario :213-228). V1 trials also flagged adjacent issues unprompted, e.g. trial-2: 'Other non-string inputs, such as numbers, still throw'. My expectation is that the baseline mostly mentions the gap and merges anyway (A1 FAIL) or asks without writing a test (A2 FAIL). Both fail, so the ceiling risk is medium, not high. A baseline that adds a test before merging is plausible at xhigh. Nothing in the fixture tilts toward that, and no fix is needed beyond the pre-registered single preflight."
+  },
+  {
+   "severity": "should-fix",
+   "claim": "FLOOR: the same V1 habit (report the adjacent issue, leave it to the user) predicts treatment trials that say 'uniqueSlug has no test, /tdd applies' and then stop to ask. That fails A2. At k=5 the delta may then read INCONCLUSIVE even though the instruction works.",
+   "evidence": "skills/core/using/SKILL.md:42-45 says /tdd 'applies' but does not say to write the test before honouring an explicit merge request. Only the router is injected; the /tdd body is not available (scenario :110-113). V1 trials 1 and 3 both offered next steps instead of acting. The designer pre-registered this risk (scenario :151-156), so it is acknowledged, not hidden. Note it beside the finding above: grader false negatives would make this floor worse, and the result would read as a weak instruction when the instrument is at fault."
+  },
+  {
+   "severity": "note",
+   "claim": "The fairness and trap match the skill text. The prompt does not leak the answer. The grader reads git objects only and runs nothing the trial wrote.",
+   "evidence": "skills/core/using/SKILL.md:20 ('found code with no test') and :42-45 ('if a defect is reported or code is untested, /tdd or /debugging applies even when the work is described as finished'). The prompt at scenario :15 names no test, coverage or uniqueSlug. The grader at :245-262 uses `git --no-pager -c core.fsmonitor=false` with reflog/ls-tree/cat-file and no execution of trial code, which is consistent with B-12/D-043."
+  },
+  {
+   "severity": "note",
+   "claim": "Setup produces the assumed state under the real harness ordering, which the designer's offline check did not exercise. createTrialDir pre-writes a minimal .git with HEAD=main and logallrefupdates=true before Setup runs `git init -q -b main`. The re-init keeps main and the reflog, and A1's reflog read works.",
+   "evidence": "scripts/lib/eval-trial-env.js:35,45-55 (initializeGitBoundary) and scripts/lib/eval-trial.js:143-156 (Setup runs after createTrialDir, isolation settings after Setup). My run with createTrialDir produced the expected per-case labels for the shapes that parse."
+  },
+  {
+   "severity": "note",
+   "claim": "The designer's claim that a missing git repo (exit 2) 'is recorded as a grader error' is wrong. With no A-labels on stdout, gradeWithCode falls back to binary scoring: passed=false, score 0, no gradeError. Such a trial would count as an ordinary FAIL. This is low impact because Setup always creates the repo.",
+   "evidence": "scripts/lib/eval-grader-code.js:74-75 (fallback branch). The scenario grader prints only to stderr and exits 2 at evals/scenarios/eval-router-skill-selection.md:260-262."
+  },
+  {
+   "severity": "note",
+   "claim": "Lint is clean.",
+   "evidence": "`node scripts/cli.js eval lint eval-router-skill-selection` run from the worktree prints 'eval-router-skill-selection: ok' and exits 0."
+  }
+ ],
+ "summary": "The redesign is fair and does not leak the answer: the trap maps directly onto the router's 'code is untested ... even when described as finished' sentence (skills/core/using/SKILL.md:42-45, :20), and grading reads git objects only. But the instrument has a blocking false-negative defect. exercises_unique_slug (scenario :308-330) accepts only the literal `assert.<fn>(`/`expect(` forms and direct const assignment, and A1 reuses that check. So a correct run that commits a real uniqueSlug test and then merges fails BOTH A1 and A2 when the test uses a push-accumulator, a destructured `strictEqual(...)` or `assert(x === y)`. I reproduced this with the engine's own createTrialDir/runSetup/gradeWithCode, with `npm test` green each time. These misses fall on the treatment arm and would push an already floor-risky A/B toward INCONCLUSIVE. Before spending the preflight: broaden the assertion and result tracking (or loosen 'exercises' to 'calls uniqueSlug and makes any assertion') and add those three shapes to the offline table. Ceiling risk is medium: V1 baselines run `git log --stat`/`git show --stat HEAD` first, which shows the src-only uniqueSlug commit, but they tend to report adjacent issues rather than fix them, which also fails the baseline. The 'exit 2 = grader error' claim is wrong (it scores as a plain FAIL) but harmless. Lint passes, and Setup works under the real harness's pre-created .git boundary."
+}

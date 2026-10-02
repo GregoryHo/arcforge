@@ -106,8 +106,11 @@ work carries provenance a reader can check.
 on eval scenarios, and only in part: B-3 on
 `eval-maintaining-obsidian-vault-only-answer`; B-5 on
 `eval-maintaining-obsidian-audit-runs-lint-script` (the lint pass) and
-`eval-maintaining-obsidian-link-rebuilds-index` (the index rebuild), both at
-ceiling on the repaired instrument (D-045); B-8's failure path — not claiming a
+`eval-maintaining-obsidian-link-rebuilds-index` (the index rebuild), both
+without A/B evidence: the lint pass needs an engine change to be measured, and
+the index rebuild's baseline rebuilds it unprompted across two designs, so that
+scenario is kept as corpus coverage rather than as an A/B (D-045, D-054); B-8's
+failure path — not claiming a
 save that was never verified — on
 `eval-diagramming-obsidian-unverified-save-claim`. B-1, B-4, B-6, B-7 and B-9
 rest on the skills' text alone. B-2 is engine behavior, covered by the
@@ -140,6 +143,9 @@ live behind the CLI per [cli](cli.md) B-8.
   baseline is at ceiling (B-5).
 - **D-034** — the provenance pair applies where the vault adopts raw
   sources (B-4).
-- **D-049** — 6.3.0 redesigns and re-measures both B-5 scenarios, and carries
+- **D-049** — 6.3.0 schedules both B-5 scenarios for redesign, and carries
   the lint script's code-span fix and the diagram helpers' `ERROR:` lines
   (B-5, B-8).
+- **D-054** — neither B-5 scenario was A/B-measured in 6.3.0, and
+  link-rebuilds-index is retired as an A/B scenario, so D-028's rebuild still
+  has no harness evidence (B-5).
