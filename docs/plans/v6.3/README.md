@@ -6,6 +6,7 @@
 |---|---|
 | [`PLAN.md`](PLAN.md) | 核可的計畫：兩個版本的範圍、工作包、順序限制、6.3.0 的 eval 額度、執行規則與操作備忘 |
 | [`post-release-6.2.1.md`](post-release-6.2.1.md) | 6.2.1 發版後查核：release、網站、GitHub 來源安裝與 hook、`eval history`、stale lock 回收 |
+| [`post-release-6.3.0.md`](post-release-6.3.0.md) | 6.3.0 發版後查核：release、網站、GitHub 來源安裝與 hook、重疊 opt-in（#164）、helper 錯誤輸出（#228）、fence 前的 code span（#210） |
 | [`wp-h/`](wp-h/) | 6.3.0 量測輪的兩份 preflight 讀數（router-skill-selection V2、maintaining-obsidian-link-rebuilds-index V2），從被 gitignore 的快取原樣複製出來；`design-review/` 是五支 scenario 的離線設計審查紀錄（design／attack／revise／gate，本機路徑已替換） |
 
 上一輪的規劃與 120 項盤點在 [`../v6.1/`](../v6.1/)。
