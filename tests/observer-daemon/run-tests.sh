@@ -1010,6 +1010,143 @@ assert_eq \
   "${UP_STOP_ALIVE}|${UP_STOP_LOCKED}"
 
 # ─────────────────────────────────────────────
+# LR-T1: concurrent starts leave exactly one daemon
+# ─────────────────────────────────────────────
+# The observe hook can spawn `start` from several tool calls at once, and every
+# one of them may find the same stale lock. However many race, one becomes the
+# daemon. daemon_loop is stubbed: it records its own PID and idles, keeping this
+# script on its command line so the other starts see a live daemon.
+
+echo ""
+echo "=== LR-T1: concurrent starts leave exactly one daemon ==="
+
+TMPDIR_LR=$(mktemp -d)
+trap 'rm -rf "$TMPDIR_UP" "$TMPDIR_LR"' EXIT
+LR_ROUNDS=5
+LR_STARTS=30
+
+lr_start() {
+  env -u ARCFORGE_HOME HOME="$1" bash -c '
+    source "$1"
+    daemon_loop() {
+      touch "${HOME}/daemon.$(exec sh -c "echo \$PPID")"
+      while :; do sleep 1; done
+    }
+    cmd_start
+  ' _ "$DAEMON_SCRIPT" > /dev/null 2>&1  # no daemon may hold the runner's output pipe
+}
+
+# Prints the PIDs of the live daemons recorded under home $1.
+lr_daemons() {
+  local marker
+  for marker in "$1"/daemon.*; do
+    [ -e "$marker" ] || continue
+    kill -0 "${marker##*.}" 2>/dev/null && echo "${marker##*.}"
+  done
+}
+
+# Waits up to 5 s for a first daemon under home $1, then lets stragglers settle.
+lr_settle() {
+  local i
+  for i in $(seq 50); do
+    [ -n "$(lr_daemons "$1")" ] && break
+    sleep 0.1
+  done
+  sleep 0.5
+}
+
+lr_reap() {
+  # shellcheck disable=SC2046
+  kill $(lr_daemons "$1") 2>/dev/null || true
+}
+
+# A lock left behind by a daemon that died: its PID is of an exited process.
+lr_stale_lock() {
+  local lock="$1/.arcforge/instincts/.observer.lock"
+  mkdir -p "$lock"
+  true &
+  local dead=$!
+  wait "$dead"
+  echo "$dead" > "${lock}/pid"
+  echo "$dead"
+}
+
+# Runs LR_STARTS concurrent starts per round; prints each round's daemon count.
+lr_race() {
+  local mode="$1" round home i counts=""
+  for round in $(seq "$LR_ROUNDS"); do
+    home="${TMPDIR_LR}/${mode}-${round}"
+    mkdir -p "${home}/.arcforge/instincts"
+    [ "$mode" = stale ] && lr_stale_lock "$home" > /dev/null
+    for i in $(seq "$LR_STARTS"); do lr_start "$home" & done
+    wait
+    lr_settle "$home"
+    counts="${counts}$(lr_daemons "$home" | grep -c .) "
+    lr_reap "$home"
+  done
+  echo "$counts"
+}
+
+LR_ONE=$(printf '1 %.0s' $(seq "$LR_ROUNDS"))
+assert_eq \
+  "LR-T1: ${LR_STARTS} concurrent starts against a stale lock leave one daemon, every round" \
+  "$LR_ONE" \
+  "$(lr_race stale)"
+assert_eq \
+  "LR-T1: ${LR_STARTS} concurrent starts with no lock leave one daemon, every round" \
+  "$LR_ONE" \
+  "$(lr_race clean)"
+
+# A start that died mid-reclaim leaves its reservation behind. While it is fresh
+# it holds the reclaim (that start may still be finishing); once older than the
+# claim window it is abandoned, and the next start reclaims the lock.
+LR_HOLD="${TMPDIR_LR}/reservation-fresh"
+LR_HOLD_PID=$(lr_stale_lock "$LR_HOLD")
+mkdir "${LR_HOLD}/.arcforge/instincts/.observer.lock.reclaim.${LR_HOLD_PID}"
+lr_start "$LR_HOLD"
+sleep 0.5
+assert_eq \
+  'LR-T1: a fresh reclaim reservation makes start back off, lock untouched' \
+  "0|${LR_HOLD_PID}" \
+  "$(lr_daemons "$LR_HOLD" | grep -c .)|$(cat "${LR_HOLD}/.arcforge/instincts/.observer.lock/pid")"
+lr_reap "$LR_HOLD"
+
+LR_DEAD="${TMPDIR_LR}/reservation-abandoned"
+LR_DEAD_PID=$(lr_stale_lock "$LR_DEAD")
+mkdir "${LR_DEAD}/.arcforge/instincts/.observer.lock.reclaim.${LR_DEAD_PID}"
+touch -t 200001010000 "${LR_DEAD}/.arcforge/instincts/.observer.lock.reclaim.${LR_DEAD_PID}"
+lr_start "$LR_DEAD"
+lr_settle "$LR_DEAD"
+assert_eq \
+  'LR-T1: a reservation abandoned by a dead start expires, and start reclaims the lock' \
+  '1' \
+  "$(lr_daemons "$LR_DEAD" | grep -c .)"
+lr_reap "$LR_DEAD"
+
+# A lock with no PID yet is a start mid-claim; one that stayed that way past the
+# claim window is a start that crashed there.
+LR_CLAIMING="${TMPDIR_LR}/pidless-fresh"
+mkdir -p "${LR_CLAIMING}/.arcforge/instincts/.observer.lock"
+lr_start "$LR_CLAIMING"
+sleep 0.5
+assert_eq \
+  'LR-T1: a fresh lock with no PID is left to the start claiming it' \
+  "0|yes" \
+  "$(lr_daemons "$LR_CLAIMING" | grep -c .)|$([ -d "${LR_CLAIMING}/.arcforge/instincts/.observer.lock" ] && echo yes || echo no)"
+lr_reap "$LR_CLAIMING"
+
+LR_CRASHED="${TMPDIR_LR}/pidless-old"
+mkdir -p "${LR_CRASHED}/.arcforge/instincts/.observer.lock"
+touch -t 200001010000 "${LR_CRASHED}/.arcforge/instincts/.observer.lock"
+lr_start "$LR_CRASHED"
+lr_settle "$LR_CRASHED"
+assert_eq \
+  'LR-T1: a lock with no PID older than the claim window is reclaimed' \
+  '1' \
+  "$(lr_daemons "$LR_CRASHED" | grep -c .)"
+lr_reap "$LR_CRASHED"
+
+# ─────────────────────────────────────────────
 # Results
 # ─────────────────────────────────────────────
 

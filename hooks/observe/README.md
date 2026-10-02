@@ -35,6 +35,8 @@ starts the daemon and the daemon reclaims the lock. The hook treats the lock as
 stale only when its process is gone or `ps` shows it running something else;
 when it cannot tell — `ps` is not installed, or the lock's pid file is empty
 or not written yet — it leaves the lock alone rather than risk a second daemon.
+Several tool calls can start the daemon at the same moment; however many race
+for the same lock, one daemon comes out of it.
 
 ## Related
 
