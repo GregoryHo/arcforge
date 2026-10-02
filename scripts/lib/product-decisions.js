@@ -415,7 +415,9 @@ function checkClauseClaimant(superseder, targetId, clause, claimants, errors) {
  * force and a `Proposed` target is still open, so neither is reported. Strict:
  * an entry that supersedes a target whole and relates to it too names its own
  * `D-id` on both sides and is not reported (D-050's residual). A target with no
- * `Status:` is `checkStatusPresence`'s to report.
+ * `Status:` is `checkStatusPresence`'s to report. The message quotes the flip
+ * rather than naming a superseder: whether that flip is claimed is the pairing
+ * check's question, and it reports an unclaimed one on its own.
  */
 function checkRelationTargetLive(entry, kind, targetId, target, errors) {
   if (target.status === null) return;
@@ -424,7 +426,7 @@ function checkRelationTargetLive(entry, kind, targetId, target, errors) {
     .find((m) => m !== null && Number(m[1]) < entry.num);
   if (!killed) return;
   errors.push(
-    `C3 ${entry.id}: "${kind}: ${targetId}" names a decision D-${killed[1]} had already wholly superseded — a relation must name a decision still in force when it is written`,
+    `C3 ${entry.id}: "${kind}: ${targetId}" names a decision whose Status carries "${killed[0]}", lower than ${entry.id} — it was already dead when this relation was written`,
   );
 }
 

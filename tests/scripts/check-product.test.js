@@ -1006,8 +1006,8 @@ describe('check-product', () => {
       ];
       const errors = of('C3', run({ roadmap: { decisions } }));
       expect(errors).toHaveLength(2);
-      expect(errors[0]).toMatch(/^C3 D-003: "Refines: D-001" names a decision D-002 had already/);
-      expect(errors[1]).toMatch(/^C3 D-004: "Extends: D-001" names a decision D-002 had already/);
+      expect(errors[0]).toMatch(/^C3 D-003: "Refines: D-001" .*"Superseded-by: D-002", lower/);
+      expect(errors[1]).toMatch(/^C3 D-004: "Extends: D-001" .*"Superseded-by: D-002", lower/);
     });
 
     it('accepts a Refines: written while its target was still live', () => {

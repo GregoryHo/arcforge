@@ -70,7 +70,7 @@ describe('check-product C3 — a Refines/Extends target was live when the relati
       ]);
       expect(errors).toHaveLength(1);
       expect(errors[0]).toBe(
-        `C3 D-003: "${kind}: D-001" names a decision D-002 had already wholly superseded — a relation must name a decision still in force when it is written`,
+        `C3 D-003: "${kind}: D-001" names a decision whose Status carries "Superseded-by: D-002", lower than D-003 — it was already dead when this relation was written`,
       );
     });
 
@@ -119,7 +119,9 @@ describe('check-product C3 — a Refines/Extends target was live when the relati
         [decision({ id: 'D-001', status: 'Superseded-by: D-002' })],
       );
       expect(errors).toHaveLength(1);
-      expect(errors[0]).toMatch(/^C3 D-003: "Refines: D-001" names a decision D-002 had already/);
+      expect(errors[0]).toMatch(
+        /^C3 D-003: "Refines: D-001" .*"Superseded-by: D-002", lower than D-003/,
+      );
     });
 
     it('accepts a relation written before the folded target died', () => {
@@ -132,6 +134,20 @@ describe('check-product C3 — a Refines/Extends target was live when the relati
       );
       expect(errors).toEqual([]);
     });
+  });
+
+  it('claims only the flip it read when that flip names a decision that never superseded the target', () => {
+    // D-002 carries no "Supersedes: D-001": the pairing check reports that, and
+    // the liveness message must not assert that D-002 superseded anything.
+    const errors = run([
+      decision({ id: 'D-001', status: 'Superseded-by: D-002' }),
+      decision({ id: 'D-002' }),
+      decision({ id: 'D-003', extra: ['- Refines: D-001'] }),
+    ]);
+    expect(errors).toEqual([
+      'C3 D-003: "Refines: D-001" names a decision whose Status carries "Superseded-by: D-002", lower than D-003 — it was already dead when this relation was written',
+      'C3 D-001: Status carries "Superseded-by: D-002" but D-002 carries no "Supersedes: D-001" — a reversal is two edits, and this is only one',
+    ]);
   });
 
   it('does not report an entry that supersedes and refines the same target (equal D-id)', () => {
