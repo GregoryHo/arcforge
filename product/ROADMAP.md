@@ -1198,7 +1198,7 @@ reverse one, append a superseding entry (see AGENTS.md).
 ### D-049 — 6.3.0 measures the five ceiling redesigns, and carries what re-arms the gate
 - Date: 2026-10-02
 - Version: 6.3.0
-- Status: Accepted
+- Status: Accepted · partially superseded by D-054
 - Decision: 6.3.0, a minor, graduates the five `redesign-*` wishes —
   `eval-executing-verify-decides-done`, `eval-router-skill-selection`,
   `eval-maintaining-obsidian-audit-runs-lint-script`,
@@ -1401,29 +1401,41 @@ reverse one, append a superseding entry (see AGENTS.md).
 ### D-054 — 6.3.0's round: the router measures, and four scenarios are findings
 - Date: 2026-10-02
 - Version: 6.3.0
-- Refines: D-049
+- Supersedes: D-049 (clause 2)
+- Supersedes: D-049 (clause 3)
 - Status: Accepted
-- Decision: Of D-049's five scenarios one was measured:
+- Decision: Numbering D-049's `Decision:` clauses in the order written — (1)
+  scope, conditions and cap; (2) each scenario gets a new `## Version` and a
+  preflight at k=3; (3) a PASS goes to an A/B at the scenario's own
+  `## Trials`; (4) one redesign on a BLOCK; (5) a second BLOCK is a finding;
+  (6) the offline no-session outcome; (7) the A/B order and the cap rule;
+  (8) #228, #210 and #164 — clauses 2 and 3 are replaced: a scenario gets a
+  new Version and a preflight unless an offline review before any session
+  finds that it needs an engine change (clause 6) or that its recorded
+  baselines already do the behavior; and a PASS goes to an A/B only when the
+  assertions that earned it measure the behavior under test. Of D-049's five
+  scenarios one was measured:
   `eval-router-skill-selection` Version 2 passed preflight (baseline 0/3) and
   read **+1.00 CI[1, 1] IMPROVED** at k=5. The other four are findings with no
   A/B: `eval-maintaining-obsidian-link-rebuilds-index` Version 2 passed
-  preflight (1/3) and its A/B was not run, a deviation from the letter of the
-  pre-registration taken in the conservative direction;
+  preflight (1/3) and its A/B was not run, a departure from D-049's clause 3
+  taken after the preflight was read, in the conservative direction;
   `eval-maintaining-obsidian-audit-runs-lint-script` was recorded before any
-  session as needing an engine change, the outcome D-049 permits; and
-  `eval-executing-verify-decides-done` and
-  `eval-speccing-supersede-not-overwrite` were recorded before any session
-  under that same no-session treatment for a different reason — their
-  baselines already do the behavior. The link-rebuilds-index and supersede
+  session as needing an engine change, the outcome D-049's clause 6 permits;
+  and `eval-executing-verify-decides-done` and
+  `eval-speccing-supersede-not-overwrite` got no new Version and no preflight,
+  a departure from clause 2, because their recorded baselines already do the
+  behavior. The link-rebuilds-index and supersede
   scenarios are retired as A/B scenarios and kept as corpus coverage.
 - Why: The router reading holds up under audit: every baseline noticed that
   `uniqueSlug` had no test and merged anyway, and every treatment committed a
   real passing test before the merge, so no grader blind spot handed out a
   pass. The link-rebuilds-index PASS came from A4 (note edits), whose premise
   is false: the fixture carries a plain-text relationship and the skill's LINK
-  step resolves relationships, so all three baselines rebuilt the index
-  correctly and a treatment would have been penalised for following the
-  skill. An A/B would have measured A4, not the rebuild, so none was spent and
+  step resolves relationships. All three baselines rebuilt the index
+  correctly, and a treatment that follows the skill's LINK step would edit
+  notes and fail A4 — no treatment ran, so that is the rubric's prediction,
+  not a reading. An A/B would have measured A4, not the rebuild, so none was spent and
   no improvement is claimed; the one further redesign D-049 allowed was not
   used, because two designs have now shown the baseline rebuilding unprompted.
   The executing claim formalizes existing behavior — 26 of 37 recorded
@@ -1433,21 +1445,29 @@ reverse one, append a superseding entry (see AGENTS.md).
   the skill's `references/` inside the trial directory, where the baseline
   reads it too. A scenario whose baseline does the behavior unprompted across
   two designs measures the model, not the skill, so retiring it as an A/B
-  beats designing a third trap for the same claim. This narrows D-049's rule
-  in one place — a preflight PASS earned by an assertion that does not measure
-  the behavior is not run as an A/B — and widens its no-session outcome to a
-  baseline already at the behavior; it reverses nothing D-049 decided.
+  beats designing a third trap for the same claim. Clauses 2 and 3 were not
+  honored and are no longer how a result is read, so they are superseded
+  rather than refined: leaving them `Accepted` beside this entry would keep
+  two protocols that contradict each other, and a reader of D-049 alone could
+  not tell it was departed from. Clauses 1 and 4 to 8 still govern — the
+  conditions and the cap, the one-redesign rule, the second-BLOCK finding, the
+  engine-change outcome, the A/B order, and #228, #210 and #164.
 - Residual: the router result shows what the router's `SKILL.md` text does
   when injected at skill scope on `opus[1m]` / `xhigh`: the agent turns
   noticing an untested function into a committed test before merging. It does
   not show routing under a real plugin load (D-024, D-044), other fixtures,
-  models or efforts, or red-first ordering inside `tdd`. D-028's index rebuild,
+  models or efforts, or red-first ordering inside `tdd`. Its CI[1, 1] is the
+  engine's zero-variance interval for 0/5 against 5/5 and says nothing about
+  precision: the direction is supported (Fisher's exact p ≈ 0.008), but the
+  size of the effect is not established at k=5 — a Newcombe interval for the
+  difference is about [0.39, 1.00]. D-028's index rebuild,
   `executing`'s verify-decides-done claim, sdd B-4's append-only behavior and
   the audit's lint pass still have no A/B evidence. #228 and #210 ship on
   contract tests (D-049's Residual), and #164 is engine-only. Instrument gaps
-  the round found are wishes: preflight writes no result rows, records and
-  rows carry neither the Node version nor the scenario hash, and the
-  operator's `PATH` reaches trials; #250 is already filed.
+  the round found are wishes: preflight writes no result rows, preflight
+  records carry no Node version, A/B rows carry neither the Node version nor
+  the scenario hash, and the operator's `PATH` reaches trials; #250 is
+  already filed.
 - Cost accepted: 16 trial sessions of an 80 cap — link-rebuilds-index
   preflight 3, router preflight 3 and A/B 10 — and no model-grader calls,
   both scenarios being code-graded. The router treatment's per-trial time rose
@@ -1456,8 +1476,10 @@ reverse one, append a superseding entry (see AGENTS.md).
 - Verification: the preflight records
   `docs/plans/v6.3/wp-h/preflight.eval-router-skill-selection.json` and
   `docs/plans/v6.3/wp-h/preflight.eval-maintaining-obsidian-link-rebuilds-index.json`,
-  on `opus[1m]` / `xhigh` at k=3, Node v24.13.1, commit `20edf82e`,
-  2026-10-02; the A/B pool is in the snapshot
-  `evals/benchmarks/2026-10-02.json` (= `latest.json`, generated
-  2026-10-02T17:38:15Z); the operator audit of every row is the 6.3.0 section
-  of `evals/skill-eval-coverage.md`.
+  each carrying its scenario hash, model, effort, turn budget, ceiling, k,
+  pass rate, verdict and timestamp (`opus[1m]` / `xhigh`, k=3, 2026-10-02);
+  the A/B pool is in the snapshot `evals/benchmarks/2026-10-02.json`
+  (= `latest.json`, generated 2026-10-02T17:38:15Z). Neither records the Node
+  version or the commit; Node v24.13.1 and commit `20edf82e` are recorded by
+  hand in the 6.3.0 section of `evals/skill-eval-coverage.md`, with the
+  operator audit of every row.

@@ -236,6 +236,10 @@ its rationale is inline at B-10.
 - **D-047** — 6.2.0's round: the supersede scenario's ceiling BLOCK is a
   finding about the scenario, and the no-bootstrap scenario measured after its
   one pre-registered redesign (B-3, B-8).
+- **D-054** — 6.3.0's round: a preflight PASS goes to an A/B only when the
+  assertions that earned it measure the behavior under test, and a scenario
+  whose recorded baselines already do the behavior is a finding without a
+  session — both read B-3's ceiling, neither changes the gate (B-3).
 - **D-020** — 6.2.0 carries the scenario rubric fixes with their own
   measurement round (B-8).
 - **D-043** — graders never execute trial output (B-6, B-7, B-8, B-12).
