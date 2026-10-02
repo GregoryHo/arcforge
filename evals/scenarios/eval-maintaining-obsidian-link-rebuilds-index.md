@@ -293,15 +293,17 @@ not pooled with V2's: V2 is a different fixture and a fresh pool.
 
   ```bash
   arcforge eval preflight eval-maintaining-obsidian-link-rebuilds-index \
-    --k 3 --model 'opus[1m]' --effort xhigh --max-turns 40
+    --model 'opus[1m]' --effort xhigh --max-turns 40
   # only on PASS:
   arcforge eval ab eval-maintaining-obsidian-link-rebuilds-index \
     --skill-file skills/core/maintaining-obsidian/SKILL.md \
     --k 5 --model 'opus[1m]' --effort xhigh --max-turns 40
   ```
 
-  The flag is `--k`: the CLI reads a single-dash `-k 3` as a bare flag and a
-  stray positional, and preflight would fall back to `## Trials` (5).
+  Preflight always runs 3 baseline trials and takes no `--k`; the A/B's
+  `--k 5` matches `## Trials`. Spell the flag `--k`: the CLI reads a
+  single-dash `-k 5` as a bare flag and a stray positional, which the A/B
+  ignores.
 - **Preflight expectation.** PASS — the baseline trial pass rate is below 0.8.
   The expected baseline end state is `01011` (score 0.6, trial FAIL); a
   baseline that rebuilds from frontmatter unprompted, as V1's did when the
