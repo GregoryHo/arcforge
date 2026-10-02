@@ -31,7 +31,7 @@ const ALLOWLIST = {
   'hooks/__tests__/observe.test.js': 1246,
   'tests/scripts/eval.test.js': 3385,
   'tests/scripts/check-product.test.js': 2433,
-  'tests/scripts/learning.test.js': 1985,
+  'tests/scripts/learning.test.js': 1856,
   'tests/scripts/learning-dashboard.test.js': 1770,
   'tests/scripts/learning-curator-materialize.test.js': 1186,
   'tests/scripts/learning-curator-proposal-ingestor.test.js': 1111,

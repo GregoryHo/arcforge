@@ -20,7 +20,8 @@ Emits one combined JSON with two channels (see `hooks.md` → Output Visibility)
   pending action notifications, stale-draft warnings (only for drafts written
   since the learning opt-in took effect — stubs from a learning-off period are
   by design, so counting them would report the whole backlog the moment a user
-  opts in). A queued `reflect-ready` is dropped at delivery when learning is off
+  opts in. "Took effect" is the start of unbroken authorization in either scope,
+  so disabling one scope while the other stays on does not move it). A queued `reflect-ready` is dropped at delivery when learning is off
   in both scopes, so disabling it between the queuing Stop and this SessionStart
   retracts the invitation rather than spending it; the action is consumed either
   way, so a suppressed nudge never resurfaces later with a stale count.

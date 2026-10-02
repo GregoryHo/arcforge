@@ -415,6 +415,49 @@ describe('inject-context stale-draft warning gate (D-009)', () => {
     );
   });
 
+  /** Write the global-scope config with an `enabled_at` period, by ages in days. */
+  function writeGlobalPeriod({ enabledDaysAgo, disabledDaysAgo }) {
+    const configPath = path.join(homeDir, '.arcforge', 'learning', 'config.json');
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        scope: 'global',
+        enabled: false,
+        updated_at: new Date(Date.now() - disabledDaysAgo * DAY_MS).toISOString(),
+        enabled_at: new Date(Date.now() - enabledDaysAgo * DAY_MS).toISOString(),
+      }),
+    );
+  }
+
+  // D-051 (#164): global on, project on, global off — authorization never
+  // lapsed, so a draft from before the project opt-in is still reported.
+  it('warns about a draft from an overlapping opt-in after the earlier scope is disabled', () => {
+    writeGlobalPeriod({ enabledDaysAgo: 5, disabledDaysAgo: 1 });
+    enableLearning(3 * DAY_MS);
+    writeStaleDraft('diary-session-overlap-draft.md', 4 * DAY_MS);
+
+    const res = runInject();
+    assert.strictEqual(res.status, 0, res.stderr);
+    assert.ok(
+      res.stdout.includes('1 diary draft unenriched'),
+      `a draft written under the global opt-in must still warn. stdout: ${res.stdout}`,
+    );
+  });
+
+  it('stays silent about a draft from before a lapse in authorization', () => {
+    writeGlobalPeriod({ enabledDaysAgo: 5, disabledDaysAgo: 4 });
+    enableLearning(2 * DAY_MS);
+    writeStaleDraft('diary-session-lapse-draft.md', 3 * DAY_MS);
+
+    const res = runInject();
+    assert.strictEqual(res.status, 0, res.stderr);
+    assert.ok(
+      !res.stdout.includes('unenriched'),
+      `a draft written while learning was off everywhere must not warn. stdout: ${res.stdout}`,
+    );
+  });
+
   // Direct call, not a spawn: only mtime can be backdated portably, and this
   // case is about the CREATION stamp — so the draft is written now and the
   // floor is placed after it, which is the same ordering a pre-opt-in stub has.
