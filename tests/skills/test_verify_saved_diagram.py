@@ -64,6 +64,19 @@ if mode == "silent":
 if mode == "sleep":
     import time
     time.sleep(30)
+if mode == "tree":
+    # Like `uv run`: the render is a grandchild. It outlives a SIGKILLed parent
+    # unless it is signalled itself, and then writes into the scratch directory.
+    import subprocess
+    out = sys.argv[sys.argv.index("--output") + 1]
+    grandchild = subprocess.Popen([sys.executable, "-c", (
+        "import os, sys, time; from pathlib import Path\\n"
+        "Path(sys.argv[2]).write_text(str(os.getpid()))\\n"
+        "time.sleep(1.5)\\n"
+        "Path(sys.argv[1]).parent.mkdir(parents=True, exist_ok=True)\\n"
+        "Path(sys.argv[1]).write_bytes(b'late')\\n"
+    ), out, os.environ["FAKE_UV_LOG"] + ".grandchild"])
+    grandchild.wait()
 if mode == "no-png":
     sys.exit(0)
 out = Path(sys.argv[sys.argv.index("--output") + 1])
@@ -247,8 +260,9 @@ def test_post_save_render_size_must_stay_within_half_to_double_the_reference(
     assert "post-save render size deviates sharply from pre-save" in capsys.readouterr().err
 
 
-def test_manual_path_invalid_json_fails_with_one_line_before_rendering(tmp_path):
-    proc = _verify(tmp_path, _manual("{not json"), _fake_uv(tmp_path, "ok"))
+@pytest.mark.parametrize("block", ["{not json", "[" * 200_000 + "]" * 200_000], ids=["not-json", "nested-too-deep"])
+def test_manual_path_invalid_json_fails_with_one_line_before_rendering(tmp_path, block):
+    proc = _verify(tmp_path, _manual(block), _fake_uv(tmp_path, "ok"))
     assert proc.returncode == 1
     (line,) = proc.stderr.splitlines()
     assert line.startswith("VERIFY FAILED: drawing block is not valid JSON: ")
@@ -308,18 +322,19 @@ def test_signal_mid_render_removes_the_scratch_directory(tmp_path, signum):
     saved = tmp_path / "d.excalidraw.md"
     saved.write_text(_manual(SCENE), encoding="utf-8")
     log = tmp_path / "uv-call.json"
+    grandchild_log = Path(str(log) + ".grandchild")
     proc = subprocess.Popen(
         [sys.executable, str(SCRIPT), str(saved)],
-        env=_fake_uv(tmp_path, "sleep"),
+        env=_fake_uv(tmp_path, "tree"),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
     )
     try:
         deadline = time.monotonic() + 10
-        while not log.exists() and time.monotonic() < deadline:
+        while not grandchild_log.exists() and time.monotonic() < deadline:
             time.sleep(0.05)
-        assert log.exists(), "the stub renderer never started"
+        assert grandchild_log.exists(), "the stub render never started"
         time.sleep(0.1)  # let the stub finish writing its log
         call = json.loads(log.read_text(encoding="utf-8"))
         scratch = Path(call["argv"][3]).parent
@@ -328,8 +343,14 @@ def test_signal_mid_render_removes_the_scratch_directory(tmp_path, signum):
         _, stderr = proc.communicate(timeout=10)
     finally:
         proc.kill()
-    assert proc.returncode == 128 + signum
+    assert proc.returncode == 128 + signum, stderr
     assert stderr.strip() == f"VERIFY FAILED: interrupted by {signal.Signals(signum).name}"
     assert not scratch.exists()
-    with pytest.raises(ProcessLookupError):  # the renderer was killed and reaped
+    with pytest.raises(ProcessLookupError):  # the stub `uv` was killed and reaped
         os.kill(call["pid"], 0)
+    # The render under it is gone too: past the moment it would have written,
+    # nothing has re-created the scratch directory and the process is dead.
+    time.sleep(2)
+    assert not scratch.exists()
+    with pytest.raises(ProcessLookupError):
+        os.kill(int(grandchild_log.read_text(encoding="utf-8")), 0)

@@ -16,16 +16,19 @@ What is checked depends on the save path, which the drawing block reveals:
 
 Exits 0 on success, 1 on any failure with one `VERIFY FAILED:` line on
 stderr naming the cause, 2 on a usage error, and 128+N when stopped by
-signal N (SIGTERM, SIGHUP), after removing its scratch directory.
+signal N (SIGTERM, SIGHUP), after stopping the render and removing its
+scratch directory.
 """
 from __future__ import annotations
 
 import json
+import os
 import re
 import signal
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 
@@ -46,6 +49,40 @@ def interrupted(signum: int, _frame: object) -> None:
     """Exit through SystemExit so the render's scratch directory unwinds."""
     print(f'VERIFY FAILED: interrupted by {signal.Signals(signum).name}', file=sys.stderr)
     sys.exit(128 + signum)
+
+
+def run_render(args: list[str]) -> subprocess.CompletedProcess:
+    """Run the renderer in its own process group, and take the whole group
+    down if this process is interrupted: `uv run` cannot forward the SIGKILL
+    subprocess.run would send it, so the render under it would outlive us."""
+    proc = subprocess.Popen(
+        args, cwd=Path(__file__).parent, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, start_new_session=True,
+    )
+    try:
+        stdout, stderr = proc.communicate()
+    except BaseException:
+        stop_process_group(proc)
+        raise
+    return subprocess.CompletedProcess(args, proc.returncode, stdout, stderr)
+
+
+def stop_process_group(proc: subprocess.Popen) -> None:
+    """SIGTERM the renderer's group so Playwright can close Chromium, give it
+    five seconds, then SIGKILL whatever is left."""
+    try:
+        os.killpg(proc.pid, signal.SIGTERM)
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            proc.poll()  # reap our direct child so it stops counting
+            os.killpg(proc.pid, 0)  # raises once the group is empty
+            time.sleep(0.05)
+        os.killpg(proc.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        # Gone: ESRCH once the group is empty; EPERM on macOS when only
+        # zombies are left in a group this process created itself.
+        pass
+    proc.wait()
 
 
 def render_failure_cause(result: subprocess.CompletedProcess) -> str:
@@ -79,10 +116,9 @@ def render_and_compare(json_text: str, reference_png: Path | None) -> None:
         verify_path.write_text(json_text, encoding='utf-8')
         out_png = Path(scratch) / 'diagram-post-save.png'
         try:
-            result = subprocess.run(
+            result = run_render(
                 ['uv', 'run', 'python', 'render_excalidraw.py',
                  str(verify_path), '--output', str(out_png), '--scale', '2'],
-                cwd=Path(__file__).parent, capture_output=True, text=True,
             )
         except FileNotFoundError:
             fail('render failed: `uv` not found on PATH')
@@ -124,7 +160,7 @@ def main() -> None:
 
     try:
         json.loads(json_text)
-    except json.JSONDecodeError as e:
+    except (json.JSONDecodeError, RecursionError) as e:
         fail(f'drawing block is not valid JSON: {e}')
     for name in ('SIGTERM', 'SIGHUP'):
         if hasattr(signal, name):

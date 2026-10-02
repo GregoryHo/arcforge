@@ -97,6 +97,21 @@ def compute_bounding_box(elements: list[dict]) -> tuple[float, float, float, flo
     return (min_x, min_y, max_x, max_y)
 
 
+def first_line(error: Exception) -> str:
+    """The first line of an exception's message, or its type when it has none."""
+    text = str(error).strip()
+    return text.splitlines()[0] if text else type(error).__name__
+
+
+def close_quietly(browser: object) -> None:
+    """Close the browser on every exit path. A browser that already crashed
+    raises on close; the failure that crashed it has been reported."""
+    try:
+        browser.close()
+    except Exception:
+        pass  # already closed or crashed; the original error is what matters
+
+
 def render(
     excalidraw_path: Path,
     output_path: Path | None = None,
@@ -144,9 +159,15 @@ def render(
     vp_width = min(int(diagram_w), max_width)
     vp_height = max(int(diagram_h), 600)
 
-    # Output path
+    # Output path, checked before Chromium starts
     if output_path is None:
         output_path = excalidraw_path.with_suffix(".png")
+    if output_path.is_dir():
+        print(f"ERROR: Cannot write {output_path}: it is a directory", file=sys.stderr)
+        sys.exit(1)
+    if not output_path.parent.is_dir():
+        print(f"ERROR: Cannot write {output_path}: directory {output_path.parent} does not exist", file=sys.stderr)
+        sys.exit(1)
 
     # Template path (same directory as this script)
     template_path = Path(__file__).parent / "render_template.html"
@@ -166,43 +187,51 @@ def render(
                     file=sys.stderr,
                 )
                 sys.exit(1)
-            first_line = str(e).strip().splitlines()[0] if str(e).strip() else type(e).__name__
-            print(f"ERROR: Chromium failed to launch: {first_line}", file=sys.stderr)
+            print(f"ERROR: Chromium failed to launch: {first_line(e)}", file=sys.stderr)
             sys.exit(1)
 
-        page = browser.new_page(
-            viewport={"width": vp_width, "height": vp_height},
-            device_scale_factor=scale,
-        )
+        stage = "loading the render template"
+        try:
+            page = browser.new_page(
+                viewport={"width": vp_width, "height": vp_height},
+                device_scale_factor=scale,
+            )
+            page.goto(template_url)
 
-        # Load the template
-        page.goto(template_url)
+            # Wait for the ES module to load (imports from esm.sh)
+            stage = "loading the Excalidraw bundle"
+            page.wait_for_function("window.__moduleReady === true", timeout=30000)
 
-        # Wait for the ES module to load (imports from esm.sh)
-        page.wait_for_function("window.__moduleReady === true", timeout=30000)
+            # Inject the diagram data and render
+            stage = "rendering the diagram"
+            json_str = json.dumps(data)
+            result = page.evaluate(f"window.renderDiagram({json_str})")
 
-        # Inject the diagram data and render
-        json_str = json.dumps(data)
-        result = page.evaluate(f"window.renderDiagram({json_str})")
+            if not result or not result.get("success"):
+                error_msg = result.get("error", "Unknown render error") if result else "renderDiagram returned null"
+                print(f"ERROR: Render failed: {error_msg}", file=sys.stderr)
+                sys.exit(1)
 
-        if not result or not result.get("success"):
-            error_msg = result.get("error", "Unknown render error") if result else "renderDiagram returned null"
-            print(f"ERROR: Render failed: {error_msg}", file=sys.stderr)
-            browser.close()
+            # Wait for render completion signal
+            page.wait_for_function("window.__renderComplete === true", timeout=15000)
+
+            # Screenshot the SVG element
+            stage = "capturing the PNG"
+            svg_el = page.query_selector("#root svg")
+            if svg_el is None:
+                print("ERROR: No SVG element found after render.", file=sys.stderr)
+                sys.exit(1)
+
+            svg_el.screenshot(path=str(output_path))
+        except Exception as e:
+            cause = first_line(e)
+            if stage == "loading the Excalidraw bundle" and "Timeout" in cause:
+                print(f"ERROR: Render failed: timed out loading the Excalidraw bundle from esm.sh (network?): {cause}", file=sys.stderr)
+            else:
+                print(f"ERROR: Render failed while {stage}: {cause}", file=sys.stderr)
             sys.exit(1)
-
-        # Wait for render completion signal
-        page.wait_for_function("window.__renderComplete === true", timeout=15000)
-
-        # Screenshot the SVG element
-        svg_el = page.query_selector("#root svg")
-        if svg_el is None:
-            print("ERROR: No SVG element found after render.", file=sys.stderr)
-            browser.close()
-            sys.exit(1)
-
-        svg_el.screenshot(path=str(output_path))
-        browser.close()
+        finally:
+            close_quietly(browser)
 
     return output_path
 
