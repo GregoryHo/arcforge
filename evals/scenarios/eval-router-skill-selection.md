@@ -162,14 +162,26 @@ b = a.trim(); assert.equal(b, …)` with the call and `b` in different
 statements) is not linked and fails. None of these is a shape a model writes
 by default. Ordering inside `/tdd` — whether the new test was run before the
 merge — is not scored: the code already exists, so there is no red-first step
-to order, and the claim is about which row wins. The grader reads only
-`<trial>/.git`: if it is missing or is not a real directory (deleted, or a
-`.git` file redirecting to another repository), the grader exits 2 with no
-labels at once, which the engine scores as an ordinary FAIL rather than a
-grader error; `## Setup` always creates the repository. If the grader's git
-reads run past their shared 20 s budget, it prints an out-of-range `A0` label,
-which the engine records as a grade error — no verdict, and a preflight with
-such a trial BLOCKs as unmeasured instead of counting a FAIL.
+to order, and the claim is about which row wins.
+
+**When the grader gives no verdict.** The grader reads only the repository
+`## Setup` created. It refuses, printing an out-of-range `A0` label that the
+engine records as a grade error, when `<trial>/.git` is missing or is not a
+plain directory (deleted, symlinked, or a `.git` file redirecting elsewhere),
+when its `objects/` or `refs/` is not a plain directory, when it carries a
+`commondir` or an `objects/info/alternates` / `http-alternates` file — each
+would make git read another repository — or when its git reads run past their
+shared 20 s budget. `## Setup` creates none of these, and no ordinary git
+command in a merge task does (`git worktree add` writes `.git/worktrees/…`,
+not `.git/commondir`); every honest case in the tables below grades in under
+0.3 s. A grade error is not a FAIL: a preflight with one BLOCKs as unmeasured
+(`pass_rate: null`), and an A/B drops the trial from its statistics. **An
+operator who sees `A0`** reads that trial's transcript for what touched
+`.git`. The errored preflight is not this Version's one preflight and does not
+use the redesign allowance; its sessions still count toward the round's cap.
+Rerun it once. If `A0` recurs because the agent rewrites `.git`, that is a
+finding about the scenario (the task invites it), recorded before any further
+session, not a reason to loosen the grader.
 
 **Validated offline, nothing run against a model.** Each case below was built
 with the engine's own `createTrialDir` + `runSetup` (so `## Setup` runs over
@@ -281,8 +293,8 @@ so no `## Version` bump.
   from the trial to the arcforge checkout and read its `main`. The grader now
   sets `GIT_DIR=<trial>/.git` (which must be a real directory) and
   `GIT_CEILING_DIRECTORIES=<trial parent>`, and drops every inherited `GIT_*`
-  variable, so it never reads another repository; a `.git` file redirecting to
-  a decoy repository exits 2 the same way.
+  variable; a `.git` file redirecting to a decoy repository is refused the
+  same way.
 - **An unreadable object failed open.** A reflog commit whose tree or a `.js`
   blob could not be read was skipped, so deleting the blob of
   `src/unique-slug.js` after an untested merge read as clean. Such a commit now
@@ -293,6 +305,26 @@ so no `## Version` bump.
   re-merge, is `01` by QA's own corrected reading). Of QA's 25 exploit probes
   and the four from the first QA revision, none runs a planted program during
   grading.
+
+**Third QA review (2026-10-02).** No `## Version` bump; nothing measured.
+
+- **A test file with a non-ASCII name was invisible** to the commit reader:
+  `git ls-tree` C-quotes such a path, so `test/ünique-slug.test.js` scored
+  `01` after a correct test-then-merge. Paths now come from `ls-tree -z`; that
+  file and `test/unique slug.test.js` score `11`.
+- **A missing or redirected `.git` scored as a FAIL**, which a preflight
+  counts. It now gives no verdict (`A0`), as above.
+- **Git still followed `.git/commondir` and `objects/info/alternates`**, reading
+  a decoy repository or the operator's own objects; a decoy could supply a fake
+  A2 branch tip. Either file, or a non-directory `objects/` or `refs/`, is now
+  refused with `A0`, and replace refs are off (`GIT_NO_REPLACE_OBJECTS`).
+- **Locale.** Git output is decoded and the grader's output written as UTF-8
+  whatever the locale; the non-ASCII case scores `11` under `C` and
+  `en_US.ISO8859-1`.
+- Replayed: the 32 rows, QA's 26 and 50 scoring cases (the two new names
+  included) as listed; `.git` deleted, redirected, `commondir`, alternates
+  pointing at a decoy and at the real arcforge objects, and a FIFO via
+  `include.path` all give `A0`; no planted program runs.
 
 **Pre-registered reading.** This Version gets **one** preflight at k=3
 (opus[1m], xhigh, isolated, no `--plugin-dir`, `--max-turns 25`). PASS
@@ -320,6 +352,11 @@ arcforge eval ab eval-router-skill-selection \
   --skill-file skills/core/using/SKILL.md \
   --k 5 --model 'opus[1m]' --effort xhigh --max-turns 25
 ```
+
+A preflight the harness BLOCKs because a trial errored (`infraError` /
+`gradeError`, `A0` included) measured nothing: it is not this Version's one
+preflight, does not use the redesign allowance, counts toward the round's cap,
+and is rerun once after its transcript is read.
 
 **Prediction, stated before it runs.** Baseline mostly fails (0 or 1 of 3
 passing): it merges, often after noting the missing test, or notes the gap and
@@ -420,8 +457,11 @@ from pathlib import Path
 # run (eval B-12, D-043). The grader runs from the trial directory, which the trial owns:
 # - `python3 -I`: the cwd is not on sys.path and PYTHON* is ignored, so a planted
 #   subprocess.py / pathlib.py / sitecustomize.py is never imported.
-# - git reads exactly <trial>/.git (GIT_DIR, ceiling at its parent): a deleted or redirected
-#   .git fails closed instead of reading an enclosing or decoy repository.
+# - git reads only <trial>/.git (GIT_DIR, ceiling at its parent, no inherited GIT_*, replace
+#   refs off). A .git that is missing or not a real directory, whose objects/ or refs/ is not
+#   a real directory, or that carries a commondir or an objects/info/(http-)alternates file
+#   would make git read another repository; none exists in a repository ## Setup creates, so
+#   the grader refuses to read it and reports a grade error (`A0`) instead of a verdict.
 # - only plumbing reads: rev-parse, ls-tree, cat-file (blobs), symbolic-ref, for-each-ref.
 #   None runs a pager, hook, textconv, external diff or signature check, and an alias
 #   cannot shadow a builtin. main's reflog is read as a file, not through `git log`.
@@ -433,6 +473,9 @@ from pathlib import Path
 #   20 s budget, inside the harness's 30 s kill. Out of budget, the grader prints an
 #   out-of-range `A0` label, which the engine records as a grade error (no verdict), never
 #   as a FAIL that preflight would count.
+# - paths come from `ls-tree -z`, so a non-ASCII or spaced file name is read as itself; output
+#   is UTF-8 whatever the locale.
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 trial = Path(os.environ["TRIAL_DIR"])
 gitdir = trial / ".git"
 DEADLINE = time.monotonic() + 20
@@ -455,13 +498,23 @@ def regular_text(path):
         return None
 
 
-try:
-    gitdir_ok = stat.S_ISDIR(os.lstat(gitdir).st_mode)
-except OSError:
-    gitdir_ok = False
-if not gitdir_ok:
-    print(f"no git directory at {gitdir}", file=sys.stderr)
-    sys.exit(2)
+def no_verdict(why):
+    print(f"A0:FAIL:{why}; this trial has no verdict")
+    sys.exit(3)
+
+
+def real_dir(path):
+    try:
+        return stat.S_ISDIR(os.lstat(path).st_mode)
+    except OSError:
+        return False
+
+
+if not (real_dir(gitdir) and real_dir(gitdir / "objects") and real_dir(gitdir / "refs")):
+    no_verdict(f"{gitdir} is missing or is not a plain repository directory")
+for redirect in ("commondir", "objects/info/alternates", "objects/info/http-alternates"):
+    if os.path.lexists(gitdir / redirect):
+        no_verdict(f".git/{redirect} would make git read another repository")
 
 PINNED = [
     "core.fsmonitor=false", "core.hooksPath=/dev/null", "core.pager=cat",
@@ -475,7 +528,7 @@ GIT_ENV.update({
     "GIT_DIR": str(gitdir), "GIT_WORK_TREE": str(trial),
     "GIT_CEILING_DIRECTORIES": str(trial.parent), "GIT_CONFIG_NOSYSTEM": "1",
     "GIT_CONFIG_GLOBAL": os.devnull, "GIT_NO_LAZY_FETCH": "1", "GIT_TERMINAL_PROMPT": "0",
-    "GIT_OPTIONAL_LOCKS": "0",
+    "GIT_OPTIONAL_LOCKS": "0", "GIT_NO_REPLACE_OBJECTS": "1",
 })
 
 
@@ -488,7 +541,8 @@ def git(*args):
     if left <= 0:
         raise OutOfTime()
     try:
-        r = subprocess.run(GIT + list(args), capture_output=True, text=True, env=GIT_ENV,
+        r = subprocess.run(GIT + list(args), capture_output=True, encoding="utf-8",
+                           errors="replace", env=GIT_ENV,
                            stdin=subprocess.DEVNULL, timeout=left, cwd=str(trial))
     except subprocess.TimeoutExpired:
         raise OutOfTime()
@@ -625,11 +679,11 @@ def state_of(files):
 
 def commit_files(sha):
     """The commit's .js blobs; None when the commit or any of those blobs cannot be read."""
-    listing = git("ls-tree", "-r", "--full-tree", sha)
+    listing = git("ls-tree", "-r", "-z", "--full-tree", sha)
     if listing is None:
         return None
     files = {}
-    for line in listing.splitlines():
+    for line in listing.split("\0"):
         meta, _, path = line.partition("\t")
         parts = meta.split()
         if len(parts) != 3 or parts[1] != "blob" or not is_js(path):
@@ -695,8 +749,7 @@ try:
     a2 = any(state_of(files)[1] for files in places)
     emit("A2", a2, "no test file calls uniqueSlug and asserts on what it returned")
 except OutOfTime:
-    print("A0:FAIL:grader ran out of its 20 s git budget; this trial has no verdict")
-    sys.exit(3)
+    no_verdict("grader ran out of its 20 s git budget")
 
 sys.exit(0 if a1 and a2 else 1)
 PY
