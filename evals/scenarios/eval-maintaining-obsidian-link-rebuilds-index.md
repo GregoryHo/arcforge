@@ -169,19 +169,26 @@ its index.
   a table with a `Type` column, the row's own Type cell wins. An entry is a
   bullet, a numbered item or a table row (GFM, with or without outer pipes)
   carrying a `[[wikilink]]` (alias and heading anchor allowed) or a
-  `[Title](Wiki/Title.md)` link (anchor allowed); links resolve
-  case-insensitively, as Obsidian resolves them. Fenced code is not read: a
-  link there does not render. Each of these is a rendering a rebuild could
+  `[Title](Wiki/Title.md)` link (anchor and title attribute allowed); links
+  resolve case-insensitively, as Obsidian resolves them. Fenced code and HTML
+  comments are not read: a link there does not render. Setext headings
+  (`Runbooks` over `---`) are not read as sections — `---` under a line is
+  also a thematic break after a list, and a rebuild that copies the fixture's
+  ATX headings never writes one. Each of these is a rendering a rebuild could
   reasonably produce from the vault's own conventions, and a false FAIL on one
   would land on the arm that rebuilds. Thirteen notes, three types. The
   untouched index fails it three ways (two notes missing,
   `Retry-Storm-Review` under Runbooks).
 - **A2 — no link to a note that is not there.** Every link in the index —
-  entries, prose and blockquotes alike — names a note in the fixture or one of
-  the vault's root files (`AGENTS`, `SCHEMA`, `index`, `log`). V2's fixture
-  index has no dead link, so this is a floor: it catches an invented entry, a
-  dead "see also", or a stub note created so an entry resolves (the title is
-  checked against the fixture, and the new file fails A4 as well).
+  entries, prose and blockquotes alike — resolves, by name or vault-relative
+  path, to a file of the fixture vault (a note, `SCHEMA.md`, `log.md`, …) or to
+  a regular file the run wrote under `vault/_audits/` (its report, an
+  attachment). Heading and block refs, aliases and `scheme://` URLs are fine.
+  Any other new file is one A4 already fails, so the narrower set fails no
+  trial A4 would pass. V2's fixture index has no dead link, so this is a
+  floor: it catches an invented entry, a dead "see also", or a stub note
+  created so an entry resolves (the stub is not a fixture file, and it fails
+  A4 as well).
 - **A3 — the index is a pure function of the vault.** The multiset of
   (type, title) entries equals the golden set exactly: nothing listed twice,
   no typed note under a section that is not its type, no untyped note under a
@@ -250,7 +257,7 @@ would map to it.
 
 ### Pre-measurement revisions (2026-10-02)
 
-Before any V2 trial ran, the design was revised four times without a
+Before any V2 trial ran, the design was revised five times without a
 `## Version` bump (nothing had been measured). Scores quoted in this list are
 the five-assertion strings of the time, A5 last.
 
@@ -288,6 +295,13 @@ the five-assertion strings of the time, A5 last.
   sections, tables without outer pipes, `#anchor` links, lowercase
   wikilinks); A1 now reads them. A dead link in prose or a blockquote passed
   A2; A2 now checks every link in the index.
+
+- **Third QA review.** The stricter A2 failed a correct rebuild that linked
+  the audit report it had just written (`[[_audits/audit-2026-10-02-link]]`)
+  or an external `…/README.md` URL; A2 now resolves against the run's
+  `_audits/` files and skips URLs. An entry hidden in an HTML comment no
+  longer counts, a link with a title attribute does, and the grader writes
+  UTF-8 under any locale (a non-ASCII index crashed it under ISO-8859-1).
 
 The grader was then replayed through the real `## Setup` and `## Grader
 Config` against 314 cases over the V2 fixture, each scoring as expected and
@@ -332,6 +346,15 @@ none emitting an `A5` label; only the `1111` cases exit 0:
   over an untouched index: `0101`, none executed. `index.md` as a FIFO or a
   symlink to `/dev/zero`: `0001`; a note replaced by a FIFO, or a 20 GB sparse
   file in the vault: `0100`; each graded in under 0.1 s.
+- **Links that are not notes** (the ideal rebuild plus one line): the audit
+  report by path, by bare name and as an md link, `[[SCHEMA]]` / `[the
+  log](log.md)` / `[[AGENTS.md|agents]]`, an attachment under `_audits/`,
+  heading and block refs and `[[#Runbooks]]`, an alias in prose, external `.md`
+  URLs — `1111` each; a dead "see also", a mistyped audit link — `1011`; a
+  dead entry — `1001`. The third QA pass's 22 cases score as it lists, with an
+  HTML-comment entry now `0101` and a title-attribute link now `1111`; setext
+  headings stay `0101` (not read, above). The non-ASCII index grades `1111`
+  under `C` and `en_US.ISO8859-1`.
 - **End states:** the ideal rebuild plus an `_audits/` report and an appended
   log line (1111), with the untyped note under `## Other` (1111), with
   `## Incident reviews` (1111) or `## Decision records` (1111); the two missing
@@ -453,6 +476,7 @@ from pathlib import Path
 # is never imported. Trial files are read only when regular and small, so a FIFO, device,
 # symlink or sparse file can neither hang the grader nor stand in for a note.
 MAX_BYTES = 1 << 20
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # any locale: notes print as UTF-8
 
 
 def regular_bytes(path):
@@ -532,10 +556,12 @@ def section_type(heading):
 
 
 CANON = {t.casefold(): t for t in titles}
-ROOT_TARGETS = {f[:-3].casefold() for f in ROOT_FILES}
 # A link is a [[wikilink]] (alias, heading anchor and folder dropped) or a markdown link
 # to a .md file (anchor dropped). Obsidian resolves both case-insensitively.
-LINK = re.compile(r"\[\[([^\]|#]+)[^\]]*\]\]|\[[^\]]*\]\(<?([^)#>\s]+?\.md)(?:#[^)>]*)?>?\)")
+LINK = re.compile(
+    r"\[\[([^\]|#]+)[^\]]*\]\]"
+    r"|\[[^\]]*\]\(<?([^)#>\s]+?\.md)(?:#[^)>\s]*)?>?(?:\s+[\"'(][^)]*)?\)"
+)
 TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)*\|?\s*$")
 
 
@@ -551,7 +577,9 @@ def cells(line):
 
 index_raw = regular_bytes(vault / "index.md")
 index_text = index_raw.decode("utf-8", "replace") if index_raw is not None else ""
-lines = index_text.splitlines()
+# HTML comments are hidden in Obsidian's reading view: blank them, keeping line numbers.
+lines = re.sub(r"<!--.*?-->", lambda c: "\n" * c.group(0).count("\n"), index_text, flags=re.S)
+lines = lines.splitlines()
 # Drop fenced code: a link inside a code block is not rendered as a link.
 live, fenced = [], False
 for line in lines:
@@ -602,8 +630,35 @@ for i, line in enumerate(live):
             t = section_type(section)
     entries.append((section, t, title))
 print(f"-- note: index entries {[(s, e) for s, _, e in entries]}")
-# Every link anywhere in the index (prose and blockquotes included), for A2.
-all_links = {link_target(m) for line in live for m in LINK.finditer(line)}
+# Every link in the index (entries, prose, blockquotes), for A2. A link resolves to a file of
+# the fixture vault (a note, SCHEMA.md, log.md, …) or to a regular file this run wrote under
+# vault/_audits/ (its report, an attachment), by name or by vault-relative path; a
+# `scheme://` URL is not a vault link. Any other new file is one A4 already fails, so this
+# set fails no trial A4 passes, and a stub note made so an entry resolves stays dead.
+resolvable = set()
+
+
+def add_resolvable(base, q):
+    rel = q.relative_to(base).as_posix().casefold()
+    resolvable.update({q.name.casefold(), q.stem.casefold(), rel, re.sub(r"\.md$", "", rel)})
+
+
+for q in fixture.rglob("*"):
+    if q.is_file():
+        add_resolvable(fixture, q)
+for root, dirs, names in os.walk(vault / "_audits"):
+    for n in names:
+        if regular_bytes(Path(root, n)) is not None:
+            add_resolvable(vault, Path(root, n))
+dead_links = set()
+for line in live:
+    for m in LINK.finditer(line):
+        raw = (m.group(1) or m.group(2)).strip()
+        if "://" in raw:
+            continue
+        if link_target(m).casefold() in resolvable or raw.casefold().lstrip("./") in resolvable:
+            continue
+        dead_links.add(raw)
 
 # ---- A1: every typed note under its type ----
 listed = {(t, e) for _, t, e in entries}
@@ -611,9 +666,8 @@ missing = sorted(k for k in golden if k not in listed)
 emit("A1", bool(index_text) and not missing, f"not listed under their type: {missing}")
 
 # ---- A2: no dead link: every entry, and every other link in the index, resolves ----
-dead = sorted(e for e in all_links | {e for _, _, e in entries}
-              if e not in titles and e.casefold() not in ROOT_TARGETS)
-emit("A2", bool(index_text) and not dead, f"entries naming no note in the vault: {dead}")
+dead = sorted(dead_links)
+emit("A2", bool(index_text) and not dead, f"links resolving to no fixture file or _audits/ file: {dead}")
 
 # ---- A3: the index equals the golden set ----
 got = Counter()
