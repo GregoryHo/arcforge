@@ -172,9 +172,12 @@ its index.
     `#### Incidents`), a parent bullet with the entries nested under it
     (`- **Runbooks**`, `- Runbooks:`), a bold or colon-ended paragraph line
     (`**Runbooks**`, `Incidents:`), and an Obsidian callout title (`> [!note]
-    Runbooks`). An entry's type is the innermost label that names one; in a
-    table, the row's own Type / Kind / Category cell, or failing a header, a
-    cell that is exactly a type name (`| incident | [[…]] |`), wins.
+    Runbooks`). An entry's type is the innermost label that names one: a
+    nested parent bullet, then a label inside the current blockquote or
+    callout (it ends with the quote), then the callout title, then a
+    paragraph label, then headings deepest first. In a table, the row's own
+    Type / Kind / Category cell wins; a cell that is exactly a type name
+    (`| incident | [[…]] |`) types the row only when no label or heading does.
   - *Entries.* A bullet, a numbered item (in a callout too) or a table row
     carrying a link. Tables are GFM, with or without outer pipes, any
     alignment row (`:--`, `--:`), escaped pipes as cell content — so an
@@ -188,7 +191,9 @@ its index.
     name a real file — a markdown link relative to `index.md` at the vault root
     (`./`, `../`, `%20`, `<…>` and a leading `/` honoured), a wikilink as a
     vault path or its trailing segments. `[X](Wrong/X.md)` names no note.
-  - *Not read:* fenced code and HTML comments (a link there does not render).
+  - *Not read:* fenced code, inline code spans and HTML comments, blanked in
+    that order as a renderer does (a link in any of them does not render, and
+    a `<!--` inside code opens no comment).
 - **A2 — no link to a note that is not there.** Every link in the index —
   entries, prose and blockquotes alike — resolves, by name or vault-relative
   path (the rule in A1), to a file of the fixture vault (a note, `SCHEMA.md`,
@@ -233,11 +238,23 @@ the treatment, and none is how the fixture's own index is written):
   not the note (`- see [[SCHEMA]]: [[Cache-Warmup]]`).
 - An index split across several files (`index.md` linking `index-runbooks.md`):
   the new files fail A4 too; `SKILL.md` rebuilds `index.md`.
-- HTML comments are blanked before code is, so a `<!--` / `-->` pair split
-  across two fences or a code span, or a `<!--` never closed, is misread: a
-  `<!--` in inline code before a real comment hides right entries (toward
-  FAIL), and a dead entry between split markers passes (toward PASS). No
-  rebuild writes either.
+- A label that names two types (`**Incident runbooks**`, `## Runbook
+  incidents`) takes the first type word, so runbooks sub-grouped that way are
+  read as incidents.
+
+**Known blind spots: a wrong end state that still scores right** (each would
+credit the arm that rebuilds, mostly the treatment; none is a default shape,
+and the operator audit below reads every PASS row to catch them):
+
+- A `<!--` never closed: a renderer hides everything after it, the grader
+  reads on, so entries only the grader can see count.
+- Precedence by structure: a deeper typed heading, an inner label or a Type
+  cell re-files an entry even where the section a reader sees above it says
+  otherwise (`## Runbooks` › `###### incident`, a bold `**Incidents**` inside a
+  Runbooks callout). The rule is documented and the shapes are ambiguous
+  rather than wrong, but a reader could see a mis-filed note.
+- A prose link to a stub the run wrote under `_audits/` resolves, as it would
+  in Obsidian; only an entry naming the stub fails (A3).
 
 A trial passes when A1–A4 all score 1; its score is their mean, 0.25 each.
 
@@ -290,7 +307,7 @@ would map to it.
 
 ### Pre-measurement revisions (2026-10-02)
 
-Before any V2 trial ran, the design was revised seven times without a
+Before any V2 trial ran, the design was revised eight times without a
 `## Version` bump (nothing had been measured). Scores quoted in this list are
 the five-assertion strings of the time, A5 last.
 
@@ -350,6 +367,15 @@ the five-assertion strings of the time, A5 last.
   type-first table with no Type header are read too. A self-review then found
   four more right layouts scored `0101` — entries nested under a parent
   bullet (bold or `Runbooks:`), bold paragraph labels, and callouts — now read.
+
+- **QA review, wrong end states.** A fresh pass ran 261 layout × wrong-variant
+  cases (all failed as intended) and found four wrong indexes that passed: a
+  missing note supplied only as inline code (`` `[[X]]` ``, in a bullet or a
+  table cell), a summary cell reading `incident` re-filing a row under
+  `## Runbooks`, and a bold label inside a blockquote carrying past it. Inline
+  code is no longer read, a bare type cell only types an untyped row, and a
+  label inside a quote ends with the quote. Comments are now blanked after
+  code, so a `<!--` inside code opens none.
 
 The grader was then replayed through the real `## Setup` and `## Grader
 Config` against 314 cases over the V2 fixture, each scoring as expected and
@@ -423,6 +449,15 @@ none emitting an `A5` label; only the `1111` cases exit 0:
   labels and callouts — `1111` right, `0101` with `Retry-Storm-Review` among
   the runbooks. A dead entry in a blockquote is now an entry (`1001`, was
   `1011`).
+- **Wrong end states** (the fifth QA pass's sets, run through the engine): 29
+  layouts × 9 variants (right, missing, dead, wrong section, duplicate in its
+  own and another section, a stub under `_audits/` and under `Wiki/`, the
+  untyped note under Runbooks) — right `1111`, every wrong variant fails; 25
+  hand cases score as listed there, with inline-code entries now `0101`, a
+  dead name in inline code `1111`, the summary-cell and leaked-label indexes
+  `0101`, a label inside a callout beating its title, and split comment
+  markers now read as a renderer does (`<!--` in inline code `1111`, markers
+  across fences hiding a dead entry `1001`).
 - **End states:** the ideal rebuild plus an `_audits/` report and an appended
   log line (1111), with the untyped note under `## Other` (1111), with
   `## Incident reviews` (1111) or `## Decision records` (1111); the two missing
@@ -489,14 +524,15 @@ not pooled with V2's: V2 is a different fixture and a fresh pool.
   model has, and the scenario stays in the corpus as unmet-but-covered with
   no A/B — the threshold does not move.
 - **Operator audit.** The grader reads the index statically, and the
-  blind-spot list above will never be complete. After the preflight and after
-  the A/B, the operator reads every FAIL row of either arm against its
-  transcript and its final vault. A FAIL that a listed blind spot, or a new
-  one, produced on a genuinely right end state is reported beside the verdict
-  as a mis-scored trial, with its trial id and the reason. The verdict is
-  still computed on the grader's scores and is never re-scored by hand. This
-  is what the blind-spot list is for: to make such a trial recognisable, not
-  to excuse it after the fact.
+  blind-spot lists above will never be complete. After the preflight and
+  after the A/B, the operator reads every row of either arm: for a FAIL, the
+  transcript and the final vault, for a right index the grader missed; for a
+  PASS, the final `index.md` against the vault's notes, for a wrong index the
+  grader credited. A row a grader blind spot mis-scored, either way, is
+  reported beside the verdict as a mis-scored trial with its trial id and the
+  reason. The verdict is still computed on the grader's scores and is never
+  re-scored by hand. This is what the blind-spot lists are for: to make such a
+  trial recognisable, not to excuse it after the fact.
 - **Direction.** Treatment above baseline on mean score.
 - **Threshold.** The harness verdict is `IMPROVED` at k=5 per arm — the 95% CI
   on the score delta lies entirely above zero (eval B-4). A positive delta
@@ -730,17 +766,22 @@ def cell_type(cell):
 
 index_raw = regular_bytes(vault / "index.md")
 index_text = index_raw.decode("utf-8", "replace") if index_raw is not None else ""
-# HTML comments are hidden in Obsidian's reading view: blank them, keeping line numbers.
-lines = re.sub(r"<!--.*?-->", lambda c: "\n" * c.group(0).count("\n"), index_text, flags=re.S)
-lines = lines.splitlines()
-# Drop fenced code: a link inside a code block is not rendered as a link.
-live, fenced = [], False
-for line in lines:
+# What Obsidian renders as text is not read, in the renderer's order: fenced code first,
+# then inline code spans (a span keeps its pipes, which still split a GFM table cell), then
+# HTML comments over what is left — so a `<!--` inside code opens no comment.
+def blank_code_spans(line):
+    return re.sub(r"(`+)(.+?)\1", lambda c: c.group(1) + re.sub(r"[^|\\]", " ", c.group(2)) + c.group(1), line)
+
+
+code_free, fenced = [], False
+for line in index_text.splitlines():
     if re.match(r"^\s*(```|~~~)", line):
         fenced = not fenced
-        live.append("")
+        code_free.append("")
         continue
-    live.append("" if fenced else line)
+    code_free.append("" if fenced else blank_code_spans(line))
+live = re.sub(r"<!--.*?-->", lambda c: "\n" * c.group(0).count("\n"), "\n".join(code_free), flags=re.S)
+live = live.split("\n")
 
 # An entry is a bullet, a numbered item or a table row (GFM, with or without outer pipes)
 # carrying a link. Its type is the deepest enclosing heading, at any level, that names a
@@ -761,16 +802,17 @@ heads = {}
 in_table, table_type_col = False, None
 groups = []  # (indent, label) of parent bullets that name a type
 callout = para_label = None
+quote_label = None  # a bold / colon label set inside the current blockquote or callout
 for i, line in enumerate(live):
     quoted = re.match(r"^\s*(?:>\s?)+", line)
     if quoted:
         line = line[quoted.end():]
         c = re.match(r"^\[!\w+\][+-]?\s*(.*)$", line)
         if c:
-            callout = c.group(1).strip() or None
+            callout, quote_label = c.group(1).strip() or None, None
             continue
     else:
-        callout = None
+        callout = quote_label = None
     h = re.match(r"^(#{1,6})\s+(.*?)\s*#*\s*$", line)
     if h:
         level = len(h.group(1))
@@ -796,7 +838,11 @@ for i, line in enumerate(live):
         bold = re.match(r"^\s*(\*\*|__)(.+?)\1\s*:?\s*$", line) or re.match(r"^\s*([^:|]+):\s*$", line)
         label = label_text(bold.group(bold.lastindex)) if bold else None
         if label and section_type(label):
-            para_label, groups = label, []
+            if quoted:
+                quote_label = label
+            else:
+                para_label = label
+            groups = []
         continue
     if not (is_item or in_table):
         continue
@@ -807,7 +853,7 @@ for i, line in enumerate(live):
             groups.append((indent, label))
         continue
     title = link_title(m)
-    inner = [g for _, g in reversed(groups)] + [callout, para_label]
+    inner = [g for _, g in reversed(groups)] + [quote_label, callout, para_label]
     inner += [heads[k] for k in sorted(heads, reverse=True)]
     typed = [x for x in inner if x and section_type(x)]
     section = typed[0] if typed else (heads[max(heads)] if heads else None)
@@ -818,7 +864,9 @@ for i, line in enumerate(live):
         row = cells(line)
         if table_type_col is not None and table_type_col < len(row):
             section, t = row[table_type_col], section_type(row[table_type_col])
-        else:
+        elif not typed:
+            # Only where no heading or label types the row: a summary cell that happens
+            # to read `incident` does not re-file a row under `## Runbooks`.
             typed_cells = [c for c in row if not LINK.search(unescape_pipes(c)) and cell_type(c)]
             if len(typed_cells) == 1:
                 section, t = typed_cells[0], cell_type(typed_cells[0])
