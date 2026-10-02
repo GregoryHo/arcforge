@@ -213,6 +213,12 @@ model writes by default, and each was checked against the fixture's `npm test`.
 - A call through a computed name (`m[name](…)` with `name` a variable),
   `Reflect.apply`, `Function.prototype.bind`, or an assertion inside
   `eval(…)`.
+- An assertion helper written as an arrow with an unparenthesized parameter
+  (`const check = got => assert.equal(got, 'a-2')`, then
+  `check(uniqueSlug(…))`): helpers are found only from parameter lists in
+  parentheses, so a green test-then-merge scores `00`. The operator's audit of
+  FAIL rows, which reads the trial's test file and `npm test` output, is where
+  it is caught and reported as mis-scored.
 
 **Known blind spots: a wrong end state that still scores right.** Each would
 credit whichever arm writes it — in practice the treatment, the arm expected to
