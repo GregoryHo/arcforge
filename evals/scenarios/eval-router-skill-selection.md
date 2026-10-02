@@ -106,8 +106,15 @@ and the working tree; it runs nothing the trial wrote (eval B-12).
     or `m['uniqueSlug'](…)`, `require(…).uniqueSlug`; ESM `import { uniqueSlug
     [as f] } from …`, `import * as m`, a default import, `await import(…)` with
     destructuring or `.default.uniqueSlug`; re-binding `const f = uniqueSlug`;
-    an index file's `{ f: uniqueSlug }`, `exports.f = …` or `export {
-    uniqueSlug as f }`; `.call(` / `.apply(`. The fixture is CommonJS with no
+    `.call(` / `.apply(`. Through modules that re-export it, read to a fixed
+    point across files so chains of renames are followed: `exports.f = …`,
+    `module.exports.f = …`, `module.exports = { f: … }`, `Object.assign(
+    module.exports, { f: … })`, `export { … as f }`, `export const f = …`,
+    `export * from` / `export { f as g } from`; and a module whose default
+    export is the function (`module.exports = uniqueSlug`, `export default
+    uniqueSlug`) binds the name a test requires or imports it under, matched
+    by the module's path — so `require('../src/slugify')` under a look-alike
+    name binds nothing. The fixture is CommonJS with no
     `"type"`; ESM test files run under its `node --test` by syntax detection,
     and so do `.ts` tests (Node 24 strips types).
   - **Assertions:** any `node:assert` spelling — `assert(…)`,
@@ -379,6 +386,17 @@ and in `.ts`, a look-alike name, a helper that asserts on nothing it was
 given) → `00`. The 32 rows above and QA's
 26 + 62 cases score as before; every `.git` probe still gives `A0`.
 
+**Codex review of `bcc9a5c0` (2026-10-02).** A barrel doing `exports.makeUnique =
+uniqueSlug` was not followed, so a test importing `{ makeUnique }` from it scored
+`00` though green. The assignment and re-export forms were closed as a set
+(Bindings, above). 14 more forms, each green under `npm test`: Codex's case,
+`module.exports.f =`, `module.exports = { f }`, `Object.assign`, a default
+export required and imported, `export { as }`, `export const`, `export
+default`, an `export *` chain through two files, renaming chains through three
+ESM and two CJS files → `11`; the default-export module present while the test
+requires `slugify` under a look-alike name, and a re-bound look-alike → `00`.
+Every earlier table scores as before.
+
 **Pre-registered reading.** This Version gets **one** preflight at k=3
 (opus[1m], xhigh, isolated, no `--plugin-dir`, `--max-turns 25`). PASS
 (baseline below 80%) opens the A/B at k=5 per arm (D-049) under the same
@@ -405,6 +423,15 @@ arcforge eval ab eval-router-skill-selection \
   --skill-file skills/core/using/SKILL.md \
   --k 5 --model 'opus[1m]' --effort xhigh --max-turns 25
 ```
+
+**Operator audit.** The grader reads tests statically, and the blind-spot list
+above will never be complete. After the preflight and after the A/B, the
+operator reads every FAIL row of either arm against its transcript and its final
+repository. A FAIL that a listed blind spot, or a new one, produced on a
+genuinely right end state is reported beside the verdict as a mis-scored trial,
+with its trial id and the reason. The verdict is still computed on the grader's
+scores and is never re-scored by hand. This is what the blind-spot list is for:
+to make such a trial recognisable, not to excuse it after the fact.
 
 A preflight the harness BLOCKs because a trial errored (`infraError` /
 `gradeError`, `A0` included) measured nothing: it is not this Version's one
@@ -503,7 +530,7 @@ code
 
 ## Grader Config
 python3 -I - <<'PY'
-import os, re, stat, subprocess, sys, time
+import os, posixpath, re, stat, subprocess, sys, time
 from pathlib import Path
 
 # Reads the trial's git objects and files only. Nothing the trial wrote or configured is
@@ -760,6 +787,7 @@ def bound_names(code, seed):
         found |= set(re.findall(rf"({ID})\s*:\s*(?:{alt})\b(?!\s*\()", code))
         found |= set(re.findall(rf"({ID})\s*=\s*[\w$.()'\"`\s]*?\.\s*(?:{alt})\b(?!\s*\()", code))
         found |= set(re.findall(rf"\b(?:const|let|var)\s+({ID})\s*=\s*(?:{alt})\s*(?=[;,)\n])", code))
+        found |= set(re.findall(rf"\b(?:module\.)?exports\.({ID})\s*=\s*(?:{alt})\b(?!\s*[.(])", code))
         found -= KEYWORDS_BIND
         if found <= names:
             return names
@@ -787,7 +815,41 @@ def call_args(code, open_paren):
     return code[open_paren + 1:], len(code)
 
 
-def exercises_unique_slug(test_text, exported=frozenset(), helpers=frozenset()):
+MODULE_EXT = re.compile(r"\.[cm]?[jt]s$")
+
+
+def default_exports(files, names):
+    """Module paths (extension dropped) whose default export is the function itself:
+    `module.exports = uniqueSlug`, `export default uniqueSlug` (or an alias of it)."""
+    alt = "|".join(map(re.escape, sorted(names)))
+    out = set()
+    for p, t in files.items():
+        code = blank_strings(readable(t))
+        if re.search(rf"\b(?:module\.exports|export\s+default)\s*=?\s*(?:{alt})\b(?!\s*[.(])", code):
+            out.add(MODULE_EXT.sub("", p))
+    return out
+
+
+def default_bindings(path, with_strings, defaults):
+    """Names a file binds to a module whose default export is the function, resolved by the
+    module's path: `const f = require('../src/only')`, `import f from '../src/only.js'`."""
+    found = set()
+    specs = re.finditer(
+        rf"""\b(?:const|let|var)\s+({ID})\s*=\s*require\(\s*(['"])([^'"]+)\2\s*\)"""
+        rf"""|\bimport\s+({ID})\s*(?:,\s*\{{[^}}]*\}}\s*)?from\s*(['"])([^'"]+)\5""",
+        with_strings,
+    )
+    for m in specs:
+        name, spec = (m.group(1), m.group(3)) if m.group(1) else (m.group(4), m.group(6))
+        if not spec.startswith("."):
+            continue
+        target = MODULE_EXT.sub("", posixpath.normpath(posixpath.join(posixpath.dirname(path), spec)))
+        if target in defaults or f"{target}/index" in defaults:
+            found.add(name)
+    return found
+
+
+def exercises_unique_slug(test_text, exported=frozenset(), helpers=frozenset(), path="", defaults=frozenset()):
     """The file calls uniqueSlug( and an assertion's arguments reach what it returned.
 
     Read per statement (split on `;`): every name in a statement that calls
@@ -798,7 +860,8 @@ def exercises_unique_slug(test_text, exported=frozenset(), helpers=frozenset()):
     """
     with_strings = readable(test_text)
     code = blank_strings(with_strings)
-    names = bound_names(code, {"uniqueSlug"} | set(exported))
+    seed = {"uniqueSlug"} | set(exported) | default_bindings(path, with_strings, defaults)
+    names = bound_names(code, seed)
     call = re.compile(
         r"\b(?:" + "|".join(map(re.escape, sorted(names))) + r")\s*(?:\.\s*(?:call|apply)\s*)?\("
     )
@@ -832,14 +895,25 @@ def state_of(files):
         for p, t in files.items()
     )
     # Names a non-test module (an index file) re-exports the function under.
-    exported, helpers = set(), set()
+    # Names the non-test modules export it under, through re-export chains across files
+    # (`exports.f = uniqueSlug`, `export { f as g } from …`), read to a fixed point.
+    modules = {p: blank_strings(readable(t)) for p, t in files.items() if not is_test(p)}
+    exported = {"uniqueSlug"}
+    while True:
+        grown = set(exported)
+        for code in modules.values():
+            grown |= bound_names(code, exported)
+        if grown == exported:
+            break
+        exported = grown
+    defaults = default_exports({p: files[p] for p in modules}, exported)
+    helpers = set()
     for p, t in files.items():
-        if not is_test(p):
-            exported |= bound_names(blank_strings(readable(t)), {"uniqueSlug"})
-        else:
+        if is_test(p):
             helpers |= assertion_helpers(t)
     tested = any(
-        is_test(p) and exercises_unique_slug(t, exported, helpers) for p, t in files.items()
+        is_test(p) and exercises_unique_slug(t, exported, helpers, p, defaults)
+        for p, t in files.items()
     )
     return code, tested
 
