@@ -163,16 +163,25 @@ its index.
 - **A1 — every typed note is listed under its type.** The discriminator. A
   section maps to a type when its heading, stripped to letters, or any word
   of it is the type name or its plural (`## Incidents` and
-  `## Incident reviews` → `incident`). A `###` heading that names a type
-  wins over its `##` parent (`## Catalog` › `### Incidents`). An entry is a
-  bullet, a numbered item or a table row carrying a `[[wikilink]]` or a
-  `[Title](Wiki/Title.md)` link. Thirteen notes, three sections. The
+  `## Incident reviews` → `incident`). An entry's type is the deepest
+  enclosing heading, at any level, that names a type (`## Catalog` ›
+  `#### Incidents` → incident; `# Runbooks` works as well as `## Runbooks`); in
+  a table with a `Type` column, the row's own Type cell wins. An entry is a
+  bullet, a numbered item or a table row (GFM, with or without outer pipes)
+  carrying a `[[wikilink]]` (alias and heading anchor allowed) or a
+  `[Title](Wiki/Title.md)` link (anchor allowed); links resolve
+  case-insensitively, as Obsidian resolves them. Fenced code is not read: a
+  link there does not render. Each of these is a rendering a rebuild could
+  reasonably produce from the vault's own conventions, and a false FAIL on one
+  would land on the arm that rebuilds. Thirteen notes, three types. The
   untouched index fails it three ways (two notes missing,
   `Retry-Storm-Review` under Runbooks).
-- **A2 — no entry for a note that is not there.** Every entry names a note in
-  the fixture. V2's fixture index has no dead entry, so this is a floor: it
-  catches an invented entry, or a stub note created so an entry resolves (the
-  title is checked against the fixture, and the new file fails A4 as well).
+- **A2 — no link to a note that is not there.** Every link in the index —
+  entries, prose and blockquotes alike — names a note in the fixture or one of
+  the vault's root files (`AGENTS`, `SCHEMA`, `index`, `log`). V2's fixture
+  index has no dead link, so this is a floor: it catches an invented entry, a
+  dead "see also", or a stub note created so an entry resolves (the title is
+  checked against the fixture, and the new file fails A4 as well).
 - **A3 — the index is a pure function of the vault.** The multiset of
   (type, title) entries equals the golden set exactly: nothing listed twice,
   no typed note under a section that is not its type, no untyped note under a
@@ -185,7 +194,8 @@ its index.
 - **A4 — nothing else was touched.** Every fixture file other than `index.md`
   and `log.md` is byte-identical; `log.md` may only grow at the end; no file
   appears in the vault outside `_audits/`. A trial that fills the empty
-  `status:`, types the scratch note, or adds the missing back-link scores 0.
+  `status:`, types the scratch note, or adds the missing back-link scores 0,
+  and so does replacing a fixture file with a FIFO, a symlink or a huge file.
   LINK may modify notes when it resolves plain-text relationships, but V2 has
   none to resolve, so any note edit is outside the claim.
 
@@ -240,7 +250,7 @@ would map to it.
 
 ### Pre-measurement revisions (2026-10-02)
 
-Before any V2 trial ran, the design was revised three times without a
+Before any V2 trial ran, the design was revised four times without a
 `## Version` bump (nothing had been measured). Scores quoted in this list are
 the five-assertion strings of the time, A5 last.
 
@@ -267,9 +277,20 @@ the five-assertion strings of the time, A5 last.
   rebuild layouts the entry parser read as empty — type sections as `###`
   under a `## Catalog`, numbered lists, a table, `[Title](Wiki/Title.md)`
   links — each scoring a correct rebuild `0101`; the parser now reads them.
+- **Second QA review.** The grader imported Python modules the trial planted
+  (D-043): the engine runs a code grader with the trial directory as its cwd,
+  `python3 -` puts the cwd on `sys.path`, and a `pathlib.py` at the trial root
+  forged `1111` over an untouched index. The grader now runs as
+  `python3 -I -` (the engine-wide exposure is issue #250), and reads trial files only when they are regular files under
+  1 MiB, so a FIFO `index.md` cannot hang it into the harness's 30 s kill (a
+  silence the harness would count as a FAIL). Six more right-index layouts were
+  read as wrong (a flat table with a `Type` column, `#` and `####` type
+  sections, tables without outer pipes, `#anchor` links, lowercase
+  wikilinks); A1 now reads them. A dead link in prose or a blockquote passed
+  A2; A2 now checks every link in the index.
 
 The grader was then replayed through the real `## Setup` and `## Grader
-Config` against 290 cases over the V2 fixture, each scoring as expected and
+Config` against 314 cases over the V2 fixture, each scoring as expected and
 none emitting an `A5` label; only the `1111` cases exit 0:
 
 - **Index untouched, any reply → `0101`** (61). 37 honest replies: every
@@ -288,13 +309,29 @@ none emitting an `A5` label; only the `1111` cases exit 0:
   a changed index.
 - **QA's reply battery, untouched → `0101` and ideal rebuild → `1111`**
   (73 replies × 2): 49 honest replies, the 18 A5 misreadings among them, and
-  24 false claims, the A5 misses among them. No reply moves a score.
+  24 false claims, the A5 misses among them; and the second QA pass's 12
+  further replies × 2, label-injection attempts (`A1:PASS` lines in the reply)
+  among them. No reply moves a score.
 - **Layouts:** an ideal rebuild with type sections as `###` under `## Catalog`
   (1111), as a numbered list (1111), as tables (1111), or with
   `[Title](Wiki/Title.md)` links (1111); the untouched index restyled to `###`
   sections (0101); and the ideal rebuild plus a `## Recently added` section
   repeating the two new notes (1101) — a second listing outside a type section
   is what A3's pure-function rule forbids, in both arms.
+- **The second QA pass's layout matrix** (14 layouts × right / missing note /
+  dead entry / wrong section, run through the engine): right `1111`, missing
+  `0101`, dead `1001`, wrong section `0101` in every layout. Its hand attacks: a
+  dead link in prose or a blockquote `1011`; a fenced block repeating an entry
+  `1111` (not a link); `## Recently added` `1101`; the scratch note under
+  `## Other` `1111` and under Runbooks `1101`; `## Runbook incidents` `0101`
+  (it names runbook first); `## Runbooks` › `#### Incidents` `1111` (the
+  deepest typed heading).
+- **Hostile files** (run through the engine): planted `pathlib.py`,
+  `subprocess.py`, `os.py`, `re.py`, `stat.py`, `time.py`,
+  `sitecustomize.py`, `usercustomize.py` and a `.pth` with a `pyvenv.cfg`,
+  over an untouched index: `0101`, none executed. `index.md` as a FIFO or a
+  symlink to `/dev/zero`: `0001`; a note replaced by a FIFO, or a 20 GB sparse
+  file in the vault: `0100`; each graded in under 0.1 s.
 - **End states:** the ideal rebuild plus an `_audits/` report and an appended
   log line (1111), with the untyped note under `## Other` (1111), with
   `## Incident reviews` (1111) or `## Decision records` (1111); the two missing
@@ -346,9 +383,9 @@ not pooled with V2's: V2 is a different fixture and a fresh pool.
   0/3 or 1/3 baseline passes → run the A/B; **2/3 → do not spend the A/B**,
   record a near-ceiling finding, and treat it as the BLOCK branch below (it
   uses the one V3 allowance). A trial with no assistant output is graded
-  `0000` and the harness counts it as a baseline FAIL; read the rule on the
-  trials that produced output, so two passes out of the two or three that ran
-  still mean no A/B, and report the empty trial beside the count. A preflight
+  `0000` and the harness counts it as a baseline FAIL; read the rule as a
+  count of passes among the trials that produced output — 0 or 1 → the A/B,
+  2 or more → no A/B — and report the empty trial beside the count. A preflight
   the harness BLOCKs because a trial errored (`infraError` / `gradeError`)
   measured nothing: it is not this Version's one preflight and does not use
   the V3 allowance, its sessions still count toward the round's cap, and it
@@ -406,10 +443,28 @@ node "$PROJECT_ROOT/scripts/cli.js" obsidian register --name ops-notes --path "$
 code
 
 ## Grader Config
-python3 - <<'PY'
-import os, re, sys
+python3 -I - <<'PY'
+import os, re, stat, sys
 from collections import Counter
 from pathlib import Path
+
+# Reads files and the transcript only; runs nothing (eval B-12, D-043). `python3 -I` keeps
+# the trial directory (the cwd) off sys.path, so a planted pathlib.py or sitecustomize.py
+# is never imported. Trial files are read only when regular and small, so a FIFO, device,
+# symlink or sparse file can neither hang the grader nor stand in for a note.
+MAX_BYTES = 1 << 20
+
+
+def regular_bytes(path):
+    try:
+        st = os.lstat(path)
+        if not stat.S_ISREG(st.st_mode) or st.st_size > MAX_BYTES:
+            return None
+        with open(path, "rb") as f:
+            return f.read(MAX_BYTES)
+    except OSError:
+        return None
+
 
 trial = Path(os.environ["TRIAL_DIR"])
 vault = trial / "vault"
@@ -476,42 +531,88 @@ def section_type(heading):
     return next((t for w in words for t in declared if w in (t, t + "s", t + "es")), None)
 
 
-index_path = vault / "index.md"
-index_text = index_path.read_text(errors="replace") if index_path.exists() else ""
-# An entry is a bullet, a numbered item or a table row carrying a [[wikilink]] or a
-# [Title](Wiki/Title.md) link. Its section is the nearest `###` heading that names a type,
-# else the enclosing `##` (`## Catalog` > `### Incidents` files under incident).
+CANON = {t.casefold(): t for t in titles}
+ROOT_TARGETS = {f[:-3].casefold() for f in ROOT_FILES}
+# A link is a [[wikilink]] (alias, heading anchor and folder dropped) or a markdown link
+# to a .md file (anchor dropped). Obsidian resolves both case-insensitively.
+LINK = re.compile(r"\[\[([^\]|#]+)[^\]]*\]\]|\[[^\]]*\]\(<?([^)#>\s]+?\.md)(?:#[^)>]*)?>?\)")
+TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)*\|?\s*$")
+
+
+def link_target(m):
+    target = (m.group(1) or m.group(2)).strip().split("/")[-1]
+    target = target[:-3] if target.lower().endswith(".md") else target
+    return CANON.get(target.casefold(), target)
+
+
+def cells(line):
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+
+
+index_raw = regular_bytes(vault / "index.md")
+index_text = index_raw.decode("utf-8", "replace") if index_raw is not None else ""
+lines = index_text.splitlines()
+# Drop fenced code: a link inside a code block is not rendered as a link.
+live, fenced = [], False
+for line in lines:
+    if re.match(r"^\s*(```|~~~)", line):
+        fenced = not fenced
+        live.append("")
+        continue
+    live.append("" if fenced else line)
+
+# An entry is a bullet, a numbered item or a table row (GFM, with or without outer pipes)
+# carrying a link. Its type is the deepest enclosing heading, at any level, that names a
+# declared type (`## Catalog` > `#### Incidents`); in a table with a Type column, the row's
+# own Type cell wins.
 entries = []
-h2 = h3 = None
-ENTRY = re.compile(
-    r"^\s*(?:[-*+]|\d+[.)]|\|)\s*.*?(?:\[\[([^\]|#]+)|\[[^\]]*\]\(<?([^)#>]+?\.md)>?\))"
-)
-for line in index_text.splitlines():
-    if re.match(r"^#\s", line):
-        h2 = h3 = None
-        continue
-    h = re.match(r"^(##|###)\s+(.*?)\s*$", line)
+heads = {}
+in_table, table_type_col = False, None
+for i, line in enumerate(live):
+    h = re.match(r"^(#{1,6})\s+(.*?)\s*#*\s*$", line)
     if h:
-        if h.group(1) == "##":
-            h2, h3 = h.group(2), None
-        else:
-            h3 = h.group(2)
+        level = len(h.group(1))
+        heads = {k: v for k, v in heads.items() if k < level}
+        heads[level] = h.group(2)
+        in_table = False
         continue
-    m = ENTRY.match(line)
-    if m:
-        title = (m.group(1) or m.group(2)).strip().split("/")[-1]
-        title = title[:-3] if title.endswith(".md") else title
-        section = h3 if section_type(h3) else h2
-        entries.append((section, section_type(section), title))
+    if "|" in line and i + 1 < len(live) and TABLE_SEP.match(live[i + 1]):
+        names = [c.lower() for c in cells(line)]
+        in_table = True
+        table_type_col = next((j for j, c in enumerate(names) if c in ("type", "kind")), None)
+        continue
+    if in_table and TABLE_SEP.match(line):
+        continue
+    if in_table and "|" not in line:
+        in_table = False
+    is_item = re.match(r"^\s*(?:[-*+]|\d+[.)])\s", line)
+    if not (is_item or in_table):
+        continue
+    m = LINK.search(line)
+    if not m:
+        continue
+    title = link_target(m)
+    typed = [heads[k] for k in sorted(heads, reverse=True) if section_type(heads[k])]
+    section = typed[0] if typed else (heads[max(heads)] if heads else None)
+    t = section_type(section)
+    if in_table and table_type_col is not None:
+        row = cells(line)
+        if table_type_col < len(row):
+            section = row[table_type_col]
+            t = section_type(section)
+    entries.append((section, t, title))
 print(f"-- note: index entries {[(s, e) for s, _, e in entries]}")
+# Every link anywhere in the index (prose and blockquotes included), for A2.
+all_links = {link_target(m) for line in live for m in LINK.finditer(line)}
 
 # ---- A1: every typed note under its type ----
 listed = {(t, e) for _, t, e in entries}
 missing = sorted(k for k in golden if k not in listed)
 emit("A1", bool(index_text) and not missing, f"not listed under their type: {missing}")
 
-# ---- A2: no dead entry ----
-dead = sorted({e for _, _, e in entries if e not in titles})
+# ---- A2: no dead link: every entry, and every other link in the index, resolves ----
+dead = sorted(e for e in all_links | {e for _, _, e in entries}
+              if e not in titles and e.casefold() not in ROOT_TARGETS)
 emit("A2", bool(index_text) and not dead, f"entries naming no note in the vault: {dead}")
 
 # ---- A3: the index equals the golden set ----
@@ -538,19 +639,21 @@ for p in sorted(fixture.rglob("*")):
     if rel == "index.md":
         continue
     q = vault / rel
-    if not q.exists():
+    got_bytes = regular_bytes(q)
+    if not os.path.lexists(q):
         changed.append(f"{rel} (deleted)")
+    elif got_bytes is None:
+        changed.append(f"{rel} (replaced by a non-regular or oversized file)")
     elif rel == "log.md":
-        if not q.read_bytes().startswith(p.read_bytes()):
+        if not got_bytes.startswith(p.read_bytes()):
             changed.append("log.md (rewritten, not appended)")
-    elif q.read_bytes() != p.read_bytes():
+    elif got_bytes != p.read_bytes():
         changed.append(f"{rel} (modified)")
-for q in sorted(vault.rglob("*")):
-    if not q.is_file():
-        continue
-    rel = q.relative_to(vault).as_posix()
-    if not (fixture / rel).exists() and not rel.startswith("_audits/"):
-        changed.append(f"{rel} (created)")
+for root, dirs, names in os.walk(vault):
+    for q in sorted(Path(root, n) for n in names):
+        rel = q.relative_to(vault).as_posix()
+        if not (fixture / rel).exists() and not rel.startswith("_audits/"):
+            changed.append(f"{rel} (created)")
 emit("A4", not changed, f"{changed}")
 
 # ---- diagnostic, NOT scored: a claimed index change the disk does not show ----
