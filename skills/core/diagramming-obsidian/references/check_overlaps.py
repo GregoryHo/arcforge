@@ -44,15 +44,23 @@ def escape_unprintable(text: str) -> str:
 MAX_ERROR_CHARS = 1000
 
 
-def fail(message: str) -> NoReturn:
-    """Exit 1 with `ERROR: <message>` as exactly one bounded stderr line.
+def fail(message: str, code: int = 1) -> NoReturn:
+    """Exit `code` (1 unless given) with `ERROR: <message>` as exactly one bounded stderr line.
     Unprintable characters a quoted value or path may carry are escaped, so
     the line cannot split, and a huge value is cut short."""
     line = escape_unprintable(message)
     if len(line) > MAX_ERROR_CHARS:
         line = line[:MAX_ERROR_CHARS] + "… (truncated)"
     print(f"ERROR: {line}", file=sys.stderr)
-    sys.exit(1)
+    sys.exit(code)
+
+
+class OneLineParser(argparse.ArgumentParser):
+    """argparse, with a usage error as one `ERROR:` line and exit 2 instead
+    of the usage block; --help still prints the full usage and exits 0."""
+
+    def error(self, message: str) -> NoReturn:
+        fail(f"{message} (run with --help for usage)", code=2)
 
 
 def bbox(el: dict) -> tuple[float, float, float, float] | None:
@@ -516,7 +524,7 @@ def main() -> None:
 
 
 def run() -> None:
-    parser = argparse.ArgumentParser(description="Check Excalidraw diagram for overlapping elements")
+    parser = OneLineParser(description="Check Excalidraw diagram for overlapping elements")
     parser.add_argument("input", type=Path, help="Path to .excalidraw JSON file")
     parser.add_argument("--min-overlap", type=float, default=100, help="Minimum overlap area (px²) to report for shapes (default: 100)")
     parser.add_argument("--padding", type=float, default=10, help="Padding around text elements for near-miss detection (default: 10)")

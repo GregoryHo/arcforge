@@ -324,3 +324,32 @@ def test_mutated_specs_never_print_a_traceback(tmp_path):
     cases = mutations(FUZZ_SPEC)
     assert len(cases) > 100
     assert contract_violations(run_all(cases, run), "ERROR: ") == []
+
+
+@pytest.mark.parametrize(
+    "args, fragment",
+    [
+        ([], "the following arguments are required: input"),
+        (["in.json", "--bogus"], "unrecognized arguments: --bogus"),
+        (["in.json", "--output"], "argument --output/-o: expected one argument"),
+    ],
+    ids=["missing-input", "unknown-option", "bad-value"],
+)
+def test_usage_error_is_one_line_and_exit_2(tmp_path, args, fragment):
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPT), *args], capture_output=True, text=True, check=False, cwd=tmp_path
+    )
+    assert proc.returncode == 2
+    (line,) = proc.stderr.splitlines()
+    assert line.startswith("ERROR: ") and fragment in line, line
+    assert line.endswith(" (run with --help for usage)")
+    assert "usage:" not in proc.stderr
+
+
+def test_help_prints_usage_on_stdout_and_exits_0(tmp_path):
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPT), "--help"], capture_output=True, text=True, check=False, cwd=tmp_path
+    )
+    assert proc.returncode == 0
+    assert proc.stdout.startswith("usage: ")
+    assert proc.stderr == ""

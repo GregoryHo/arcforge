@@ -41,15 +41,23 @@ def escape_unprintable(text: str) -> str:
 MAX_ERROR_CHARS = 1000
 
 
-def fail(message: str) -> NoReturn:
-    """Exit 1 with `ERROR: <message>` as exactly one bounded stderr line.
+def fail(message: str, code: int = 1) -> NoReturn:
+    """Exit `code` (1 unless given) with `ERROR: <message>` as exactly one bounded stderr line.
     Unprintable characters a quoted value or path may carry are escaped, so
     the line cannot split, and a huge value is cut short."""
     line = escape_unprintable(message)
     if len(line) > MAX_ERROR_CHARS:
         line = line[:MAX_ERROR_CHARS] + "… (truncated)"
     print(f"ERROR: {line}", file=sys.stderr)
-    sys.exit(1)
+    sys.exit(code)
+
+
+class OneLineParser(argparse.ArgumentParser):
+    """argparse, with a usage error as one `ERROR:` line and exit 2 instead
+    of the usage block; --help still prints the full usage and exits 0."""
+
+    def error(self, message: str) -> NoReturn:
+        fail(f"{message} (run with --help for usage)", code=2)
 
 
 def validate_excalidraw(data: object) -> list[str]:
@@ -260,7 +268,7 @@ def main() -> None:
 
 
 def run() -> None:
-    parser = argparse.ArgumentParser(description="Render Excalidraw JSON to PNG")
+    parser = OneLineParser(description="Render Excalidraw JSON to PNG")
     parser.add_argument("input", type=Path, help="Path to .excalidraw JSON file")
     parser.add_argument("--output", "-o", type=Path, default=None, help="Output PNG path (default: same name with .png)")
     parser.add_argument("--scale", "-s", type=int, default=2, help="Device scale factor (default: 2)")
