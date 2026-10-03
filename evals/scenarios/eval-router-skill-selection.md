@@ -361,7 +361,10 @@ so no `## Version` bump.
   `subprocess.py`, `pathlib.py`, `os.py`, `re.py`, `stat.py`, `time.py`,
   `sitecustomize.py`, `usercustomize.py` and a `.pth` with a `pyvenv.cfg` all
   run nothing and score as the end state does. The same exposure in the engine
-  and in the corpus's other `python3 -` graders is issue #250.
+  and in the corpus's other `python3 -` graders was issue #250, since fixed:
+  the engine now runs every code grader from a fresh empty directory, and the
+  grader reaches trial files only through the absolute `TRIAL_DIR` /
+  `PROJECT_ROOT` / `TRANSCRIPT_PATH`, so the `-I` here is belt-and-braces.
 - **A planted hang counted as a FAIL.** The harness kills a grader at 30 s and
   scores the silence as an ordinary FAIL, which a preflight counts. Trial files
   — the reflog and every working-tree `.js` — are now read only when they are
@@ -609,9 +612,10 @@ import os, posixpath, re, stat, subprocess, sys, time
 from pathlib import Path
 
 # Reads the trial's git objects and files only. Nothing the trial wrote or configured is
-# run (eval B-12, D-043). The grader runs from the trial directory, which the trial owns:
-# - `python3 -I`: the cwd is not on sys.path and PYTHON* is ignored, so a planted
-#   subprocess.py / pathlib.py / sitecustomize.py is never imported.
+# run (eval B-12, D-043). The grader reads the trial directory, which the trial owns; the
+# engine runs it from a fresh empty cwd and passes the trial as the absolute TRIAL_DIR (#250):
+# - `python3 -I`: belt-and-braces over that empty cwd. No cwd on sys.path and PYTHON* is
+#   ignored, so a planted subprocess.py / pathlib.py / sitecustomize.py is never imported.
 # - git reads only <trial>/.git (GIT_DIR, ceiling at its parent, no inherited GIT_*, replace
 #   refs off). A .git that is missing or not a real directory, whose objects/ or refs/ is not
 #   a real directory, or that carries a commondir or an objects/info/(http-)alternates file

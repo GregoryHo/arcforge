@@ -53,7 +53,8 @@ const {
  */
 function gradeTrialResult(result, scenario, projectRoot, actionLog) {
   if (scenario.grader === 'code') {
-    // Code grading runs in trialDir (where agent artifacts live), with $PROJECT_ROOT available
+    // Code grading runs from a fresh empty cwd (#250); graders reach trial artifacts through
+    // the absolute $TRIAL_DIR, $PROJECT_ROOT and $TRANSCRIPT_PATH
     return gradeWithCode(
       result,
       scenario.graderConfig,

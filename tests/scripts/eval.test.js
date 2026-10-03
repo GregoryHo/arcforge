@@ -2059,12 +2059,12 @@ Do something.
       expect(graded.passed).toBe(true);
     });
 
-    it('should run grader in trialDir when available', () => {
+    it('should never run grader in trialDir (#250: cwd is on the import path)', () => {
       const trialDir = fs.mkdtempSync(path.join(os.tmpdir(), 'trial-cwd-'));
       fs.writeFileSync(path.join(trialDir, 'artifact.txt'), 'hello');
       try {
         const result = makeResult({ trialDir });
-        const graded = gradeWithCode(result, 'test -f artifact.txt', tempDir);
+        const graded = gradeWithCode(result, 'test ! -e artifact.txt', tempDir);
         expect(graded.passed).toBe(true);
       } finally {
         fs.rmSync(trialDir, { recursive: true, force: true });
