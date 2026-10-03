@@ -1620,3 +1620,75 @@ reverse one, append a superseding entry (see AGENTS.md).
   engine owner. The `sessions` `SKILL.md` grows from a body of 155 lines,
   already over the 150-line soft cap (the **skill-body-trim** wish), toward
   the 250-line hard cap.
+
+### D-057 — 6.4.0's round: the `sessions` scenario measures B-11 alone, and the verify-exit sentence is a finding
+- Date: 2026-10-03
+- Version: 6.4.0
+- Refines: D-055 (clause 5)
+- Refines: D-056 (clause 6)
+- Status: Accepted
+- Decision: Three changes to D-055's clause 5, fixed before any session of
+  the round is read. (i) The one `sessions` scenario,
+  `eval-sessions-handover-and-resume` Version 1, measures present-then-stop
+  ([skill-system](specs/skill-system.md) B-11) alone, not the five-section
+  handover (B-10) with it; still one scenario, preflight 3 and an A/B of 10
+  on a PASS. (iii) The `diagramming-obsidian` verify-exit sentence is NOT
+  MEASURABLE on the current engine and is recorded as a finding at 0
+  sessions — the outcome clause 5 (iii) already allows, recorded here
+  because it sets the budget. The budget is now pre-registered as 26
+  scheduled sessions (`sessions` 3 + 10, router 3 + 10), at most one full
+  10-session replacement of one A/B that reads INSUFFICIENT_DATA, and at
+  most one 3-session rerun of a preflight that measured nothing because of
+  grade or infrastructure errors: a worst case of 39, under the cap of about
+  40. The cap, the router regression run (ii) and the round's rules stand
+  unchanged; the same narrowing applies to D-056's clause 6, whose
+  "handover and present-then-stop behaviours are measured" now covers
+  present-then-stop only.
+- Why: One trial is one `claude -p` turn with one user message under
+  `--no-session-persistence` (`scripts/lib/eval-trial.js`, the stdin prompt
+  and `buildClaudeArgs`), so a trial cannot write a handover and later
+  resume from it as a second session; a prompt asking for both either
+  dictates the order or puts the stop in the prompt, which hands B-11 to the
+  baseline. B-10's distinctive half — the `.handovers/<date>-<slug>.md` path
+  and the five headings — separates the arms by construction, since an arm
+  that never saw the convention cannot produce it, so an A/B on it would
+  measure exposure, not behaviour; that shape is already checked by
+  `eval-sessions-handover-completeness` A5. No scenario in the corpus covered
+  B-11. The verify-exit gate found three independent blocks: an injected
+  `SKILL.md` carries no skill base directory, so a treatment cannot reach
+  `references/verify_saved_diagram.py` without leaving the trial, and a
+  fixture copy reaches the baseline too; a scenario cannot set a trial's
+  `PATH` or `HOME`, so the missing-dependency exit cannot be produced, and an
+  install would write user caches the write guard does not watch and leak
+  into later trials; and `eval ab` compares no skill text against one, while
+  only the pre-#267 `SKILL.md` against the current one isolates the
+  sentence, and a no-skill baseline that follows the error line's install
+  command is likely already at ceiling. Any one block alone stops the
+  measurement, so 13 sessions there would buy no evidence. The
+  rerun and replacement allowances exist because `eval ab` has no arm or
+  trial selector, so a partial rerun is impossible, and a second replacement
+  (46) would pass the cap. The 39 matches D-055's stated worst case, now made
+  of different parts. This is a refinement, not a supersession: clause 5's
+  cap, its router run and its rules still govern, and (iii)'s outcome is one
+  the clause foresaw.
+- Residual: B-10 has no A/B evidence in 6.4.0 — its shape stays on
+  `eval-sessions-handover-completeness` A5's existing reading — and B-11 is
+  measured only on a fixture-planted `.handovers/` file, not on a handover
+  the agent wrote in an earlier session nor on an archive read through
+  `arcforge session resume`. The verify-exit sentence ships on its text, as
+  #228's and #210's script changes did (D-049), and stays unmeasured until
+  three engine changes all land: the **eval-skill-files-outside-trial** wish
+  (a host-format base-directory line for the treatment, with the skill's
+  files outside the trial tree); a per-trial `PATH` and `HOME` override a
+  scenario can declare, narrower than the **eval-trial-sandbox** wish; and an
+  A/B between two skill texts rather than none against one.
+- Cost accepted: B-10 and the verify-exit sentence both ship without A/B
+  evidence this round; the 13 sessions D-055 held for (iii) and the 1-session
+  reserve are not spent on anything.
+- Verification: `evals/scenarios/eval-sessions-handover-and-resume.md`
+  Version 1 (PR #276); the design review in
+  `docs/plans/v6.4/wp-d/design-review/` — `sessions.design.json` (its
+  `departure` field), `sessions.attack.json`, `sessions.revise.json` and
+  `sessions.gate.json` (its `rerun_policy` field); the departure note
+  `docs/plans/v6.4/wp-d/departures.md`; and the gate
+  `docs/plans/v6.4/wp-d/design-gate.verify-exit.md`.

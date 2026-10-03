@@ -110,9 +110,9 @@ work carries provenance a reader can check.
   the skill names that case itself: install `uv` first. Only format corruption
   or a render mismatch sends the agent back to the canonical template, never
   to the file it just wrote (#228). The sentence reached `main` after `v6.3.0`
-  (#267) without harness evidence; 6.4.0's round measures it only if a
-  scenario designer first shows the engine can make the two arms differ, and
-  otherwise records it as a finding (D-055).
+  (#267) without harness evidence, and ships in 6.4.0 on its text alone: the
+  round's design gate found it not measurable on the current engine and
+  recorded it as a finding at 0 sessions (D-055, D-057).
 
 **Residual — most of this section has no harness evidence.** Three items rest
 on eval scenarios, and only in part: B-3 on
@@ -163,3 +163,6 @@ live behind the CLI per [cli](cli.md) B-8.
   has no harness evidence (B-5).
 - **D-055** — the verify-exit sentence that #267 put on `main` ships in 6.4.0,
   measured only if a scenario can make the arms differ (B-10).
+- **D-057** — it cannot: an injected `SKILL.md` cannot reach the verifier,
+  no trial's `PATH` or `HOME` can be overridden, and there is no A/B between
+  two skill texts, so the sentence is a finding at 0 sessions (B-10).

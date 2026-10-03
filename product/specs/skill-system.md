@@ -123,9 +123,10 @@ situations to skills.
   `arcforge session alias remove <name>` and see the names with
   `arcforge session alias list` ([cli](cli.md) B-9). The `.handovers/` file needs no CLI, so it still
   works on a host where `arcforge` does not resolve
-  ([codex-harness](codex-harness.md) B-3). B-10 and B-11 are measured at skill
-  scope in 6.4.0's round; B-12's CLI half ships on contract tests (D-055,
-  D-056).
+  ([codex-harness](codex-harness.md) B-3). B-10 is not measured in 6.4.0's
+  round; B-11 is measured at skill scope by `eval-sessions-handover-and-resume`
+  Version 1, on a `.handovers/` file the fixture plants (D-057). B-12's CLI
+  half ships on contract tests (D-055, D-056).
 
 ## Data / domain model
 
@@ -158,6 +159,9 @@ asserted by test (B-3).
   B-11).
 - **D-056** — `sessions` gains save, resume, list and alias over
   `arcforge session`, on the handover's five sections (B-10, B-11, B-12).
+- **D-057** — 6.4.0's `sessions` scenario measures present-then-stop alone:
+  a trial is one turn, so it cannot write a handover and resume it, and the
+  five-section shape separates the arms by construction (B-10, B-11).
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
 
