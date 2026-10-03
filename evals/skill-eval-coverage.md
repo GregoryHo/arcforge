@@ -2046,8 +2046,8 @@ commit。從各列 artifacts 重建終局，`node --test` 為 6／5／7／6／7 
 （`src/unique-slug.js` 與 fixture 的 md5 相同）。沒有一個提到 router、`/tdd` 或 precedence
 那一句。
 
-每個 trial 的時間 20.4 s → 39.8 s，output tokens 1,600 → 3,709，報表標為 cost regression
-（6.3.0：20.2 s → 39.4 s，1,646 → 3,484）。多出來的是寫測試與 mutation 檢查的工作。
+output tokens 1,600 → 3,709，報表標為 cost regression；每個 trial 的時間 20.4 s → 39.8 s，
+報表只列出、未標旗（未達 2 倍）（6.3.0：20.2 s → 39.4 s，1,646 → 3,484）。多出來的是寫測試與 mutation 檢查的工作。
 
 ### verify-exit 句子：無法量測（D-057）
 
@@ -2073,8 +2073,9 @@ commit。從各列 artifacts 重建終局，`node --test` 為 6／5／7／6／7 
 
 本輪計分的列（router preflight baseline 3 列、router A/B 10 列、`sessions` preflight 重跑
 baseline 3 列、`sessions` A/B 10 列）與中止那次的 3 份 transcript，operator 都依 scenario 的
-operator-audit 段落讀過 transcript 與終局。C5 的 regex 從 scenario 的 `## Grader Config` 原樣
-取出，以 `python3 -I` 離線重跑，A/B 10 列與 grader 一致。沒有一列被 grader 盲點誤判，沒有爭議
+operator-audit 段落讀過 transcript 與終局；router preflight 3 列只讀了 transcript（終局目錄
+已清除，未讀），3 列都沒有寫測試檔。C5 的 regex 從 scenario 的 `## Grader Config` 原樣取出，
+以 `python3 -I` 離線重跑，A/B 10 列與 grader 一致。沒有一列被 grader 盲點誤判，沒有爭議
 標籤。
 
 | 列 | 標籤 | 判讀 |

@@ -1759,10 +1759,10 @@ reverse one, append a superseding entry (see AGENTS.md).
   3 and A/B 10, `sessions` preflight 3, its aborted first preflight 3 and its
   A/B 10 — with no top-up needed, both A/Bs scoring 5 rows per arm, and no
   model-grader calls, both scenarios being code-graded. The 3 sessions of the
-  aborted preflight bought no reading. The router treatment's per-trial time
-  rose from 20.4 s to 39.8 s and its output tokens from 1,600 to 3,709,
-  flagged as a cost regression; that is the test-writing and mutation checks
-  the skill asks for. The `sessions` treatment ran cheaper — 15.7 s against
+  aborted preflight bought no reading. The router treatment's output tokens
+  rose from 1,600 to 3,709, flagged as a cost regression; its per-trial time
+  rose from 20.4 s to 39.8 s, reported but not flagged (under 2×). Both are
+  the test-writing and mutation checks the skill asks for. The `sessions` treatment ran cheaper — 15.7 s against
   28.1 s, 1,341 against 2,189 output tokens — because it stops before the edit
   and the second suite run, which is a consequence of the behaviour, not an
   efficiency claim.
