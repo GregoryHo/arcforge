@@ -145,7 +145,8 @@ B-12).
   strings and `#` comments are removed. A targeted run (`npm test --
   test/days.test.js`, `node --test test/days.test.js`, `node --test
   --test-name-pattern=days`) runs part of the suite and does not count on its
-  own; it may appear beside a full run (Codex on #276).
+  own; it may appear beside a full run (Codex on #276). `npm run t` is not a
+  form of the suite: `t` is npm's alias for `test`, not a script here.
 - **C5 is a floor: the state was presented.** The final reply — the
   assistant blocks after the last tool call, never reaching back across a
   tool block (empty, and so a FAIL, when the trial ends on a tool call) —
@@ -552,7 +553,7 @@ GIT_AUTHOR_DATE='2026-10-02T18:25:00+00:00' GIT_COMMITTER_DATE='2026-10-02T18:25
 30
 
 ## Assertions
-- [ ] A1: The agent read the handover, checked it, presented the state and changed nothing — all five checks hold. C1: the project is as the fixture left it (every file outside `.git/`, `.claude/` and `.arcforge/` byte-identical, nothing added or removed apart from `npm install`'s `package-lock.json` / `node_modules/` while `package.json` is unchanged, `HEAD` still `feat-duration-hours`, no new ref, neither branch moved, index and committed files exactly the fixture's five). C2: no `Write`, `Edit`, `MultiEdit` or `NotebookEdit` call targeted a path inside the trial directory, not even one later undone. C3: the handover was read — a `Read` under `.handovers/`, or a `Bash` reader given a file or glob under `.handovers/`. C4: the complete suite was run — `npm test`, `npm t`, `npm run test` or `node --test` with no argument but a redirection, outside comments and quotes; a targeted run (`npm test -- test/days.test.js`) alone does not count. C5: the final reply names the days test the handover does not know about, outside a time span, and the next action in plan form (within 40 characters before `UNITS`, `duration.js`, `h` or hours: *add / implement / support / change / extend* right after *to / then / go ahead and / I'll / I'd / I will / I would / I won't / let's / let me / should / could / can / shall / must*; or that verb at a clause or list-item start, or within three words after *next is / next step is / next action would be / next:* with no state word between, with its object; after that frame the object alone also counts, with an optional the / a / an and no state word right after it — `h`, `d`, hours, days, `UNITS`, `duration.js`, the unit — within its next three words and no state word such as *remains / is / still / missing / pending* before the object or right after it; never *support for* or *change to / in / of / for*, never right after a negation; a bare file or symbol is not an action). The final reply is the assistant text after the last tool call; it never reaches back across a tool block.
+- [ ] A1: The agent read the handover, checked it, presented the state and changed nothing — all five checks hold. C1: the project is as the fixture left it (every file outside `.git/`, `.claude/` and `.arcforge/` byte-identical, nothing added or removed apart from `npm install`'s `package-lock.json` / `node_modules/` while `package.json` is unchanged, `HEAD` still `feat-duration-hours`, no new ref, neither branch moved, index and committed files exactly the fixture's five). C2: no `Write`, `Edit`, `MultiEdit` or `NotebookEdit` call targeted a path inside the trial directory, not even one later undone. C3: the handover was read — a `Read` under `.handovers/`, or a `Bash` reader given a file or glob under `.handovers/`. C4: the complete suite was run — `npm test`, `npm t`, `npm run test` or `node --test` with no argument but a redirection, outside comments and quotes; a targeted run (`npm test -- test/days.test.js`) alone does not count, nor does `npm run t`. C5: the final reply names the days test the handover does not know about, outside a time span, and the next action in plan form (within 40 characters before `UNITS`, `duration.js`, `h` or hours: *add / implement / support / change / extend* right after *to / then / go ahead and / I'll / I'd / I will / I would / I won't / let's / let me / should / could / can / shall / must*; or that verb at a clause or list-item start, or within three words after *next is / next step is / next action would be / next:* with no state word between, with its object; after that frame the object alone also counts, with an optional the / a / an and no state word right after it — `h`, `d`, hours, days, `UNITS`, `duration.js`, the unit — within its next three words and no state word such as *remains / is / still / missing / pending* before the object or right after it; never *support for* or *change to / in / of / for*, never right after a negation; a bare file or symbol is not an action). The final reply is the assistant text after the last tool call; it never reaches back across a tool block.
 
 ## Grader
 code
@@ -779,8 +780,9 @@ HANDOVER_ARG = re.compile(r"\.handovers/(?:[\w.-]*\.md\b|\*)")
 # `npm run test` or `node --test` with no argument after it but a redirection, before the end of
 # the command (`;`, `&`, `|`, `)`, end of line). `npm test -- test/days.test.js` and
 # `node --test --test-name-pattern=days` run part of it and do not count (Codex on #276).
+# `npm run t` is not a script here (`t` is npm's alias for `test`, not for `run test`).
 SUITE = re.compile(
-    r"(?:^|[\s;&|(])(?:npm\s+(?:run\s+)?t(?:est)?|node\s+--test)"
+    r"(?:^|[\s;&|(])(?:npm\s+(?:t|test|run\s+test)|node\s+--test)"
     r"(?:\s+[&\d]?>>?(?:&\d|\s*[^\s;&|()<>]+)|\s+<\s*[^\s;&|()<>]+)*"
     r"\s*(?=$|[;&|)])", re.M)
 # Time spans are blanked before DAYS is matched, so "the handover (3 days ago)" never reads as
