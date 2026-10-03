@@ -166,8 +166,8 @@ uv run python verify_saved_diagram.py <vault-path>/<name>.excalidraw.md
 ```
 
 Non-zero exit prints one line naming the cause; read it before acting. A missing
-`uv`, playwright, or Chromium is setup, not corruption: install what the line
-names (the setup command above) and verify again — do not regenerate. An `ea.create()`
+dependency is setup, not corruption — do not regenerate. No `uv`: install `uv`
+first. No playwright or Chromium: run the setup command above. Then verify again. An `ea.create()`
 save is a compressed-json block, which the verifier does not decode. On that
 path it checks the format markers only, so exit zero does not show the canvas
 renders. On format corruption or a render mismatch,
