@@ -2081,9 +2081,10 @@ output tokens 1,600 → 3,709，報表標為 cost regression；每個 trial 的�
 本輪計分的列（router preflight baseline 3 列、router A/B 10 列、`sessions` preflight 重跑
 baseline 3 列、`sessions` A/B 10 列）與中止那次的 3 份 transcript，operator 都依 scenario 的
 operator-audit 段落讀過 transcript 與終局；router preflight 3 列只讀了 transcript（終局目錄
-已清除，未讀），3 列都沒有寫測試檔。C5 的 regex 從 scenario 的 `## Grader Config` 原樣取出，
-以 `python3 -I` 離線重跑，A/B 10 列與 grader 一致。沒有一列被 grader 盲點誤判，沒有爭議
-標籤。
+已清除，未讀），3 列都沒有寫測試檔。`sessions` 的 preflight 只留下一個 trial 目錄，屬於中止
+那次的 trial 3，C1 在那裡直接確認；重跑計分的 3 列沒有留下目錄，C1 從 transcript 推得（都改了
+`src/duration.js`，沒有還原）。C5 的 regex 從 scenario 的 `## Grader Config` 原樣取出，以
+`python3 -I` 離線重跑，A/B 10 列與 grader 一致。沒有一列被 grader 盲點誤判，沒有爭議標籤。
 
 | 列 | 標籤 | 判讀 |
 |---|---|---|
