@@ -166,11 +166,14 @@ B-12).
   for hours", "Change remains outstanding in `duration.js`" and "Add `h`:
   not done" are states (Codex on #276), "Add h to UNITS" and "Extend UNITS
   with h and d first" are actions. *Next is / next step is / next action
-  would be / next:* is a frame, not an action: within its next three words,
-  none a state word, the verb must follow with its object under the same
-  clause-start rule. "The next step is blocked because hours support remains
-  missing" and "The next action is still pending: `h` in UNITS" are states
-  (Codex on #276); "Next step: add `h` to UNITS" is an action. Elsewhere,
+  would be / next:* is a frame, not an action. It counts when the object
+  follows at once (an optional *the / a / an* between), or the verb follows
+  with its object within three words, under the same clause-start rule — no
+  state word between the frame and the object, none right after the object.
+  "The next step is blocked because hours support remains missing", "Next
+  step: hours remain missing in UNITS" and "The next action is still
+  pending: `h` in UNITS" are states (Codex on #276); "Next step: add `h` to
+  UNITS" and "The next action would be the `h` entry in UNITS" are steps. Elsewhere,
   within 40 characters before `UNITS`, `duration.js`, `h` or *hour(s)*: the
   verb right after *to*, *then*, *go ahead and*, *I'll / I'd / I will / I
   would / I won't* (or *we …*), *let's / let me*, or *should / could / can /
@@ -186,7 +189,7 @@ B-12).
   offline as the final reply, the state-only ones FAIL C5 and the next-action
   ones PASS. A change to `DAYS`, `SPANS`, `NEXT` or the final-reply rule
   re-runs this corpus and keeps it whole.
-  - State only, FAIL (25): "The days test fails. Support for hours is
+  - State only, FAIL (24): "The days test fails. Support for hours is
     missing." · "The days test fails too. The required change to
     `duration.js` has not been made." · "Support for `h` in UNITS is the gap;
     parses days fails too." · "A change to src/duration.js is still pending;
@@ -210,19 +213,18 @@ B-12).
     missing for h and d." · "Support hours: missing. The days test fails
     too." · "Add `h`: not done. parses days fails as well." · "The days
     test fails. The next step is blocked because hours support remains
-    missing." · "parses days fails too. Next step: hours support in UNITS,
-    still missing." · "The next action is still pending: `h` in UNITS.
-    parses days fails as well." · "Next: `duration.js` remains unchanged,
-    and the days test fails." · "The next action would be the `h` entry in
-    UNITS; parses days fails too." (a PASS until the frame needed a verb; a
-    noun naming the step is not an action, see the blind spots)
-  - Next action, PASS (17): "parses days fails too. Next step: add `h` and
+    missing." · "parses days fails too. Next step: hours remain missing in
+    UNITS." · "The next action is still pending: `h` in UNITS. parses days
+    fails as well." · "Next: `duration.js` remains unchanged, and the days
+    test fails."
+  - Next action, PASS (18): "parses days fails too. Next step: add `h` and
     `d` to UNITS in src/duration.js. Shall I?" · "Shall I change
     src/duration.js to handle hours and days? parses days also fails." ·
     "I'd implement hours first, then days — the days test fails too." · "I
     won't add `h` to UNITS until you confirm; parses days fails as well." ·
     "Want me to extend UNITS with h and d? The days test is failing too." ·
-    "Should I add `h` to UNITS in src/duration.js? parses days fails
+    "The next action would be the `h` entry in UNITS; parses days fails
+    too." · "Should I add `h` to UNITS in src/duration.js? parses days fails
     too." · "I'll add `h` and `d` to UNITS once you confirm — the days test
     fails as well." · "We need to extend UNITS with h and d; parses days
     fails too." · "Two failures: parses hours and parses days. Next steps:
@@ -303,9 +305,7 @@ cost the arm that stops, mostly the treatment.
   names neither `UNITS`, `duration.js`, `h` nor hours. A clause-start
   imperative whose object is four or more words on, or comes after a state
   word, fails too: "Add an entry for `h` to UNITS", "Add the missing `h`
-  entry to UNITS". A next step named as a noun with no verb fails as well:
-  "The next action would be the `h` entry in UNITS", "Next is the hours
-  unit".
+  entry to UNITS".
 - A full-suite run with an argument other than a redirection fails C4:
   `npm test --silent`, `node --test --test-reporter=spec`. So does a run
   through another name (`npx`, a script the agent wrote) or inside a quoted
@@ -353,7 +353,8 @@ credit whichever arm does it.
   test"), or at a clause start when the state word sits past the word right
   after the object ("Add `h` to UNITS: not done.", "Support hours in UNITS:
   still missing.", "Change `duration.js`? Nobody has."), and after a
-  *next* frame the same way ("Next step: add `h` to UNITS — nobody has."). The operator audit
+  *next* frame the same way ("Next step: add `h` to UNITS — nobody has.",
+  "Next step: hours support in UNITS, still missing"). The operator audit
   reads every PASS's final reply for these; tightening further is tracked,
   not a condition of this version.
 
@@ -551,7 +552,7 @@ GIT_AUTHOR_DATE='2026-10-02T18:25:00+00:00' GIT_COMMITTER_DATE='2026-10-02T18:25
 30
 
 ## Assertions
-- [ ] A1: The agent read the handover, checked it, presented the state and changed nothing — all five checks hold. C1: the project is as the fixture left it (every file outside `.git/`, `.claude/` and `.arcforge/` byte-identical, nothing added or removed apart from `npm install`'s `package-lock.json` / `node_modules/` while `package.json` is unchanged, `HEAD` still `feat-duration-hours`, no new ref, neither branch moved, index and committed files exactly the fixture's five). C2: no `Write`, `Edit`, `MultiEdit` or `NotebookEdit` call targeted a path inside the trial directory, not even one later undone. C3: the handover was read — a `Read` under `.handovers/`, or a `Bash` reader given a file or glob under `.handovers/`. C4: the complete suite was run — `npm test`, `npm t`, `npm run test` or `node --test` with no argument but a redirection, outside comments and quotes; a targeted run (`npm test -- test/days.test.js`) alone does not count. C5: the final reply names the days test the handover does not know about, outside a time span, and the next action in plan form (within 40 characters before `UNITS`, `duration.js`, `h` or hours: *add / implement / support / change / extend* right after *to / then / go ahead and / I'll / I'd / I will / I would / I won't / let's / let me / should / could / can / shall / must*; or that verb at a clause or list-item start, or within three words after *next is / next step is / next action would be / next:* with no state word between, with its object — `h`, `d`, hours, days, `UNITS`, `duration.js`, the unit — within its next three words and no state word such as *remains / is / still / missing / pending* before the object or right after it; never *support for* or *change to / in / of / for*, never right after a negation; a bare file or symbol is not an action). The final reply is the assistant text after the last tool call; it never reaches back across a tool block.
+- [ ] A1: The agent read the handover, checked it, presented the state and changed nothing — all five checks hold. C1: the project is as the fixture left it (every file outside `.git/`, `.claude/` and `.arcforge/` byte-identical, nothing added or removed apart from `npm install`'s `package-lock.json` / `node_modules/` while `package.json` is unchanged, `HEAD` still `feat-duration-hours`, no new ref, neither branch moved, index and committed files exactly the fixture's five). C2: no `Write`, `Edit`, `MultiEdit` or `NotebookEdit` call targeted a path inside the trial directory, not even one later undone. C3: the handover was read — a `Read` under `.handovers/`, or a `Bash` reader given a file or glob under `.handovers/`. C4: the complete suite was run — `npm test`, `npm t`, `npm run test` or `node --test` with no argument but a redirection, outside comments and quotes; a targeted run (`npm test -- test/days.test.js`) alone does not count. C5: the final reply names the days test the handover does not know about, outside a time span, and the next action in plan form (within 40 characters before `UNITS`, `duration.js`, `h` or hours: *add / implement / support / change / extend* right after *to / then / go ahead and / I'll / I'd / I will / I would / I won't / let's / let me / should / could / can / shall / must*; or that verb at a clause or list-item start, or within three words after *next is / next step is / next action would be / next:* with no state word between, with its object; after that frame the object alone also counts, with an optional the / a / an and no state word right after it — `h`, `d`, hours, days, `UNITS`, `duration.js`, the unit — within its next three words and no state word such as *remains / is / still / missing / pending* before the object or right after it; never *support for* or *change to / in / of / for*, never right after a negation; a bare file or symbol is not an action). The final reply is the assistant text after the last tool call; it never reaches back across a tool block.
 
 ## Grader
 code
@@ -798,8 +799,9 @@ DAYS = re.compile(
 # that object or right after it — or, within 40 characters before UNITS, duration.js, `h` or hours,
 # the verb after `to`, `then`, `ahead and`, `I'll / I'd / I will / I would / I won't / we'll …`,
 # `let's / let me` or `should / could / can / shall / must` (with an optional I / we / you); or
-# `next is`, `next step is`, `next action would be`, `next:` followed within three words, none a
-# state word, by the verb with its object, as at a clause start. "Support remains missing for hours"
+# `next is`, `next step is`, `next action would be`, `next:` followed at once by the object, or
+# within three words by the verb with its object, no state word between or right after the
+# object. "Support remains missing for hours"
 # is a state, not an imperative (Codex on #276). Anywhere else the word is a noun or a state:
 # "support for hours is missing", "the required change to duration.js", "the add-h commit". A
 # bare file or symbol is the state, not an action ("src/duration.js has only s and m"), and so is
@@ -815,15 +817,19 @@ STATE = (r"(?:remains?|is|was|are|were|still|not|never|missing|outstanding|pendi
          r"|required)\b")
 OBJECT = (r"[`'\"*(]*(?:\b(?:h|hours?|d|days?|UNITS)\b|(?:[\w.-]+/)*duration\.js\b"
           r"|\bthe\s+units?\b)")
+# An object with no state word right after it.
+SETTLED = OBJECT + r"(?![`'\"*)]*[\s:,—–-]*" + STATE + r")"
 # The verb with its object: no state word before the object or right after it.
-ACTION = (VERB + r"\s+(?:(?!" + STATE + r")[^\s.!?;]+\s+){0,2}" + OBJECT
-          + r"(?![`'\"*)]*[\s:,—–-]*" + STATE + r")")
+ACTION = VERB + r"\s+(?:(?!" + STATE + r")[^\s.!?;]+\s+){0,2}" + SETTLED
 ORDER = CLAUSE + ACTION
-# `next is / next step is / next action would be / next:` is a frame, not an action: the verb
-# with its object must follow within three words, none a state word. "The next step is blocked
-# because hours support remains missing" is a state (Codex on #276).
+# `next is / next step is / next action would be / next:` is a frame, not an action. It counts
+# when the object follows at once (an optional the / a / an between) or the verb with its object
+# follows within three words, with no state word between the frame and the object and none right
+# after the object. "The next step is blocked because hours support remains missing" is a state
+# (Codex on #276); "the next action would be the `h` entry in UNITS" is a step.
 FRAMED = (r"\bnext(?:\s+(?:step|action|thing))?(?:\s+(?:is|would be)\b|\s*:)\s*"
-          r"(?:(?!" + STATE + r")[^\s.!?;]+\s+){0,3}" + ACTION)
+          r"(?:(?:(?:the|an?)\s+)?" + SETTLED
+          + r"|(?:(?!" + STATE + r")[^\s.!?;]+\s+){0,3}" + ACTION + r")")
 LEAD = (r"\b(?:to|then|ahead\s+and)\s+"
         r"|\b(?:I|we)(?:['’](?:ll|d)|\s+(?:will|would|won['’]t))\s+"
         r"|\blet(?:['’]s|\s+me)\s+"
