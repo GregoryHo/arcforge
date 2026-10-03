@@ -214,7 +214,7 @@ function SessionLearning({theme:t}) {
         n="07"
         kicker="OPTIONAL WORKFLOW · SESSION MEMORY"
         title={<>Pick up where you <em style={{color:t.brass,fontStyle:'italic'}}>left off.</em> Learn only when it earns it.</>}
-        sub={<>Lightweight handover by default — five-line "you are here" markers, not heavy archives. Opt-in learning is <em style={{color:t.ink,fontStyle:'italic'}}>off until you turn it on per project</em>; once enabled, three explicit gates stand between any pattern and active behavior. The <em style={{color:t.ink,fontStyle:'italic'}}>learning dashboard</em> (<code>arcforge learn dashboard</code>) is the review and control surface where you approve, promote, or deactivate each candidate.</>}
+        sub={<>Lightweight handover by default — five-line "you are here" markers, not heavy archives. Opt-in learning is <em style={{color:t.ink,fontStyle:'italic'}}>off until you turn it on</em>; once enabled, three explicit gates stand between any pattern and active behavior. The <em style={{color:t.ink,fontStyle:'italic'}}>learning dashboard</em> (<code>arcforge learn dashboard</code>) is the review and control surface where you approve, promote, or deactivate each candidate.</>}
         theme={t}
       />
       <div data-af-reveal style={{background:t.bg2,border:`1px solid ${t.line}`,padding:'56px 56px',position:'relative'}}>
@@ -301,7 +301,7 @@ function SkillsGrid({theme:t}) {
   const layers = [
     ['Self-contained', t.ember, 'no shared state', 'Every skill is a closed unit. It can be read, moved, or deleted without touching anything else — and it reaches the engine one way only, through the CLI.'],
     ['Description-triggered', t.brass, 'no global preamble', 'A skill fires because its description matches the situation in front of you. There is no mandatory routing rule injected into every session.'],
-    ['Eval-backed', t.dim, 'measured, not asserted', 'A skill ships when trials show it changes what an agent does against a baseline that lacked it. Claims without numbers do not land.'],
+    ['Eval-backed', t.dim, 'measured, gaps named', 'Skills are measured against a baseline that lacks them. Where a claim has no A/B evidence yet, the coverage ledger says so.'],
   ];
   const groups = [
     ['Orientation', t.dim, [
