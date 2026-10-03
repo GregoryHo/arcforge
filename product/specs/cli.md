@@ -149,7 +149,9 @@ record's `lastUpdated` stamp it was read at, then the five handover sections
 verbatim as `save --from` supplied them, and no text of the user's messages ([learning](learning.md) B-20). The alias index is `~/.arcforge/sessions/<project>/aliases.json`, owned by
 `scripts/lib/session-aliases.js`: a `version` and an `aliases` map from name to
 `{ sessionPath, createdAt, updatedAt, title }`, written through the shared
-atomic-write helper ([learning](learning.md) B-22). `<project>` is the sanitized
+atomic-write helper ([learning](learning.md) B-22); every change to it holds
+`aliases.lock` beside it from load to save, so processes changing aliases at once
+never drop each other's changes. `<project>` is the sanitized
 directory basename, so two same-named projects share both (D-037, D-056).
 
 ## Decisions

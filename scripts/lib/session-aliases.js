@@ -2,11 +2,20 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { atomicWriteFile } = require('./atomic-write');
+const { withLock } = require('./locking');
 const { getProjectSessionsDir, log } = require('./utils');
 
 const ALIASES_FILENAME = 'aliases.json';
 const ALIAS_VERSION = '1.0';
 const MAX_ALIAS_LENGTH = 128;
+// Every change to the index holds this lock file beside it, from load to save:
+// the atomic write alone keeps a reader from seeing half a file, but two writers
+// that load the same index would each save their own copy, and the second would
+// drop the first's change. The holder of a lock older than locking.js's stale
+// threshold (30 s) is taken to be dead and the lock is reclaimed — a change
+// holds it for one small read and write.
+const LOCK_FILENAME = 'aliases.lock';
+const LOCK_WAIT_MS = 2000;
 
 /**
  * Get aliases file path for a project.
@@ -15,6 +24,25 @@ const MAX_ALIAS_LENGTH = 128;
  */
 function getAliasesPath(project) {
   return path.join(getProjectSessionsDir(project), ALIASES_FILENAME);
+}
+
+/**
+ * Run `fn` holding the project's alias-index lock. Waits up to LOCK_WAIT_MS for
+ * another writer, then throws naming the lock file.
+ */
+function withAliasesLock(project, fn) {
+  const dir = getProjectSessionsDir(project);
+  fs.mkdirSync(dir, { recursive: true });
+  try {
+    return withLock(dir, fn, { lockName: LOCK_FILENAME, timeout: LOCK_WAIT_MS });
+  } catch (err) {
+    if (err.name !== 'LockError') throw err;
+    const lockPath = path.join(dir, LOCK_FILENAME);
+    throw new Error(
+      `alias index is locked: ${lockPath} was held by another process for ${LOCK_WAIT_MS}ms`,
+      { cause: err },
+    );
+  }
 }
 
 /**
@@ -124,27 +152,29 @@ function setAlias(project, alias, sessionPath, title = null, { force = false } =
     return { success: false, error: 'Session path cannot be empty' };
   }
 
-  const data = loadAliases(project);
-  const existing = getEntry(data, alias);
-  const isNew = !existing;
-  if (existing && !force) {
-    return {
-      success: false,
-      error: `alias "${alias}" already exists — pass --force to overwrite it`,
+  return withAliasesLock(project, () => {
+    const data = loadAliases(project);
+    const existing = getEntry(data, alias);
+    const isNew = !existing;
+    if (existing && !force) {
+      return {
+        success: false,
+        error: `alias "${alias}" already exists — pass --force to overwrite it`,
+      };
+    }
+
+    data.aliases[alias] = {
+      sessionPath,
+      createdAt: existing ? existing.createdAt : new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      title: title || null,
     };
-  }
 
-  data.aliases[alias] = {
-    sessionPath,
-    createdAt: existing ? existing.createdAt : new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    title: title || null,
-  };
-
-  if (saveAliases(project, data)) {
-    return { success: true, isNew, alias, sessionPath };
-  }
-  return { success: false, error: 'Failed to save alias' };
+    if (saveAliases(project, data)) {
+      return { success: true, isNew, alias, sessionPath };
+    }
+    return { success: false, error: 'Failed to save alias' };
+  });
 }
 
 /**
@@ -219,17 +249,19 @@ function listAliases(project, options = {}) {
  * @returns {{ success: boolean, error?: string }}
  */
 function deleteAlias(project, alias) {
-  const data = loadAliases(project);
-  if (!getEntry(data, alias)) {
-    return { success: false, error: `Alias '${alias}' not found` };
-  }
+  return withAliasesLock(project, () => {
+    const data = loadAliases(project);
+    if (!getEntry(data, alias)) {
+      return { success: false, error: `Alias '${alias}' not found` };
+    }
 
-  delete data.aliases[alias];
+    delete data.aliases[alias];
 
-  if (saveAliases(project, data)) {
-    return { success: true, alias };
-  }
-  return { success: false, error: 'Failed to delete alias' };
+    if (saveAliases(project, data)) {
+      return { success: true, alias };
+    }
+    return { success: false, error: 'Failed to delete alias' };
+  });
 }
 
 module.exports = {

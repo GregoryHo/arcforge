@@ -268,6 +268,9 @@ and `_`, at most 128 characters; anything else is refused, never rewritten, and
 no name is reserved. Replacing a name that already exists, through `save` or
 `alias set`, needs `--force`. `<project>` is the project directory's name, so
 two projects with the same directory name share their archives and aliases.
+Commands that change aliases at the same time take turns on
+`~/.arcforge/sessions/<project>/aliases.lock`; one that waits more than 2
+seconds fails with `alias index is locked` and that path.
 
 | Flag | Effect |
 |------|--------|

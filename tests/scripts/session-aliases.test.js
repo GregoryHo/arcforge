@@ -279,6 +279,21 @@ describe('session-aliases', () => {
     });
   });
 
+  describe('index lock', () => {
+    it('releases aliases.lock when a change throws', () => {
+      const { setAlias, deleteAlias, getAliasesPath } = getAliasesModule();
+      const lockProject = 'lock-release-project';
+      const indexPath = getAliasesPath(lockProject);
+      const lockPath = path.join(path.dirname(indexPath), 'aliases.lock');
+      fs.mkdirSync(path.dirname(indexPath), { recursive: true });
+      fs.writeFileSync(indexPath, '{ not json');
+      expect(() => setAlias(lockProject, 'x', '/x.md')).toThrow(/is not valid JSON/);
+      expect(fs.existsSync(lockPath)).toBe(false);
+      expect(() => deleteAlias(lockProject, 'x')).toThrow(/is not valid JSON/);
+      expect(fs.existsSync(lockPath)).toBe(false);
+    });
+  });
+
   describe('persistence', () => {
     it('aliases persist across loadAliases calls', () => {
       const { setAlias } = getAliasesModule();
