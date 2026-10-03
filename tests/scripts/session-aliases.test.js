@@ -109,6 +109,70 @@ describe('session-aliases', () => {
         expect(fs.readFileSync(file, 'utf8')).toBe(bad);
       }
     });
+
+    it('fails loudly when the file cannot be read, naming it and the error', () => {
+      const { getAliasesPath, setAlias, listAliases } = getAliasesModule();
+      const file = getAliasesPath('unreadable-project');
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, '{"version":"1.0","aliases":{"keep":{"sessionPath":"/k.md"}}}');
+      const realRead = fs.readFileSync;
+      const spy = jest.spyOn(fs, 'readFileSync').mockImplementation((p, ...rest) => {
+        if (p === file) {
+          throw Object.assign(new Error(`EACCES: permission denied, open '${file}'`), {
+            code: 'EACCES',
+          });
+        }
+        return realRead(p, ...rest);
+      });
+      try {
+        expect(() => listAliases('unreadable-project')).toThrow(
+          /Cannot read .*aliases\.json: EACCES: permission denied/,
+        );
+        expect(() => setAlias('unreadable-project', 'new', '/x.md')).toThrow(/EACCES/);
+      } finally {
+        spy.mockRestore();
+      }
+      expect(JSON.parse(fs.readFileSync(file, 'utf8')).aliases).toEqual({
+        keep: { sessionPath: '/k.md' },
+      });
+    });
+
+    it('fails loudly when aliases.json is a directory, and reads a missing one as empty', () => {
+      const { getAliasesPath, listAliases } = getAliasesModule();
+      const file = getAliasesPath('dir-project');
+      fs.mkdirSync(file, { recursive: true });
+      expect(() => listAliases('dir-project')).toThrow(/Cannot read .*aliases\.json: EISDIR/);
+      expect(listAliases('no-index-project')).toEqual([]);
+    });
+  });
+
+  describe('names that are Object.prototype keys', () => {
+    const names = ['constructor', 'toString', '__proto__'];
+
+    it('are new on a fresh index, persist, resolve, list and delete like any name', () => {
+      const { setAlias, resolveAlias, listAliases, deleteAlias, getAliasesPath } =
+        getAliasesModule();
+      const proj = 'proto-project';
+      for (const name of names) {
+        expect(resolveAlias(proj, name)).toBeNull();
+        expect(deleteAlias(proj, name).success).toBe(false);
+        const result = setAlias(proj, name, `/s/${name}.md`);
+        expect(result).toMatchObject({ success: true, isNew: true });
+      }
+      const onDisk = JSON.parse(fs.readFileSync(getAliasesPath(proj), 'utf8'));
+      expect(Object.keys(onDisk.aliases).sort()).toEqual([...names].sort());
+      for (const name of names) {
+        expect(resolveAlias(proj, name).sessionPath).toBe(`/s/${name}.md`);
+        expect(setAlias(proj, name, '/other.md').success).toBe(false);
+      }
+      expect(
+        listAliases(proj)
+          .map((a) => a.name)
+          .sort(),
+      ).toEqual([...names].sort());
+      for (const name of names) expect(deleteAlias(proj, name).success).toBe(true);
+      expect(listAliases(proj)).toEqual([]);
+    });
   });
 
   describe('setAlias', () => {

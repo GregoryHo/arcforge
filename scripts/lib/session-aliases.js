@@ -1,7 +1,8 @@
 // scripts/lib/session-aliases.js
+const fs = require('node:fs');
 const path = require('node:path');
 const { atomicWriteFile } = require('./atomic-write');
-const { readFileSafe, getProjectSessionsDir, log } = require('./utils');
+const { getProjectSessionsDir, log } = require('./utils');
 
 const ALIASES_FILENAME = 'aliases.json';
 const ALIAS_VERSION = '1.0';
@@ -17,13 +18,19 @@ function getAliasesPath(project) {
 }
 
 /**
- * Default aliases structure.
+ * Default aliases structure. The map has no prototype, so a name such as
+ * `constructor` or `__proto__` is an ordinary key.
  */
 function getDefaultAliases() {
   return {
     version: ALIAS_VERSION,
-    aliases: {},
+    aliases: Object.create(null),
   };
+}
+
+/** The entry stored under `name`, never one inherited from a prototype. */
+function getEntry(data, name) {
+  return Object.hasOwn(data.aliases, name) ? data.aliases[name] : undefined;
 }
 
 /**
@@ -32,8 +39,15 @@ function getDefaultAliases() {
  * @returns {Object} Aliases data
  */
 function loadAliases(project) {
-  const content = readFileSafe(getAliasesPath(project));
-  if (!content) return getDefaultAliases();
+  let content;
+  try {
+    content = fs.readFileSync(getAliasesPath(project), 'utf8');
+  } catch (err) {
+    // Only a missing file means "no index yet": an unreadable one read as
+    // empty would be overwritten by the next save.
+    if (err.code === 'ENOENT') return getDefaultAliases();
+    throw new Error(`Cannot read ${getAliasesPath(project)}: ${err.message}`, { cause: err });
+  }
 
   let data;
   try {
@@ -50,6 +64,8 @@ function loadAliases(project) {
     );
   }
   if (!data.version) data.version = ALIAS_VERSION;
+  // JSON.parse makes "__proto__" an own key; copying keeps it one.
+  data.aliases = Object.assign(Object.create(null), data.aliases);
   return data;
 }
 
@@ -109,7 +125,7 @@ function setAlias(project, alias, sessionPath, title = null, { force = false } =
   }
 
   const data = loadAliases(project);
-  const existing = data.aliases[alias];
+  const existing = getEntry(data, alias);
   const isNew = !existing;
   if (existing && !force) {
     return {
@@ -143,7 +159,7 @@ function resolveAlias(project, alias) {
   if (!validation.valid) return null;
 
   const data = loadAliases(project);
-  const entry = data.aliases[alias];
+  const entry = getEntry(data, alias);
   if (!entry) return null;
 
   return {
@@ -204,7 +220,7 @@ function listAliases(project, options = {}) {
  */
 function deleteAlias(project, alias) {
   const data = loadAliases(project);
-  if (!data.aliases[alias]) {
+  if (!getEntry(data, alias)) {
     return { success: false, error: `Alias '${alias}' not found` };
   }
 
