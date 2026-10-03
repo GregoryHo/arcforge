@@ -310,7 +310,7 @@ function SkillsGrid({theme:t}) {
     ['Doing the work', t.ember, [
       ['brainstorming','explore before the design settles'],
       ['executing','task list, then run it'],
-      ['speccing','specs and decision log move with the code'],
+      ['speccing','specs and decision log move with the code · successor to the v5 pipeline, files not an engine'],
       ['dispatching','parallel work, isolated writers'],
       ['looping','unattended across fresh sessions'],
       ['finishing','merge, PR, keep, or discard'],

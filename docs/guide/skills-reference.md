@@ -80,7 +80,11 @@ when a shipped version needs its roadmap row and spec header flipped, or when
 the user asks to start keeping product state this way. Two rules carry it: the
 spec and the code merge in the same PR, and a recorded decision is superseded
 rather than edited. It never creates product files in a repo whose user has not
-asked for them.
+asked for them. It is the file-based successor to v5's spec-driven pipeline:
+the product intent that pipeline kept now lives as living specs, a roadmap, a
+decision log, and a backlog under `product/`. The pipeline's automated stages —
+spec refinement, `dag.yaml` generation, build orchestration — were removed in
+6.0.0 and are not replaced.
 
 `brainstorming` settles what to build; `speccing` records what was settled.
 
