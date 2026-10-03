@@ -61,7 +61,7 @@ describe('findLatestSessionRecord', () => {
     expect(findLatestSessionRecord('none')).toBeNull();
   });
 
-  it('picks the most recently updated record of the newest date that has one', () => {
+  it('picks the most recently updated record across date directories', () => {
     writeRecord('p', '2026-10-02', {
       sessionId: 'session-old',
       lastUpdated: '2026-10-02T23:00:00Z',
@@ -70,6 +70,39 @@ describe('findLatestSessionRecord', () => {
     writeRecord('p', '2026-10-03', { sessionId: 'session-b', lastUpdated: '2026-10-03T10:00:00Z' });
     fs.mkdirSync(path.join(home, 'sessions', 'p', '2026-10-04'));
     expect(findLatestSessionRecord('p').sessionId).toBe('session-b');
+  });
+
+  it('a record in an older date directory with a later lastUpdated wins (midnight)', () => {
+    writeRecord('p', '2026-10-02', {
+      sessionId: 'session-overnight',
+      started: '2026-10-02T23:30:00Z',
+      lastUpdated: '2026-10-03T01:00:00Z',
+    });
+    writeRecord('p', '2026-10-03', {
+      sessionId: 'session-today',
+      started: '2026-10-03T00:10:00Z',
+      lastUpdated: '2026-10-03T00:20:00Z',
+    });
+    expect(findLatestSessionRecord('p').sessionId).toBe('session-overnight');
+  });
+
+  it('breaks a lastUpdated tie by the later started', () => {
+    writeRecord('p', '2026-10-02', {
+      sessionId: 'session-early',
+      started: '2026-10-02T22:00:00Z',
+      lastUpdated: '2026-10-03T01:00:00Z',
+    });
+    writeRecord('p', '2026-10-03', {
+      sessionId: 'session-late',
+      started: '2026-10-03T00:30:00Z',
+      lastUpdated: '2026-10-03T01:00:00Z',
+    });
+    writeRecord('p', '2026-10-01', {
+      sessionId: 'session-mid',
+      started: '2026-10-02T23:00:00Z',
+      lastUpdated: '2026-10-03T01:00:00Z',
+    });
+    expect(findLatestSessionRecord('p').sessionId).toBe('session-late');
   });
 
   it('skips an unparseable record file', () => {

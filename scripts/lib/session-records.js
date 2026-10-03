@@ -39,21 +39,30 @@ function readRecords(dir) {
 }
 
 const byLastUpdatedDesc = (a, b) => String(b.lastUpdated).localeCompare(String(a.lastUpdated));
+const byStartedDesc = (a, b) => String(b.started).localeCompare(String(a.started));
 
 /**
- * The project's most recent session-tracker record: the most recently updated
- * `session-*.json` in the newest date directory that holds one.
+ * The project's most recent session-tracker record: the greatest `lastUpdated`
+ * across every date directory (a session that crosses midnight keeps updating
+ * its record in the day it started), ties broken by the later `started`.
  * @param {string} project
  * @returns {Object|null}
  */
 function findLatestSessionRecord(project) {
   const sessionsDir = getProjectSessionsDir(project);
   if (!fs.existsSync(sessionsDir)) return null;
+  let latest = null;
   for (const date of getDateDirs(sessionsDir)) {
-    const records = readRecords(path.join(sessionsDir, date));
-    if (records.length > 0) return records.sort(byLastUpdatedDesc)[0];
+    for (const record of readRecords(path.join(sessionsDir, date))) {
+      if (!latest) {
+        latest = record;
+        continue;
+      }
+      const order = byLastUpdatedDesc(record, latest) || byStartedDesc(record, latest);
+      if (order < 0) latest = record;
+    }
   }
-  return null;
+  return latest;
 }
 
 /**

@@ -270,7 +270,9 @@ no name is reserved. Replacing a name that already exists, through `save` or
 two projects with the same directory name share their archives and aliases.
 Commands that change aliases at the same time take turns on
 `~/.arcforge/sessions/<project>/aliases.lock`; one that waits more than 2
-seconds fails with `alias index is locked` and that path.
+seconds fails with `alias index is locked` and that path. `save` holds that
+lock from its alias check until the alias is set, so of two saves racing for
+one new name exactly one keeps an archive; the other is refused and writes none.
 
 | Flag | Effect |
 |------|--------|

@@ -2,7 +2,8 @@
 /**
  * Concurrency contract for the alias index (cli B-9): every change holds
  * `aliases.lock` beside `aliases.json` from load to save, so `arcforge session`
- * processes running at once never drop each other's changes.
+ * processes running at once never drop each other's changes; `save` holds it
+ * from its alias check until the alias is set, so a refused alias leaves no archive.
  *
  * Each test runs real `node scripts/cli.js session alias ...` child processes
  * with ARCFORGE_HOME and CLAUDE_PROJECT_DIR pointed at tmp dirs.
@@ -45,10 +46,11 @@ main; npm test — 1 passed
 1. npm test
 `;
 
-/** Run the CLI to completion; resolves { code, stdout, stderr }. */
-function runCli(args) {
+/** Run the CLI to completion, `input` on stdin; resolves { code, stdout, stderr }. */
+function runCli(args, input = '') {
   return new Promise((resolve) => {
     const child = spawn('node', [CLI_PATH, ...args], { env: ENV, cwd: PROJECT_DIR });
+    child.stdin.end(input);
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', (d) => {
@@ -59,6 +61,14 @@ function runCli(args) {
     });
     child.on('close', (code) => resolve({ code, stdout, stderr }));
   });
+}
+
+/** Every archive file under the project's date directories. */
+function listArchiveFiles() {
+  return fs
+    .readdirSync(SESSIONS, { recursive: true })
+    .filter((f) => path.basename(f).startsWith('archive-') && f.endsWith('.md'))
+    .sort();
 }
 
 function aliasNames() {
@@ -136,6 +146,25 @@ async function main() {
     assert.notStrictEqual(r.code, 0);
     assert.ok(r.stderr.includes(`alias index is locked: ${LOCK}`), r.stderr);
     assert.ok(aliasNames().includes('waited'), 'removed without the lock');
+  });
+
+  await test('two concurrent saves of one new alias: one archive, one refusal', async () => {
+    const archivesBefore = listArchiveFiles();
+    const results = await Promise.all([
+      runCli(['session', 'save', 'raced', '--from', '-'], FIVE),
+      runCli(['session', 'save', 'raced', '--from', '-'], FIVE),
+    ]);
+    const won = results.filter((r) => r.code === 0);
+    const lost = results.filter((r) => r.code !== 0);
+    assert.strictEqual(won.length, 1, results.map((r) => r.stderr).join('\n'));
+    assert.strictEqual(lost.length, 1);
+    assert.ok(lost[0].stderr.includes('alias "raced" already exists'), lost[0].stderr);
+    const added = listArchiveFiles().filter((f) => !archivesBefore.includes(f));
+    assert.strictEqual(added.length, 1, `archives added: ${added.join(', ')}`);
+    assert.ok(added[0].includes('archive-raced-'), added[0]);
+    const index = JSON.parse(fs.readFileSync(ALIASES, 'utf8')).aliases;
+    assert.strictEqual(path.basename(index.raced.sessionPath), path.basename(added[0]));
+    assert.ok(!fs.existsSync(LOCK), 'lock left behind');
   });
 
   fs.rmSync(tmp, { recursive: true, force: true });

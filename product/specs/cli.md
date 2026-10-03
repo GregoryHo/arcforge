@@ -73,12 +73,15 @@ underneath without breaking anything written against it.
   followed by those five sections verbatim; the engine writes none of the
   narrative and calls no model. The header — duration, tool calls, user
   messages, files modified ([hooks](hooks.md) B-8) — is read from the
-  project's most recent session-tracker record, or from the record
+  project's most recent session-tracker record (the latest `lastUpdated`
+  across its date directories), or from the record
   `--session <id-prefix>` selects, and gives the counts the session-tracker
   record holds at its `lastUpdated` stamp — since the record's last diary
   capture or resume, not since the session began; a line of its own names
   that stamp. No live hook counter feeds it. `save` then performs `alias set` for `<alias>` on the new archive, and
-  checks the alias before it writes, so a refused alias leaves no archive.
+  checks the alias before it writes and holds the alias lock from that check
+  until the alias is set, so a refused alias leaves no archive — two saves
+  racing for one new name leave exactly one.
   `resume` takes an alias or a path, reads either an archive or a
   `.handovers/` file in the five sections, and prints it for the caller to
   present; an archive in v5's section set is not supported. `list` shows

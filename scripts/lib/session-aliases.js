@@ -152,29 +152,38 @@ function setAlias(project, alias, sessionPath, title = null, { force = false } =
     return { success: false, error: 'Session path cannot be empty' };
   }
 
-  return withAliasesLock(project, () => {
-    const data = loadAliases(project);
-    const existing = getEntry(data, alias);
-    const isNew = !existing;
-    if (existing && !force) {
-      return {
-        success: false,
-        error: `alias "${alias}" already exists — pass --force to overwrite it`,
-      };
-    }
+  return withAliasesLock(project, () =>
+    setAliasLocked(project, alias, sessionPath, title, { force }),
+  );
+}
 
-    data.aliases[alias] = {
-      sessionPath,
-      createdAt: existing ? existing.createdAt : new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      title: title || null,
+/**
+ * setAlias for a caller already inside withAliasesLock(project) — the lock is
+ * not reentrant, so this one does not take it.
+ * @returns {{ success: boolean, isNew?: boolean, error?: string }}
+ */
+function setAliasLocked(project, alias, sessionPath, title = null, { force = false } = {}) {
+  const data = loadAliases(project);
+  const existing = getEntry(data, alias);
+  const isNew = !existing;
+  if (existing && !force) {
+    return {
+      success: false,
+      error: `alias "${alias}" already exists — pass --force to overwrite it`,
     };
+  }
 
-    if (saveAliases(project, data)) {
-      return { success: true, isNew, alias, sessionPath };
-    }
-    return { success: false, error: 'Failed to save alias' };
-  });
+  data.aliases[alias] = {
+    sessionPath,
+    createdAt: existing ? existing.createdAt : new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    title: title || null,
+  };
+
+  if (saveAliases(project, data)) {
+    return { success: true, isNew, alias, sessionPath };
+  }
+  return { success: false, error: 'Failed to save alias' };
 }
 
 /**
@@ -270,6 +279,8 @@ module.exports = {
   saveAliases,
   validateAlias,
   setAlias,
+  setAliasLocked,
+  withAliasesLock,
   resolveAlias,
   listAliases,
   deleteAlias,

@@ -8,7 +8,13 @@ const path = require('node:path');
 const { atomicWriteFile } = require('./atomic-write');
 const { getProjectSessionsDir, getSessionDir, sanitizeFilename } = require('./utils');
 const { getDateDirs, findLatestSessionRecord, getSessionById } = require('./session-records');
-const { validateAlias, resolveAlias, setAlias, listAliases } = require('./session-aliases');
+const {
+  validateAlias,
+  resolveAlias,
+  setAliasLocked,
+  withAliasesLock,
+  listAliases,
+} = require('./session-aliases');
 
 // ─────────────────────────────────────────────
 // Session Archive (cli B-9, D-056)
@@ -274,7 +280,10 @@ function writeNewArchive(dir, stem, content) {
  * Save the caller's five sections as a new archive and point the alias at it.
  * A save never replaces an archive file; `force` only lets it repoint an
  * alias that already exists. Every refusal (alias, an existing name without
- * force, input, an unknown --session) happens before anything is written.
+ * force, input, an unknown --session) happens before anything is written,
+ * and the alias lock is held from the alias check until the alias is set, so
+ * of two saves racing for one new alias exactly one keeps an archive. An
+ * archive whose alias then cannot be set is removed before the error.
  * @param {string} project
  * @param {string} alias
  * @param {string} input - Markdown holding the five sections (an optional H1 is the title)
@@ -285,9 +294,50 @@ function writeNewArchive(dir, stem, content) {
 function saveArchive(project, alias, input, { now = new Date(), sessionId, force = false } = {}) {
   const check = validateAlias(alias);
   if (!check.valid) throw new Error(`Invalid alias: ${check.error}`);
-  if (!force && resolveAlias(project, alias)) {
-    throw new Error(`alias "${alias}" already exists — pass --force to overwrite it`);
-  }
+  const refuseExisting = () => {
+    if (!force && resolveAlias(project, alias)) {
+      throw new Error(`alias "${alias}" already exists — pass --force to overwrite it`);
+    }
+  };
+  refuseExisting();
+  const handover = readSaveInput(input);
+  const record =
+    sessionId === undefined ? findLatestSessionRecord(project) : getSessionById(project, sessionId);
+
+  return withAliasesLock(project, () => {
+    refuseExisting();
+    const savedAt = now.toISOString();
+    const date = savedAt.slice(0, 10);
+    const stamp = `${savedAt.slice(0, 19).replace(/[-:]/g, '')}Z`;
+    const archivePath = writeNewArchive(
+      getSessionDir(project, date),
+      sanitizeFilename(`${ARCHIVE_PREFIX}${alias}-${stamp}`),
+      generateSession(record, handover, { project, alias, date, savedAt }),
+    );
+
+    let result;
+    try {
+      result = setAliasLocked(project, alias, archivePath, handover.title, { force });
+    } catch (err) {
+      fs.rmSync(archivePath, { force: true });
+      throw err;
+    }
+    if (!result.success) {
+      fs.rmSync(archivePath, { force: true });
+      throw new Error(`alias "${alias}": ${result.error} — no archive kept`);
+    }
+    return {
+      alias,
+      path: archivePath,
+      project,
+      isNew: result.isNew,
+      session: record?.sessionId || null,
+    };
+  });
+}
+
+/** The save input as a handover: an optional # title line, then the five sections. */
+function readSaveInput(input) {
   const handover = readHandover(input, 'session input', { strict: true });
   const above = handover.preamble.split('\n').filter((l) => l.trim());
   const titles = above.filter((l) => l.startsWith('# '));
@@ -304,29 +354,7 @@ function saveArchive(project, alias, input, { now = new Date(), sessionId, force
         'only one optional # title line and the five sections',
     );
   }
-  const record =
-    sessionId === undefined ? findLatestSessionRecord(project) : getSessionById(project, sessionId);
-
-  const savedAt = now.toISOString();
-  const date = savedAt.slice(0, 10);
-  const stamp = `${savedAt.slice(0, 19).replace(/[-:]/g, '')}Z`;
-  const archivePath = writeNewArchive(
-    getSessionDir(project, date),
-    sanitizeFilename(`${ARCHIVE_PREFIX}${alias}-${stamp}`),
-    generateSession(record, handover, { project, alias, date, savedAt }),
-  );
-
-  const result = setAlias(project, alias, archivePath, handover.title, { force });
-  if (!result.success) {
-    throw new Error(`Archive written to ${archivePath}, but alias "${alias}": ${result.error}`);
-  }
-  return {
-    alias,
-    path: archivePath,
-    project,
-    isNew: result.isNew,
-    session: record?.sessionId || null,
-  };
+  return handover;
 }
 
 /**
