@@ -455,7 +455,7 @@ function Install({theme:t}) {
             <div><span style={{color:t.dim}}>$ </span>codex plugin add arcforge@arcforge-dev</div>
           </div>
           <div style={{color:t.mute,fontSize:13,lineHeight:1.7,marginTop:18}}>
-            All 16 skills load, listed as <span style={{color:t.brass,fontFamily:'monospace'}}>arcforge:&lt;name&gt;</span>. Codex has no slash commands for skills: pick one from the composer{'\u2019'}s <span style={{color:t.brass,fontFamily:'monospace'}}>$</span> mention picker. The 7 skills that call the <span style={{color:t.brass,fontFamily:'monospace'}}>arcforge</span> CLI report command not found there, and hooks, learning, the eval harness and the loop do not run. For the whole toolkit, use Claude Code.
+            All 16 skills load, listed as <span style={{color:t.brass,fontFamily:'monospace'}}>arcforge:&lt;name&gt;</span>. Codex has no slash commands for skills: pick one from the composer{'\u2019'}s <span style={{color:t.brass,fontFamily:'monospace'}}>$</span> mention picker. The 8 skills that call the <span style={{color:t.brass,fontFamily:'monospace'}}>arcforge</span> CLI report command not found there, and hooks, learning, the eval harness and the loop do not run. For the whole toolkit, use Claude Code.
           </div>
         </div>
       </div>

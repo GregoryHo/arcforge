@@ -1203,7 +1203,7 @@ function Install({
       color: t.brass,
       fontFamily: 'monospace'
     }
-  }, "$"), " mention picker. The 7 skills that call the ", /*#__PURE__*/React.createElement("span", {
+  }, "$"), " mention picker. The 8 skills that call the ", /*#__PURE__*/React.createElement("span", {
     style: {
       color: t.brass,
       fontFamily: 'monospace'
