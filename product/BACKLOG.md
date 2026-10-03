@@ -7,7 +7,7 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 ## Harness
 
 - ~~**codex-harness**~~ — graduated into 6.1.0 (D-013).
-- **codex-cli-on-path** — give the seven CLI-backed skills a working engine call
+- **codex-cli-on-path** — give the eight CLI-backed skills a working engine call
   on Codex, which does not put a plugin's `bin/` on `PATH`. Two mechanisms were
   observed working in the spike, and they are not equally cheap: a **skill-relative
   path** from Codex's skills-roots table up to the bundled `bin/arcforge` (proven,

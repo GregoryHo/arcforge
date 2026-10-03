@@ -86,11 +86,13 @@ arcforge session save <alias> --from .handovers/<YYYY-MM-DD>-<slug>.md
 
 The archive is an engine-written metrics header — duration, tool calls, user
 messages, files modified — followed by the five sections verbatim. It holds none
-of the user's message text. The engine refuses, exits non-zero and writes nothing
-when a section is missing, empty, out of order or extra; when the alias is not
-letters, digits, `-` and `_` (at most 128); or when the name or archive already
-exists. Fix the file or pick another name. `--force` replaces the existing one
-only when the user has said to.
+of the user's message text. Each save writes a new `archive-<alias>-<UTC stamp>.md`;
+no archive is ever overwritten. The engine refuses, exits non-zero and writes
+nothing when a section is missing, empty, out of order or extra; when the alias is
+not letters, digits, `-` and `_` (at most 128); or with `alias "<name>" already
+exists — pass --force to overwrite it`. Fix the file or pick another name.
+`--force` only when the user has said to: it moves the alias to the new archive,
+and the old archive stays on disk with no alias.
 
 If `arcforge` reports `command not found`, the CLI is not on this host's PATH:
 the handover file stands on its own, so tell the user the archive was not made.
@@ -204,5 +206,5 @@ above. During active implementation the answer is usually "not yet".
 | Paste the transcript or the diff into the file | Both are reconstructable; the handover exists for what is not |
 | Start working right after reading a handover or `session resume` output | Present the state and wait for the user to confirm the plan |
 | Run `session save` before the handover file exists | Write `.handovers/<date>-<slug>.md` first; it is what `--from` archives |
-| Add `--force` because the name was taken | Ask the user — the name already points at an archive someone kept |
+| Add `--force` because the name was taken | Ask the user — the name points at an archive someone kept, and `--force` leaves that archive without it |
 | Rebuild a v5 archive into the five sections | Report it unsupported; the old file is not a handover |
