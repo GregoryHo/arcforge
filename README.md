@@ -92,7 +92,7 @@ Most skills also fire on their own when their trigger condition shows up. The th
 
 - **brainstorming** — structured exploration before a design is settled
 - **executing** — break work into a checkbox task list and run it, attended or unattended
-- **speccing** — keep a project's living specs, roadmap, and append-only decision log in step with the code
+- **speccing** — keep a project's living specs, roadmap, and append-only decision log in step with the code; replaces v5's spec-driven pipeline with files under `product/` instead of an engine
 - **dispatching** — split work that can run in parallel, isolate each writer, accept on evidence
 - **looping** _(user-invoked)_ — hand a task list to an unattended loop that keeps working across fresh sessions
 - **finishing** — integrate completed work: merge, PR, keep, or discard
