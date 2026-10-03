@@ -134,7 +134,7 @@ function BeforeAfter({
 function DayInLife({
   theme: t
 }) {
-  const steps = [['09:02', 'session start', 'SessionStart hooks fire. session-tracker opens the session file and injects the previous handover — five lines, not an archive.', t.brass], ['09:04', '"add OAuth login"', 'Vague intent, several plausible designs. brainstorming picks it up before a single line is written.', t.ember], ['09:12', 'design settled', 'One approach chosen, its tradeoffs written down. executing turns it into a checkbox task list.', t.brass], ['09:24', 'split the work', 'Two independent tracks. dispatching gives each writer its own worktree so neither can stomp the other.', t.brass], ['09:38', 'implement (TDD)', 'tdd holds the line per task: failing test first, then the code that passes it, then the cleanup.', t.ember], ['11:20', 'compact suggested', 'compact-suggester fires once the session gets long. /compact runs; pre-compact checkpoints state first.', t.dim], ['14:05', 'a test fails', 'Not a guess-and-patch. debugging reads the failure to root cause before anything is changed.', t.ember], ['17:40', 'wrap up', 'sessions writes the handover for tomorrow. learning captures the diary — opt-in, and only if you enabled it.', t.brass], ['17:45', 'finish + merge', 'code-review on the diff, then finishing makes the merge decision and collapses the worktrees.', t.ember]];
+  const steps = [['09:02', 'session start', 'SessionStart hooks fire. session-tracker opens the session record. Nothing from yesterday is injected — sessions resumes from the handover when you ask.', t.brass], ['09:04', '"add OAuth login"', 'Vague intent, several plausible designs. brainstorming picks it up before a single line is written.', t.ember], ['09:12', 'design settled', 'One approach chosen, its tradeoffs written down. executing turns it into a checkbox task list.', t.brass], ['09:24', 'split the work', 'Two independent tracks. dispatching gives each writer its own worktree so neither can stomp the other.', t.brass], ['09:38', 'implement (TDD)', 'tdd holds the line per task: failing test first, then the code that passes it, then the cleanup.', t.ember], ['11:20', 'compact suggested', 'compact-suggester fires once the session gets long. /compact runs; pre-compact checkpoints state first.', t.dim], ['14:05', 'a test fails', 'Not a guess-and-patch. debugging reads the failure to root cause before anything is changed.', t.ember], ['17:40', 'wrap up', 'sessions writes the handover for tomorrow. learning captures the diary — opt-in, and only if you enabled it.', t.brass], ['17:45', 'finish + merge', 'code-review on the diff, then finishing makes the merge decision and collapses the worktrees.', t.ember]];
   return /*#__PURE__*/React.createElement(PageSection, {
     theme: t,
     id: "day"
@@ -571,7 +571,7 @@ function SessionLearning({
         fontStyle: 'italic'
       }
     }, "left off."), " Learn only when it earns it."),
-    sub: /*#__PURE__*/React.createElement(React.Fragment, null, "Lightweight handover by default \u2014 five-line \"you are here\" markers, not heavy archives. Opt-in learning is ", /*#__PURE__*/React.createElement("em", {
+    sub: /*#__PURE__*/React.createElement(React.Fragment, null, "Lightweight handover by default \u2014 a five-section \"you are here\" file, and a named archive only when you save one. Opt-in learning is ", /*#__PURE__*/React.createElement("em", {
       style: {
         color: t.ink,
         fontStyle: 'italic'
