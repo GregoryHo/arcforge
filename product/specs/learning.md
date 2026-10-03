@@ -1,6 +1,6 @@
 # learning — spec
 
-> Status: shipped v6.3.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.3.0 · extended by 6.4.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -295,6 +295,35 @@ was recorded about them.
   the product tells them apart, `learn --project` included; the learning guide
   states the collision where it explains scope. Separating them is a keyspace
   redesign that migrates every user's learning data, not a filter (D-037).
+- **B-20 A session archive stores none of the user's words (6.4.0).** An
+  archive written by `arcforge session save` ([cli](cli.md) B-9) holds the
+  engine's metrics header and the agent's five sections and no text of the
+  user's messages — v5's `Conversation Trail` is not written, whether or not
+  learning is enabled. The user's words stay where B-1 puts them: only in the
+  session record's verbatim prose, only under the opt-in, and removed from it
+  when the opt-in reads off ([hooks](hooks.md) B-6). So the archive needs no
+  opt-in of its own and outlives an opt-out without keeping anything the
+  opt-out was meant to stop. No model call writes an archive, so it adds no
+  outbound path to B-9 (D-056).
+
+### Concurrency
+- **B-21 One observer daemon, whoever starts or stops it (6.4.0).** A start
+  that cannot run a usable `ps` never takes a live daemon's lock for stale, so
+  it never starts a second daemon beside it (#247); and
+  `observer-daemon.sh stop` and `status` take part in the same reclaim
+  reservation as a start, so a manual stop or status racing a start leaves at
+  most one daemon (#252). Until 6.4.0 ships, the Residual in the domain model
+  below that names #247 and #252 describes the product (D-055).
+- **B-22 Two writers of one file never expose it empty or partial (6.4.0).**
+  The shared atomic-write helper behind B-5's atomically overwritten formats —
+  among its callers the learning queue's records, materialized drafts,
+  activation and restore writes, and the session alias index ([cli](cli.md)
+  B-9) — gives each write its own temporary file. Two processes writing one
+  file at once each publish a whole file and the later rename wins; neither
+  removes or publishes the other's temporary file, and a reader never sees
+  the file empty or partial (#253, D-055). Residual: the later write wins
+  whole, it is not merged, so a read-modify-write that loses that race loses
+  its update.
 
 ## Data / domain model
 
@@ -405,3 +434,8 @@ data contracts live in `docs/decisions/learning-curator-schema/`.
   advances the effective opt-in while another scope stays on (B-1, B-19).
 - **D-053** — a disabled scope's period counts only when its own disable
   recorded it, and every ambiguity moves the instant later (B-19).
+- **D-055** — 6.4.0 repairs the daemon races and the shared atomic-write
+  helper's temporary-file race, promises the domain model and B-5 already
+  made (B-21, B-22).
+- **D-056** — a session archive carries no conversation trail, so the user's
+  words stay only in the opt-in session record (B-20).

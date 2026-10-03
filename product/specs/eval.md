@@ -1,6 +1,6 @@
 # eval — spec
 
-> Status: shipped v6.2.1 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.2.1 · extended by 6.4.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -136,6 +136,18 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   empties the scenario's pool (B-8), and the scenario is re-measured at k=10 in
   both arms. Cost accepted: a static floor can pass on code that reads right
   and does not run (D-043).
+- **B-14 No code grader runs with the trial directory importable (6.4.0).**
+  The engine runs every code grader from a fresh, empty temporary directory
+  that it deletes afterwards, never from the trial directory, so whatever the
+  scenario's grader command spells — `python3 -` included — the trial
+  directory is not on Python's import path, and a module the trial left
+  behind cannot be imported in place of the standard library to forge a
+  grade. A grader reaches the trial's files only through the absolute paths
+  in `TRIAL_DIR`, `PROJECT_ROOT` and `TRANSCRIPT_PATH`, and reads them as
+  data. Importing a planted module is running trial output, which B-12
+  already forbids (#250, D-055). Residual: a grader the timeout kills is
+  still scored as an ordinary FAIL, not a grade error, so it lands in the
+  scored pool as a behavioural failure.
 - **B-10 A trial the runner cut off is an instrument failure, not a
   measurement.** Every trial's `claude -p` session runs under a per-trial
   ceiling: 900 s, unless `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS` moves it for one run —
@@ -245,3 +257,7 @@ its rationale is inline at B-10.
 - **D-043** — graders never execute trial output (B-6, B-7, B-8, B-12).
 - **D-048** — 6.2.1 makes same-day snapshots additive and shows a failed pool
   on the dashboard, with no live session spent (B-9, B-13).
+- **D-055** — 6.4.0 runs code graders from an empty directory, so a trial's
+  modules are never importable (#250), and its round
+  measures the `diagramming-obsidian` verify-exit sentence only if a scenario
+  can make the arms differ (B-3, B-12, B-14).

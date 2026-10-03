@@ -1,6 +1,6 @@
 # cli — spec
 
-> Status: shipped v6.2.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.2.0 · extended by 6.4.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -58,6 +58,22 @@ underneath without breaking anything written against it.
   the full list, and a test holds each command's help flags equal to its
   manifest flags; the guides describe the same surface and
   `npm run check:docs` holds them to it.
+- **B-9 A sixth group, `session` (6.4.0).** `arcforge session` takes
+  `save <alias>`, `resume <alias|path>`, `list` and `alias`, and is
+  independent in B-3's sense: it works with learning off, with no worktree and
+  no loop. `save` writes an archive whose metrics header the engine fills from
+  the session-tracker record — duration, tool calls, user messages, files
+  modified ([hooks](hooks.md) B-8) — and whose five narrative sections
+  (`Where it stands`, `Done`, `Unfinished`, `Decisions`, `Next`) the caller
+  supplies; the engine writes none of the narrative and calls no model.
+  `resume` takes an alias or a path, reads either an archive or a
+  `.handovers/` file in the five sections, and prints it for the caller to
+  present; an archive in v5's section set is not supported. `list` shows
+  the project's archives, and `alias` manages the project's alias index. An
+  alias is letters, digits, `-` and `_`, at most 128 characters, and none of
+  the alias module's reserved words. The group sits in the one manifest (B-4)
+  and under the exit-code API (B-5). Until 6.4.0 ships, B-3 names the five
+  groups shipped today (D-055, D-056).
 
 ### Output contracts
 - **B-5 Exit codes are the API.** `0` on success and non-zero on any failure,
@@ -99,6 +115,16 @@ command declares it exactly when its handler acts on it). Its structural
 invariants are the exit-code API (B-5) and the stability of a `--json` shape once a
 command offers one (B-6).
 
+The `session` group (B-9) is the exception from 6.4.0, because no other area
+stands behind it: the archive is a markdown file under
+`~/.arcforge/sessions/<project>/<date>/`, owned by `scripts/lib/session-utils.js`
+— an engine-written metrics header, then the five handover sections, and no text
+of the user's messages ([learning](learning.md) B-20). The alias index is `~/.arcforge/sessions/<project>/aliases.json`, owned by
+`scripts/lib/session-aliases.js`: a `version` and an `aliases` map from name to
+`{ sessionPath, createdAt, updatedAt, title }`, written through the shared
+atomic-write helper ([learning](learning.md) B-22). `<project>` is the sanitized
+directory basename, so two same-named projects share both (D-037, D-056).
+
 ## Decisions
 
 - **D-002** — the bare-command discovery contract (B-1) leans on the host
@@ -110,6 +136,9 @@ command offers one (B-6).
   touches no eval-backed path (B-4, B-6).
 - **D-020** — new commands wait for 6.2.0, a minor (B-3).
 - **D-040** — `learn instinct restore` is one of those commands (B-3).
+- **D-055** — 6.4.0 is a minor because it adds a command group (B-9).
+- **D-056** — that group is `arcforge session`, an engine-written metrics
+  header plus the handover's five sections, aliased per project (B-9).
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
 

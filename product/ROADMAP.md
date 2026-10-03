@@ -14,7 +14,8 @@ decision *and* every reversal. How to maintain this file: [`product/AGENTS.md`](
 | 6.1.2 | `v6.1.2` | docs-are-the-contract sweep | **shipped** | Where the docs promise what the engine does not do: CLI messages and contract drift, hooks promises the engine never kept, loop state bugs, contributor tooling and repo hygiene. It touches no eval-backed path — nothing under `skills/`, `evals/scenarios/` or `evals/fixtures/` — so it ships without a benchmark regeneration. | [cli](specs/cli.md) · [hooks](specs/hooks.md) · [learning](specs/learning.md) · [worktrees-loop](specs/worktrees-loop.md) · [obsidian](specs/obsidian.md) · [codex-harness](specs/codex-harness.md) |
 | 6.2.0 | `v6.2.0` | learning lifecycle · eval corpus repairs | **shipped** | Exits for candidates stuck at `approved` or `materialized`, `learn instinct deactivate` and `learn instinct restore`, a policy for candidate names, and worktree paths derived from the repo root; plus the scenario rubric fixes, measured in their own, smaller round. A minor because it adds CLI commands. | [learning](specs/learning.md) · [cli](specs/cli.md) · [worktrees-loop](specs/worktrees-loop.md) · [codex-harness](specs/codex-harness.md) · [eval](specs/eval.md) · [sdd](specs/sdd.md) |
 | 6.2.1 | `v6.2.1` | instrument and state repairs, no measurement | **shipped** | Repairs to promises already shipped: same-day benchmark snapshots stop overwriting each other and `eval history` lists them all, the eval dashboard shows an instrument-failure pool instead of hiding it, loop run state is written atomically, the observe hook's lazy daemon start reclaims a dead process's lock, `check:product` rejects a relation aimed at an already-dead decision, and the `releasing` skill describes what a squash-only ruleset does to the flip commit. Nothing under `skills/`, `evals/scenarios/` or `evals/fixtures/`, so it ships without a live eval session. | [eval](specs/eval.md) · [worktrees-loop](specs/worktrees-loop.md) · [learning](specs/learning.md) |
-| 6.3.0 | `v6.3.0` | ceiling redesigns · skill-local script fixes · the enable stamp | **shipped ← we are here** | Two of the five scenarios whose baseline sat at ceiling on the repaired instrument are redesigned to Version 2 — router skill selection and the LINK-mode index rebuild — and the round, capped at about 80 trial sessions, spent 16 for one A/B result (router skill selection) and four findings without an A/B (D-054); the `diagramming-obsidian` helpers and `lint_vault` fixes ship in it on contract tests because they sit under `skills/`; and the stale-draft floor stops losing an overlapping opt-in, through additive `enabled_at` and `disabled_at` stamps in the learning config. | [skill-system](specs/skill-system.md) · [obsidian](specs/obsidian.md) · [sdd](specs/sdd.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) |
+| 6.3.0 | `v6.3.0` | ceiling redesigns · skill-local script fixes · the enable stamp | **shipped** | Two of the five scenarios whose baseline sat at ceiling on the repaired instrument are redesigned to Version 2 — router skill selection and the LINK-mode index rebuild — and the round, capped at about 80 trial sessions, spent 16 for one A/B result (router skill selection) and four findings without an A/B (D-054); the `diagramming-obsidian` helpers and `lint_vault` fixes ship in it on contract tests because they sit under `skills/`; and the stale-draft floor stops losing an overlapping opt-in, through additive `enabled_at` and `disabled_at` stamps in the learning config. | [skill-system](specs/skill-system.md) · [obsidian](specs/obsidian.md) · [sdd](specs/sdd.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) |
+| 6.4.0 | — | session archive returns · daemon, write and counter races · grader isolation | **next ← we are here** | v5's session archive, dropped at 6.0.0 without a record, returns as a sixth CLI group, `arcforge session` (`save`, `resume`, `list`, `alias`), over the engine modules that survived unexposed: an engine-written metrics header plus the handover file's five sections, written by the agent in-session, and the `sessions` skill learns to drive it (D-056). The engine fixes planned as 6.3.1 ride along — observer daemon starts and stops that can leave two daemons (#247, #252), the shared atomic-write helper's temporary-file race (#253), the diary tool counter that loses increments (#260), and code graders that can import from the trial directory (#250) — with the README naming `speccing` as the v5 pipeline's file-based replacement and two corrections to past CHANGELOG entries. A minor because it adds a CLI group; one round of about 40 trial sessions measures the `sessions` edit and the `diagramming-obsidian` sentence already on `main` (#267) together (D-055). | [cli](specs/cli.md) · [skill-system](specs/skill-system.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) · [eval](specs/eval.md) · [obsidian](specs/obsidian.md) |
 
 > Un-scheduled ideas live in the [Backlog](BACKLOG.md); a wish graduates into a
 > version (row + spec + Decision Log entry) when picked.
@@ -1483,3 +1484,124 @@ reverse one, append a superseding entry (see AGENTS.md).
   version or the commit; Node v24.13.1 and commit `20edf82e` are recorded by
   hand in the 6.3.0 section of `evals/skill-eval-coverage.md`, with the
   operator audit of every row.
+
+### D-055 — 6.4.0: the session archive returns, the 6.3.1 engine fixes ride with it, and one round measures both
+- Date: 2026-10-03
+- Version: 6.4.0
+- Status: Accepted
+- Decision: 6.4.0, a minor, carries (1) the session archive's return as a
+  sixth CLI group, `arcforge session`, with the `sessions` skill instructions
+  that drive it, as D-056 designs it; (2) the engine fixes planned as 6.3.1 —
+  a live observer daemon read as stale without a usable `ps` (#247), a manual
+  `observer-daemon.sh stop` or `status` racing a start (#252), the shared
+  atomic-write helper's one temporary name for every writer (#253), the diary
+  tool counter losing increments under concurrent PostToolUse hooks (#260),
+  and code graders run from the trial directory, which put it on Python's
+  import path — fixed by running every code grader from an empty temporary
+  directory (#250); (3) the README and `docs/guide/skills-reference.md`
+  saying that `speccing` replaces the v5 spec-driven pipeline, with files
+  instead of an engine; (4) two corrections to past CHANGELOG entries, carried
+  in the 6.4.0 entry — 6.3.0's "the line ends in the command that installs
+  it" does not hold for a missing `uv`, and 6.0.0 left out that the session
+  save, resume, list and alias set was dropped; and (5) one measurement round
+  on `opus[1m]` / `xhigh`, capped at about 40 trial sessions, under a plan
+  fixed before any result is read: (i) the `sessions` skill's handover and
+  present-then-stop behaviour, at skill scope; (ii) a router regression run of
+  `eval-router-skill-selection` Version 2; and (iii) the `diagramming-obsidian`
+  verify-exit sentence (`SKILL.md`, the paragraph after the verifier command)
+  only if a scenario designer first shows that the current engine can make the
+  two arms differ — otherwise it is recorded as a finding, with no session
+  spent. #256, #184 and #185 stay out, and stay open.
+- Why: Three things meet in one version. `skills/core/diagramming-obsidian/SKILL.md`
+  changed on `main` after `v6.3.0` (#267, the verify-exit sentence for #228)
+  with no harness evidence, so whatever ships next re-arms the benchmark gate
+  and pays for a round — a 6.3.1 of engine fixes would have paid for one too.
+  6.0.0 folded v5's `arc-managing-sessions` into `sessions` and dropped its <!-- doc-ref-lint: ignore R4 names the v5 skill 6.0.0 folded into sessions; historical, not a reference -->
+  save/resume/list/alias archive with no decision and no CHANGELOG line, while
+  the engine modules it ran on stayed shipped and unexposed; the owner wants it
+  back. A new CLI group makes the version a minor by the 6.2.0 precedent
+  (D-020), so the engine fixes ride it and one round is paid for instead of two.
+  Each engine fix repairs a promise already made: learning's domain model says
+  one daemon runs per machine, learning B-5 says its formats are atomically
+  overwritten, hooks B-7 says the threshold fires at 50 tool calls, and eval
+  B-12 says a grader never runs what a trial produced — a planted module a
+  grader imports is exactly that. The CHANGELOG corrections are owed because
+  the CHANGELOG is the release's record: a sentence there that does not hold,
+  or a removal it never mentioned, stays wrong until a later entry says so.
+  (iii) is conditional because of D-049's Residual: a skill-scope A/B injects
+  `SKILL.md` alone, and the verify-exit sentence is about how the agent reads
+  a skill-local script's output, which reaches a trial only through a fixture
+  both arms see. Spending sessions on a scenario that cannot discriminate buys
+  a BLOCK, not evidence.
+- Residual: if (iii) ends as a finding, the sentence ships on its text alone,
+  as #228's and #210's script changes did on contract tests (D-049); measuring
+  it waits for the **eval-skill-files-outside-trial** wish. The `session` CLI
+  pieces and the five engine fixes ship on contract tests, not on a live
+  session. Every wish D-049's Residual kept back stays in the backlog, along
+  with #256, #184 and #185.
+- Cost accepted: up to about 40 trial sessions, plus any model-grader calls
+  the cap does not count. The engine fixes reach users later than a 6.3.1
+  would have, because they wait for the round.
+- Verification: the round's preflight records and A/B pools, written down the
+  way D-054's were; the 6.4.0 CHANGELOG entry carries both corrections; and
+  `npm run check:docs` holds the new group's documentation to the CLI manifest.
+
+### D-056 — The session archive returns as `arcforge session`, on the handover's five sections
+- Date: 2026-10-03
+- Version: 6.4.0
+- Status: Accepted
+- Decision: (1) A sixth CLI group, `arcforge session`, with `save <alias>`,
+  `resume <alias|path>`, `list` and `alias`, exposes the engine modules that
+  survived v5 unexposed — `scripts/lib/session-utils.js` and
+  `scripts/lib/session-aliases.js`. (2) An archive is an engine-written
+  metrics header, taken from the session-tracker record (duration, tool calls,
+  user messages, files modified), followed by the handover file's five
+  sections — `Where it stands`, `Done`, `Unfinished`, `Decisions`, `Next` —
+  which the agent writes in-session; no background model call writes any part
+  of it. (3) It lives under `~/.arcforge/sessions/<project>/<date>/`, and a
+  per-project alias index, `aliases.json` under
+  `~/.arcforge/sessions/<project>/`, points at it; aliases are scoped to the
+  project. (4) `.handovers/<date>-<slug>.md` stays the committable handoff for
+  other people, with the same five sections, and `resume` reads either — in
+  those five sections only; an archive in v5's section set is not supported.
+  (5) An archive never carries v5's Conversation Trail: it holds no text of
+  the user's messages, whether or not learning is enabled.
+  (6) The `sessions` skill gains the save, resume, list and alias
+  instructions; its handover and present-then-stop behaviours are measured at
+  skill scope in 6.4.0's round (D-055), and the CLI pieces ship on contract
+  tests.
+- Why: v5's archive had its own section set — Summary, What Worked, What
+  Failed, Blockers, Next Step, still the one `generateSession` writes — while
+  v6's handover file has five. Two section sets for one act would mean two
+  templates in the skill and two formats for `resume` to read; one set means
+  an archive and a handover differ only in where they live and who reads them.
+  The agent writes the narrative because it holds the session's context, and a
+  background model call to write it would be a third outbound path beside
+  diary enrichment and the curator (learning B-9), one the trust design would
+  then have to gate and name. The engine writes the metrics because the
+  session-tracker record already holds them ([hooks](specs/hooks.md) B-8) and
+  an agent recounting its own session would guess. The archive sits under
+  `~/.arcforge/` because it is one user's continuity — it never shows in
+  `git status`, as learning B-9 keeps the review loop out of the repo — while
+  `.handovers/` stays the file someone else can be given. The trail was the
+  user's own words, which D-010 keeps only in the opt-in session record, and
+  removes from it whenever the opt-in reads off; an archive is a file the user
+  asked to keep, so a trail there would either outlive an opt-out or need a
+  second deletion rule. Leaving it out keeps the user's words in the one place
+  D-010 already governs, and the archive needs no opt-in of its own. Reading
+  only the five sections keeps `resume` to one format. Per-project aliases are what `session-aliases.js` already
+  implements, keyed like the rest of `~/.arcforge/sessions/`.
+- Residual: the project key is the sanitized directory basename, so two
+  same-named projects share one alias index and one archive tree, the
+  collision D-037 records for learning. An archive written by v5, in its
+  Summary / What Worked / What Failed / Blockers / Next Step sections, is not
+  read by `resume`, and the 6.4.0 CHANGELOG entry says so; nothing converts
+  one. An archive does not record what the user asked for in their own words,
+  so a reader rebuilds that from the agent's five sections alone. On Codex the CLI-backed instructions report `command not found`
+  (D-013) while the `.handovers/` file still works. SessionStart still injects
+  nothing from the last session (D-031): `resume` is asked for, so the
+  **session-continuity-injection** wish stays open.
+- Cost accepted: a sixth command group and one more on-disk format with an
+  engine owner. The `sessions` `SKILL.md` grows from a body of 155 lines,
+  already over the 150-line soft cap (the **skill-body-trim** wish), toward
+  the 250-line hard cap.

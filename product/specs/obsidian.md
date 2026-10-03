@@ -1,6 +1,6 @@
 # obsidian — spec
 
-> Status: shipped v6.3.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.3.0 · extended by 6.4.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -101,6 +101,18 @@ work carries provenance a reader can check.
 - **B-9 The pair composes by invocation.** Diagram work inside a vault
   operation is handed to `/diagramming-obsidian` — after user approval, and
   only by prose invocation, per [skill-system](skill-system.md) B-5.
+- **B-10 A failed verify is read before it is acted on.** When the save
+  verifier exits non-zero, `diagramming-obsidian` has the agent read the one
+  line printed before acting. A missing dependency is setup, not corruption,
+  so the agent installs it and verifies again rather than regenerating the
+  diagram. A missing `uv` produces no helper line at all, because the verifier
+  never starts and the shell's own `command not found` takes its place, so
+  the skill names that case itself: install `uv` first. Only format corruption
+  or a render mismatch sends the agent back to the canonical template, never
+  to the file it just wrote (#228). The sentence reached `main` after `v6.3.0`
+  (#267) without harness evidence; 6.4.0's round measures it only if a
+  scenario designer first shows the engine can make the two arms differ, and
+  otherwise records it as a finding (D-055).
 
 **Residual — most of this section has no harness evidence.** Three items rest
 on eval scenarios, and only in part: B-3 on
@@ -149,3 +161,5 @@ live behind the CLI per [cli](cli.md) B-8.
 - **D-054** — neither B-5 scenario was A/B-measured in 6.3.0, and
   link-rebuilds-index is retired as an A/B scenario, so D-028's rebuild still
   has no harness evidence (B-5).
+- **D-055** — the verify-exit sentence that #267 put on `main` ships in 6.4.0,
+  measured only if a scenario can make the arms differ (B-10).
