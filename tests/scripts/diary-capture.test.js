@@ -8,6 +8,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
+const { execFile } = require('node:child_process');
 
 describe('diary-capture', () => {
   let homeDir;
@@ -22,6 +23,9 @@ describe('diary-capture', () => {
     // root keeps the gate's answer independent of local repo state.
     projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'diary-capture-proj-'));
     jest.spyOn(os, 'homedir').mockReturnValue(homeDir);
+    // os.tmpdir() inside jest ignores process.env.TMPDIR (#260); mock it so the
+    // session counters stay in this test's own dir. TMPDIR still reaches children.
+    jest.spyOn(os, 'tmpdir').mockReturnValue(tmpDir);
     process.env.TMPDIR = tmpDir;
     savedSession = process.env.CLAUDE_SESSION_ID;
     process.env.CLAUDE_SESSION_ID = 'diary-capture-session';
@@ -70,6 +74,42 @@ describe('diary-capture', () => {
       expect(toolCount).toBe(50);
       expect(shouldTrigger(0, toolCount)).toBe(true);
     });
+
+    // #260 flake: process.env.TMPDIR inside jest does not reach os.tmpdir(), so
+    // the counter landed in the shared system temp dir and concurrent jest runs
+    // overwrote each other's count.
+    it("counter file lives under this test's temp dir, not the system temp dir", () => {
+      const { createSessionCounter } = require('../../scripts/lib/utils');
+      const counterPath = createSessionCounter('tool-count').getFilePath();
+      expect(path.dirname(counterPath)).toBe(tmpDir);
+    });
+
+    // #260: concurrent PostToolUse hooks each increment once. The count must be
+    // exact, and a reader racing the writers must never see it fall to 0.
+    it('incrementSharedToolCount from 8 concurrent processes x 50 on top of 5 ends at exactly 405', async () => {
+      const { createSessionCounter } = require('../../scripts/lib/utils');
+      const lib = path.resolve(__dirname, '../../scripts/lib');
+      const env = { ...process.env, TMPDIR: tmpDir, CLAUDE_SESSION_ID: 'diary-capture-session' };
+      createSessionCounter('tool-count').write(5);
+      const writer = `const { incrementSharedToolCount } = require(${JSON.stringify(`${lib}/diary-capture`)});
+for (let i = 0; i < 50; i++) incrementSharedToolCount();`;
+      const reader = `const c = require(${JSON.stringify(`${lib}/utils`)}).createSessionCounter('tool-count');
+let min = Infinity; const end = Date.now() + 1500;
+while (Date.now() < end) min = Math.min(min, c.read());
+process.stdout.write(String(min));`;
+      const run = (code) =>
+        new Promise((resolve, reject) => {
+          execFile(process.execPath, ['-e', code], { env }, (err, stdout) =>
+            err ? reject(err) : resolve(stdout),
+          );
+        });
+      const [readerMin] = await Promise.all([
+        run(reader),
+        ...Array.from({ length: 8 }, () => run(writer)),
+      ]);
+      expect(Number(readerMin)).toBeGreaterThanOrEqual(5);
+      expect(createSessionCounter('tool-count').read()).toBe(405);
+    }, 30000);
   });
 
   describe('getSuggesterStatePath', () => {

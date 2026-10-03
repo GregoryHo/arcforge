@@ -670,10 +670,10 @@ function createSessionCounter(name) {
     return path.join(getTempDir(), `arcforge-${name}-${sessionId}`);
   }
 
+  // A base count plus any `\n1` lines appended per increment, summed (#260).
   function read() {
-    const content = readFileSafe(getFilePath());
-    const count = parseInt(content, 10);
-    return Number.isNaN(count) ? 0 : count;
+    const lines = (readFileSafe(getFilePath()) || '').split('\n');
+    return lines.reduce((sum, line) => sum + (parseInt(line, 10) || 0), 0);
   }
 
   function write(count) {

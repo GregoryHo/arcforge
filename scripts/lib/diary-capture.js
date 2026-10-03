@@ -67,8 +67,11 @@ function resetCounters() {
  * threshold share a single source of truth.
  */
 function incrementSharedToolCount() {
-  const counter = createSessionCounter('tool-count');
-  counter.write(counter.read() + 1);
+  // Append, never read-modify-write: concurrent PostToolUse hooks would lose
+  // updates, and a truncating rewrite lets a racing reader see 0 (#260). One
+  // O_APPEND write of a few bytes is atomic between processes on POSIX, so this
+  // needs no lock on the synchronous hook path; the counter's read() sums lines.
+  fs.appendFileSync(createSessionCounter('tool-count').getFilePath(), '\n1');
 }
 
 /**

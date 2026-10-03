@@ -256,6 +256,12 @@ describe('compact-suggester e2e (ICL-9 acceptance)', () => {
     return path.join(testDir, `arcforge-tool-count-session-${sessionId}`);
   }
 
+  // The counter file is a base count plus one `\n1` line per increment (#260).
+  function readToolCount() {
+    const lines = fs.readFileSync(toolCountPath(), 'utf-8').split('\n');
+    return lines.reduce((sum, line) => sum + (parseInt(line, 10) || 0), 0);
+  }
+
   function readState() {
     return JSON.parse(fs.readFileSync(statePath(), 'utf-8'));
   }
@@ -297,7 +303,7 @@ describe('compact-suggester e2e (ICL-9 acceptance)', () => {
     assert.strictEqual(state.suggestions[0].count, 50);
 
     // Shared diary tool-count incremented in lockstep (binding preserved).
-    assert.strictEqual(fs.readFileSync(toolCountPath(), 'utf-8'), '50');
+    assert.strictEqual(readToolCount(), 50);
   });
 
   it('S6-3: threshold output is a SINGLE JSON object carrying BOTH channels', () => {
@@ -392,7 +398,7 @@ describe('compact-suggester e2e (ICL-9 acceptance)', () => {
     // threshold so the diary trigger remains firable after consolidation.
     for (let i = 0; i < 50; i++) runSuggester('Read');
     const { shouldTrigger, MIN_TOOL_CALLS } = require('../../scripts/lib/thresholds');
-    const toolCount = parseInt(fs.readFileSync(toolCountPath(), 'utf-8'), 10);
+    const toolCount = readToolCount();
     assert.strictEqual(toolCount, 50);
     assert.ok(toolCount >= MIN_TOOL_CALLS);
     assert.strictEqual(shouldTrigger(0, toolCount), true, 'diary threshold triggerable');
