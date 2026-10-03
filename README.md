@@ -56,9 +56,9 @@ All 16 skills load, listed as `arcforge:<name>`. Codex has no slash commands for
 
 | On Codex | Status |
 |---|---|
-| 8 of the 9 skills that need no engine — `using`, `brainstorming`, `speccing`, `executing`, `tdd`, `debugging`, `code-review`, `diagramming-obsidian` | Work fully |
-| `sessions`, the ninth | Handovers, resuming from a handover, and the when-to-compact table work. The compaction indicator it describes does not appear: that line comes from a Claude Code hook, so on Codex you decide when to run the table yourself |
-| The 7 skills that shell out to the `arcforge` CLI — `dispatching`, `looping`, `finishing`, `evaluating`, `learning`, `writing-skills`, `maintaining-obsidian` | Load and read correctly, but their CLI steps report `command not found`: Codex does not put a plugin's `bin/` on `PATH` |
+| The 8 skills that need no engine — `using`, `brainstorming`, `speccing`, `executing`, `tdd`, `debugging`, `code-review`, `diagramming-obsidian` | Work fully |
+| The 8 skills that shell out to the `arcforge` CLI — `dispatching`, `looping`, `finishing`, `evaluating`, `learning`, `writing-skills`, `maintaining-obsidian`, `sessions` | Load and read correctly, but their CLI steps report `command not found`: Codex does not put a plugin's `bin/` on `PATH` |
+| `sessions`, one of those eight | Handovers, resuming from a `.handovers/` file, and the when-to-compact table work; only the named archive (`arcforge session`) is out of reach. The compaction indicator it describes does not appear: that line comes from a Claude Code hook, so on Codex you decide when to run the table yourself |
 | Hooks, the learning subsystem, the eval harness, the unattended loop | Do not run — they are built on Claude Code's hook protocol and on spawning `claude` |
 
 arcforge's hooks ship in the same tree, but Codex never loads them. The registry is named `hooks/claude-code.json` and Claude Code finds it through the plugin manifest; Codex only auto-discovers `hooks/hooks.json`, which arcforge deliberately leaves empty. So there is no hook-trust prompt to answer and nothing for you to decline. <!-- doc-ref-lint: ignore R1 names the path that must NOT exist; its absence is the guard (check:hooks) -->
@@ -106,7 +106,7 @@ Most skills also fire on their own when their trigger condition shows up. The th
 
 **Memory and continuity**
 
-- **sessions** — handover when work stops mid-task, resume when it restarts, decide when to compact
+- **sessions** — handover when work stops mid-task, save it as a named archive, resume when it restarts, decide when to compact
 - **learning** _(user-invoked)_ — the opt-in learning loop: session diaries, pattern extraction, review of what activates
 
 **Knowledge base**

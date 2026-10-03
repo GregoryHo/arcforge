@@ -117,7 +117,10 @@ session, restartable across a crash or a closed laptop. See the
 being handed over, you are stopping mid-task, you are picking up from an earlier
 handover note, or a long session is filling up and compaction is the question.
 Both ways of losing context lose the same thing, and both are answered by getting
-it onto disk first.
+it onto disk first. Asked to save the session under a name, it writes the
+handover and archives it with `arcforge session save`; a named archive comes back
+through `arcforge session resume`, presented and checked like any handover. See
+the [CLI guide](cli-invocation.md#session) for the `session` commands.
 
 ## Your notes
 

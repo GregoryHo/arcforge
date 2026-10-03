@@ -157,7 +157,7 @@ whole and fails halfway through a workflow.
   decision to record, not a directory to add.
 - **B-8 The boundary does not move in 6.2.0.** Each item below stays where
   D-013 drew it, as a Residual here with its wish left in the Backlog (D-039):
-  - Residual: the seven CLI-backed skills keep reporting `command not found` on
+  - Residual: the eight CLI-backed skills keep reporting `command not found` on
     Codex (B-3) — a skill-relative engine path would break D1/D9, and a
     SessionStart-hook route would re-open the discovery guard of B-2
     (`codex-cli-on-path`).
