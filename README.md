@@ -171,7 +171,7 @@ arcforge obsidian list-vaults --json
 
 Three systems ship with arcforge and stay out of your way until you ask for them.
 
-- **Learning** is off until you run `arcforge learn enable --project`. Once on, observations become candidates, candidates need your approval, and approved drafts still need an explicit activation step before they change behavior. The **[Learning Dashboard](docs/guide/learning-dashboard.md)** (`arcforge learn dashboard`) is the review surface for that queue.
+- **Learning** is off until you run `arcforge learn enable` with `--project` or `--global`. Once on, observations become candidates, candidates need your approval, and approved drafts still need an explicit activation step before they change behavior. The **[Learning Dashboard](docs/guide/learning-dashboard.md)** (`arcforge learn dashboard`) is the review surface for that queue.
 - **Eval** measures whether a skill or instruction actually changes what an agent does — trials, behavioral assertions, A/B comparison against a baseline. See the **[Eval System guide](docs/guide/eval-system.md)**.
 - **Obsidian** connects a vault so sessions can file knowledge into it and answer from it later. Register a vault, then use `/arcforge:maintaining-obsidian`.
 

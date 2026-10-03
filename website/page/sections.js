@@ -576,7 +576,7 @@ function SessionLearning({
         color: t.ink,
         fontStyle: 'italic'
       }
-    }, "off until you turn it on per project"), "; once enabled, three explicit gates stand between any pattern and active behavior. The ", /*#__PURE__*/React.createElement("em", {
+    }, "off until you turn it on"), "; once enabled, three explicit gates stand between any pattern and active behavior. The ", /*#__PURE__*/React.createElement("em", {
       style: {
         color: t.ink,
         fontStyle: 'italic'
@@ -819,7 +819,7 @@ function Platforms({
 function SkillsGrid({
   theme: t
 }) {
-  const layers = [['Self-contained', t.ember, 'no shared state', 'Every skill is a closed unit. It can be read, moved, or deleted without touching anything else — and it reaches the engine one way only, through the CLI.'], ['Description-triggered', t.brass, 'no global preamble', 'A skill fires because its description matches the situation in front of you. There is no mandatory routing rule injected into every session.'], ['Eval-backed', t.dim, 'measured, not asserted', 'A skill ships when trials show it changes what an agent does against a baseline that lacked it. Claims without numbers do not land.']];
+  const layers = [['Self-contained', t.ember, 'no shared state', 'Every skill is a closed unit. It can be read, moved, or deleted without touching anything else — and it reaches the engine one way only, through the CLI.'], ['Description-triggered', t.brass, 'no global preamble', 'A skill fires because its description matches the situation in front of you. There is no mandatory routing rule injected into every session.'], ['Eval-backed', t.dim, 'measured, gaps named', 'Skills are measured against a baseline that lacks them. Where a claim has no A/B evidence yet, the coverage ledger says so.']];
   const groups = [['Orientation', t.dim, [['using', 'router · skill index']]], ['Doing the work', t.ember, [['brainstorming', 'explore before the design settles'], ['executing', 'task list, then run it'], ['speccing', 'specs and decision log move with the code'], ['dispatching', 'parallel work, isolated writers'], ['looping', 'unattended across fresh sessions'], ['finishing', 'merge, PR, keep, or discard']]], ['Quality gates', t.brass, [['tdd', 'RED → GREEN → REFACTOR'], ['debugging', 'root cause before any fix'], ['code-review', 'review the diff, answer the feedback'], ['evaluating', 'measure behavioral change']]], ['Memory', t.ember, [['sessions', 'handover, resume, compact'], ['learning', 'opt-in diary → candidate → activate']]], ['Knowledge base', t.brass, [['maintaining-obsidian', 'vault lifecycle'], ['diagramming-obsidian', 'Excalidraw diagrams']]], ['Authoring', t.dim, [['writing-skills', 'build a skill that changes behavior']]]];
   return /*#__PURE__*/React.createElement(PageSection, {
     theme: t,
