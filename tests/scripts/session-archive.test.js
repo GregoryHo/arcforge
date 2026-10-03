@@ -1,0 +1,221 @@
+// tests/scripts/session-archive.test.js
+//
+// Behaviour of the session archive engine behind `arcforge session` (cli B-9):
+// which tracker record feeds the metrics header, where save writes, how list
+// orders, how an alias or a path resolves, and what resume prints.
+
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+
+const {
+  findLatestSessionRecord,
+  saveArchive,
+  listArchives,
+  resolveSessionRef,
+  formatSessionBriefing,
+} = require('../../scripts/lib/session-utils');
+const { resolveAlias, setAlias } = require('../../scripts/lib/session-aliases');
+
+const FIVE = `# Parser work
+
+## Where it stands
+feat/parser; npm test — 41 passed
+
+## Done
+- tokenizer — verified by npm test
+
+## Unfinished
+none
+
+## Decisions
+none
+
+## Next
+1. node scripts/cli.js parse fixtures/a.txt
+`;
+
+let home;
+let prevHome;
+
+beforeEach(() => {
+  home = fs.mkdtempSync(path.join(os.tmpdir(), 'session-archive-'));
+  prevHome = process.env.ARCFORGE_HOME;
+  process.env.ARCFORGE_HOME = home;
+});
+
+afterEach(() => {
+  if (prevHome === undefined) delete process.env.ARCFORGE_HOME;
+  else process.env.ARCFORGE_HOME = prevHome;
+  fs.rmSync(home, { recursive: true, force: true });
+});
+
+function writeRecord(project, date, record) {
+  const dir = path.join(home, 'sessions', project, date);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, `${record.sessionId}.json`), JSON.stringify(record));
+}
+
+describe('findLatestSessionRecord', () => {
+  it('returns null when the project has no tracker record', () => {
+    expect(findLatestSessionRecord('none')).toBeNull();
+  });
+
+  it('picks the most recently updated record of the newest date that has one', () => {
+    writeRecord('p', '2026-10-02', {
+      sessionId: 'session-old',
+      lastUpdated: '2026-10-02T23:00:00Z',
+    });
+    writeRecord('p', '2026-10-03', { sessionId: 'session-a', lastUpdated: '2026-10-03T09:00:00Z' });
+    writeRecord('p', '2026-10-03', { sessionId: 'session-b', lastUpdated: '2026-10-03T10:00:00Z' });
+    fs.mkdirSync(path.join(home, 'sessions', 'p', '2026-10-04'));
+    expect(findLatestSessionRecord('p').sessionId).toBe('session-b');
+  });
+
+  it('skips an unparseable record file', () => {
+    writeRecord('p', '2026-10-03', { sessionId: 'session-a', lastUpdated: '2026-10-03T09:00:00Z' });
+    fs.writeFileSync(path.join(home, 'sessions', 'p', '2026-10-03', 'session-bad.json'), '{');
+    expect(findLatestSessionRecord('p').sessionId).toBe('session-a');
+  });
+});
+
+describe('saveArchive', () => {
+  const now = new Date('2026-10-03T12:00:00.000Z');
+
+  it('writes archive-<alias>.md under sessions/<project>/<date>/ and registers the alias', () => {
+    writeRecord('p', '2026-10-03', {
+      sessionId: 'session-b',
+      started: '2026-10-03T11:00:00Z',
+      lastUpdated: '2026-10-03T11:30:00Z',
+      toolCalls: 9,
+      userMessages: 2,
+      filesModified: [],
+    });
+    const result = saveArchive('p', 'parser', FIVE, { now });
+    const expected = path.join(home, 'sessions', 'p', '2026-10-03', 'archive-parser.md');
+    expect(result).toEqual({
+      alias: 'parser',
+      path: expected,
+      project: 'p',
+      isNew: true,
+      session: 'session-b',
+    });
+    const md = fs.readFileSync(expected, 'utf8');
+    expect(md).toContain('**Duration:** ~30 minutes');
+    expect(md).toContain('**Files modified:** 0');
+    expect(resolveAlias('p', 'parser').sessionPath).toBe(expected);
+  });
+
+  it('a second save under the same alias reports isNew false and repoints it', () => {
+    saveArchive('p', 'parser', FIVE, { now });
+    const later = saveArchive('p', 'parser', FIVE, { now: new Date('2026-10-04T08:00:00Z') });
+    expect(later.isNew).toBe(false);
+    expect(resolveAlias('p', 'parser').sessionPath).toBe(later.path);
+    expect(later.path).toContain(`${path.sep}2026-10-04${path.sep}`);
+  });
+
+  it('rejects an invalid alias before writing anything', () => {
+    for (const bad of ['../x', 'a/b', 'has space', 'list', 'x'.repeat(129), '']) {
+      expect(() => saveArchive('p', bad, FIVE, { now })).toThrow(/alias/i);
+    }
+    expect(fs.existsSync(path.join(home, 'sessions', 'p'))).toBe(false);
+  });
+
+  it('rejects input that is not the five sections, naming the problem', () => {
+    expect(() => saveArchive('p', 'x', '## Done\nstuff\n', { now })).toThrow(
+      /missing handover section\(s\): Where it stands, Unfinished, Decisions, Next/,
+    );
+    expect(() => saveArchive('p', 'x', 42, { now })).toThrow(/input must be a string/);
+  });
+});
+
+describe('listArchives', () => {
+  it('lists archives only, newest first, with every alias pointing at each', () => {
+    writeRecord('p', '2026-10-03', { sessionId: 'session-b', lastUpdated: '2026-10-03T10:00:00Z' });
+    const v5Dir = path.join(home, 'sessions', 'p', '2026-10-01');
+    fs.mkdirSync(v5Dir, { recursive: true });
+    fs.writeFileSync(path.join(v5Dir, 'session-old.md'), '## Summary\nx\n');
+    const a = saveArchive('p', 'first', FIVE, { now: new Date('2026-10-02T12:00:00Z') });
+    const b = saveArchive('p', 'second', FIVE, { now: new Date('2026-10-03T12:00:00Z') });
+    setAlias('p', 'also-first', a.path);
+
+    const list = listArchives('p');
+    expect(list.map((e) => e.path)).toEqual([b.path, a.path]);
+    expect(list[0]).toEqual({
+      date: '2026-10-03',
+      path: b.path,
+      title: 'Parser work',
+      aliases: ['second'],
+    });
+    expect(list[1].aliases.sort()).toEqual(['also-first', 'first']);
+  });
+
+  it('honours limit and returns [] for a project with no archives', () => {
+    saveArchive('p', 'one', FIVE, { now: new Date('2026-10-02T12:00:00Z') });
+    saveArchive('p', 'two', FIVE, { now: new Date('2026-10-03T12:00:00Z') });
+    expect(listArchives('p', { limit: 1 }).map((e) => e.aliases[0])).toEqual(['two']);
+    expect(listArchives('empty')).toEqual([]);
+  });
+});
+
+describe('resolveSessionRef', () => {
+  it('resolves an alias to its archive path', () => {
+    const saved = saveArchive('p', 'parser', FIVE, { now: new Date() });
+    expect(resolveSessionRef('p', 'parser', home)).toBe(saved.path);
+  });
+
+  it('resolves a relative .md path against cwd, and an absolute one as is', () => {
+    const dir = path.join(home, 'repo', '.handovers');
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, '2026-10-03-parser.md');
+    fs.writeFileSync(file, FIVE);
+    expect(resolveSessionRef('p', '.handovers/2026-10-03-parser.md', path.join(home, 'repo'))).toBe(
+      file,
+    );
+    expect(resolveSessionRef('p', file, '/')).toBe(file);
+  });
+
+  it('fails with the alias and project named when the alias is unknown', () => {
+    expect(() => resolveSessionRef('p', 'nope', home)).toThrow(
+      /no session alias "nope" in project "p"/,
+    );
+  });
+
+  it('fails when a path does not name an existing file', () => {
+    expect(() => resolveSessionRef('p', 'missing/x.md', home)).toThrow(/not a file: .*missing/);
+  });
+
+  it('fails when an alias points at a file that is gone', () => {
+    const saved = saveArchive('p', 'parser', FIVE, { now: new Date() });
+    fs.rmSync(saved.path);
+    expect(() => resolveSessionRef('p', 'parser', home)).toThrow(
+      /alias "parser" points at .* not a file/,
+    );
+  });
+});
+
+describe('formatSessionBriefing', () => {
+  it('prints the source, the header and the five sections', () => {
+    const saved = saveArchive('p', 'parser', FIVE, { now: new Date('2026-10-03T12:00:00Z') });
+    const briefing = formatSessionBriefing(fs.readFileSync(saved.path, 'utf8'), saved.path);
+    expect(briefing.split('\n')[0]).toBe(`Source: ${saved.path}`);
+    expect(briefing).toContain('# Parser work');
+    expect(briefing).toContain('**Alias:** parser');
+    for (const h of ['Where it stands', 'Done', 'Unfinished', 'Decisions', 'Next']) {
+      expect(briefing).toContain(`## ${h}`);
+    }
+    expect(briefing).toContain('node scripts/cli.js parse fixtures/a.txt');
+  });
+
+  it('reads a handover file the same way', () => {
+    const briefing = formatSessionBriefing(`${FIVE}\n## Scratch\nignored\n`, 'h.md');
+    expect(briefing).toContain('## Next');
+    expect(briefing).not.toContain('Scratch');
+  });
+
+  it('refuses a v5 archive', () => {
+    expect(() => formatSessionBriefing('## Summary\nx\n## Next Step\ny\n', 'old.md')).toThrow(
+      /v5 session archive format/,
+    );
+  });
+});

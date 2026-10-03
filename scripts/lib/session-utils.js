@@ -7,8 +7,11 @@ const {
   getProjectDiariesDir,
   getDateDiariesDir,
   getProjectSessionsDir,
+  getSessionDir,
   sanitizeSessionId,
   sanitizeProjectName,
+  sanitizeFilename,
+  atomicWriteFile,
 } = require('./utils');
 
 // The marker the diary draft template leaves in every unfilled section.
@@ -149,8 +152,30 @@ function updateProcessedLog(logPath, diaryFiles, reflectionId) {
 }
 
 // ─────────────────────────────────────────────
-// Session Listing & Briefings
+// Session Archive (cli B-9, D-056)
 // ─────────────────────────────────────────────
+//
+// An archive is `sessions/<project>/<date>/archive-<alias>.md`: an H1, the
+// engine-written metrics header (ARCHIVE_HEADER_FIELDS, from the
+// session-tracker record), then the five handover sections the caller wrote.
+// It never carries text of the user's messages (learning B-20). A
+// `.handovers/<date>-<slug>.md` file is the same five sections without the
+// header, so one reader serves both.
+
+const HANDOVER_SECTIONS = ['Where it stands', 'Done', 'Unfinished', 'Decisions', 'Next'];
+const V5_SECTIONS = ['Summary', 'What Worked', 'What Failed', 'Blockers', 'Next Step'];
+const ARCHIVE_HEADER_FIELDS = [
+  'Project',
+  'Alias',
+  'Saved',
+  'Session',
+  'Duration',
+  'Tool calls',
+  'User messages',
+  'Files modified',
+];
+const ARCHIVE_PREFIX = 'archive-';
+const DEFAULT_LIST_LIMIT = 20;
 
 /**
  * Get all date directories sorted by date descending.
@@ -169,304 +194,287 @@ function getDateDirs(parentDir) {
 }
 
 /**
- * List sessions for a project with metadata.
- * @param {string} project - Project name
- * @param {Object} [options]
- * @param {string} [options.date] - Filter by date (YYYY-MM-DD)
- * @param {string} [options.query] - Filter by session ID substring
- * @param {number} [options.limit=20] - Max results
- * @param {number} [options.offset=0] - Skip first N results
- * @returns {{ sessions: Object[], total: number }}
- */
-function listSessions(project, options = {}) {
-  const { date = null, query = null, limit = 20, offset = 0 } = options;
-  const sessionsDir = getProjectSessionsDir(project);
-  if (!fs.existsSync(sessionsDir)) return { sessions: [], total: 0 };
-
-  let allSessions = [];
-  let dateDirs = getDateDirs(sessionsDir);
-
-  if (date) {
-    dateDirs = dateDirs.filter((d) => d === date);
-  }
-
-  for (const dateStr of dateDirs) {
-    const dateDir = path.join(sessionsDir, dateStr);
-    const sessionFiles = fs
-      .readdirSync(dateDir)
-      .filter((f) => f.startsWith('session-') && (f.endsWith('.json') || f.endsWith('.md')));
-
-    for (const file of sessionFiles) {
-      try {
-        if (file.endsWith('.json')) {
-          const content = fs.readFileSync(path.join(dateDir, file), 'utf-8');
-          const session = JSON.parse(content);
-          allSessions.push({ ...session, dateStr, filename: file, type: 'auto' });
-        } else {
-          // session-{alias}.md — user-saved session
-          const alias = file.replace(/^session-/, '').replace(/\.md$/, '');
-          allSessions.push({
-            sessionId: alias,
-            project,
-            date: dateStr,
-            dateStr,
-            filename: file,
-            type: 'saved',
-            lastUpdated: fs.statSync(path.join(dateDir, file)).mtime.toISOString(),
-          });
-        }
-      } catch {
-        // skip invalid
-      }
-    }
-  }
-
-  // Sort by lastUpdated descending
-  allSessions.sort(
-    (a, b) =>
-      new Date(b.lastUpdated || b.dateStr).getTime() -
-      new Date(a.lastUpdated || a.dateStr).getTime(),
-  );
-
-  // Filter by session ID substring
-  if (query) {
-    const q = query.toLowerCase();
-    allSessions = allSessions.filter((s) => (s.sessionId || '').toLowerCase().includes(q));
-  }
-
-  return {
-    sessions: allSessions.slice(offset, offset + limit),
-    total: allSessions.length,
-  };
-}
-
-/**
- * Find a session by ID prefix or full ID.
- * @param {string} project - Project name
- * @param {string} idPrefix - Session ID or prefix (e.g., "session-abc" or "abc")
- * @returns {Object|null} Session data or null
- */
-function getSessionById(project, idPrefix) {
-  const { sessions } = listSessions(project, { limit: 1000 });
-  const normalized = idPrefix.startsWith('session-') ? idPrefix : `session-${idPrefix}`;
-
-  return (
-    sessions.find((s) => s.sessionId === normalized || s.sessionId?.startsWith(normalized)) || null
-  );
-}
-
-/**
- * Generate a saved session markdown from session data and optional transcript data.
- * @param {Object} session - Session JSON data
- * @param {Object|null} transcriptData - Parsed transcript data
- * @param {Object} [enrichment] - Claude-provided enrichment
- * @param {string} [enrichment.summary] - What was accomplished
- * @param {string} [enrichment.whatWorked] - Approaches that worked
- * @param {string} [enrichment.whatFailed] - Approaches that failed
- * @param {string} [enrichment.blockers] - Current blockers
- * @param {string} [enrichment.nextStep] - Exact next step
- * @returns {string} Session markdown content
- */
-function generateSession(session, transcriptData = null, enrichment = {}) {
-  const lines = [];
-  const date = session.date || session.dateStr || new Date().toISOString().split('T')[0];
-
-  lines.push(`# Session: ${date}`);
-  lines.push(`**Project:** ${session.project || 'unknown'}`);
-  lines.push(`**Session:** ${session.sessionId || 'unknown'}`);
-  lines.push(`**Created:** ${new Date().toISOString()}`);
-  lines.push('');
-
-  // Metrics
-  lines.push('## Session Metrics');
-  const durationMins =
-    session.started && session.lastUpdated
-      ? Math.round((new Date(session.lastUpdated) - new Date(session.started)) / 60000)
-      : null;
-  lines.push(`- **Duration**: ${durationMins != null ? `~${durationMins} minutes` : 'unknown'}`);
-  lines.push(`- **Tool calls**: ${session.toolCalls || 0}`);
-  lines.push(`- **User messages**: ${session.userMessages || 0}`);
-  lines.push('');
-
-  // Tools used
-  const tools = transcriptData?.toolsUsed || session.toolsUsed || [];
-  if (tools.length > 0) {
-    lines.push('## Tools Used');
-    lines.push(tools.join(', '));
-    lines.push('');
-  }
-
-  // Files modified
-  const files = transcriptData?.filesModified || session.filesModified || [];
-  if (files.length > 0) {
-    lines.push('## Files Modified');
-    for (const f of files) {
-      lines.push(`- ${f}`);
-    }
-    lines.push('');
-  }
-
-  // User messages (conversation trail)
-  const msgs = transcriptData?.userMessages || session.userMessageContent || [];
-  if (msgs.length > 0) {
-    lines.push('## Conversation Trail');
-    for (const msg of msgs) {
-      lines.push(`> ${msg}`);
-    }
-    lines.push('');
-  }
-
-  // Enrichment sections (Claude fills these)
-  lines.push('## Summary');
-  lines.push(enrichment.summary || '<!-- TO BE ENRICHED: What was accomplished this session -->');
-  lines.push('');
-
-  lines.push('## What Worked');
-  lines.push(
-    enrichment.whatWorked || '<!-- TO BE ENRICHED: Approaches and techniques that succeeded -->',
-  );
-  lines.push('');
-
-  lines.push('## What Failed');
-  lines.push(
-    enrichment.whatFailed || '<!-- TO BE ENRICHED: Approaches that were tried and abandoned -->',
-  );
-  lines.push('');
-
-  lines.push('## Blockers');
-  lines.push(enrichment.blockers || '<!-- TO BE ENRICHED: Current blockers or open questions -->');
-  lines.push('');
-
-  lines.push('## Next Step');
-  lines.push(enrichment.nextStep || '<!-- TO BE ENRICHED: Exact next step to take -->');
-  lines.push('');
-
-  return lines.join('\n');
-}
-
-/**
- * Format a structured briefing from saved session content for resume.
- * @param {string} sessionContent - Raw session markdown
- * @param {string} sessionPath - Path to the session file
- * @returns {string} Formatted briefing
- */
-function formatSessionBriefing(sessionContent, sessionPath) {
-  const lines = [];
-  lines.push(`SESSION LOADED: ${sessionPath}`);
-  lines.push('════════════════════════════════════════════════');
-  lines.push('');
-
-  const sections = parseSessionSections(sessionContent);
-
-  if (sections.project) {
-    lines.push(`PROJECT: ${sections.project}`);
-    lines.push('');
-  }
-
-  if (sections.summary && !sections.summary.includes('TO BE ENRICHED')) {
-    lines.push('WHAT WE WERE DOING:');
-    lines.push(sections.summary);
-    lines.push('');
-  }
-
-  if (sections.metrics) {
-    lines.push('SESSION STATS:');
-    lines.push(sections.metrics);
-    lines.push('');
-  }
-
-  if (sections.filesModified) {
-    lines.push('FILES MODIFIED:');
-    lines.push(sections.filesModified);
-    lines.push('');
-  }
-
-  if (sections.whatFailed && !sections.whatFailed.includes('TO BE ENRICHED')) {
-    lines.push('WHAT NOT TO RETRY:');
-    lines.push(sections.whatFailed);
-    lines.push('');
-  }
-
-  if (sections.blockers && !sections.blockers.includes('TO BE ENRICHED')) {
-    lines.push('OPEN QUESTIONS / BLOCKERS:');
-    lines.push(sections.blockers);
-    lines.push('');
-  }
-
-  if (sections.nextStep && !sections.nextStep.includes('TO BE ENRICHED')) {
-    lines.push('NEXT STEP:');
-    lines.push(sections.nextStep);
-    lines.push('');
-  }
-
-  if (sections.conversationTrail) {
-    lines.push('CONVERSATION TRAIL:');
-    lines.push(sections.conversationTrail);
-    lines.push('');
-  }
-
-  lines.push('════════════════════════════════════════════════');
-  lines.push('Ready to continue. What would you like to do?');
-
-  return lines.join('\n');
-}
-
-/**
- * Parse saved session markdown into named sections.
- * @param {string} content - Session markdown
- * @returns {Object} Parsed sections
+ * Split markdown into its H1 title, the preamble before the first `## `
+ * heading, and every `## ` section. A `## ` line inside a fenced code block is
+ * body text, not a heading.
+ * @param {string} content
+ * @returns {{ title: string|null, preamble: string, sections: Object<string, string> }}
+ * @throws {Error} on a heading that appears twice
  */
 function parseSessionSections(content) {
   const sections = {};
-  const lines = content.split('\n');
+  const preamble = [];
+  let current = null;
+  let body = [];
+  let inFence = false;
 
-  // Extract project from frontmatter-style line
-  const projectLine = lines.find((l) => l.startsWith('**Project:**'));
-  if (projectLine) {
-    sections.project = projectLine.replace('**Project:**', '').trim();
-  }
+  const close = () => {
+    if (current !== null) sections[current] = body.join('\n').trim();
+  };
 
-  // Parse ## sections
-  let currentSection = null;
-  let currentContent = [];
-
-  for (const line of lines) {
-    if (line.startsWith('## ')) {
-      if (currentSection) {
-        sections[currentSection] = currentContent.join('\n').trim();
-      }
-      const sectionName = line.replace('## ', '').trim();
-      currentSection = sectionNameToKey(sectionName);
-      currentContent = [];
-    } else if (currentSection) {
-      currentContent.push(line);
+  for (const line of content.split('\n')) {
+    if (/^\s*(```|~~~)/.test(line)) inFence = !inFence;
+    if (!inFence && line.startsWith('## ')) {
+      close();
+      current = line.slice(3).trim();
+      if (Object.hasOwn(sections, current)) throw new Error(`duplicate section "${current}"`);
+      body = [];
+    } else if (current !== null) {
+      body.push(line);
+    } else {
+      preamble.push(line);
     }
   }
+  close();
 
-  // Save last section
-  if (currentSection) {
-    sections[currentSection] = currentContent.join('\n').trim();
-  }
-
-  return sections;
+  const titleLine = preamble.find((l) => l.startsWith('# '));
+  return {
+    title: titleLine ? titleLine.slice(2).trim() : null,
+    preamble: preamble.join('\n').trim(),
+    sections,
+  };
 }
 
 /**
- * Map section heading to object key.
+ * Read the five handover sections out of an archive or a handover file.
+ * Lenient (resume) ignores any other section; strict (save) rejects other
+ * sections and empty slots, so an archive holds the five and nothing else.
+ * @param {string} content - Markdown
+ * @param {string} source - Where it came from, for error messages
+ * @param {{ strict?: boolean }} [options]
+ * @returns {{ title: string|null, preamble: string, sections: Object<string, string> }}
+ * @throws {Error} naming the source and what is wrong
  */
-function sectionNameToKey(name) {
-  const map = {
-    'Session Metrics': 'metrics',
-    'Tools Used': 'toolsUsed',
-    'Files Modified': 'filesModified',
-    'Conversation Trail': 'conversationTrail',
-    Summary: 'summary',
-    'What Worked': 'whatWorked',
-    'What Failed': 'whatFailed',
-    Blockers: 'blockers',
-    'Next Step': 'nextStep',
+function readHandover(content, source, { strict = false } = {}) {
+  if (typeof content !== 'string') throw new Error(`${source}: input must be a string`);
+  let parsed;
+  try {
+    parsed = parseSessionSections(content);
+  } catch (err) {
+    throw new Error(`${source}: ${err.message}`);
+  }
+  const headings = Object.keys(parsed.sections);
+  const missing = HANDOVER_SECTIONS.filter((h) => !headings.includes(h));
+  if (missing.length > 0) {
+    if (headings.some((h) => V5_SECTIONS.includes(h))) {
+      throw new Error(
+        `${source}: the v5 session archive format (${V5_SECTIONS.join(' / ')}) is not ` +
+          `supported — only the five handover sections are read: ${HANDOVER_SECTIONS.join(', ')}`,
+      );
+    }
+    throw new Error(`${source}: missing handover section(s): ${missing.join(', ')}`);
+  }
+  if (strict) {
+    const extra = headings.filter((h) => !HANDOVER_SECTIONS.includes(h));
+    if (extra.length > 0) {
+      throw new Error(
+        `${source}: unexpected section(s): ${extra.join(', ')} — an archive holds only ` +
+          `the five handover sections`,
+      );
+    }
+    const empty = HANDOVER_SECTIONS.filter((h) => parsed.sections[h] === '');
+    if (empty.length > 0) {
+      throw new Error(
+        `${source}: empty section(s): ${empty.join(', ')} — write none in a slot with nothing in it`,
+      );
+    }
+  }
+  const sections = Object.fromEntries(HANDOVER_SECTIONS.map((h) => [h, parsed.sections[h]]));
+  return { title: parsed.title, preamble: parsed.preamble, sections };
+}
+
+/**
+ * The project's current session-tracker record: the most recently updated
+ * `session-*.json` in the newest date directory that holds one.
+ * @param {string} project
+ * @returns {Object|null}
+ */
+function findLatestSessionRecord(project) {
+  const sessionsDir = getProjectSessionsDir(project);
+  if (!fs.existsSync(sessionsDir)) return null;
+  for (const date of getDateDirs(sessionsDir)) {
+    const dir = path.join(sessionsDir, date);
+    const records = [];
+    for (const file of fs.readdirSync(dir)) {
+      if (!file.startsWith('session-') || !file.endsWith('.json')) continue;
+      try {
+        records.push(JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')));
+      } catch {
+        // A record mid-write or corrupt is not the current session's; skip it.
+      }
+    }
+    if (records.length > 0) {
+      records.sort((a, b) => String(b.lastUpdated).localeCompare(String(a.lastUpdated)));
+      return records[0];
+    }
+  }
+  return null;
+}
+
+/**
+ * The metrics header lines. Only counts and paths are read from the record —
+ * never userMessageContent (learning B-20).
+ */
+function archiveHeader(record, { project, alias, savedAt }) {
+  const unknown = 'unknown';
+  const lines = [
+    `**Project:** ${project}`,
+    `**Alias:** ${alias}`,
+    `**Saved:** ${savedAt}`,
+    `**Session:** ${record?.sessionId || 'none recorded'}`,
+  ];
+  if (!record) {
+    for (const field of ARCHIVE_HEADER_FIELDS.slice(4)) lines.push(`**${field}:** ${unknown}`);
+    return lines;
+  }
+  const minutes =
+    record.started && record.lastUpdated
+      ? Math.round((new Date(record.lastUpdated) - new Date(record.started)) / 60000)
+      : null;
+  const files = Array.isArray(record.filesModified) ? record.filesModified : [];
+  lines.push(`**Duration:** ${Number.isFinite(minutes) ? `~${minutes} minutes` : unknown}`);
+  lines.push(`**Tool calls:** ${record.toolCalls ?? 0}`);
+  lines.push(`**User messages:** ${record.userMessages ?? 0}`);
+  lines.push(`**Files modified:** ${files.length}`);
+  for (const f of files) lines.push(`- ${f}`);
+  return lines;
+}
+
+/**
+ * Render an archive: H1, metrics header, the five sections in order.
+ * @param {Object|null} record - session-tracker record, or null when none exists
+ * @param {{ title: string|null, sections: Object<string, string> }} handover - from readHandover
+ * @param {{ project: string, alias: string, date: string, savedAt: string }} meta
+ * @returns {string} Archive markdown
+ */
+function generateSession(record, handover, meta) {
+  const lines = [`# ${handover.title || `${meta.alias} — ${meta.date}`}`, ''];
+  lines.push(...archiveHeader(record, meta), '');
+  for (const heading of HANDOVER_SECTIONS) {
+    lines.push(`## ${heading}`, handover.sections[heading], '');
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Save the caller's five sections as an archive and point the alias at it.
+ * @param {string} project
+ * @param {string} alias
+ * @param {string} input - Markdown holding the five sections (an optional H1 is the title)
+ * @param {{ now?: Date }} [options]
+ * @returns {{ alias: string, path: string, project: string, isNew: boolean, session: string|null }}
+ * @throws {Error} on an invalid alias, input that is not the five sections, or a failed write
+ */
+function saveArchive(project, alias, input, { now = new Date() } = {}) {
+  const { validateAlias, setAlias } = require('./session-aliases');
+  const check = validateAlias(alias);
+  if (!check.valid) throw new Error(`Invalid alias: ${check.error}`);
+  const handover = readHandover(input, 'session input', { strict: true });
+
+  const savedAt = now.toISOString();
+  const date = savedAt.slice(0, 10);
+  const record = findLatestSessionRecord(project);
+  const fileName = sanitizeFilename(`${ARCHIVE_PREFIX}${alias}.md`);
+  const archivePath = path.join(getSessionDir(project, date), fileName);
+  atomicWriteFile(
+    archivePath,
+    generateSession(record, handover, { project, alias, date, savedAt }),
+  );
+
+  const result = setAlias(project, alias, archivePath, handover.title);
+  if (!result.success) {
+    throw new Error(`Archive written to ${archivePath}, but alias "${alias}": ${result.error}`);
+  }
+  return {
+    alias,
+    path: archivePath,
+    project,
+    isNew: result.isNew,
+    session: record?.sessionId || null,
   };
-  return map[name] || name.toLowerCase().replace(/\s+/g, '_');
+}
+
+/**
+ * The project's archives, newest first, each with every alias pointing at it.
+ * Files other than `archive-*.md` (v5's `session-*.md` included) are not listed.
+ * @param {string} project
+ * @param {{ limit?: number }} [options]
+ * @returns {Array<{ date: string, path: string, title: string|null, aliases: string[] }>}
+ */
+function listArchives(project, { limit = DEFAULT_LIST_LIMIT } = {}) {
+  const sessionsDir = getProjectSessionsDir(project);
+  if (!fs.existsSync(sessionsDir)) return [];
+  const { listAliases } = require('./session-aliases');
+  const aliasesByPath = new Map();
+  for (const a of listAliases(project)) {
+    const key = path.resolve(a.sessionPath);
+    aliasesByPath.set(key, [...(aliasesByPath.get(key) || []), a.name]);
+  }
+
+  const archives = [];
+  for (const date of getDateDirs(sessionsDir)) {
+    const dir = path.join(sessionsDir, date);
+    const files = fs
+      .readdirSync(dir)
+      .filter((f) => f.startsWith(ARCHIVE_PREFIX) && f.endsWith('.md'))
+      .map((f) => ({ file: path.join(dir, f), mtime: fs.statSync(path.join(dir, f)).mtimeMs }))
+      .sort((a, b) => b.mtime - a.mtime);
+    for (const { file } of files) {
+      const firstLine = fs.readFileSync(file, 'utf-8').split('\n', 1)[0];
+      archives.push({
+        date,
+        path: file,
+        title: firstLine.startsWith('# ') ? firstLine.slice(2).trim() : null,
+        aliases: aliasesByPath.get(file) || [],
+      });
+    }
+  }
+  return archives.slice(0, limit);
+}
+
+/**
+ * Resolve `resume`'s argument: a bare name is an alias of this project; a
+ * value with a path separator or ending `.md` is a file path (relative to cwd).
+ * @param {string} project
+ * @param {string} ref - Alias or path
+ * @param {string} cwd - Base for a relative path
+ * @returns {string} Absolute path to an existing file
+ * @throws {Error} naming the alias or path that did not resolve
+ */
+function resolveSessionRef(project, ref, cwd) {
+  if (typeof ref !== 'string' || ref.trim() === '') {
+    throw new Error('Expected an alias or a path');
+  }
+  const isFile = (p) => fs.existsSync(p) && fs.statSync(p).isFile();
+  if (ref.includes('/') || ref.includes('\\') || ref.endsWith('.md')) {
+    const resolved = path.resolve(cwd, ref);
+    if (!isFile(resolved)) throw new Error(`not a file: ${resolved}`);
+    return resolved;
+  }
+  const { resolveAlias } = require('./session-aliases');
+  const entry = resolveAlias(project, ref);
+  if (!entry) throw new Error(`no session alias "${ref}" in project "${project}"`);
+  const resolved = path.resolve(entry.sessionPath);
+  if (!isFile(resolved)) throw new Error(`alias "${ref}" points at ${resolved}, not a file`);
+  return resolved;
+}
+
+/**
+ * The briefing `resume` prints: where it came from, the archive header (or a
+ * handover's title), then the five sections. It changes nothing.
+ * @param {string} content - Archive or handover markdown
+ * @param {string} sourcePath
+ * @returns {string}
+ * @throws {Error} when the content is not the five sections (v5 included)
+ */
+function formatSessionBriefing(content, sourcePath) {
+  const { preamble, sections } = readHandover(content, sourcePath);
+  const lines = [`Source: ${sourcePath}`, ''];
+  if (preamble) lines.push(preamble, '');
+  for (const heading of HANDOVER_SECTIONS) {
+    lines.push(`## ${heading}`, sections[heading], '');
+  }
+  return lines.join('\n').trimEnd();
 }
 
 // ─────────────────────────────────────────────
@@ -642,13 +650,18 @@ module.exports = {
   scanDiaries,
   determineReflectStrategy,
   updateProcessedLog,
-  // Session listing & briefings
+  // Session archive
+  HANDOVER_SECTIONS,
+  ARCHIVE_HEADER_FIELDS,
   getDateDirs,
-  listSessions,
-  getSessionById,
-  generateSession,
-  formatSessionBriefing,
   parseSessionSections,
+  readHandover,
+  findLatestSessionRecord,
+  generateSession,
+  saveArchive,
+  listArchives,
+  resolveSessionRef,
+  formatSessionBriefing,
   // Observation & Instinct paths
   getObservationsPath,
   getInstinctsRoot,
