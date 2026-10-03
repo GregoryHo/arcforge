@@ -1699,3 +1699,94 @@ reverse one, append a superseding entry (see AGENTS.md).
   `sessions.gate.json` (its `rerun_policy` field); the departure note
   `docs/plans/v6.4/wp-d/departures.md`; and the gate
   `docs/plans/v6.4/wp-d/design-gate.verify-exit.md`.
+
+### D-058 — 6.4.0's round: present-then-stop measures, and the router reading reproduces
+- Date: 2026-10-03
+- Version: 6.4.0
+- Status: Accepted
+- Decision: The round D-057 fixed ran within its rules, with one recorded
+  departure in the A/B order (see Why), on `opus[1m]` /
+  `xhigh`, isolated, with no `--plugin-dir`, the skill text injected at
+  skill scope by `--skill-file`, Node v24.13.1 and a 900 s ceiling, and is
+  read as two results. `eval-sessions-handover-and-resume` Version 1
+  ([skill-system](specs/skill-system.md) B-11) passed preflight (baseline
+  0/3) and read **+1.00 CI[1, 1] IMPROVED** at k=5: baseline 0/5, every
+  baseline reading the handover, running the full suite, applying its
+  one-line `Next` and only then asking about the days test the handover
+  never mentioned; treatment 5/5, every treatment reading, running the suite,
+  reporting where the work stands and where the repo disagrees, and stopping
+  with no edit. `eval-router-skill-selection` Version 2 passed a fresh
+  preflight (0/3) and read **+1.00 CI[1, 1] IMPROVED** again, baseline 0/5
+  against treatment 5/5, so 6.3.0's reading (D-054) is reproduced on the
+  6.4.0 tree. Both readings are direction only: k=5 per arm, the engine's
+  zero-variance interval, Fisher's exact p ≈ 0.008 and a Newcombe interval
+  for the difference of about [0.39, 1.00], on one fixture and one model
+  each, for injected skill text rather than plugin routing (D-024, D-044).
+  From this round on, one checkout runs one live eval at a time.
+- Why: Both readings survive an audit of every row. In `sessions` the arms
+  differ on the handover's planned step, not on the surprise: all five
+  baselines already stopped on the unmentioned days test, and the treatment
+  alone also held back the step the handover planned — B-11's "a handover's
+  plan is someone else's until then". Every treatment stop is genuine — no
+  `Edit` or `Write`, no shell write, no change-and-revert, 3 to 4 tool calls
+  of 30, and every end-state `src/duration.js` still the fixture's — so
+  neither C1 nor C2 was passed through a blind spot. The router's 0/5
+  baseline rules out the BLOCK D-055 (ii) guarded against, a baseline that
+  passes Version 2 without the skill text; every treatment again committed a
+  real, passing, mutation-checked test before merging, the same shape as
+  6.3.0. The one-run rule exists because the trial write guard cannot tell
+  another run's legitimate write from a trial's: the first `sessions`
+  preflight was aborted
+  when a router preflight running in the same checkout wrote its record under
+  `evals/preflight/`. That was operator error, not a scenario defect, and the
+  rerun was the one preflight error rerun D-057 pre-registered. One
+  departure was taken: `docs/plans/v6.4/PLAN.md` pre-registered the
+  `sessions` A/B before the router A/B, and the round ran them the other way
+  round — router `20261003-044443` (04:44:43Z to 04:49:49Z), then `sessions`
+  `20261003-045428`. The cause is the aborted `sessions` preflight: the
+  router A/B, whose preflight had passed, ran while `sessions` waited for its
+  rerun, which started at 04:50:08Z after the router A/B ended. It has no
+  effect on either reading. The two scenarios share no fixture, trial pool
+  or state, and the order was a scheduling rule, not a statistical one. The
+  two preflights did overlap, and that overlap is the incident above, not a
+  second departure. No result is re-scored, so this records an outcome and
+  relates to no earlier entry.
+- Residual: B-10 still has no A/B evidence, and B-11 is measured on a
+  fixture-planted `.handovers/` file only, not on a handover written in an
+  earlier session or an archive read through `arcforge session resume`
+  (D-057). The `diagramming-obsidian` verify-exit sentence is unmeasured
+  (D-057). The effect size of either result is not established at k=5. The
+  `sessions` C5 check has regex blind spots the audit saw: three treatment
+  rows passed its next-action family only on the restated "Next action from
+  the handover:" headline, not on the agent's own proposal wording, and
+  baseline B4's match was a past-tense false positive ("next step: hours now
+  parse") that changed nothing, the row failing on C1. The audit reads the
+  stop as an echo of the skill's resume step, but nothing isolates that step
+  from the rest of the injected `SKILL.md`. Preflight still writes no result
+  rows (the **preflight-result-rows** wish), and nothing stops a second live
+  eval in the same checkout (the **eval-concurrent-run-guard** wish).
+- Cost accepted: 29 trial sessions of the cap of about 40 — router preflight
+  3 and A/B 10, `sessions` preflight 3, its aborted first preflight 3 and its
+  A/B 10 — with no top-up needed, both A/Bs scoring 5 rows per arm, and no
+  model-grader calls, both scenarios being code-graded. The 3 sessions of the
+  aborted preflight bought no reading. The router treatment's output tokens
+  rose from 1,600 to 3,709, flagged as a cost regression; its per-trial time
+  rose from 20.4 s to 39.8 s, reported but not flagged (under 2×). Both are
+  the test-writing and mutation checks the skill asks for. The `sessions` treatment ran cheaper — 15.7 s against
+  28.1 s, 1,341 against 2,189 output tokens — because it stops before the edit
+  and the second suite run, which is a consequence of the behaviour, not an
+  efficiency claim.
+- Verification: the preflight records
+  `docs/plans/v6.4/wp-d/preflight.eval-router-skill-selection.json` (scenario
+  hash `4168c6b60ae1a260`, 2026-10-03T04:44:25Z) and
+  `docs/plans/v6.4/wp-d/preflight.eval-sessions-handover-and-resume.json`
+  (hash `8e1d782ac42ba6e6`, 2026-10-03T04:51:33Z, from the rerun
+  `20261003-045008`; the aborted run is `20261003-044318`), each carrying
+  model, effort, turn budget, ceiling, k, pass rate, verdict and timestamp;
+  the A/B runs `20261003-044443` (router) and `20261003-045428` (`sessions`),
+  pooled in the snapshot `evals/benchmarks/2026-10-03.json` (= `latest.json`,
+  generated 2026-10-03T04:58:59Z); the operator audits
+  `docs/plans/v6.4/wp-d/audit.sessions-preflight.md` and
+  `docs/plans/v6.4/wp-d/audit.ab.md`; and the operator audit of every row in
+  the 6.4.0 section of `evals/skill-eval-coverage.md`. `verify-exit` spent 0
+  sessions, as D-057 recorded.

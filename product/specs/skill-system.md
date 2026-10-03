@@ -162,6 +162,9 @@ asserted by test (B-3).
 - **D-057** — 6.4.0's `sessions` scenario measures present-then-stop alone:
   a trial is one turn, so it cannot write a handover and resume it, and the
   five-section shape separates the arms by construction (B-10, B-11).
+- **D-058** — present-then-stop measured +1.00 CI[1, 1] IMPROVED at skill
+  scope, baseline 0/5 against treatment 5/5, direction only at k=5; the
+  router's reading reproduced on the 6.4.0 tree (B-3, B-9, B-11).
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
 

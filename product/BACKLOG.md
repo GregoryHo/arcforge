@@ -119,6 +119,9 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 - **eval-trial-path** — the operator's `PATH` reaches trials, since the engine
   spawns them with the operator's environment; one 6.3.0 trial resolved
   `arcforge` and ran it. Narrower than **eval-trial-sandbox** · needs: D-054.
+- **eval-concurrent-run-guard** — refuse or lock a second live eval in the
+  same checkout, since the write guard aborts a trial for another run's write
+  under `evals/preflight/` · needs: D-058.
 
 ## CLI
 

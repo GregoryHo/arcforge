@@ -264,3 +264,5 @@ its rationale is inline at B-10.
 - **D-057** — that sentence is not measurable on the current engine, which
   injects `SKILL.md` alone, overrides no trial's `PATH` or `HOME`, and has no
   two-skill-text A/B, so it is a finding at 0 sessions (B-1, B-7).
+- **D-058** — 6.4.0's round: the write guard cannot tell another run's write
+  from a trial's, so one checkout runs one live eval at a time (B-7).
