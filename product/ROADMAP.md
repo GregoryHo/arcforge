@@ -1704,7 +1704,8 @@ reverse one, append a superseding entry (see AGENTS.md).
 - Date: 2026-10-03
 - Version: 6.4.0
 - Status: Accepted
-- Decision: The round D-057 fixed ran within its rules on `opus[1m]` /
+- Decision: The round D-057 fixed ran within its rules, with one recorded
+  departure in the A/B order (see Why), on `opus[1m]` /
   `xhigh`, isolated, with no `--plugin-dir`, the skill text injected at
   skill scope by `--skill-file`, Node v24.13.1 and a 900 s ceiling, and is
   read as two results. `eval-sessions-handover-and-resume` Version 1
@@ -1738,9 +1739,18 @@ reverse one, append a superseding entry (see AGENTS.md).
   preflight was aborted
   when a router preflight running in the same checkout wrote its record under
   `evals/preflight/`. That was operator error, not a scenario defect, and the
-  rerun was the one preflight error rerun D-057 pre-registered. No result is
-  re-scored and no departure from D-057 was taken, so this records an
-  outcome and relates to no earlier entry.
+  rerun was the one preflight error rerun D-057 pre-registered. One
+  departure was taken: `docs/plans/v6.4/PLAN.md` pre-registered the
+  `sessions` A/B before the router A/B, and the round ran them the other way
+  round — router `20261003-044443` (04:44:43Z to 04:49:49Z), then `sessions`
+  `20261003-045428`. The cause is the aborted `sessions` preflight: the
+  router A/B, whose preflight had passed, ran while `sessions` waited for its
+  rerun, which started at 04:50:08Z after the router A/B ended. It has no
+  effect on either reading. The two scenarios share no fixture, trial pool
+  or state, and the order was a scheduling rule, not a statistical one. The
+  two preflights did overlap, and that overlap is the incident above, not a
+  second departure. No result is re-scored, so this records an outcome and
+  relates to no earlier entry.
 - Residual: B-10 still has no A/B evidence, and B-11 is measured on a
   fixture-planted `.handovers/` file only, not on a handover written in an
   earlier session or an archive read through `arcforge session resume`

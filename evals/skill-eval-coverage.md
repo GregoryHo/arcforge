@@ -1988,6 +1988,13 @@ transcript 都加了 `h`，和 baseline floor 一致，但不計分。重跑 `20
 guard 無法區分 trial 的寫入和別的 run 的合法寫入，引擎也沒有鎖，見 backlog wish
 `eval-concurrent-run-guard`。
 
+**順序偏離（D-058）**：`docs/plans/v6.4/PLAN.md` 預先登記 `sessions` 的 A/B 先跑、router 的
+A/B 後跑，本輪實際順序相反：router `20261003-044443`（04:44:43Z 到 04:49:49Z）先跑，
+`sessions` `20261003-045428` 後跑。原因是 `sessions` 的 preflight 被中止：router 的 preflight
+已經 PASS，它的 A/B 就在 `sessions` 等待重跑的期間先跑完，重跑在 04:50:08Z 才開始。這對兩個
+讀數都沒有影響：兩支 scenario 不共用 fixture、trial pool 或狀態，順序是排程規則，不是統計上的
+規則。兩個 preflight 確實重疊，那就是上面這個事故，不另算一次偏離。
+
 ### A/B 結果（先過 preflight k=3 PASS）
 
 | scenario | Version | preflight | A/B run id | baseline | treatment | delta |
