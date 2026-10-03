@@ -1935,3 +1935,7 @@ transcript 與終局，沒有一列被 grader 盲點誤判。
 - #250：code grader 以 trial 目錄為 cwd 執行 `python3 -`，trial 放進去的模組會被 import。
   本輪兩支 scenario 都用 `python3 -I`，引擎層面仍未修。
 - #228 與 #210 隨 6.3.0 出貨，但沒有 harness 證據（D-049 Residual）。
+- **2026-10-03 註**：`diagramming-obsidian` 的 `SKILL.md` 中「verify 非零退出代表格式損毀或
+  render 不符」那一句（#228／PR #257 留下未改）已改為：先讀印出的那一行，缺 `uv`、playwright
+  或 Chromium 就安裝後再 verify、不重新產生；格式損毀或 render 不符才從 canonical template
+  重新產生（PR #267）。這是改 agent 指令，沒有 harness 證據，列為下一輪量測的候選。
