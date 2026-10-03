@@ -116,9 +116,12 @@ situations to skills.
   an archive in v5's section set is not supported (D-056).
 - **B-12 Save, list and alias go through the CLI (6.4.0).** The skill tells
   the agent to write the five sections itself, in-session, and to hand them to
-  `arcforge session save <alias>`, which adds the metrics header; to find
-  earlier archives with `arcforge session list`; and to name them with
-  `arcforge session alias`. The `.handovers/` file needs no CLI, so it still
+  `arcforge session save <alias> --from <path|->` — the `.handovers/` file it
+  just wrote, or stdin — which adds the metrics header; to find earlier
+  archives with `arcforge session list`; and to name them with
+  `arcforge session alias set <name> <archive-path>`, drop a name with
+  `arcforge session alias remove <name>` and see the names with
+  `arcforge session alias list` ([cli](cli.md) B-9). The `.handovers/` file needs no CLI, so it still
   works on a host where `arcforge` does not resolve
   ([codex-harness](codex-harness.md) B-3). B-10 and B-11 are measured at skill
   scope in 6.4.0's round; B-12's CLI half ships on contract tests (D-055,

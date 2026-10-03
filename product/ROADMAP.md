@@ -1550,18 +1550,24 @@ reverse one, append a superseding entry (see AGENTS.md).
 - Date: 2026-10-03
 - Version: 6.4.0
 - Status: Accepted
-- Decision: (1) A sixth CLI group, `arcforge session`, with `save <alias>`,
-  `resume <alias|path>`, `list` and `alias`, exposes the engine modules that
+- Decision: (1) A sixth CLI group, `arcforge session`, with
+  `save <alias> --from <path|->`, `resume <alias|path>`, `list`, and
+  `alias set <name> <archive-path>`, `alias remove <name>` and
+  `alias list [--json]`, exposes the engine modules that
   survived v5 unexposed — `scripts/lib/session-utils.js` and
   `scripts/lib/session-aliases.js`. (2) An archive is an engine-written
-  metrics header, taken from the session-tracker record (duration, tool calls,
-  user messages, files modified), followed by the handover file's five
+  metrics header, taken from the project's most recent session-tracker record
+  (or the one `--session <id-prefix>` selects) as of its `lastUpdated` stamp,
+  which the header names (duration, tool calls, user messages, files
+  modified), followed by the handover file's five
   sections — `Where it stands`, `Done`, `Unfinished`, `Decisions`, `Next` —
-  which the agent writes in-session; no background model call writes any part
-  of it. (3) It lives under `~/.arcforge/sessions/<project>/<date>/`, and a
-  per-project alias index, `aliases.json` under
+  verbatim, which the agent writes in-session and hands to `save --from` as a
+  file or on stdin; the engine refuses input that lacks one of the five, has
+  them out of order or leaves one empty, and no background model call writes
+  any part of it. (3) It lives under `~/.arcforge/sessions/<project>/<date>/`,
+  and a per-project alias index, `aliases.json` under
   `~/.arcforge/sessions/<project>/`, points at it; aliases are scoped to the
-  project. (4) `.handovers/<date>-<slug>.md` stays the committable handoff for
+  project, no name is reserved, and overwriting one needs `--force`. (4) `.handovers/<date>-<slug>.md` stays the committable handoff for
   other people, with the same five sections, and `resume` reads either — in
   those five sections only; an archive in v5's section set is not supported.
   (5) An archive never carries v5's Conversation Trail: it holds no text of

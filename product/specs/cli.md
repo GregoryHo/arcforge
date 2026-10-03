@@ -59,21 +59,41 @@ underneath without breaking anything written against it.
   manifest flags; the guides describe the same surface and
   `npm run check:docs` holds them to it.
 - **B-9 A sixth group, `session` (6.4.0).** `arcforge session` takes
-  `save <alias>`, `resume <alias|path>`, `list` and `alias`, and is
-  independent in B-3's sense: it works with learning off, with no worktree and
-  no loop. `save` writes an archive whose metrics header the engine fills from
-  the session-tracker record — duration, tool calls, user messages, files
-  modified ([hooks](hooks.md) B-8) — and whose five narrative sections
-  (`Where it stands`, `Done`, `Unfinished`, `Decisions`, `Next`) the caller
-  supplies; the engine writes none of the narrative and calls no model.
+  `save <alias> --from <path|->`, `resume <alias|path>`, `list`, and
+  `alias set <name> <archive-path>`, `alias remove <name>` and
+  `alias list [--json]`, and is independent in B-3's sense: it works with
+  learning off, with no worktree and no loop. `save` reads the narrative from
+  `--from`, which is required: a file — typically the
+  `.handovers/<date>-<slug>.md` the caller has just written — or `-` for
+  stdin. That input carries the five handover sections as `## Where it
+  stands`, `## Done`, `## Unfinished`, `## Decisions` and `## Next`; the engine
+  checks that all five headings are present, in that order, and that each
+  section is non-empty (`none` is content), and otherwise refuses — exit
+  non-zero, nothing written. The archive is an engine-written metrics header
+  followed by those five sections verbatim; the engine writes none of the
+  narrative and calls no model. The header — duration, tool calls, user
+  messages, files modified ([hooks](hooks.md) B-8) — is read from the
+  project's most recent session-tracker record, or from the record
+  `--session <id-prefix>` selects, as that record stood at its `lastUpdated`
+  stamp, and a line of its own names that stamp. No live hook counter feeds
+  it. `save` then performs `alias set` for `<alias>` on the new archive, and
+  checks the alias before it writes, so a refused alias leaves no archive.
   `resume` takes an alias or a path, reads either an archive or a
   `.handovers/` file in the five sections, and prints it for the caller to
   present; an archive in v5's section set is not supported. `list` shows
-  the project's archives, and `alias` manages the project's alias index. An
-  alias is letters, digits, `-` and `_`, at most 128 characters, and none of
-  the alias module's reserved words. The group sits in the one manifest (B-4)
-  and under the exit-code API (B-5). Until 6.4.0 ships, B-3 names the five
-  groups shipped today (D-055, D-056).
+  the project's archives. `alias set` points a name at an archive in the
+  project's alias index, `alias remove` drops a name, and `alias list` prints
+  the index. A name is letters, digits, `-` and `_`, at most 128 characters,
+  and anything else is refused rather than rewritten; no name is reserved,
+  because a name only ever fills an operand. Overwriting a name that already
+  exists, through `alias set` or `save`, needs `--force`. The group sits in
+  the one manifest (B-4) and under the exit-code API (B-5). Until 6.4.0
+  ships, B-3 names the five groups shipped today (D-055, D-056). Residual:
+  the header lags the session it describes. The tracker stamps its record at
+  the Stop hook, after a turn ends, so a `save` made during a turn reads
+  counts that leave that turn out; below the diary threshold the record
+  carries no files, and the header's files-modified line reads `none recorded`.
+  The stamp line is what tells a reader how old the counts are.
 
 ### Output contracts
 - **B-5 Exit codes are the API.** `0` on success and non-zero on any failure,
@@ -118,8 +138,9 @@ command offers one (B-6).
 The `session` group (B-9) is the exception from 6.4.0, because no other area
 stands behind it: the archive is a markdown file under
 `~/.arcforge/sessions/<project>/<date>/`, owned by `scripts/lib/session-utils.js`
-— an engine-written metrics header, then the five handover sections, and no text
-of the user's messages ([learning](learning.md) B-20). The alias index is `~/.arcforge/sessions/<project>/aliases.json`, owned by
+— an engine-written metrics header with a line naming the session-tracker
+record's `lastUpdated` stamp it was read at, then the five handover sections
+verbatim as `save --from` supplied them, and no text of the user's messages ([learning](learning.md) B-20). The alias index is `~/.arcforge/sessions/<project>/aliases.json`, owned by
 `scripts/lib/session-aliases.js`: a `version` and an `aliases` map from name to
 `{ sessionPath, createdAt, updatedAt, title }`, written through the shared
 atomic-write helper ([learning](learning.md) B-22). `<project>` is the sanitized

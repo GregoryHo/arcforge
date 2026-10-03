@@ -26,7 +26,7 @@ D-055：
 
 D-056：
 
-1. 第六個 CLI group `arcforge session`：`save <alias>`、`resume <alias|path>`、`list`、`alias`，對外開放 `scripts/lib/session-utils.js` 與 `scripts/lib/session-aliases.js`。
+1. 第六個 CLI group `arcforge session`：`save <alias> --from <path|->`、`resume <alias|path>`、`list`、`alias set <name> <archive-path>`／`alias remove <name>`／`alias list [--json]`，對外開放 `scripts/lib/session-utils.js` 與 `scripts/lib/session-aliases.js`。
 2. archive 是引擎寫的 metrics header（取自 session-tracker 紀錄：時長、工具呼叫數、使用者訊息數、修改的檔案），後接 handover 的五個段落 `Where it stands`、`Done`、`Unfinished`、`Decisions`、`Next`，由 agent 在 session 內寫；沒有任何背景 model 呼叫寫其中任何部分。
 3. 存放在 `~/.arcforge/sessions/<project>/<date>/`；每個專案一份 alias 索引 `~/.arcforge/sessions/<project>/aliases.json`，alias 以專案為範圍。
 4. `.handovers/<date>-<slug>.md` 仍是可 commit、給別人的交接檔，段落相同；`resume` 兩種都讀，只讀這五個段落，v5 段落格式的 archive 不支援。
@@ -73,7 +73,7 @@ D-056：
 
 **WP-B sessions**，先引擎、後 skill：
 
-1. 引擎 PR：`arcforge session` group（`save <alias>`、`resume <alias|path>`、`list`、`alias`）加進 `scripts/cli.js` 與 `scripts/lib/cli-manifest.js`，底層是 `scripts/lib/session-utils.js` 與 `session-aliases.js`。
+1. 引擎 PR：`arcforge session` group（`save <alias> --from <path|->`、`resume <alias|path>`、`list`、`alias set|remove|list`，指令形狀見 cli B-9）加進 `scripts/cli.js` 與 `scripts/lib/cli-manifest.js`，底層是 `scripts/lib/session-utils.js` 與 `session-aliases.js`。
 2. `generateSession` 改寫成 metrics header 加五個 handover 段落，不寫 Conversation Trail；`parseSessionSections`／`formatSessionBriefing` 只處理五個段落。
 3. archive 與 `aliases.json` 各有 schema 測試。
 4. 同一個 PR：`check:cli-consumers`、`docs/guide/cli-invocation.md`（「The five command groups」）、README 的「five subcommand groups」與「Five command groups」改成六個、cli B-3。
@@ -104,7 +104,7 @@ D-056：
 
 **三項量測**，A/B 依此順序開跑：
 
-1. **`sessions` scenario，skill scope。** D-055 (i) 與 skill-system B-12 把 handover（B-10）與 present-then-stop（B-11）都列入本輪。設計者讀 baseline 會失敗的行為來設計；預設是一支 scenario。preflight 3，PASS 後 A/B 10。
+1. **`sessions` scenario，skill scope。** D-055 (i) 與 skill-system B-12 把 handover（B-10）與 present-then-stop（B-11）都列入本輪。設計者讀 baseline 會失敗的行為來設計；一支 scenario，不拆。preflight 3，PASS 後 A/B 10。
 2. **`eval-router-skill-selection` V2 回歸 A/B（10）。** 確認 6.3.0 的讀數（D-054）在 6.4.0 的樹上仍成立，不是新的主張。
 3. **verify-exit 句子（#267、obsidian B-10）。** 設計者先證明現行引擎能讓兩臂不同。D-049 的 Residual：skill-scope 的 A/B 只注入 `SKILL.md`，skill-local script 的輸出只能經由兩臂都看得到的 fixture 進入 trial；量測要等 wish `eval-skill-files-outside-trial`。證明不了就記為發現，花 0 個 session。證明得了：preflight 3，PASS 後 A/B 10。
 
@@ -114,14 +114,14 @@ D-056：
 | router V2 回歸 | — | 10 | 10 |
 | verify-exit | 3 | 10 | 13 |
 
-最壞情況 3 + 10 + 10 + 3 + 10 = 36，保留 4 個。
+最壞情況 3 + 10 + 10 + 3 + 10 = 36，這就是真正的最壞情況：下列規則不允許任何會超過 36 的路徑。保留的 4 個只用於重跑個別出錯的 trial（provider 拒絕或量測工具錯誤），不用於第二次 preflight，也不用於新增 scenario。
 
-**規則**（沿用 v6.3 PLAN）：
+**規則**（由 v6.3 PLAN 的規則收窄）：
 
 - preflight 一律 k=3。PASS 之後的 A/B 用該 scenario 自己的 `## Trials`，不統一改 k。
-- BLOCK 之後只能有一次事先寫下的重新設計，再跑第二次 preflight（多 3 個）；第二次仍 BLOCK 就記為發現，不跑 A/B。
+- preflight BLOCK 就記為發現，不跑 A/B，也沒有第二次 preflight。
 - 會讓總數超過上限的 A/B 不開跑，記為未量測，絕不改用較小的 k。
-- 若設計者必須把 `sessions` 拆成兩支 scenario，第二支排在最後，受上一條約束。
+- `sessions` 是一支 scenario，同時涵蓋 B-10 與 B-11，不拆成兩支。
 - 每支 scenario 的新 Version 先離線寫好，交給獨立的審查者攻擊、修訂，通過 go/no-go 關卡之後才花 preflight 的 session。
 
 **稽核義務**：
