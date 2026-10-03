@@ -1334,6 +1334,137 @@ assert_eq \
 lr_reap "$NP_DEAD"
 
 # ─────────────────────────────────────────────
+# OW-T1: only the lock's holder removes it; status never mutates (#252)
+# ─────────────────────────────────────────────
+# stop and status used to remove any lock whose PID was not a live daemon,
+# by path: a start mid-claim (no PID yet) lost its lock, and so did a start
+# that took the lock between the check and the removal. A daemon's own exit
+# removed whatever lock stood at the path, twice on TERM. Each of those lets
+# the next start run a second daemon.
+
+echo ""
+echo "=== OW-T1: a lock is removed only by its owner ==="
+
+TMPDIR_OW=$(mktemp -d)
+trap 'rm -rf "$TMPDIR_UP" "$TMPDIR_LR" "$TMPDIR_NP" "$TMPDIR_OW"' EXIT
+
+ow_cmd() {
+  env -u ARCFORGE_HOME HOME="$1" bash "$DAEMON_SCRIPT" "$2" > /dev/null 2>&1 || true
+}
+
+OW_CLAIM="${TMPDIR_OW}/pidless"
+mkdir -p "${OW_CLAIM}/.arcforge/instincts/.observer.lock"
+ow_cmd "$OW_CLAIM" status
+OW_AFTER_STATUS=$([ -d "${OW_CLAIM}/.arcforge/instincts/.observer.lock" ] && echo yes || echo no)
+ow_cmd "$OW_CLAIM" stop
+OW_AFTER_STOP=$([ -d "${OW_CLAIM}/.arcforge/instincts/.observer.lock" ] && echo yes || echo no)
+assert_eq \
+  'OW-T1: status and stop leave a fresh lock with no PID (a start mid-claim) in place' \
+  'yes|yes' \
+  "${OW_AFTER_STATUS}|${OW_AFTER_STOP}"
+
+OW_STALE="${TMPDIR_OW}/stale"
+OW_STALE_PID=$(lr_stale_lock "$OW_STALE")
+ow_cmd "$OW_STALE" status
+assert_eq \
+  'OW-T1: status leaves even a stale lock in place' \
+  "$OW_STALE_PID" \
+  "$(cat "${OW_STALE}/.arcforge/instincts/.observer.lock/pid" 2>/dev/null)"
+ow_cmd "$OW_STALE" stop
+assert_eq \
+  'OW-T1: stop still clears a lock whose PID is dead' \
+  'no' \
+  "$([ -d "${OW_STALE}/.arcforge/instincts/.observer.lock" ] && echo yes || echo no)"
+
+# A real daemon_loop whose lock has since passed to another holder must leave
+# that lock alone when it exits, by TERM or by its own timeout.
+ow_exit_case() {
+  local home="${TMPDIR_OW}/exit-$1"
+  local lock="${home}/.arcforge/instincts/.observer.lock"
+  mkdir -p "${home}/.arcforge/instincts"
+  env -u ARCFORGE_HOME HOME="$home" bash -c '
+    source "$1"
+    POLL_INTERVAL=1
+    [ "$2" = timeout ] && MAX_AGE=2
+    cmd_start
+  ' _ "$DAEMON_SCRIPT" "$1" > /dev/null 2>&1
+  local daemon
+  daemon=$(cat "${lock}/pid")
+  sleep 0.3
+  sleep 30 &
+  local other=$!
+  rm -rf "$lock"
+  mkdir "$lock"
+  echo "$other" > "${lock}/pid"
+  if [ "$1" = term ]; then kill "$daemon"; fi
+  local i
+  for i in $(seq 50); do kill -0 "$daemon" 2>/dev/null || break; sleep 0.1; done
+  echo "$(kill -0 "$daemon" 2>/dev/null && echo alive || echo exited)|$(cat "${lock}/pid" 2>/dev/null)|${other}"
+  kill "$daemon" "$other" 2>/dev/null || true
+}
+
+OW_TERM=$(ow_exit_case term)
+assert_eq \
+  'OW-T1: a daemon stopped by TERM leaves a lock another holder has taken' \
+  "exited|${OW_TERM##*|}|${OW_TERM##*|}" \
+  "$OW_TERM"
+OW_TIMEOUT=$(ow_exit_case timeout)
+assert_eq \
+  'OW-T1: a daemon exiting on its own leaves a lock another holder has taken' \
+  "exited|${OW_TIMEOUT##*|}|${OW_TIMEOUT##*|}" \
+  "$OW_TIMEOUT"
+
+# The daemon still removes its own lock when it exits.
+OW_OWN="${TMPDIR_OW}/own"
+mkdir -p "${OW_OWN}/.arcforge/instincts"
+env -u ARCFORGE_HOME HOME="$OW_OWN" bash -c '
+  source "$1"; POLL_INTERVAL=1; cmd_start
+' _ "$DAEMON_SCRIPT" > /dev/null 2>&1
+OW_OWN_PID=$(cat "${OW_OWN}/.arcforge/instincts/.observer.lock/pid")
+sleep 0.3
+ow_cmd "$OW_OWN" stop
+for i in $(seq 50); do kill -0 "$OW_OWN_PID" 2>/dev/null || break; sleep 0.1; done
+assert_eq \
+  'OW-T1: stop ends a live daemon, and the daemon removes its own lock' \
+  'exited|no' \
+  "$(kill -0 "$OW_OWN_PID" 2>/dev/null && echo alive || echo exited)|$([ -d "${OW_OWN}/.arcforge/instincts/.observer.lock" ] && echo yes || echo no)"
+
+# Concurrent starts with one stop (or one status) among them: every round ends
+# with at most one daemon. Daemons here are the LR-T1 stub (no exit trap), so
+# a stopped one leaves a dead PID for the next start to reclaim.
+OW_ROUNDS=10
+OW_STARTS=40
+ow_storm() {
+  local cmd="$1" round home i at counts=""
+  for round in $(seq "$OW_ROUNDS"); do
+    home="${TMPDIR_OW}/storm-${cmd}-${round}"
+    mkdir -p "${home}/.arcforge/instincts"
+    at=$((RANDOM % OW_STARTS))
+    for i in $(seq "$OW_STARTS"); do
+      [ "$i" = "$at" ] && { ow_cmd "$home" "$cmd" & }
+      lr_start "$home" &
+    done
+    wait
+    lr_settle "$home"
+    for i in 1 2 3; do lr_start "$home"; done
+    sleep 0.5
+    counts="${counts}$([ "$(lr_daemons "$home" | grep -c .)" -le 1 ] && echo ok || echo "$(lr_daemons "$home" | grep -c .)") "
+    lr_reap "$home"
+  done
+  echo "$counts"
+}
+
+OW_OK=$(printf 'ok %.0s' $(seq "$OW_ROUNDS"))
+assert_eq \
+  "OW-T1: ${OW_STARTS} concurrent starts and one stop leave at most one daemon, every round" \
+  "$OW_OK" \
+  "$(ow_storm stop)"
+assert_eq \
+  "OW-T1: ${OW_STARTS} concurrent starts and one status leave at most one daemon, every round" \
+  "$OW_OK" \
+  "$(ow_storm status)"
+
+# ─────────────────────────────────────────────
 # Results
 # ─────────────────────────────────────────────
 

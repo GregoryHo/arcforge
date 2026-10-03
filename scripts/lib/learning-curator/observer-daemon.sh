@@ -151,20 +151,31 @@ acquire_lock() {
 }
 
 # Take over a lock classified stale; $1 is the validated PID read from it, or
-# "none". Every contender that read the same stale lock races for one
-# reservation named after that PID, and mkdir lets exactly one through. Without
-# it, a contender that classified the lock before the winner replaced it would
-# move the winner's fresh lock aside, and both would run as the daemon. The
-# reservation outlives the reclaim, so a contender that read the stale PID late
-# still finds it taken; it expires after the claim window, so a contender that
-# died holding it cannot block reclaims for good.
+# "none".
 reclaim_stale_lock() {
+  release_stale_lock "$1" || return 1
+  if mkdir "$LOCK_DIR" 2>/dev/null; then
+    claim_lock
+    return 0
+  fi
+  return 1  # lost the race to a fresh start
+}
+
+# Remove a lock classified stale; $1 is the validated PID read from it, or
+# "none". Every contender that read the same stale lock — a start or a stop —
+# races for one reservation named after that PID, and mkdir lets exactly one
+# through. Without it, a contender that classified the lock before the winner
+# replaced it would move the winner's fresh lock aside, and both would run as
+# the daemon. The reservation outlives the removal, so a contender that read the
+# stale PID late still finds it taken; it expires after the claim window, so a
+# contender that died holding it cannot block reclaims for good.
+release_stale_lock() {
   local stale_id="$1"
   mkdir "${LOCK_DIR}.reclaim.${stale_id}" 2>/dev/null || return 1  # another start has it
-  # Only a start or the holder's own exit changes a lock, and no other start
-  # can be reclaiming this one, so it is still the lock classified — unless a
-  # manual stop/status removed it and a new start took its place meanwhile.
-  # Check once more as late as possible, right before the move.
+  # Only a holder of this reservation, a start claiming a free path, or the
+  # holder's own exit changes a lock, so it is still the lock classified —
+  # unless it was removed and a new start took its place meanwhile. Check once
+  # more as late as possible, right before the move.
   [ "$(read_lock_pid)" = "${stale_id#none}" ] || return 1
   local tmp_stale="${LOCK_DIR}.stale.$$"
   log_msg "Reclaiming stale lock (old PID: ${stale_id})"
@@ -179,11 +190,6 @@ reclaim_stale_lock() {
     return 1
   fi
   rm -rf "$tmp_stale"
-  if mkdir "$LOCK_DIR" 2>/dev/null; then
-    claim_lock
-    return 0
-  fi
-  return 1  # lost the race to a fresh start
 }
 
 # Remove what interrupted reclaims leave next to the lock: reservations past
@@ -235,17 +241,14 @@ replace_foreign_daemon() {
   acquire_lock
 }
 
-remove_lock() {
+# Remove the lock only if PID $1 holds it. A daemon's exit must not remove a
+# lock a newer start has since claimed: that start's daemon would run unlocked,
+# and the next start would make another. The holder's PID stays in the lock
+# until this removal, and a lock whose holder is a live daemon is never
+# reclaimed, so no other process can take it between the check and the rm.
+release_own_lock() {
+  [ -n "$1" ] && [ "$(read_lock_pid)" = "$1" ] || return 0
   rm -rf "$LOCK_DIR"
-}
-
-is_running() {
-  if [ ! -d "$LOCK_DIR" ]; then
-    return 1
-  fi
-  local pid
-  pid=$(read_lock_pid)
-  is_daemon_pid "$pid"
 }
 
 # ─────────────────────────────────────────────
@@ -653,10 +656,17 @@ daemon_loop() {
   # Track observation state to detect actual new data
   local obs_state_file="${OBS_DIR}/.obs_state"
 
+  # This subshell's own PID, which cmd_start records in the lock. $$ is the
+  # starter's; BASHPID is missing before bash 4, so fall back to the parent of
+  # a child process.
+  DAEMON_PID="${BASHPID:-$(exec sh -c 'echo $PPID')}"
+
   # Cleanup lock + transient analyzer files on exit; also remove ANALYZING lock to prevent stale lock after crash.
   # Also clean up any transient curator response files left by an interrupted analysis.
-  trap 'log_msg "Daemon stopping (EXIT)"; rm -f "${INSTINCTS_DIR}/.analyzing.lock" "${INSTINCTS_DIR}/.analyzing.output.tmp" "${INSTINCTS_DIR}"/.curator-response.*.json "${INSTINCTS_DIR}"/.watchdog-fired.*; remove_lock' EXIT
-  trap 'log_msg "Daemon stopping (signal)"; rm -f "${INSTINCTS_DIR}/.analyzing.lock" "${INSTINCTS_DIR}/.analyzing.output.tmp" "${INSTINCTS_DIR}"/.curator-response.*.json "${INSTINCTS_DIR}"/.watchdog-fired.*; remove_lock; exit 0' TERM INT
+  # The signal trap only logs and exits: the exit runs the EXIT trap, which
+  # releases the lock once, and only if it is still this daemon's.
+  trap 'log_msg "Daemon stopping (EXIT)"; rm -f "${INSTINCTS_DIR}/.analyzing.lock" "${INSTINCTS_DIR}/.analyzing.output.tmp" "${INSTINCTS_DIR}"/.curator-response.*.json "${INSTINCTS_DIR}"/.watchdog-fired.*; release_own_lock "$DAEMON_PID"' EXIT
+  trap 'log_msg "Daemon stopping (signal)"; exit 0' TERM INT
 
   # SIGUSR1 handler with cooldown
   handle_sigusr1() {
@@ -747,65 +757,81 @@ cmd_start() {
   echo "Observer daemon started (PID $!)"
 }
 
-# A lock whose holder is alive but cannot be identified (no usable ps) is left
-# alone by stop and status alike: it may be a running daemon.
-holder_unverifiable() {
-  [ -d "$LOCK_DIR" ] || return 1
-  local pid
-  pid=$(read_lock_pid)
-  [ -n "$pid" ] && [ "$(daemon_pid_status "$pid")" = unknown ]
-}
-
+# stop and status apply the rules start uses, never their own: a lock with no
+# PID is a claim in progress until the claim window passes, a live holder ps
+# cannot identify may be a daemon, and a stale lock is removed only through the
+# reclaim reservation. A check-then-remove by path would take the lock from a
+# start that claimed it in between. status only reads.
 cmd_stop() {
-  if holder_unverifiable; then
-    echo "Observer daemon state unknown (PID $(read_lock_pid) is alive; ps cannot verify it) — lock left in place"
-    return 0
-  fi
-  if ! is_running; then
+  if [ ! -d "$LOCK_DIR" ]; then
     echo "Observer daemon is not running"
-    remove_lock
     return 0
   fi
-
   local pid
   pid=$(read_lock_pid)
-  echo "Stopping observer daemon (PID ${pid})..."
-  kill "$pid" 2>/dev/null || true
-  # Daemon's EXIT trap will clean up the lock
-  echo "Observer daemon stopped"
+  if [ -z "$pid" ]; then
+    if ! claim_window_expired "$LOCK_DIR"; then
+      echo "Observer daemon is starting — lock left in place"
+      return 0
+    fi
+    release_stale_lock none || true
+    echo "Observer daemon is not running"
+    return 0
+  fi
+  case "$(daemon_pid_status "$pid")" in
+    daemon)
+      echo "Stopping observer daemon (PID ${pid})..."
+      kill "$pid" 2>/dev/null || true
+      # Daemon's EXIT trap will clean up the lock
+      echo "Observer daemon stopped"
+      ;;
+    unknown)
+      echo "Observer daemon state unknown (PID ${pid} is alive; ps cannot verify it) — lock left in place"
+      ;;
+    *)
+      release_stale_lock "$pid" || true
+      echo "Observer daemon is not running"
+      ;;
+  esac
 }
 
 cmd_status() {
-  if holder_unverifiable; then
-    echo "Observer daemon: UNKNOWN (PID $(read_lock_pid) is alive; ps cannot verify it)"
+  local pid=""
+  [ -d "$LOCK_DIR" ] && pid=$(read_lock_pid)
+  if [ -z "$pid" ]; then
+    echo "Observer daemon: STOPPED"
     return 0
   fi
-  if is_running; then
-    local pid
-    pid=$(read_lock_pid)
-    echo "Observer daemon: RUNNING (PID ${pid})"
+  case "$(daemon_pid_status "$pid")" in
+    daemon) ;;
+    unknown)
+      echo "Observer daemon: UNKNOWN (PID ${pid} is alive; ps cannot verify it)"
+      return 0
+      ;;
+    *)
+      echo "Observer daemon: STOPPED"
+      return 0
+      ;;
+  esac
+  echo "Observer daemon: RUNNING (PID ${pid})"
 
-    # Show observation counts per project
-    if [ -d "$OBS_DIR" ]; then
-      for project_dir in "$OBS_DIR"/*/; do
-        [ -d "$project_dir" ] || continue
-        local project
-        project=$(basename "$project_dir")
-        local count
-        count=$(count_observations "$project")
-        echo "  ${project}: ${count} pending observations"
-      done
-    fi
+  # Show observation counts per project
+  if [ -d "$OBS_DIR" ]; then
+    for project_dir in "$OBS_DIR"/*/; do
+      [ -d "$project_dir" ] || continue
+      local project
+      project=$(basename "$project_dir")
+      local count
+      count=$(count_observations "$project")
+      echo "  ${project}: ${count} pending observations"
+    done
+  fi
 
-    # Show log tail
-    if [ -f "$LOG_FILE" ]; then
-      echo ""
-      echo "Recent log:"
-      tail -5 "$LOG_FILE" 2>/dev/null || true
-    fi
-  else
-    echo "Observer daemon: STOPPED"
-    remove_lock
+  # Show log tail
+  if [ -f "$LOG_FILE" ]; then
+    echo ""
+    echo "Recent log:"
+    tail -5 "$LOG_FILE" 2>/dev/null || true
   fi
 }
 
