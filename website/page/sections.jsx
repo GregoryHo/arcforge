@@ -51,7 +51,7 @@ function BeforeAfter({theme:t}) {
 // ─── Day in the life ───
 function DayInLife({theme:t}) {
   const steps = [
-    ['09:02', 'session start', 'SessionStart hooks fire. session-tracker opens the session file and injects the previous handover — five lines, not an archive.', t.brass],
+    ['09:02', 'session start', 'SessionStart hooks fire. session-tracker opens the session record. No handover is injected — sessions resumes from the file when you ask.', t.brass],
     ['09:04', '"add OAuth login"', 'Vague intent, several plausible designs. brainstorming picks it up before a single line is written.', t.ember],
     ['09:12', 'design settled', 'One approach chosen, its tradeoffs written down. executing turns it into a checkbox task list.', t.brass],
     ['09:24', 'split the work', 'Two independent tracks. dispatching gives each writer its own worktree so neither can stomp the other.', t.brass],
@@ -214,7 +214,7 @@ function SessionLearning({theme:t}) {
         n="07"
         kicker="OPTIONAL WORKFLOW · SESSION MEMORY"
         title={<>Pick up where you <em style={{color:t.brass,fontStyle:'italic'}}>left off.</em> Learn only when it earns it.</>}
-        sub={<>Lightweight handover by default — five-line "you are here" markers, not heavy archives. Opt-in learning is <em style={{color:t.ink,fontStyle:'italic'}}>off until you turn it on</em>; once enabled, three explicit gates stand between any pattern and active behavior. The <em style={{color:t.ink,fontStyle:'italic'}}>learning dashboard</em> (<code>arcforge learn dashboard</code>) is the review and control surface where you approve, promote, or deactivate each candidate.</>}
+        sub={<>Lightweight handover by default — a five-section "you are here" file, and a named archive only when you save one. Opt-in learning is <em style={{color:t.ink,fontStyle:'italic'}}>off until you turn it on</em>; once enabled, three explicit gates stand between any pattern and active behavior. The <em style={{color:t.ink,fontStyle:'italic'}}>learning dashboard</em> (<code>arcforge learn dashboard</code>) is the review and control surface where you approve, promote, or deactivate each candidate.</>}
         theme={t}
       />
       <div data-af-reveal style={{background:t.bg2,border:`1px solid ${t.line}`,padding:'56px 56px',position:'relative'}}>
@@ -473,7 +473,7 @@ function Footer({theme:t}) {
             <Logo size={20} ember={t.ember} brass={t.brass}/>
             <span style={{fontFamily:'"Fraunces",serif',fontSize:16,color:t.ink,fontWeight:500}}>arcforge</span>
           </div>
-          <div style={{color:t.dim}}>MIT · v6.3.0 · By Gregory Ho</div>
+          <div style={{color:t.dim}}>MIT · v6.4.0 · By Gregory Ho</div>
         </div>
         <div className="af-footer-links" style={{display:'flex',gap:48,letterSpacing:2,textTransform:'uppercase'}}>
           <a href="https://github.com/GregoryHo/arcforge" style={{color:t.ember,textDecoration:'none'}}>GitHub ↗</a>
