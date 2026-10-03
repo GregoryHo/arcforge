@@ -42,8 +42,9 @@ function loadAliases(project) {
     }
     if (!data.version) data.version = ALIAS_VERSION;
     return data;
-  } catch {
-    return getDefaultAliases();
+  } catch (err) {
+    // Reading it as empty would let the next save overwrite every alias in it.
+    throw new Error(`${getAliasesPath(project)} is not valid JSON (${err.message})`);
   }
 }
 

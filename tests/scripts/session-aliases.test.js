@@ -79,6 +79,18 @@ describe('session-aliases', () => {
     });
   });
 
+  describe('a corrupt aliases.json', () => {
+    it('fails loudly instead of reading as empty, so the next set cannot wipe the index', () => {
+      const { getAliasesPath, setAlias, listAliases } = getAliasesModule();
+      const file = getAliasesPath('corrupt-project');
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, '{"version":"1.0","aliases":{"keep":');
+      expect(() => listAliases('corrupt-project')).toThrow(/aliases\.json.*not valid JSON/);
+      expect(() => setAlias('corrupt-project', 'new', '/x.md')).toThrow(/not valid JSON/);
+      expect(fs.readFileSync(file, 'utf8')).toBe('{"version":"1.0","aliases":{"keep":');
+    });
+  });
+
   describe('setAlias', () => {
     it('creates a new alias', () => {
       const { setAlias } = getAliasesModule();

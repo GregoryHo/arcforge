@@ -154,7 +154,7 @@ describe('session archive format', () => {
     expect(md2).toContain('**User messages:** none recorded');
   });
 
-  it('marks every metric none recorded when no session record exists', () => {
+  it('marks every metric unknown when no session record exists at all', () => {
     const md = generateSession(null, readHandover(FIVE, 'input'), META);
     expect(md).toContain('**Session:** none recorded');
     expect(md).toContain('**Metrics:** no session-tracker record for this project');
@@ -165,7 +165,7 @@ describe('session archive format', () => {
       'User messages',
       'Files modified',
     ]) {
-      expect(md).toContain(`**${field}:** none recorded`);
+      expect(md).toContain(`**${field}:** unknown`);
     }
   });
 

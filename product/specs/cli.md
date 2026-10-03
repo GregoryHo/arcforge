@@ -88,9 +88,8 @@ underneath without breaking anything written against it.
   and anything else is refused rather than rewritten; no name is reserved,
   because a name only ever fills an operand. Overwriting a name that already
   exists, through `alias set` or `save`, needs `--force`. The group sits in
-  the one manifest (B-4) and under the exit-code API (B-5). Until 6.4.0
-  ships, B-3 names the five groups shipped today (D-055, D-056). Residual:
-  the header lags the session it describes. The tracker stamps its record at
+  the one manifest (B-4) and under the exit-code API (B-5) (D-055, D-056).
+  Residual: the header lags the session it describes. The tracker stamps its record at
   the Stop hook, after a turn ends, so a `save` made during a turn reads
   counts that leave that turn out; below the diary threshold the record
   carries no files, and the header's files-modified line reads `none recorded`.

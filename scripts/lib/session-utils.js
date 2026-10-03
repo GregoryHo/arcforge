@@ -293,7 +293,7 @@ function archiveHeader(record, { project, alias, savedAt }) {
   ];
   if (!record) {
     lines.push('**Metrics:** no session-tracker record for this project');
-    for (const field of ARCHIVE_HEADER_FIELDS.slice(5)) lines.push(`**${field}:** ${none}`);
+    for (const field of ARCHIVE_HEADER_FIELDS.slice(5)) lines.push(`**${field}:** unknown`);
     return lines;
   }
   const minutes =

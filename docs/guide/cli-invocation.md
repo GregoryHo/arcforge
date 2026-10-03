@@ -242,8 +242,10 @@ restarts its counts at each diary capture and its start time at each resume, so
 the counts run since the last of those, not since the session began. The record
 is stamped when a turn ends, so a `save` during a turn leaves that turn out, and
 below the diary threshold the record carries no files — the header then reads
-`none recorded`. `--session <id-prefix>` reads a named record instead of the
-project's most recent one.
+`none recorded`; when the project has no session record at all, every count
+reads `unknown`. `--session <id-prefix>` reads a named record instead of the
+project's most recent one. If two sessions run in the same project at once, the
+most recent record may be the other session's — name yours with `--session`.
 
 `resume` takes an alias or a path — an archive or a `.handovers/` file — and
 prints its five sections for you to pick the work back up. An archive written by
