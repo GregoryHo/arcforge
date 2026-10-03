@@ -25,7 +25,7 @@
  * cannot produce a deterministic live `--json` AND do a FULL key-set
  * comparison without machinery that belongs to another task:
  *   - spawns/serves/is interactive (loop, eval dashboards)
- *   - reads global ~/.arcforge state (learn, obsidian, eval list)
+ *   - reads global ~/.arcforge state (learn, obsidian, session, eval list)
  *
  * Pinning a shape MUST NOT require changing cli.js output — that belongs to a
  * capability package, not this contract.
@@ -203,6 +203,21 @@ const CLI_MANIFEST = {
       '--json',
     ],
     subcommands: names('register', 'unregister', 'set-default', 'list-vaults'),
+    output: null,
+  },
+
+  // Reads global ~/.arcforge/sessions state → not deterministic here.
+  session: {
+    flags: ['--from', '--session', '--force', '--limit', '--json'],
+    subcommands: {
+      save: { flags: ['--from', '--session', '--force'] },
+      resume: {},
+      list: { flags: ['--limit', '--json'] },
+      // `alias` takes an action as its second positional.
+      alias: {
+        subcommands: { set: { flags: ['--force'] }, remove: {}, list: { flags: ['--json'] } },
+      },
+    },
     output: null,
   },
 };

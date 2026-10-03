@@ -1,22 +1,21 @@
 // scripts/lib/session-aliases.js
+const fs = require('node:fs');
 const path = require('node:path');
 const { atomicWriteFile } = require('./atomic-write');
-const { readFileSafe, getProjectSessionsDir, log } = require('./utils');
+const { withLock } = require('./locking');
+const { getProjectSessionsDir, log } = require('./utils');
 
 const ALIASES_FILENAME = 'aliases.json';
 const ALIAS_VERSION = '1.0';
 const MAX_ALIAS_LENGTH = 128;
-const RESERVED_NAMES = [
-  'list',
-  'help',
-  'remove',
-  'delete',
-  'create',
-  'set',
-  'save',
-  'resume',
-  'aliases',
-];
+// Every change to the index holds this lock file beside it, from load to save:
+// the atomic write alone keeps a reader from seeing half a file, but two writers
+// that load the same index would each save their own copy, and the second would
+// drop the first's change. The holder of a lock older than locking.js's stale
+// threshold (30 s) is taken to be dead and the lock is reclaimed — a change
+// holds it for one small read and write.
+const LOCK_FILENAME = 'aliases.lock';
+const LOCK_WAIT_MS = 2000;
 
 /**
  * Get aliases file path for a project.
@@ -28,13 +27,38 @@ function getAliasesPath(project) {
 }
 
 /**
- * Default aliases structure.
+ * Run `fn` holding the project's alias-index lock. Waits up to LOCK_WAIT_MS for
+ * another writer, then throws naming the lock file.
+ */
+function withAliasesLock(project, fn) {
+  const dir = getProjectSessionsDir(project);
+  fs.mkdirSync(dir, { recursive: true });
+  try {
+    return withLock(dir, fn, { lockName: LOCK_FILENAME, timeout: LOCK_WAIT_MS });
+  } catch (err) {
+    if (err.name !== 'LockError') throw err;
+    const lockPath = path.join(dir, LOCK_FILENAME);
+    throw new Error(
+      `alias index is locked: ${lockPath} was held by another process for ${LOCK_WAIT_MS}ms`,
+      { cause: err },
+    );
+  }
+}
+
+/**
+ * Default aliases structure. The map has no prototype, so a name such as
+ * `constructor` or `__proto__` is an ordinary key.
  */
 function getDefaultAliases() {
   return {
     version: ALIAS_VERSION,
-    aliases: {},
+    aliases: Object.create(null),
   };
+}
+
+/** The entry stored under `name`, never one inherited from a prototype. */
+function getEntry(data, name) {
+  return Object.hasOwn(data.aliases, name) ? data.aliases[name] : undefined;
 }
 
 /**
@@ -43,19 +67,34 @@ function getDefaultAliases() {
  * @returns {Object} Aliases data
  */
 function loadAliases(project) {
-  const content = readFileSafe(getAliasesPath(project));
-  if (!content) return getDefaultAliases();
-
+  let content;
   try {
-    const data = JSON.parse(content);
-    if (!data.aliases || typeof data.aliases !== 'object') {
-      return getDefaultAliases();
-    }
-    if (!data.version) data.version = ALIAS_VERSION;
-    return data;
-  } catch {
-    return getDefaultAliases();
+    content = fs.readFileSync(getAliasesPath(project), 'utf8');
+  } catch (err) {
+    // Only a missing file means "no index yet": an unreadable one read as
+    // empty would be overwritten by the next save.
+    if (err.code === 'ENOENT') return getDefaultAliases();
+    throw new Error(`Cannot read ${getAliasesPath(project)}: ${err.message}`, { cause: err });
   }
+
+  let data;
+  try {
+    data = JSON.parse(content);
+  } catch (err) {
+    // Reading it as empty would let the next save overwrite every alias in it.
+    throw new Error(`${getAliasesPath(project)} is not valid JSON (${err.message})`);
+  }
+  const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+  if (!isObject(data) || !isObject(data.aliases)) {
+    // Same reason: a wrong shape read as empty would be overwritten.
+    throw new Error(
+      `${getAliasesPath(project)} is not an alias index: expected an object with an "aliases" object`,
+    );
+  }
+  if (!data.version) data.version = ALIAS_VERSION;
+  // JSON.parse makes "__proto__" an own key; copying keeps it one.
+  data.aliases = Object.assign(Object.create(null), data.aliases);
+  return data;
 }
 
 /**
@@ -92,21 +131,20 @@ function validateAlias(alias) {
       error: 'Alias must contain only letters, numbers, dashes, and underscores',
     };
   }
-  if (RESERVED_NAMES.includes(alias.toLowerCase())) {
-    return { valid: false, error: `'${alias}' is a reserved name` };
-  }
   return { valid: true };
 }
 
 /**
- * Set or update an alias pointing to a saved session file.
+ * Set an alias pointing to a saved session file. An alias that already exists
+ * is overwritten only with `force` (cli B-9).
  * @param {string} project - Project name
  * @param {string} alias - Alias name
  * @param {string} sessionPath - Path to saved session file
  * @param {string} [title] - Optional description
+ * @param {{ force?: boolean }} [options]
  * @returns {{ success: boolean, isNew?: boolean, error?: string }}
  */
-function setAlias(project, alias, sessionPath, title = null) {
+function setAlias(project, alias, sessionPath, title = null, { force = false } = {}) {
   const validation = validateAlias(alias);
   if (!validation.valid) return { success: false, error: validation.error };
 
@@ -114,9 +152,26 @@ function setAlias(project, alias, sessionPath, title = null) {
     return { success: false, error: 'Session path cannot be empty' };
   }
 
+  return withAliasesLock(project, () =>
+    setAliasLocked(project, alias, sessionPath, title, { force }),
+  );
+}
+
+/**
+ * setAlias for a caller already inside withAliasesLock(project) — the lock is
+ * not reentrant, so this one does not take it.
+ * @returns {{ success: boolean, isNew?: boolean, error?: string }}
+ */
+function setAliasLocked(project, alias, sessionPath, title = null, { force = false } = {}) {
   const data = loadAliases(project);
-  const existing = data.aliases[alias];
+  const existing = getEntry(data, alias);
   const isNew = !existing;
+  if (existing && !force) {
+    return {
+      success: false,
+      error: `alias "${alias}" already exists — pass --force to overwrite it`,
+    };
+  }
 
   data.aliases[alias] = {
     sessionPath,
@@ -143,7 +198,7 @@ function resolveAlias(project, alias) {
   if (!validation.valid) return null;
 
   const data = loadAliases(project);
-  const entry = data.aliases[alias];
+  const entry = getEntry(data, alias);
   if (!entry) return null;
 
   return {
@@ -203,17 +258,19 @@ function listAliases(project, options = {}) {
  * @returns {{ success: boolean, error?: string }}
  */
 function deleteAlias(project, alias) {
-  const data = loadAliases(project);
-  if (!data.aliases[alias]) {
-    return { success: false, error: `Alias '${alias}' not found` };
-  }
+  return withAliasesLock(project, () => {
+    const data = loadAliases(project);
+    if (!getEntry(data, alias)) {
+      return { success: false, error: `Alias '${alias}' not found` };
+    }
 
-  delete data.aliases[alias];
+    delete data.aliases[alias];
 
-  if (saveAliases(project, data)) {
-    return { success: true, alias };
-  }
-  return { success: false, error: 'Failed to delete alias' };
+    if (saveAliases(project, data)) {
+      return { success: true, alias };
+    }
+    return { success: false, error: 'Failed to delete alias' };
+  });
 }
 
 module.exports = {
@@ -222,9 +279,10 @@ module.exports = {
   saveAliases,
   validateAlias,
   setAlias,
+  setAliasLocked,
+  withAliasesLock,
   resolveAlias,
   listAliases,
   deleteAlias,
-  RESERVED_NAMES,
   MAX_ALIAS_LENGTH,
 };

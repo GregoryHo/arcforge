@@ -32,7 +32,7 @@ arcforge --help
 That prints the full command list. This guide is the same surface, organized by
 what you would want to do with it.
 
-## The five command groups
+## The six command groups
 
 | Group | What it does | Guide |
 |-------|--------------|-------|
@@ -41,6 +41,7 @@ what you would want to do with it.
 | `eval` | Measure whether a change alters agent behavior | [eval-system.md](eval-system.md) |
 | `learn` | The opt-in session-learning loop | [learning-dashboard.md](learning-dashboard.md) |
 | `obsidian` | Register the Obsidian vaults the toolkit may write to | below |
+| `session` | Save, list, alias and resume session archives | below |
 
 Every group is independent. You can use worktrees and never touch learning, or
 run evals without ever starting a loop.
@@ -205,6 +206,83 @@ The registry lives at `~/.arcforge/obsidian-vaults.json` and the first vault you
 register becomes the default. `--scope`, `--search-preferred`, and
 `--qmd-collection` tune how a vault is searched; the `/maintaining-obsidian`
 skill sets them for you during vault setup.
+
+## `session`
+
+```bash
+arcforge session save <alias> --from <path|-> [--session <id-prefix>] [--force]
+arcforge session resume <alias|path>
+arcforge session list [--limit N] [--json]
+arcforge session alias set <name> <archive-path> [--force]
+arcforge session alias remove <name>
+arcforge session alias list [--json]
+```
+
+A session archive is your own record of where a piece of work stands, kept
+under `~/.arcforge/sessions/<project>/<date>/archive-<alias>-<YYYYMMDDTHHMMSSZ>.md`
+(the UTC time of the `save`) — outside the repository, so it never shows in
+`git status`. It holds the same five sections
+as a `.handovers/` file — `Where it stands`, `Done`, `Unfinished`, `Decisions`,
+`Next` — under a header arcforge fills in from its session record: the session
+id, when the record started, duration, tool calls, user messages, and files
+modified. It never holds the text of your messages.
+
+`save` reads the five sections from `--from`, which is required: a file —
+usually the `.handovers/<date>-<slug>.md` just written — or `-` for stdin. All
+five headings must be there, in that order, and none may be empty (write `none`
+in a slot with nothing in it); otherwise nothing is written. An optional `# `
+title line names the archive; a second title line, or any other text above the
+first section, is refused.
+Each section is kept verbatim, indentation included. The `sessions` skill writes the sections for you.
+Every `save` writes a new file and never replaces one: a second `save` under the
+same alias, with `--force`, points the alias at the new archive, and the old
+file stays.
+
+```bash
+arcforge session save parser-work --from .handovers/2026-10-03-parser.md
+```
+
+The header's counts are as the session-tracker record holds them at its
+`lastUpdated` stamp, and a line of the header names that stamp. The record
+restarts its counts at each diary capture and its start time at each resume, so
+the counts run since the last of those, not since the session began. The record
+is stamped when a turn ends, so a `save` during a turn leaves that turn out, and
+below the diary threshold the record carries no files — the header then reads
+`none recorded`; when the project has no session record at all, every count
+reads `unknown`. `--session <id-prefix>` reads a named record instead of the
+project's most recent one. If two sessions run in the same project at once, the
+most recent record may be the other session's — name yours with `--session`.
+
+`resume` takes an alias or a path — an archive or a `.handovers/` file — and
+prints its five sections for you to pick the work back up. A name with no `/`
+and no `.md` ending is looked up as an alias first; when no alias has it, a file
+of that name in the current directory is read instead. An archive written by
+arcforge 5.x, in its Summary / What Worked / What Failed / Blockers / Next Step
+sections, is refused with an error naming that format; nothing converts one.
+
+`list` shows the project's archives newest first (default 20), each with every
+alias that points at it. `save` sets its alias for you; `alias set` points
+another name at an archive — only a file `save` wrote under this project's
+`~/.arcforge/sessions/<project>/`, so a `.handovers/` file is refused (read one
+with `resume <path>`), and so is a symlink there that leads to a file outside it. Aliases are per project and live in
+`~/.arcforge/sessions/<project>/aliases.json`. A name is letters, digits, `-`
+and `_`, at most 128 characters; anything else is refused, never rewritten, and
+no name is reserved. Replacing a name that already exists, through `save` or
+`alias set`, needs `--force`. `<project>` is the project directory's name, so
+two projects with the same directory name share their archives and aliases.
+Commands that change aliases at the same time take turns on
+`~/.arcforge/sessions/<project>/aliases.lock`; one that waits more than 2
+seconds fails with `alias index is locked` and that path. `save` holds that
+lock from its alias check until the alias is set, so of two saves racing for
+one new name exactly one keeps an archive; the other is refused and writes none.
+
+| Flag | Effect |
+|------|--------|
+| `--from` | Where `save` reads the five sections: a file, or `-` for stdin (required) |
+| `--session` | Read the session record whose id starts with this prefix |
+| `--force` | Repoint an alias that already exists |
+| `--limit` | Maximum archives to list, a positive integer (default: 20) |
+| `--json` | Machine-readable `list` or `alias list` |
 
 ## JSON output
 

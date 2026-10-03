@@ -41,10 +41,11 @@ class LockError extends Error {
  * @param {Object} options - Lock options
  * @param {number} options.timeout - Timeout in ms (default: 5000)
  * @param {number} options.retryInterval - Initial retry interval in ms (default: 50)
+ * @param {string} options.lockName - Lock file name in projectRoot (default: .arcforge-lock)
  * @returns {Object} Lock handle with release() method
  */
 function acquireLock(projectRoot, options = {}) {
-  const lockPath = path.join(projectRoot, '.arcforge-lock');
+  const lockPath = path.join(projectRoot, options.lockName || '.arcforge-lock');
   const timeout = options.timeout || DEFAULT_TIMEOUT;
   const retryInterval = options.retryInterval || 50;
   const startTime = Date.now();

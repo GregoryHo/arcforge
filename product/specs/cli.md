@@ -48,9 +48,9 @@ underneath without breaking anything written against it.
   test holds both to the variables the engine actually reads.
 
 ### Surface
-- **B-3 Five independent command groups.** `worktree`, `loop`, `eval`, `learn`,
-  `obsidian`. Independence is a contract: any group is usable without ever
-  touching the others — worktrees without learning, evals without loops.
+- **B-3 Six independent command groups.** `worktree`, `loop`, `eval`, `learn`,
+  `obsidian`, `session`. Independence is a contract: any group is usable without
+  ever touching the others — worktrees without learning, evals without loops.
 - **B-4 One manifest, no copies.** The command surface is defined once in the
   engine's CLI manifest; documentation checks and linters read it, and a second
   hardcoded copy of the command list is forbidden
@@ -73,12 +73,15 @@ underneath without breaking anything written against it.
   followed by those five sections verbatim; the engine writes none of the
   narrative and calls no model. The header — duration, tool calls, user
   messages, files modified ([hooks](hooks.md) B-8) — is read from the
-  project's most recent session-tracker record, or from the record
+  project's most recent session-tracker record (the latest `lastUpdated`
+  across its date directories), or from the record
   `--session <id-prefix>` selects, and gives the counts the session-tracker
   record holds at its `lastUpdated` stamp — since the record's last diary
   capture or resume, not since the session began; a line of its own names
   that stamp. No live hook counter feeds it. `save` then performs `alias set` for `<alias>` on the new archive, and
-  checks the alias before it writes, so a refused alias leaves no archive.
+  checks the alias before it writes and holds the alias lock from that check
+  until the alias is set, so a refused alias leaves no archive — two saves
+  racing for one new name leave exactly one.
   `resume` takes an alias or a path, reads either an archive or a
   `.handovers/` file in the five sections, and prints it for the caller to
   present; an archive in v5's section set is not supported. `list` shows
@@ -88,9 +91,8 @@ underneath without breaking anything written against it.
   and anything else is refused rather than rewritten; no name is reserved,
   because a name only ever fills an operand. Overwriting a name that already
   exists, through `alias set` or `save`, needs `--force`. The group sits in
-  the one manifest (B-4) and under the exit-code API (B-5). Until 6.4.0
-  ships, B-3 names the five groups shipped today (D-055, D-056). Residual:
-  the header lags the session it describes. The tracker stamps its record at
+  the one manifest (B-4) and under the exit-code API (B-5) (D-055, D-056).
+  Residual: the header lags the session it describes. The tracker stamps its record at
   the Stop hook, after a turn ends, so a `save` made during a turn reads
   counts that leave that turn out; below the diary threshold the record
   carries no files, and the header's files-modified line reads `none recorded`.
@@ -144,13 +146,15 @@ command offers one (B-6).
 
 The `session` group (B-9) is the exception from 6.4.0, because no other area
 stands behind it: the archive is a markdown file under
-`~/.arcforge/sessions/<project>/<date>/`, owned by `scripts/lib/session-utils.js`
+`~/.arcforge/sessions/<project>/<date>/`, owned by `scripts/lib/session-archive.js`
 — an engine-written metrics header with a line naming the session-tracker
 record's `lastUpdated` stamp it was read at, then the five handover sections
 verbatim as `save --from` supplied them, and no text of the user's messages ([learning](learning.md) B-20). The alias index is `~/.arcforge/sessions/<project>/aliases.json`, owned by
 `scripts/lib/session-aliases.js`: a `version` and an `aliases` map from name to
 `{ sessionPath, createdAt, updatedAt, title }`, written through the shared
-atomic-write helper ([learning](learning.md) B-22). `<project>` is the sanitized
+atomic-write helper ([learning](learning.md) B-22); every change to it holds
+`aliases.lock` beside it from load to save, so processes changing aliases at once
+never drop each other's changes. `<project>` is the sanitized
 directory basename, so two same-named projects share both (D-037, D-056).
 
 ## Decisions
