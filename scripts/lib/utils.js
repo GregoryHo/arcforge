@@ -9,6 +9,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const { execFileSync } = require('node:child_process');
+const { atomicWriteFile } = require('./atomic-write');
 
 // Module-level cached session ID (set from hook input)
 let _cachedSessionId = null;
@@ -85,35 +86,6 @@ function writeFileSafe(filePath, content, options = {}) {
   } catch {
     return false;
   }
-}
-
-/**
- * Atomic write: unlink any leftover `<dest>.tmp` (never following a link), create it exclusively
- * (`wx` fails rather than follow a link planted since), rename it over `dest` (replacing a symlink
- * there, not writing through it). A created temp is removed on any failure. Returns `destPath`.
- */
-function atomicWriteFile(destPath, content, options = { encoding: 'utf8' }) {
-  const tmpPath = `${destPath}.tmp`;
-  fs.mkdirSync(path.dirname(destPath), { recursive: true });
-  let fd;
-  try {
-    fs.rmSync(tmpPath, { force: true });
-    fd = fs.openSync(tmpPath, 'wx');
-  } catch (err) {
-    throw new Error(`Cannot create temp file ${tmpPath}: ${err.message}`);
-  }
-  try {
-    try {
-      fs.writeFileSync(fd, content, options);
-    } finally {
-      fs.closeSync(fd);
-    }
-    fs.renameSync(tmpPath, destPath);
-  } catch (err) {
-    fs.rmSync(tmpPath, { force: true });
-    throw err;
-  }
-  return destPath;
 }
 
 /**
@@ -725,7 +697,6 @@ module.exports = {
   fileExists,
   readFileSafe,
   writeFileSafe,
-  atomicWriteFile,
   sha256Truncated,
   readJsonFile,
   writeJsonFile,

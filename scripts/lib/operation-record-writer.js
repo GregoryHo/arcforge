@@ -13,7 +13,8 @@
 
 const path = require('node:path');
 
-const { atomicWriteFile, getArcforgeHome } = require('./utils');
+const { atomicWriteFile } = require('./atomic-write');
+const { getArcforgeHome } = require('./utils');
 
 // Map operation kind → directory name under ~/.arcforge/.
 // reflect → reflections (not "reflects") matches the spec storage path.

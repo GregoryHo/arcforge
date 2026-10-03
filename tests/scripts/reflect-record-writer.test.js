@@ -108,9 +108,7 @@ describe('saveReflectionRecord — basic write', () => {
     expect(content).toContain('User always runs grep before editing files.');
   });
 
-  test('writes atomically — no partial file on crash', () => {
-    // Atomic write means file is either fully present or absent.
-    // We verify the .tmp file is cleaned up after write.
+  test('writes atomically — no temp file left beside the record', () => {
     const { saveReflectionRecord } = getWriter();
     const reflectId = 'reflect-20260522T010000Z-ef567890';
     saveReflectionRecord({
@@ -131,10 +129,8 @@ describe('saveReflectionRecord — basic write', () => {
       'atomic-project',
       `${reflectId}.md`,
     );
-    const tmpFilePath = `${filePath}.tmp`;
-
     expect(fs.existsSync(filePath)).toBe(true);
-    expect(fs.existsSync(tmpFilePath)).toBe(false);
+    expect(fs.readdirSync(path.dirname(filePath))).toEqual([`${reflectId}.md`]);
   });
 
   test('creates parent directories recursively', () => {

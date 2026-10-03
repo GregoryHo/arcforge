@@ -11,7 +11,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 
-const { atomicWriteFile, sha256Truncated, getArcforgeHome, readFileSafe } = require('../utils');
+const { atomicWriteFile } = require('../atomic-write');
+const { sha256Truncated, getArcforgeHome, readFileSafe } = require('../utils');
 const { redactObservationText, SANITIZER_POLICY_VERSION } = require('../sanitize-observation');
 const { appendTransitionEvent } = require('./dashboard-events');
 // The name policy is shared with Layer 5, which checks it at ingestion (B-14);

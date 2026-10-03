@@ -23,7 +23,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { sanitizeObservationPayload, SANITIZER_POLICY_VERSION } = require('../sanitize-observation');
-const { atomicWriteFile, sha256Truncated, getArcforgeHome } = require('../utils');
+const { atomicWriteFile } = require('../atomic-write');
+const { sha256Truncated, getArcforgeHome } = require('../utils');
 const { MAX_DIARIES, MAX_REFLECTS, MAX_RECALLS, readRecentEvidence } = require('./evidence-files');
 
 // ---------------------------------------------------------------------------

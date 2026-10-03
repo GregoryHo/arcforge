@@ -11,8 +11,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 
+const { atomicWriteFile } = require('../atomic-write');
 const {
-  atomicWriteFile,
   sha256Truncated,
   sanitizeProjectName,
   getProjectName,

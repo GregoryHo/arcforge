@@ -1,6 +1,7 @@
 // scripts/lib/session-aliases.js
 const path = require('node:path');
-const { readFileSafe, atomicWriteFile, getProjectSessionsDir, log } = require('./utils');
+const { atomicWriteFile } = require('./atomic-write');
+const { readFileSafe, getProjectSessionsDir, log } = require('./utils');
 
 const ALIASES_FILENAME = 'aliases.json';
 const ALIAS_VERSION = '1.0';

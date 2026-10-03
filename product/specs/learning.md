@@ -309,11 +309,12 @@ was recorded about them.
 ### Concurrency
 - **B-21 One observer daemon, whoever starts or stops it (6.4.0).** A start
   that cannot run a usable `ps` never takes a live daemon's lock for stale, so
-  it never starts a second daemon beside it (#247); and
-  `observer-daemon.sh stop` and `status` take part in the same reclaim
-  reservation as a start, so a manual stop or status racing a start leaves at
-  most one daemon (#252). Until 6.4.0 ships, the Residual in the domain model
-  below that names #247 and #252 describes the product (D-055).
+  it never starts a second daemon beside it (#247). `observer-daemon.sh stop`
+  removes a stale lock only through the same reclaim reservation as a start,
+  `status` never changes the lock, and a daemon's exit removes the lock only
+  while it still holds it, so a manual stop or status racing a start leaves at
+  most one daemon (#252, D-055). The domain model's Residual below names the
+  narrow cases this does not cover.
 - **B-22 Two writers of one file never expose it empty or partial (6.4.0).**
   The shared atomic-write helper behind B-5's atomically overwritten formats —
   among its callers the learning queue's records, materialized drafts,
@@ -364,12 +365,21 @@ however many starts of one installed copy race, at most one becomes the daemon.
 It stops itself after 30 idle minutes or 2 hours. Nothing is signaled unless
 the lock's PID is a process running the daemon script, because a daemon that
 died without removing its lock leaves a PID the system can reuse. A start reclaims at once a lock whose PID is
-dead or belongs to some other program, and leaves that program alone. A lock
+dead or belongs to some other program, and leaves that program alone; a PID
+that has exited but not been reaped counts as dead only where `/proc` or `ps`
+can show that state, and its lock is held where neither can. A lock whose PID is alive
+but cannot be identified, because `ps` is missing or rejects `-p`, is held,
+never reclaimed and never signaled. A lock
 with no valid PID yet — a start still writing it — is held while it is under a
 minute old and reclaimed once older; a stale lock another start has just
 reserved for reclaim is left to that start for up to a minute; a lock with no
 valid PID, or a reservation, dated more than a few seconds in the future counts
-as expired. Stop removes any lock whose PID is not a live daemon. The lock also
+as expired. Stop signals a live daemon, which removes the lock as it exits; it
+leaves in place a lock with no valid PID inside the claim window and a lock
+whose live holder `ps` cannot verify, and removes any other stale lock only
+through the same reclaim reservation as a start. Status only reads the lock and
+never changes it. A daemon's exit removes the lock only while it still holds
+it. The lock also
 records the directory of the daemon
 script that took it, and a start asks a live daemon from a different directory —
 after a plugin upgrade, the previous version's — to stop, and takes its place if
@@ -383,10 +393,11 @@ Residual: a daemon that does not exit within about 2 s of being
 stopped — one waiting on a curator model call — is left running, and the next
 start tries again; two installed copies of the plugin used in alternation
 replace each other at each session start, and starts from both racing each
-other can leave two daemons, since each stops the other's; without a usable `ps` a live daemon
-can read as stale to a start (#247); and stop and status take no part in the
-reclaim reservation, so a manual stop racing a start can still leave two
-daemons (#252).
+other can leave two daemons, since each stops the other's; a manual stop that
+lands in the instant between a start launching the daemon and recording its
+PID stops the starter instead of the daemon, and the next start can then run a
+second one; and without a usable `ps`, a daemon running as another user under
+the same home reads as dead.
 
 The invariants: state is only ever advanced through the engine (B-5), scope decides
 location (B-9), and one session yields one diary (B-7).

@@ -1,3 +1,4 @@
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -83,15 +84,25 @@ describe('loop-state', () => {
       expect(fs.readdirSync(tmpDir)).toEqual([LOOP_STATE_FILE]);
     });
 
-    it('never writes through a symlink planted at the temp path', () => {
+    it('refuses a symlink planted at its temp path, keeping the previous state', () => {
+      const previous = loadLoopState(tmpDir);
+      saveLoopState(previous, tmpDir);
       const sentinel = path.join(tmpDir, 'sentinel.txt');
       fs.writeFileSync(sentinel, 'untouched');
-      fs.symlinkSync(sentinel, path.join(tmpDir, `${LOOP_STATE_FILE}.tmp`));
-      const state = loadLoopState(tmpDir);
-      saveLoopState(state, tmpDir);
+      // The temp name is random; pin it so the link can be planted there first.
+      const spy = jest
+        .spyOn(crypto, 'randomBytes')
+        .mockReturnValueOnce(Buffer.from('0123456789ab', 'hex'));
+      fs.symlinkSync(sentinel, path.join(tmpDir, `.atomic-${process.pid}-0123456789ab.tmp`));
+      try {
+        expect(() => saveLoopState({ ...previous, iteration: 9 }, tmpDir)).toThrow(
+          'Cannot create temp file',
+        );
+      } finally {
+        spy.mockRestore();
+      }
       expect(fs.readFileSync(sentinel, 'utf8')).toBe('untouched');
-      expect(fs.lstatSync(path.join(tmpDir, LOOP_STATE_FILE)).isFile()).toBe(true);
-      expect(loadLoopState(tmpDir)).toEqual(state);
+      expect(loadLoopState(tmpDir)).toEqual(previous);
     });
 
     it('keeps the previous state file intact when the write fails midway', () => {
