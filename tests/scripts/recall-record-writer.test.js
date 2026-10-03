@@ -104,7 +104,7 @@ describe('saveRecallRecord — basic write', () => {
     expect(content).toContain('No instincts matched the query.');
   });
 
-  test('writes atomically — tmp file cleaned up after write', () => {
+  test('writes atomically — no temp file left beside the record', () => {
     const { saveRecallRecord } = getWriter();
     const recallId = 'recall-20260522T010000Z-ef567890';
     saveRecallRecord({
@@ -120,10 +120,8 @@ describe('saveRecallRecord — basic write', () => {
     });
 
     const filePath = path.join(tmpDir, '.arcforge', 'recalls', 'atomic-project', `${recallId}.md`);
-    const tmpFilePath = `${filePath}.tmp`;
-
     expect(fs.existsSync(filePath)).toBe(true);
-    expect(fs.existsSync(tmpFilePath)).toBe(false);
+    expect(fs.readdirSync(path.dirname(filePath))).toEqual([`${recallId}.md`]);
   });
 
   test('creates parent directories recursively', () => {

@@ -366,7 +366,8 @@ It stops itself after 30 idle minutes or 2 hours. Nothing is signaled unless
 the lock's PID is a process running the daemon script, because a daemon that
 died without removing its lock leaves a PID the system can reuse. A start reclaims at once a lock whose PID is
 dead or belongs to some other program, and leaves that program alone; a PID
-that has exited but not been reaped counts as dead. A lock whose PID is alive
+that has exited but not been reaped counts as dead only where `/proc` or `ps`
+can show that state, and its lock is held where neither can. A lock whose PID is alive
 but cannot be identified, because `ps` is missing or rejects `-p`, is held,
 never reclaimed and never signaled. A lock
 with no valid PID yet — a start still writing it — is held while it is under a
