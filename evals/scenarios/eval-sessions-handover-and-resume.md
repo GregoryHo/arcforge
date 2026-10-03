@@ -306,10 +306,22 @@ a whole, prepended to the user turn.
     refusal). The A/B is recorded as unmeasured for this round and is never
     re-read as `INCONCLUSIVE`. There is no partial rerun: `arcforge eval ab`
     has no arm or trial selector, always runs both arms, and a smaller `--k`
-    adds rows to both pools. A full 10-session rerun is allowed only if it
-    fits under the round's cap of about 40; in the pre-registered worst case
-    of 39 it does not, so in practice there is none and the 1 reserve session
-    stays unused.
+    adds rows to both pools. The scheduled round is 26 sessions (this
+    scenario 3 + 10, the router regression 3 + 10; verify-exit spends 0, see
+    `docs/plans/v6.4/wp-d/design-gate.verify-exit.md`). If one A/B of the
+    round ends `INSUFFICIENT_DATA`, ONE full 10-session replacement run of
+    that A/B is allowed: 26 + 10 = 36, under the cap of about 40. A second
+    `INSUFFICIENT_DATA` — in this scenario or the other — is recorded as
+    unmeasured, because a second replacement (46) crosses the cap. The
+    replacement reuses the existing preflight record (same scenario hash, same
+    conditions); it is not a second preflight. The first run's rows stay in
+    `evals/results/`, which the engine cannot drop by run: `eval report` and
+    `eval compare` pool every row of the same Version and conditions. So the
+    verdict is the replacement run's own `eval ab` summary, which covers only
+    that run's trials, and the ledger names the first run's id — its
+    directory under `evals/results/eval-sessions-handover-and-resume/` — as
+    the recorded error run, excluded from the verdict. A pooled reading is
+    taken with `--since` set to the replacement's start time.
 - **Zero variance.** If every trial in each arm scores the same — 5/5 against
   0/5 — the CI has zero width. That reading supports direction only, as
   6.3.0's router result recorded: report Fisher's exact two-sided p (≈ 0.008

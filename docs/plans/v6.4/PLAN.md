@@ -114,9 +114,11 @@ D-056：
 |---|---|---|---|
 | `sessions` | 3 | 10 | 13 |
 | router V2 回歸 | 3 | 10 | 13 |
-| verify-exit | 3 | 10 | 13 |
+| verify-exit | 0 | 0 | 0（NOT MEASURABLE，見 `wp-d/design-gate.verify-exit.md`）|
+| 排定合計 | 6 | 20 | 26 |
+| `INSUFFICIENT_DATA` 的整組替換（至多一次） | 0 | 10 | 10 |
 
-最壞情況 3 + 10（`sessions`）+ 3 + 10（router）+ 3 + 10（verify-exit，只在設計關卡通過時）= 39，這就是真正的最壞情況：下列規則不允許任何會超過 39 的路徑，上限約 40 仍然成立。保留的 1 個 session 不用於補跑單一 trial：`arcforge eval ab` 無法只補一臂，任一臂可評分的列少於 5 筆就記為 `INSUFFICIENT_DATA`，本輪未量測；整組重跑只在不超過上限時允許，最壞情況 39 已無空間，實際上不會重跑。保留的 session 也不用於第二次 preflight 或新增 scenario。
+verify-exit 的設計關卡判定 NOT MEASURABLE（`wp-d/design-gate.verify-exit.md`），花 0 個 session，所以本輪排定的是 26 個 session：3 + 10（`sessions`）+ 3 + 10（router）。`arcforge eval ab` 無法只補一臂或單一 trial；任一臂可評分的列少於 5 筆就是 `INSUFFICIENT_DATA`。若有一組 A/B 落在 `INSUFFICIENT_DATA`，允許整組替換一次，跑滿 10 個 session：26 + 10 = 36，不超過上限約 40。第二次 `INSUFFICIENT_DATA`，不論在同一支或另一支 scenario，都記為未量測，因為第二次替換（46）會超過上限。替換沿用原有的 preflight 紀錄（scenario hash 與條件相同），不算第二次 preflight。第一次執行的列留在 `evals/results/`：引擎無法依 run 排除列，`eval report` 與 `eval compare` 會合併同一 Version、同一條件的所有列，所以判定以替換那次 `eval ab` 自己的摘要為準（只含該次的 trial），帳本記下第一次執行的 run id（`evals/results/<scenario>/<runId>/` 的目錄名）為出錯的執行，不計入判定；需要合併讀數時加 `--since <替換的開始時間>`。最壞情況是含一次替換的 36；其餘 4 個保留，不作任何其他用途。
 
 **規則**（由 v6.3 PLAN 的規則收窄）：
 
