@@ -116,10 +116,10 @@ D-056：
 | router V2 回歸 | 3 | 10 | 13 |
 | verify-exit | 0 | 0 | 0（NOT MEASURABLE，見 `wp-d/design-gate.verify-exit.md`）|
 | 排定合計 | 6 | 20 | 26 |
-| `INSUFFICIENT_DATA` 的整組替換（至多一次） | 0 | 10 | 10 |
+| `INSUFFICIENT_DATA` 的補跑（`--k 1`，每支 scenario 至多 2 次） | 0 | 8 | 8 |
 | preflight 出錯重跑（至多一次） | 3 | 0 | 3 |
 
-verify-exit 的設計關卡判定 NOT MEASURABLE（`wp-d/design-gate.verify-exit.md`），花 0 個 session，所以本輪排定的是 26 個 session：3 + 10（`sessions`）+ 3 + 10（router）。`arcforge eval ab` 無法只補一臂或單一 trial；任一臂可評分的列少於 5 筆就是 `INSUFFICIENT_DATA`。若有一組 A/B 落在 `INSUFFICIENT_DATA`，允許整組替換一次，跑滿 10 個 session：26 + 10 = 36，不超過上限約 40。第二次 `INSUFFICIENT_DATA`，不論在同一支或另一支 scenario，都記為未量測，因為第二次替換（46）會超過上限。替換沿用原有的 preflight 紀錄（scenario hash 與條件相同），不算第二次 preflight。第一次執行的列留在 `evals/results/`：引擎無法依 run 排除列，`eval report` 與 `eval compare` 會合併同一 Version、同一條件的所有列，所以判定以替換那次 `eval ab` 自己的摘要為準（只含該次的 trial），帳本記下第一次執行的 run id（`evals/results/<scenario>/<runId>/` 的目錄名）為出錯的執行，不計入判定；需要合併讀數時加 `--since <替換的開始時間>`。preflight 的列若全是 grade 或基礎設施錯誤，等於沒有量到，可重跑一次（3 個 session）；BLOCK 是發現，不重跑。最壞情況 26 + 10 + 3 = 39，其餘 1 個保留不作任何用途。
+verify-exit 的設計關卡判定 NOT MEASURABLE（`wp-d/design-gate.verify-exit.md`），花 0 個 session，所以本輪排定的是 26 個 session：3 + 10（`sessions`）+ 3 + 10（router）。任一臂可評分的列少於 5 筆就是 `INSUFFICIENT_DATA`。出錯的列由引擎排除在判定之外：`A0` 是 `gradeError` 列，`trial_killed_incomplete`、`trial_wrote_repo` 與 provider 拒答是 `infraError` 列（`scripts/lib/eval-trial.js:271-310`）；`scorableResults` 濾掉兩者（`scripts/lib/eval-stats.js:83-85`），`verdictFromDeltaCI` 在算 CI 之前只數剩下的列（`scripts/lib/eval-stats.js:387-393`）。A/B 結束時若任一臂可評分的列少於 5 筆，以相同的 skill 檔與旗標執行 `arcforge eval ab <scenario> --k 1`（每臂多跑一個 trial，2 個 session），重複到兩臂都至少有 5 筆可評分的列為止，每支 scenario 至多補跑 2 次（4 個 session）。已寫入的列一筆都不丟：判定以 `arcforge eval compare <scenario>` 讀取，它載入該 scenario 同一 Version 的所有列（`scripts/cli/eval-command.js:519-525`），並把 model、effort、時間上限與 turn 上限相同的列合併成一個池（`pairArms`，`scripts/lib/eval-pools.js:139-148`）；preflight 只寫快取紀錄，它的 trial 不在池內。每次執行自己的 `eval ab` 摘要（第一次與每次補跑）也記入帳本，放在合併判定旁。`eval ab` 無法只補一臂或單一 trial（`runAbTrials`，`scripts/lib/eval.js:160-181`），補跑會讓兩臂各多一列，原本已有 5 筆的那一臂可能變成 6 或 7 筆；判定規則不變，合併後的列上由引擎算出的 delta CI 整段大於 0 才是 `IMPROVED`。補跑 2 次後仍有一臂少於 5 筆，就是 `INSUFFICIENT_DATA`，記為未量測。`trial_wrote_repo` 會中止該次執行（`stopIfTrialWroteRepo`，`scripts/lib/eval-trial.js:341-348`）；在它之前寫入的列已經落地（每個 trial 一次 `appendResult`，`scripts/lib/eval.js:140`），留在池內，重設 repository 後同樣適用補跑規則。不再有整組替換。preflight 的列若全是 grade 或基礎設施錯誤，等於沒有量到，可重跑一次（3 個 session）；BLOCK 是發現，不重跑。最壞情況：排定 26，加上每支 scenario 至多 4 個補跑、兩支共 8，為 34，再加 preflight 出錯重跑 3，共 37，不超過上限約 40，其餘 3 個不作任何用途。
 
 **規則**（由 v6.3 PLAN 的規則收窄）：
 

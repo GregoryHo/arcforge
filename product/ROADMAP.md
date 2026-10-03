@@ -1636,11 +1636,14 @@ reverse one, append a superseding entry (see AGENTS.md).
   MEASURABLE on the current engine and is recorded as a finding at 0
   sessions — the outcome clause 5 (iii) already allows, recorded here
   because it sets the budget. The budget is now pre-registered as 26
-  scheduled sessions (`sessions` 3 + 10, router 3 + 10), at most one full
-  10-session replacement of one A/B that reads INSUFFICIENT_DATA, and at
-  most one 3-session rerun of a preflight that measured nothing because of
-  grade or infrastructure errors: a worst case of 39, under the cap of about
-  40. The cap, the router regression run (ii) and the round's rules stand
+  scheduled sessions (`sessions` 3 + 10, router 3 + 10), at most two
+  top-ups of one trial per arm (`eval ab --k 1`, 4 sessions) for each A/B
+  that ends with fewer than 5 scorable rows in an arm — its verdict read
+  from the pooled rows of the scenario's Version, no row discarded, and
+  INSUFFICIENT_DATA if an arm is still short after the second — and at most
+  one 3-session rerun of a preflight that measured nothing because of grade
+  or infrastructure errors: a worst case of 26 + 8 + 3 = 37, under the cap
+  of about 40. The cap, the router regression run (ii) and the round's rules stand
   unchanged; the same narrowing applies to D-056's clause 6, whose
   "handover and present-then-stop behaviours are measured" now covers
   present-then-stop only.
@@ -1665,10 +1668,10 @@ reverse one, append a superseding entry (see AGENTS.md).
   sentence, and a no-skill baseline that follows the error line's install
   command is likely already at ceiling. Any one block alone stops the
   measurement, so 13 sessions there would buy no evidence. The
-  rerun and replacement allowances exist because `eval ab` has no arm or
-  trial selector, so a partial rerun is impossible, and a second replacement
-  (46) would pass the cap. The 39 matches D-055's stated worst case, now made
-  of different parts. This is a refinement, not a supersession: clause 5's
+  rerun and top-up allowances exist because `eval ab` has no arm or trial
+  selector, so a one-arm rerun is impossible, and a top-up keeps every
+  scorable row where a full replacement would discard them and re-roll the
+  reading. The 37 sits under D-055's stated worst case of 39. This is a refinement, not a supersession: clause 5's
   cap, its router run and its rules still govern, and (iii)'s outcome is one
   the clause foresaw.
 - Residual: B-10 has no A/B evidence in 6.4.0 — its shape stays on

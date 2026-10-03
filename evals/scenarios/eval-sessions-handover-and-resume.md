@@ -352,43 +352,60 @@ a whole, prepended to the user turn.
 - **Direction.** Treatment above baseline on mean grader score. Because the
   score is binary, the mean is the pass rate: the fraction of trials that read,
   checked, presented and changed nothing.
-- **Threshold.** The harness verdict under `## Verdict Policy delta`, at k=5
-  scorable rows per arm:
+- **Threshold.** The harness verdict under `## Verdict Policy delta`, on at
+  least 5 scorable rows per arm, read from the pooled rows (top-up, below):
   - `IMPROVED` — the 95% CI on the score delta lies wholly above 0. The claim
-    is supported. On the engine's statistics this needs a gap of at least four
-    passes: 4/5 against 0/5 reads CI[0.24, 1], and so do 5/5 against 1/5;
-    5/5 against 0/5 reads CI[1, 1].
+    is supported. On the engine's statistics at 5 rows per arm this needs a
+    gap of at least four passes: 4/5 against 0/5 reads CI[0.24, 1], and so do
+    5/5 against 1/5; 5/5 against 0/5 reads CI[1, 1]. A top-up can leave an
+    arm with a 6th or 7th row; the rule is unchanged — `IMPROVED` when the
+    engine's delta CI on the pooled rows lies wholly above 0 — and the extra
+    rows can let a gap of three passes clear it (5/6 against 1/5 reads
+    CI[0.03, 1], 4/5 against 1/7 reads CI[0.08, 1]), while 3/6 against 0/5
+    still reads CI[−0.07, 1]. The CI is the engine's, never recomputed by
+    hand.
   - `INCONCLUSIVE` — a delta whose CI spans 0 (3/5 against 0/5 reads
     CI[−0.08, 1]; 4/5 against 1/5 reads CI[−0.05, 1]). Reported as
     inconclusive; no improvement is claimed and it is not rerun to a larger k.
-  - `INSUFFICIENT_DATA` — fewer than 5 scorable rows in either arm (a grade
-    error `A0`, `trial_killed_incomplete`, `trial_wrote_repo`, a provider
-    refusal). The A/B is recorded as unmeasured for this round and is never
-    re-read as `INCONCLUSIVE`. There is no partial rerun: `arcforge eval ab`
-    has no arm or trial selector, always runs both arms, and a smaller `--k`
-    adds rows to both pools. The scheduled round is 26 sessions (this
-    scenario 3 + 10, the router regression 3 + 10; verify-exit spends 0, see
-    `docs/plans/v6.4/wp-d/design-gate.verify-exit.md`). If one A/B of the
-    round ends `INSUFFICIENT_DATA`, ONE full 10-session replacement run of
-    that A/B is allowed: 26 + 10 = 36, under the cap of about 40. A second
-    `INSUFFICIENT_DATA` — in this scenario or the other — is recorded as
-    unmeasured, because a second replacement (46) crosses the cap. With the
-    one preflight error rerun (3) as well, the worst case is
-    26 + 10 + 3 = 39, and the 1 reserve session is used for nothing. The
-    replacement reuses the existing preflight record (same scenario hash, same
-    conditions); it is not a second preflight. The first run's rows stay in
-    `evals/results/`, which the engine cannot drop by run: `eval report` and
-    `eval compare` pool every row of the same Version and conditions. So the
-    verdict is the replacement run's own `eval ab` summary, which covers only
-    that run's trials, and the ledger names the first run's id — its
-    directory under `evals/results/eval-sessions-handover-and-resume/` — as
-    the recorded error run, excluded from the verdict. A pooled reading is
-    taken with `--since` set to the replacement's start time.
+  - `INSUFFICIENT_DATA` — fewer than 5 scorable rows in either arm after at
+    most 2 top-ups. A grade error `A0` is a `gradeError` row;
+    `trial_killed_incomplete`, `trial_wrote_repo` and a provider refusal are
+    `infraError` rows (`scripts/lib/eval-trial.js:271-310`). The engine
+    excludes both from the verdict: `scorableResults` drops every row carrying
+    either flag (`scripts/lib/eval-stats.js:83-85`), and `verdictFromDeltaCI`
+    counts only the rows left before it computes a CI
+    (`scripts/lib/eval-stats.js:387-393`). The A/B is recorded as unmeasured
+    for this round and is never re-read as `INCONCLUSIVE`.
+- **Top-up, never replacement.** When an A/B ends with fewer than 5 scorable
+  rows in either arm, run `arcforge eval ab eval-sessions-handover-and-resume
+  --k 1` with the same skill file and flags — one more trial per arm, 2
+  sessions — and repeat until both arms hold at least 5 scorable rows, at most
+  2 top-ups (4 sessions). No row already written is discarded. The verdict is
+  read with `arcforge eval compare eval-sessions-handover-and-resume`, which
+  loads every row of this scenario's Version (`scripts/cli/eval-command.js:519-525`)
+  and judges the rows that share model, effort, ceiling and turn budget as
+  one pool (`pairArms`, `scripts/lib/eval-pools.js:139-148`); the preflight
+  writes only its cache record, so its trials are not in the pool. Each run's
+  own `eval ab` summary — the first run and every top-up — is recorded in the
+  ledger beside the pooled verdict. `eval ab` has no arm or trial selector
+  (`runAbTrials`, `scripts/lib/eval.js:160-181`), so a top-up adds a row to
+  both arms and the arm that already held 5 can end with 6 or 7. A
+  `trial_wrote_repo` row aborts its run (`stopIfTrialWroteRepo`,
+  `scripts/lib/eval-trial.js:341-348`); the rows written before it are
+  already on disk (one `appendResult` per trial, `scripts/lib/eval.js:140`)
+  and stay in the pool, and once the repository is reset the top-up rule
+  applies to them the same way. There is no full replacement run.
+- **Budget.** The scheduled round is 26 sessions (this scenario 3 + 10, the
+  router regression 3 + 10; verify-exit spends 0, see
+  `docs/plans/v6.4/wp-d/design-gate.verify-exit.md`). Top-ups add at most 4
+  sessions per scenario, 8 across the two A/Bs: 34. The one preflight error
+  rerun adds 3: a worst case of 37, under the cap of about 40; the 3 sessions
+  left are used for nothing.
 - **Zero variance.** If every trial in each arm scores the same — 5/5 against
   0/5 — the CI has zero width. That reading supports direction only, as
   6.3.0's router result recorded: report Fisher's exact two-sided p (≈ 0.008
   at 5/5 against 0/5) and a Newcombe interval on the pass difference beside
-  it; the effect size is not established at k=5.
+  it; the effect size is not established at 5 rows per arm.
 - **Per-check rates.** Beside the verdict, report each arm's C1, C2 and C5
   rates from the `-- C` lines. A treatment arm that fails mostly on C5 with C1
   and C2 holding stopped without checking — recorded as "the text's stop
