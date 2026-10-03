@@ -112,7 +112,7 @@ describe('getSessionById', () => {
 describe('saveArchive', () => {
   const now = new Date('2026-10-03T12:00:00.000Z');
 
-  it('writes archive-<alias>.md under sessions/<project>/<date>/ and registers the alias', () => {
+  it('writes archive-<alias>-<UTC stamp>.md under sessions/<project>/<date>/, aliased', () => {
     writeRecord('p', '2026-10-03', {
       sessionId: 'session-b',
       started: '2026-10-03T11:00:00Z',
@@ -122,7 +122,13 @@ describe('saveArchive', () => {
       filesModified: [],
     });
     const result = saveArchive('p', 'parser', FIVE, { now });
-    const expected = path.join(home, 'sessions', 'p', '2026-10-03', 'archive-parser.md');
+    const expected = path.join(
+      home,
+      'sessions',
+      'p',
+      '2026-10-03',
+      'archive-parser-20261003T120000Z.md',
+    );
     expect(result).toEqual({
       alias: 'parser',
       path: expected,
@@ -159,11 +165,28 @@ describe('saveArchive', () => {
     expect(resolveAlias('p', 'parser').sessionPath).toBe(first.path);
   });
 
-  it('refuses to overwrite an archive file left without an alias, unless forced', () => {
+  it('never replaces an archive: a later same-day save writes a new file, the old one stays', () => {
     const first = saveArchive('p', 'parser', FIVE, { now });
-    require('../../scripts/lib/session-aliases').deleteAlias('p', 'parser');
-    expect(() => saveArchive('p', 'parser', FIVE, { now })).toThrow(/already exists.*--force/);
-    expect(saveArchive('p', 'parser', FIVE, { now, force: true }).path).toBe(first.path);
+    const later = saveArchive('p', 'parser', FIVE.replace('# Parser work', '# Later'), {
+      now: new Date('2026-10-03T12:00:07.000Z'),
+      force: true,
+    });
+    expect(path.basename(later.path)).toBe('archive-parser-20261003T120007Z.md');
+    expect(fs.readFileSync(first.path, 'utf8')).toMatch(/^# Parser work\n/);
+    expect(resolveAlias('p', 'parser').sessionPath).toBe(later.path);
+  });
+
+  it('a save in the same second as an existing archive takes the next -N suffix', () => {
+    const names = [1, 2, 3].map(() =>
+      path.basename(saveArchive('p', 'parser', FIVE, { now, force: true }).path),
+    );
+    expect(names).toEqual([
+      'archive-parser-20261003T120000Z.md',
+      'archive-parser-20261003T120000Z-2.md',
+      'archive-parser-20261003T120000Z-3.md',
+    ]);
+    const dir = path.join(home, 'sessions', 'p', '2026-10-03');
+    expect(fs.readdirSync(dir).filter((f) => f.endsWith('.tmp'))).toEqual([]);
   });
 
   it('with force, a second save repoints the alias and reports isNew false', () => {
@@ -211,6 +234,19 @@ describe('listArchives', () => {
       aliases: ['second'],
     });
     expect(list[1].aliases.sort()).toEqual(['also-first', 'first']);
+  });
+
+  it('lists every archive of a re-saved alias, newest first, the alias on the newest only', () => {
+    const now = new Date('2026-10-03T12:00:00.000Z');
+    const a = saveArchive('p', 'parser', FIVE, { now });
+    const b = saveArchive('p', 'parser', FIVE, { now, force: true });
+    const c = saveArchive('p', 'parser', FIVE, {
+      now: new Date('2026-10-03T12:00:01.000Z'),
+      force: true,
+    });
+    const list = listArchives('p');
+    expect(list.map((e) => e.path)).toEqual([c.path, b.path, a.path]);
+    expect(list.map((e) => e.aliases)).toEqual([['parser'], [], []]);
   });
 
   it('honours limit and returns [] for a project with no archives', () => {

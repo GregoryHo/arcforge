@@ -219,8 +219,9 @@ arcforge session alias list [--json]
 ```
 
 A session archive is your own record of where a piece of work stands, kept
-under `~/.arcforge/sessions/<project>/<date>/archive-<alias>.md` — outside the
-repository, so it never shows in `git status`. It holds the same five sections
+under `~/.arcforge/sessions/<project>/<date>/archive-<alias>-<YYYYMMDDTHHMMSSZ>.md`
+(the UTC time of the `save`) — outside the repository, so it never shows in
+`git status`. It holds the same five sections
 as a `.handovers/` file — `Where it stands`, `Done`, `Unfinished`, `Decisions`,
 `Next` — under a header arcforge fills in from its session record: the session
 id, when the record started, duration, tool calls, user messages, and files
@@ -231,6 +232,9 @@ usually the `.handovers/<date>-<slug>.md` just written — or `-` for stdin. All
 five headings must be there, in that order, and none may be empty (write `none`
 in a slot with nothing in it); otherwise nothing is written. An optional `# `
 title line names the archive. The `sessions` skill writes the sections for you.
+Every `save` writes a new file and never replaces one: a second `save` under the
+same alias, with `--force`, points the alias at the new archive, and the old
+file stays.
 
 ```bash
 arcforge session save parser-work --from .handovers/2026-10-03-parser.md
@@ -265,7 +269,7 @@ two projects with the same directory name share their archives and aliases.
 |------|--------|
 | `--from` | Where `save` reads the five sections: a file, or `-` for stdin (required) |
 | `--session` | Read the session record whose id starts with this prefix |
-| `--force` | Replace an alias (or an archive) that already exists |
+| `--force` | Repoint an alias that already exists |
 | `--limit` | Maximum archives to list (default: 20) |
 | `--json` | Machine-readable `list` or `alias list` |
 

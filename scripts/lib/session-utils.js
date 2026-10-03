@@ -156,7 +156,8 @@ function updateProcessedLog(logPath, diaryFiles, reflectionId) {
 // Session Archive (cli B-9, D-056)
 // ─────────────────────────────────────────────
 //
-// An archive is `sessions/<project>/<date>/archive-<alias>.md`: an H1, the
+// An archive is `sessions/<project>/<date>/archive-<alias>-<YYYYMMDDTHHMMSSZ>.md`
+// (UTC; `-2`, `-3`… when a save lands in a second already taken): an H1, the
 // engine-written metrics header (ARCHIVE_HEADER_FIELDS, from the
 // session-tracker record), then the five handover sections the caller wrote.
 // It never carries text of the user's messages (learning B-20). A
@@ -178,6 +179,7 @@ const ARCHIVE_HEADER_FIELDS = [
   'Files modified',
 ];
 const ARCHIVE_PREFIX = 'archive-';
+const ARCHIVE_NAME = /-(\d{8}T\d{6}Z)(?:-(\d+))?\.md$/;
 const DEFAULT_LIST_LIMIT = 20;
 
 /**
@@ -332,9 +334,35 @@ function generateSession(record, handover, meta) {
 }
 
 /**
- * Save the caller's five sections as an archive and point the alias at it.
- * Every refusal (alias, an existing name or file without force, input, an
- * unknown --session) happens before anything is written.
+ * Write `content` to `<stem>.md` in `dir`, or `<stem>-2.md`, `<stem>-3.md`…
+ * when that name is taken. The temp file is hard-linked into place, which
+ * fails on an existing name instead of replacing it, so no archive is ever
+ * overwritten — not even by a concurrent save.
+ * @returns {string} The path written
+ */
+function writeNewArchive(dir, stem, content) {
+  const tmpPath = path.join(dir, `.${stem}.${process.pid}.tmp`);
+  atomicWriteFile(tmpPath, content);
+  try {
+    for (let n = 1; ; n++) {
+      const dest = path.join(dir, n === 1 ? `${stem}.md` : `${stem}-${n}.md`);
+      try {
+        fs.linkSync(tmpPath, dest);
+        return dest;
+      } catch (err) {
+        if (err.code !== 'EEXIST') throw err;
+      }
+    }
+  } finally {
+    fs.rmSync(tmpPath, { force: true });
+  }
+}
+
+/**
+ * Save the caller's five sections as a new archive and point the alias at it.
+ * A save never replaces an archive file; `force` only lets it repoint an
+ * alias that already exists. Every refusal (alias, an existing name without
+ * force, input, an unknown --session) happens before anything is written.
  * @param {string} project
  * @param {string} alias
  * @param {string} input - Markdown holding the five sections (an optional H1 is the title)
@@ -355,13 +383,10 @@ function saveArchive(project, alias, input, { now = new Date(), sessionId, force
 
   const savedAt = now.toISOString();
   const date = savedAt.slice(0, 10);
-  const fileName = sanitizeFilename(`${ARCHIVE_PREFIX}${alias}.md`);
-  const archivePath = path.join(getSessionDir(project, date), fileName);
-  if (!force && fs.existsSync(archivePath)) {
-    throw new Error(`archive ${archivePath} already exists — pass --force to overwrite it`);
-  }
-  atomicWriteFile(
-    archivePath,
+  const stamp = `${savedAt.slice(0, 19).replace(/[-:]/g, '')}Z`;
+  const archivePath = writeNewArchive(
+    getSessionDir(project, date),
+    sanitizeFilename(`${ARCHIVE_PREFIX}${alias}-${stamp}`),
     generateSession(record, handover, { project, alias, date, savedAt }),
   );
 
@@ -379,7 +404,8 @@ function saveArchive(project, alias, input, { now = new Date(), sessionId, force
 }
 
 /**
- * The project's archives, newest first, each with every alias pointing at it.
+ * The project's archives, newest first by the stamp in their names, each with
+ * every alias pointing at it.
  * Files other than `archive-*.md` (v5's `session-*.md` included) are not listed.
  * @param {string} project
  * @param {{ limit?: number }} [options]
@@ -401,8 +427,13 @@ function listArchives(project, { limit = DEFAULT_LIST_LIMIT } = {}) {
     const files = fs
       .readdirSync(dir)
       .filter((f) => f.startsWith(ARCHIVE_PREFIX) && f.endsWith('.md'))
-      .map((f) => ({ file: path.join(dir, f), mtime: fs.statSync(path.join(dir, f)).mtimeMs }))
-      .sort((a, b) => b.mtime - a.mtime);
+      .map((f) => {
+        const file = path.join(dir, f);
+        const m = f.match(ARCHIVE_NAME);
+        const [stamp, n] = m ? [m[1], Number(m[2] || 1)] : ['', 0];
+        return { file, stamp, n, mtime: fs.statSync(file).mtimeMs };
+      })
+      .sort((a, b) => b.stamp.localeCompare(a.stamp) || b.n - a.n || b.mtime - a.mtime);
     for (const { file } of files) {
       const firstLine = fs.readFileSync(file, 'utf-8').split('\n', 1)[0];
       archives.push({

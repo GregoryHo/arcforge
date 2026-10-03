@@ -64,6 +64,18 @@ function runCli(args, { input = '', expectFail = false } = {}) {
   }
 }
 
+// The path `save` reports writing.
+function savedPath(stdout) {
+  return stdout.match(/^Saved session archive: (.+) \(alias /m)[1];
+}
+
+// Every archive saved today under `alias`.
+function archivesOf(alias) {
+  const dir = path.join(SESSIONS, today);
+  const name = new RegExp(`^archive-${alias}-\\d{8}T\\d{6}Z(-\\d+)?\\.md$`);
+  return fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => name.test(f)) : [];
+}
+
 function readAliases() {
   return JSON.parse(fs.readFileSync(path.join(SESSIONS, 'aliases.json'), 'utf8'));
 }
@@ -102,8 +114,9 @@ fs.writeFileSync(
 let firstPath;
 test('save <alias> --from -: sections on stdin → archive + alias', () => {
   const { stdout } = runCli(['session', 'save', 'parser', '--from', '-'], { input: FIVE });
-  firstPath = path.join(SESSIONS, today, 'archive-parser.md');
-  assert.match(stdout, new RegExp(firstPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  firstPath = savedPath(stdout);
+  assert.strictEqual(path.dirname(firstPath), path.join(SESSIONS, today));
+  assert.match(path.basename(firstPath), /^archive-parser-\d{8}T\d{6}Z(-\d+)?\.md$/);
   const md = fs.readFileSync(firstPath, 'utf8');
   assert.match(md, /^# Parser work\n/);
   assert.match(md, /\*\*Session:\*\* session-abc/);
@@ -122,8 +135,8 @@ test('save <alias> --from -: sections on stdin → archive + alias', () => {
 test('save --from <path>: reads the sections from a file', () => {
   const file = path.join(PROJECT_DIR, 'handover.md');
   fs.writeFileSync(file, FIVE.replace('# Parser work', '# Second'));
-  runCli(['session', 'save', 'second', '--from', 'handover.md']);
-  const md = fs.readFileSync(path.join(SESSIONS, today, 'archive-second.md'), 'utf8');
+  const { stdout } = runCli(['session', 'save', 'second', '--from', 'handover.md']);
+  const md = fs.readFileSync(savedPath(stdout), 'utf8');
   assert.match(md, /^# Second\n/);
 });
 
@@ -134,7 +147,7 @@ test('save: input missing a section fails, naming it', () => {
   });
   assert.notStrictEqual(exitCode, 0);
   assert.match(stderr, /missing handover section\(s\): Decisions/);
-  assert.ok(!fs.existsSync(path.join(SESSIONS, today, 'archive-bad.md')));
+  assert.deepStrictEqual(archivesOf('bad'), []);
 });
 
 test('save: a path-like alias is refused, leaving no archive', () => {
@@ -158,21 +171,27 @@ test('save without an alias, or without --from, prints usage', () => {
     assert.notStrictEqual(exitCode, 0);
     assert.match(stderr, /Usage: arcforge session save <alias> --from <path\|->/);
   }
-  assert.ok(!fs.existsSync(path.join(SESSIONS, today, 'archive-x.md')));
+  assert.deepStrictEqual(archivesOf('x'), []);
 });
 
-test('save: an existing alias is refused without --force, replaced with it', () => {
+test('save: an existing alias is refused without --force; with it, a new archive, the old stays', () => {
+  const old = readAliases().aliases.second.sessionPath;
   const { exitCode, stderr } = runCli(['session', 'save', 'second', '--from', '-'], {
     input: FIVE,
     expectFail: true,
   });
   assert.notStrictEqual(exitCode, 0);
   assert.match(stderr, /alias "second" already exists — pass --force/);
-  assert.match(
-    fs.readFileSync(path.join(SESSIONS, today, 'archive-second.md'), 'utf8'),
-    /^# Second/,
-  );
-  runCli(['session', 'save', 'second', '--from', 'handover.md', '--force']);
+  assert.strictEqual(archivesOf('second').length, 1);
+  const { stdout } = runCli(['session', 'save', 'second', '--from', '-', '--force'], {
+    input: FIVE.replace('# Parser work', '# Second again'),
+  });
+  const now = savedPath(stdout);
+  assert.notStrictEqual(now, old);
+  assert.strictEqual(archivesOf('second').length, 2);
+  assert.match(fs.readFileSync(old, 'utf8'), /^# Second\n/);
+  assert.match(fs.readFileSync(now, 'utf8'), /^# Second again\n/);
+  assert.strictEqual(readAliases().aliases.second.sessionPath, now);
 });
 
 test('save --session <id-prefix>: reads that record, and an unknown prefix is refused', () => {
@@ -180,8 +199,11 @@ test('save --session <id-prefix>: reads that record, and an unknown prefix is re
     path.join(SESSIONS, today, 'session-zzz9.json'),
     JSON.stringify({ sessionId: 'session-zzz9', lastUpdated: `${today}T09:00:00.000Z` }),
   );
-  runCli(['session', 'save', 'picked', '--from', '-', '--session', 'zzz'], { input: FIVE });
-  const md = fs.readFileSync(path.join(SESSIONS, today, 'archive-picked.md'), 'utf8');
+  const picked = savedPath(
+    runCli(['session', 'save', 'picked', '--from', '-', '--session', 'zzz'], { input: FIVE })
+      .stdout,
+  );
+  const md = fs.readFileSync(picked, 'utf8');
   assert.match(md, /\*\*Session:\*\* session-zzz9/);
   assert.match(md, /\*\*Files modified:\*\* none recorded/);
   const { exitCode, stderr } = runCli(
@@ -191,7 +213,7 @@ test('save --session <id-prefix>: reads that record, and an unknown prefix is re
   assert.notStrictEqual(exitCode, 0);
   assert.match(stderr, /no session-tracker record matches --session "qqq"/);
   runCli(['session', 'alias', 'remove', 'picked']);
-  fs.rmSync(path.join(SESSIONS, today, 'archive-picked.md'));
+  fs.rmSync(picked);
 });
 
 // --- resume ---
@@ -234,7 +256,7 @@ test('list --json: archives only, newest first, with aliases', () => {
   assert.strictEqual(result.project, 'my-proj');
   assert.deepStrictEqual(
     result.archives.map((a) => a.aliases),
-    [['second'], ['parser']],
+    [['second'], [], ['parser']],
   );
   for (const a of result.archives) {
     assert.deepStrictEqual(Object.keys(a).sort(), ['aliases', 'date', 'path', 'title']);
@@ -252,7 +274,7 @@ test('list --limit 1: one entry; a bad limit fails', () => {
 test('list (text): one line per archive', () => {
   const { stdout } = runCli(['session', 'list']);
   assert.match(stdout, /parser/);
-  assert.match(stdout, /archive-second\.md/);
+  assert.match(stdout, /archive-second-\d{8}T\d{6}Z/);
 });
 
 // --- alias ---
@@ -264,7 +286,7 @@ test('alias set <name> <archive-path>: points a new name at an archive', () => {
 });
 
 test('alias set: an existing name is refused without --force, repointed with it', () => {
-  const secondPath = path.join(SESSIONS, today, 'archive-second.md');
+  const secondPath = readAliases().aliases.second.sessionPath;
   const { exitCode, stderr } = runCli(['session', 'alias', 'set', 'pw', secondPath], {
     expectFail: true,
   });

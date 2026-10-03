@@ -154,7 +154,7 @@ COMMANDS:
                                      them at its lastUpdated stamp — since the record's last diary
                                      capture or resume, not since the session began.
                                      --session        Read that record instead of the latest one
-                                     --force          Overwrite an existing alias or archive
+                                     --force          Repoint an existing alias (no archive is replaced)
   session resume <alias|path>        Print an archive or a .handovers/ file — its five sections only.
   session list [--limit N] [--json]  List this project's archives, newest first (default: 20).
   session alias set <name> <archive-path> [--force]
