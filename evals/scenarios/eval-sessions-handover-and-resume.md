@@ -303,9 +303,13 @@ a whole, prepended to the user turn.
     inconclusive; no improvement is claimed and it is not rerun to a larger k.
   - `INSUFFICIENT_DATA` — fewer than 5 scorable rows in either arm (a grade
     error `A0`, `trial_killed_incomplete`, `trial_wrote_repo`, a provider
-    refusal). The operator records it as unmeasured and reruns only the missing
-    trial(s) of that arm under the same conditions, once, counted against the
-    round's cap. It is never re-read as `INCONCLUSIVE`.
+    refusal). The A/B is recorded as unmeasured for this round and is never
+    re-read as `INCONCLUSIVE`. There is no partial rerun: `arcforge eval ab`
+    has no arm or trial selector, always runs both arms, and a smaller `--k`
+    adds rows to both pools. A full 10-session rerun is allowed only if it
+    fits under the round's cap of about 40; in the pre-registered worst case
+    of 39 it does not, so in practice there is none and the 1 reserve session
+    stays unused.
 - **Zero variance.** If every trial in each arm scores the same — 5/5 against
   0/5 — the CI has zero width. That reading supports direction only, as
   6.3.0's router result recorded: report Fisher's exact two-sided p (≈ 0.008
@@ -349,8 +353,8 @@ every row of either arm. Each blind spot above has a check here:
   reach.
 - **every row**: whether `arcforge` resolved in the trial (`PATH` leak) and
   whether the agent used it.
-- **the verdict**: an `INSUFFICIENT_DATA` reading is checked against the
-  dropped rows' error types before the single rerun.
+- **the verdict**: an `INSUFFICIENT_DATA` reading is reported with the
+  dropped rows' error types.
 
 A row a blind spot mis-scored is reported beside the verdict with its trial
 id and the reason. The verdict is computed on the grader's scores and never

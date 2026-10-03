@@ -116,7 +116,7 @@ D-056：
 | router V2 回歸 | 3 | 10 | 13 |
 | verify-exit | 3 | 10 | 13 |
 
-最壞情況 3 + 10（`sessions`）+ 3 + 10（router）+ 3 + 10（verify-exit，只在設計關卡通過時）= 39，這就是真正的最壞情況：下列規則不允許任何會超過 39 的路徑，上限約 40 仍然成立。保留的 1 個只用於重跑個別出錯的 trial（provider 拒絕或量測工具錯誤），不用於第二次 preflight，也不用於新增 scenario。
+最壞情況 3 + 10（`sessions`）+ 3 + 10（router）+ 3 + 10（verify-exit，只在設計關卡通過時）= 39，這就是真正的最壞情況：下列規則不允許任何會超過 39 的路徑，上限約 40 仍然成立。保留的 1 個 session 不用於補跑單一 trial：`arcforge eval ab` 無法只補一臂，任一臂可評分的列少於 5 筆就記為 `INSUFFICIENT_DATA`，本輪未量測；整組重跑只在不超過上限時允許，最壞情況 39 已無空間，實際上不會重跑。保留的 session 也不用於第二次 preflight 或新增 scenario。
 
 **規則**（由 v6.3 PLAN 的規則收窄）：
 
