@@ -156,7 +156,7 @@ describe('saveArchive', () => {
     });
     const result = saveArchive('p', 'parser', FIVE, { now });
     const expected = path.join(
-      home,
+      fs.realpathSync(home),
       'sessions',
       'p',
       '2026-10-03',

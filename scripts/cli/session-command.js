@@ -96,8 +96,13 @@ function runAlias(args, project, asJson) {
   if (action === 'set') {
     const target = args.positional[3];
     if (!name || !target) usage('alias set <name> <archive-path> [--force]');
-    const file = path.resolve(process.cwd(), target);
-    if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Error(`not a file: ${file}`);
+    const given = path.resolve(process.cwd(), target);
+    if (!fs.existsSync(given) || !fs.statSync(given).isFile()) {
+      throw new Error(`not a file: ${given}`);
+    }
+    // The real path is what is stored, so `list` matches it and a later retarget of a symlink
+    // cannot move the alias.
+    const file = fs.realpathSync(given);
     const { title } = readArchive(project, file);
     const result = setAlias(project, name, file, title, { force: Boolean(args.flags.force) });
     if (!result.success) throw new Error(`alias "${name}": ${result.error}`);

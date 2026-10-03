@@ -309,11 +309,13 @@ function saveArchive(project, alias, input, { now = new Date(), sessionId, force
     const savedAt = now.toISOString();
     const date = savedAt.slice(0, 10);
     const stamp = `${savedAt.slice(0, 19).replace(/[-:]/g, '')}Z`;
-    const archivePath = writeNewArchive(
+    const writtenPath = writeNewArchive(
       getSessionDir(project, date),
       sanitizeFilename(`${ARCHIVE_PREFIX}${alias}-${stamp}`),
       generateSession(record, handover, { project, alias, date, savedAt }),
     );
+    // Aliases store canonical paths; listArchives matches on them.
+    const archivePath = fs.realpathSync(writtenPath);
 
     let result;
     try {
@@ -366,11 +368,13 @@ function readSaveInput(input) {
  * @returns {Array<{ date: string, path: string, title: string|null, aliases: string[] }>}
  */
 function listArchives(project, { limit = DEFAULT_LIST_LIMIT } = {}) {
-  const sessionsDir = getProjectSessionsDir(project);
-  if (!fs.existsSync(sessionsDir)) return [];
+  const projectDir = getProjectSessionsDir(project);
+  if (!fs.existsSync(projectDir)) return [];
+  // Real paths, the form aliases store and `save` reports.
+  const sessionsDir = fs.realpathSync(projectDir);
   const aliasesByPath = new Map();
   for (const a of listAliases(project)) {
-    const key = path.resolve(a.sessionPath);
+    const key = canonicalPath(a.sessionPath);
     aliasesByPath.set(key, [...(aliasesByPath.get(key) || []), a.name]);
   }
 
@@ -393,11 +397,17 @@ function listArchives(project, { limit = DEFAULT_LIST_LIMIT } = {}) {
         date,
         path: file,
         title: firstLine.startsWith('# ') ? firstLine.slice(2).trim() : null,
-        aliases: aliasesByPath.get(file) || [],
+        aliases: aliasesByPath.get(canonicalPath(file)) || [],
       });
     }
   }
   return archives.slice(0, limit);
+}
+
+/** A path's real path when it exists; otherwise its resolved form, which matches nothing listed. */
+function canonicalPath(p) {
+  const resolved = path.resolve(p);
+  return fs.existsSync(resolved) ? fs.realpathSync(resolved) : resolved;
 }
 
 /**

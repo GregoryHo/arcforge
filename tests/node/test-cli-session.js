@@ -115,7 +115,7 @@ let firstPath;
 test('save <alias> --from -: sections on stdin → archive + alias', () => {
   const { stdout } = runCli(['session', 'save', 'parser', '--from', '-'], { input: FIVE });
   firstPath = savedPath(stdout);
-  assert.strictEqual(path.dirname(firstPath), path.join(SESSIONS, today));
+  assert.strictEqual(path.dirname(firstPath), fs.realpathSync(path.join(SESSIONS, today)));
   assert.match(path.basename(firstPath), /^archive-parser-\d{8}T\d{6}Z(-\d+)?\.md$/);
   const md = fs.readFileSync(firstPath, 'utf8');
   assert.match(md, /^# Parser work\n/);
@@ -414,6 +414,18 @@ test('alias set: a symlink inside the tree to an archive outside it is refused',
   assert.notStrictEqual(exitCode, 0);
   assert.match(stderr, /not a session archive of project "my-proj"/);
   assert.ok(!readAliases().aliases.linked);
+  fs.rmSync(link);
+});
+
+test('alias set: a symlink inside the tree stores the archive real path, and list shows it', () => {
+  const link = path.join(SESSIONS, today, 'link-to-first.md');
+  fs.symlinkSync(firstPath, link);
+  runCli(['session', 'alias', 'set', 'viasym', link]);
+  assert.strictEqual(readAliases().aliases.viasym.sessionPath, fs.realpathSync(firstPath));
+  const { archives } = JSON.parse(runCli(['session', 'list', '--json']).stdout);
+  const first = archives.find((a) => fs.realpathSync(a.path) === fs.realpathSync(firstPath));
+  assert.ok(first.aliases.includes('viasym'), `aliases on ${first.path}: ${first.aliases}`);
+  runCli(['session', 'alias', 'remove', 'viasym']);
   fs.rmSync(link);
 });
 
