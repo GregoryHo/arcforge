@@ -160,6 +160,8 @@ Include only sections that have entries. Order: Fixed → Changed → Added → 
 
 **Write narrative, not file lists.** The reader of this entry six months from now needs to know: what broke, why it broke, how the fix works, and what they can now do (or stop worrying about) as a result. "Updated `session-utils.js`" is useless. "Diary enricher had silently failed for 30 days because Claude Code v2.1.78+ blocks nested Writes inside `~/.claude/` — moved state to `~/.arcforge/`, 91 stubs now enrich" is reference-grade. The `release.yml` workflow extracts this exact `## [X.Y.Z]` section verbatim into the GitHub Release body when the tag is pushed (it slices from the version header to the next `## [` header), so this is the text users read on the GitHub release page — treat it as a user-facing artifact. The release job **fails** if no matching CHANGELOG section exists, which enforces the "no bump without CHANGELOG entry" rule below.
 
+**Keep contributor-only changes, labelled.** Eval scenarios, contributor tooling and plan records get an entry in the same sections as user-facing changes, with the entry's text opening `Contributor-only:` after its bold lead. One changelog is the release's full history and its GitHub Release body, so dropping them leaves a gap in both; the label lets a user skip them. The `[6.3.0]` entries for #249 and #255 are the precedent.
+
 ### 5. Flip the product state
 
 `product/` records what the product is and why. A release makes it stale in four
