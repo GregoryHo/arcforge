@@ -5,12 +5,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const {
-  getProjectSessionsDir,
-  getSessionDir,
-  sanitizeFilename,
-  atomicWriteFile,
-} = require('./utils');
+const { atomicWriteFile } = require('./atomic-write');
+const { getProjectSessionsDir, getSessionDir, sanitizeFilename } = require('./utils');
 const { getDateDirs, findLatestSessionRecord, getSessionById } = require('./session-records');
 const { validateAlias, resolveAlias, setAlias, listAliases } = require('./session-aliases');
 
