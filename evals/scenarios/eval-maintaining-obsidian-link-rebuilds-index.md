@@ -599,10 +599,12 @@ import html, os, posixpath, re, stat, sys, urllib.parse
 from collections import Counter
 from pathlib import Path
 
-# Reads files and the transcript only; runs nothing (eval B-12, D-043). `python3 -I` keeps
-# the trial directory (the cwd) off sys.path, so a planted pathlib.py or sitecustomize.py
-# is never imported. Trial files are read only when regular and small, so a FIFO, device,
-# symlink or sparse file can neither hang the grader nor stand in for a note.
+# Reads files and the transcript only; runs nothing (eval B-12, D-043). The engine runs the
+# grader from a fresh empty cwd and passes the trial as the absolute TRIAL_DIR (#250);
+# `python3 -I` is belt-and-braces over that: no cwd on sys.path and PYTHON* ignored, so a
+# planted pathlib.py or sitecustomize.py is never imported. Trial files are read only when
+# regular and small, so a FIFO, device, symlink or sparse file can neither hang the grader
+# nor stand in for a note.
 MAX_BYTES = 1 << 20
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # any locale: notes print as UTF-8
 
