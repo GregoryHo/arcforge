@@ -291,6 +291,21 @@ test('list --limit 1: one entry; a bad limit fails', () => {
   assert.match(stderr, /--limit must be a positive integer/);
 });
 
+test('list: a --limit with no value, or not a positive integer, fails naming the flag', () => {
+  for (const args of [['--limit'], ['--limit=2'], ['--limit', '--json']]) {
+    const { exitCode, stdout, stderr } = runCli(['session', 'list', ...args], {
+      expectFail: true,
+    });
+    assert.notStrictEqual(exitCode, 0);
+    assert.match(stdout + stderr, /--limit needs a value/);
+  }
+  for (const bad of ['1.5', 'abc', '0']) {
+    const { exitCode, stderr } = runCli(['session', 'list', '--limit', bad], { expectFail: true });
+    assert.notStrictEqual(exitCode, 0);
+    assert.match(stderr, new RegExp(`--limit must be a positive integer, got "${bad}"`));
+  }
+});
+
 test('list (text): one line per archive', () => {
   const { stdout } = runCli(['session', 'list']);
   assert.match(stdout, /parser/);
@@ -328,6 +343,22 @@ test('alias set: a former reserved word is an ordinary name', () => {
   runCli(['session', 'alias', 'set', 'list', firstPath]);
   assert.strictEqual(readAliases().aliases.list.sessionPath, firstPath);
   runCli(['session', 'alias', 'remove', 'list']);
+});
+
+test('save/resume: constructor, toString and __proto__ are ordinary alias names', () => {
+  for (const name of ['constructor', 'toString', '__proto__']) {
+    const { exitCode, stderr } = runCli(['session', 'resume', name], { expectFail: true });
+    assert.notStrictEqual(exitCode, 0);
+    assert.match(stderr, new RegExp(`${name}.*my-proj|my-proj.*${name}`));
+    const { stdout } = runCli(['session', 'save', name, '--from', '-'], { input: FIVE });
+    assert.match(stdout, new RegExp(`alias "${name}", new\\)`));
+    const saved = savedPath(stdout);
+    assert.ok(Object.hasOwn(readAliases().aliases, name));
+    assert.strictEqual(readAliases().aliases[name].sessionPath, saved);
+    assert.match(runCli(['session', 'resume', name]).stdout, /## Where it stands/);
+    runCli(['session', 'alias', 'remove', name]);
+    assert.ok(!Object.hasOwn(readAliases().aliases, name));
+  }
 });
 
 test('alias set: a target that is not the five sections is refused', () => {

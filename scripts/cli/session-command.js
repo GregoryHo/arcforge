@@ -34,7 +34,19 @@ function readInput(from) {
   return fs.readFileSync(0, 'utf-8');
 }
 
-function parseLimit(raw) {
+// parseArgs reads neither a trailing --flag nor --flag=value as a value.
+function refuseValuelessFlag(args, flag, usageLine) {
+  if (Object.keys(args.flags).some((k) => k === flag || k.startsWith(`${flag}=`))) {
+    throw new Error(
+      `--${flag} needs a value as the next argument (--${flag} <value>, not ` +
+        `--${flag}=<value>) — ${usageLine}`,
+    );
+  }
+}
+
+function parseLimit(args) {
+  refuseValuelessFlag(args, 'limit', 'list [--limit N] [--json]');
+  const raw = args.options.limit;
   if (raw === undefined) return undefined;
   const n = Number(raw);
   if (!Number.isInteger(n) || n < 1) {
@@ -44,15 +56,7 @@ function parseLimit(raw) {
 }
 
 function runSave(args, project) {
-  // parseArgs reads neither a trailing --flag nor --flag=value as a value.
-  for (const flag of ['from', 'session']) {
-    if (Object.keys(args.flags).some((k) => k === flag || k.startsWith(`${flag}=`))) {
-      throw new Error(
-        `--${flag} needs a value as the next argument (--${flag} <value>, not ` +
-          `--${flag}=<value>) — ${SAVE_USAGE}`,
-      );
-    }
-  }
+  for (const flag of ['from', 'session']) refuseValuelessFlag(args, flag, SAVE_USAGE);
   const alias = args.positional[1];
   const from = args.options.from;
   if (!alias || typeof from !== 'string') usage(SAVE_USAGE);
@@ -73,7 +77,7 @@ function runResume(args, project) {
 }
 
 function runList(args, project, asJson) {
-  const archives = listArchives(project, { limit: parseLimit(args.options.limit) });
+  const archives = listArchives(project, { limit: parseLimit(args) });
   if (asJson) {
     output({ project, archives }, true);
   } else if (archives.length === 0) {

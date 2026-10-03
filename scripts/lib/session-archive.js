@@ -217,21 +217,49 @@ function generateSession(record, handover, meta) {
   return lines.join('\n');
 }
 
+// `link` errors from a filesystem without hard links (FAT, exFAT, some mounts).
+const NO_HARD_LINKS = new Set(['ENOTSUP', 'EXDEV', 'EPERM']);
+
+/** Create `dest` exclusively (EEXIST if taken) and write `content`; no partial file stays. */
+function writeExclusive(dest, content) {
+  const fd = fs.openSync(dest, 'wx');
+  try {
+    fs.writeFileSync(fd, content, 'utf8');
+  } catch (err) {
+    fs.closeSync(fd);
+    fs.rmSync(dest, { force: true });
+    throw err;
+  }
+  fs.closeSync(fd);
+}
+
 /**
  * Write `content` to `<stem>.md` in `dir`, or `<stem>-2.md`, `<stem>-3.md`…
- * when that name is taken. The temp file is hard-linked into place, which
- * fails on an existing name instead of replacing it, so no archive is ever
- * overwritten — not even by a concurrent save.
+ * when that name is taken. Both ways of creating the file fail on an existing
+ * name instead of replacing it, so no archive is ever overwritten — not even by
+ * a concurrent save. The temp file is hard-linked into place, so a reader never
+ * sees a partial archive; where the filesystem has no hard links, the file is
+ * created exclusively (`wx`) and written instead.
  * @returns {string} The path written
  */
 function writeNewArchive(dir, stem, content) {
   const tmpPath = path.join(dir, `.${stem}.${process.pid}.tmp`);
   atomicWriteFile(tmpPath, content);
+  let canLink = true;
   try {
     for (let n = 1; ; n++) {
       const dest = path.join(dir, n === 1 ? `${stem}.md` : `${stem}-${n}.md`);
       try {
-        fs.linkSync(tmpPath, dest);
+        if (canLink) {
+          try {
+            fs.linkSync(tmpPath, dest);
+            return dest;
+          } catch (err) {
+            if (!NO_HARD_LINKS.has(err.code)) throw err;
+            canLink = false;
+          }
+        }
+        writeExclusive(dest, content);
         return dest;
       } catch (err) {
         if (err.code !== 'EEXIST') throw err;
@@ -261,11 +289,19 @@ function saveArchive(project, alias, input, { now = new Date(), sessionId, force
     throw new Error(`alias "${alias}" already exists — pass --force to overwrite it`);
   }
   const handover = readHandover(input, 'session input', { strict: true });
-  const stray = handover.preamble.split('\n').find((l) => l.trim() && !l.startsWith('# '));
+  const above = handover.preamble.split('\n').filter((l) => l.trim());
+  const titles = above.filter((l) => l.startsWith('# '));
+  const stray = above.find((l) => !l.startsWith('# '));
   if (stray !== undefined) {
     throw new Error(
       `session input: text above the first section: "${stray.trim()}" — an archive holds ` +
         'only an optional # title line and the five sections',
+    );
+  }
+  if (titles.length > 1) {
+    throw new Error(
+      `session input: a second # title line: "${titles[1].trim()}" — an archive holds ` +
+        'only one optional # title line and the five sections',
     );
   }
   const record =

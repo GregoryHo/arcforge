@@ -215,6 +215,49 @@ describe('saveArchive', () => {
     expect(fs.existsSync(path.join(home, 'sessions', 'p'))).toBe(false);
   });
 
+  it('rejects a second # title line above the first section, quoting it', () => {
+    const two = `# T1\n# T2\n\n${FIVE.replace('# Parser work\n', '')}`;
+    expect(() => saveArchive('p', 'twotitles', two, { now })).toThrow(
+      /a second # title line: "# T2"/,
+    );
+    expect(fs.existsSync(path.join(home, 'sessions', 'p'))).toBe(false);
+  });
+
+  it('without hard links, creates each archive exclusively instead — never replacing one', () => {
+    const spy = jest.spyOn(fs, 'linkSync').mockImplementation(() => {
+      throw Object.assign(new Error('ENOTSUP: operation not supported'), { code: 'ENOTSUP' });
+    });
+    try {
+      const first = saveArchive('p', 'fat', FIVE, { now });
+      const second = saveArchive('p', 'fat', FIVE.replace('# Parser work', '# Second'), {
+        now,
+        force: true,
+      });
+      expect(path.basename(first.path)).toBe('archive-fat-20261003T120000Z.md');
+      expect(path.basename(second.path)).toBe('archive-fat-20261003T120000Z-2.md');
+      expect(fs.readFileSync(first.path, 'utf8')).toMatch(/^# Parser work\n/);
+      expect(fs.readFileSync(second.path, 'utf8')).toMatch(/^# Second\n/);
+      expect(resolveAlias('p', 'fat').sessionPath).toBe(second.path);
+      expect(spy).toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+    const dir = path.join(home, 'sessions', 'p', '2026-10-03');
+    expect(fs.readdirSync(dir).filter((f) => f.endsWith('.tmp'))).toEqual([]);
+  });
+
+  it('a link error other than no-hard-links still fails the save', () => {
+    const spy = jest.spyOn(fs, 'linkSync').mockImplementation(() => {
+      throw Object.assign(new Error('EIO: i/o error'), { code: 'EIO' });
+    });
+    try {
+      expect(() => saveArchive('p', 'eio', FIVE, { now })).toThrow(/EIO/);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(fs.readdirSync(path.join(home, 'sessions', 'p', '2026-10-03'))).toEqual([]);
+  });
+
   it('rejects input that is not the five sections, naming the problem', () => {
     expect(() => saveArchive('p', 'x', '## Done\nstuff\n', { now })).toThrow(
       /missing handover section\(s\): Where it stands, Unfinished, Decisions, Next/,

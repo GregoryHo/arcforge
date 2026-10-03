@@ -231,7 +231,8 @@ modified. It never holds the text of your messages.
 usually the `.handovers/<date>-<slug>.md` just written — or `-` for stdin. All
 five headings must be there, in that order, and none may be empty (write `none`
 in a slot with nothing in it); otherwise nothing is written. An optional `# `
-title line names the archive; any other text above the first section is refused.
+title line names the archive; a second title line, or any other text above the
+first section, is refused.
 Each section is kept verbatim, indentation included. The `sessions` skill writes the sections for you.
 Every `save` writes a new file and never replaces one: a second `save` under the
 same alias, with `--force`, points the alias at the new archive, and the old
@@ -273,7 +274,7 @@ two projects with the same directory name share their archives and aliases.
 | `--from` | Where `save` reads the five sections: a file, or `-` for stdin (required) |
 | `--session` | Read the session record whose id starts with this prefix |
 | `--force` | Repoint an alias that already exists |
-| `--limit` | Maximum archives to list (default: 20) |
+| `--limit` | Maximum archives to list, a positive integer (default: 20) |
 | `--json` | Machine-readable `list` or `alias list` |
 
 ## JSON output
