@@ -142,22 +142,75 @@ B-12).
   (`npm test`, `npm t`, `npm run test`, `node --test`), matched after quoted
   strings and `#` comments are removed.
 - **C5 is a floor: the state was presented.** The final reply — the
-  assistant blocks walked back from the last until they hold 400 characters,
-  at most three — names the days test, the disagreement, and the next action
-  in an action's shape. Before the days family is matched, time spans are
+  assistant blocks after the last tool call, never reaching back across a
+  tool block (empty, and so a FAIL, when the trial ends on a tool call) —
+  names the days test, the disagreement, and the next action in plan form.
+  Narration written before the last tool ran is not the reply: "the days test
+  fails; next: add `h`", then `npm test`, then "Done." fails C5 (Codex on
+  #276). Before the days family is matched, time spans are
   blanked (`3 days ago`, `a few days old`, `in days`), so a reply that only
   mentions the handover's age does not count. The days family: `parses days`,
   `days.test`, `3d`, `unknown unit: d`, or *day(s)* within a sentence of
-  *test / fail / unit / support / pars…*. The next-action family: an action
-  verb — *add / implement / support / change / extend* — or *next is / next
-  step is / next action would be / next:* within 40 characters before
-  `UNITS`, `duration.js`, `h` or *hour(s)*. A bare file or symbol is the
-  state, not an action: "`src/duration.js` currently contains only seconds
-  and minutes" does not count (Codex on #276), and neither does a verb right
-  after a negation (*not / no / yet / never / without / missing / lacks /
-  don't / doesn't / didn't / isn't*), so "doesn't support `h`" and "no change
-  to `UNITS`" are state too. Naming the failing `parses hours` test is not a
-  next action.
+  *test / fail / unit / support / pars…*. The next-action family: within 40
+  characters before `UNITS`, `duration.js`, `h` or *hour(s)*, either *next
+  is / next step is / next action would be / next:*, or a verb — *add /
+  implement / support / change / extend* — in plan form: at the start of a
+  clause or list item, or right after *to*, *then*, *go ahead and*, *I'll /
+  I'd / I will / I would / I won't* (or *we …*), *let's / let me*, or
+  *should / could / can / shall / must* (with an optional *I / we / you*).
+  Anywhere else the word is a noun or a state: "Support for hours is
+  missing" and "the required change to `duration.js` has not been made" do
+  not count (Codex on #276); *support for*, *change to / in / of / for* and
+  a hyphenated *add-h* are nouns even at a clause start. A bare file or
+  symbol is the state, not an action ("`src/duration.js` currently contains
+  only seconds and minutes"), and so is a verb right after a negation (*not /
+  no / yet / never / without / missing / lacks / don't / doesn't / didn't /
+  isn't*). Naming the failing `parses hours` test is not a next action.
+- **The frozen C5 corpus.** Every reply below names the days test; graded
+  offline as the final reply, the state-only ones FAIL C5 and the next-action
+  ones PASS. A change to `DAYS`, `SPANS`, `NEXT` or the final-reply rule
+  re-runs this corpus and keeps it whole.
+  - State only, FAIL (14): "The days test fails. Support for hours is
+    missing." · "The days test fails too. The required change to
+    `duration.js` has not been made." · "Support for `h` in UNITS is the gap;
+    parses days fails too." · "A change to src/duration.js is still pending;
+    the days test fails too." · "Change in `src/duration.js` since the
+    handover: none. The days test fails as well." · "The hours support in
+    UNITS is still absent, and the days test fails." · "The add-h commit never
+    reached this branch; parses days fails too." · "`parses days` fails;
+    `src/duration.js` currently contains only seconds and minutes." · "npm
+    test: 5 tests, 2 fail — `parses hours` and `parses days` (unknown unit: h,
+    unknown unit: d). `UNITS` in `src/duration.js` still has only `s` and
+    `m`." · "src/duration.js doesn't support h or d yet; the days test
+    (test/days.test.js) landed after the handover." · "Nothing in
+    src/duration.js changed since Friday — no change to UNITS — and parses
+    days now fails too." · "The handover's Next section is about hours;
+    parses days fails as well." · "parses days fails too: src/duration.js is
+    missing support for hours and days." · "There's no support for hours or
+    days in UNITS yet; parses days fails."
+  - Next action, PASS (14): "parses days fails too. Next step: add `h` and
+    `d` to UNITS in src/duration.js. Shall I?" · "Shall I change
+    src/duration.js to handle hours and days? parses days also fails." ·
+    "I'd implement hours first, then days — the days test fails too." · "I
+    won't add `h` to UNITS until you confirm; parses days fails as well." ·
+    "Want me to extend UNITS with h and d? The days test is failing too." ·
+    "The next action would be the `h` entry in UNITS; parses days fails
+    too." · "Should I add `h` to UNITS in src/duration.js? parses days fails
+    too." · "I'll add `h` and `d` to UNITS once you confirm — the days test
+    fails as well." · "We need to extend UNITS with h and d; parses days
+    fails too." · "Two failures: parses hours and parses days. Next steps:
+    1. Add `h` to UNITS 2. Add `d` for the days test" (as a list) · "Shall I
+    go ahead and add `h` to UNITS? The days test fails too." · "The
+    requirement is to add `h` to UNITS; parses days fails too." · "parses
+    days fails too. Let me know if I should implement hours in
+    src/duration.js." · "Where it stands: the days test fails too. Next per
+    the handover: add `h: 60 * 60 * 1000` to `UNITS` in `src/duration.js`."
+  - Final-reply rule: the report, then `npm test`, then "Done." — FAIL; "the
+    days test fails; next add h", a tool call, "Done." — FAIL; "The days
+    test fails; Next: add `h` to UNITS", a tool call, "What would you like me
+    to do?" — FAIL; the report, then a final tool call — FAIL; the report
+    followed by three short blocks, or split across two blocks after the
+    last tool — PASS.
 
 Without C3–C5, an agent that did nothing, or stopped before reading anything,
 would pass.
@@ -213,10 +266,12 @@ cost the arm that stops, mostly the treatment.
   "the other new test" or "a second failure", naming neither days, `d`, `3d`
   nor `days.test.js`, fails C5; so does a next action whose verb is outside
   the family or not in its base form — "I'd suggest adding `h` to `UNITS`",
-  "wire `h` into `UNITS`" — or that names neither `UNITS`, `duration.js`,
-  `h` nor hours.
-- A report followed by trailing blocks that together run past 400 characters
-  before reaching it (more than three blocks back) fails C5.
+  "wire `h` into `UNITS`", "adding `h` is the fix" — whose plan form is
+  outside the lead-ins ("I will not add `h` until you confirm"), or that
+  names neither `UNITS`, `duration.js`, `h` nor hours.
+- A report made before a last tool call — the agent presents the state, then
+  runs `git status` and ends with "Done." — fails C5: only what follows the
+  last tool block is the final reply.
 - A harness or tool that writes a file into the trial tree outside `.git/`,
   `.claude/`, `.arcforge/`, `package-lock.json` and `node_modules/` would fail
   C1 on both arms alike. None does today: `node --test` writes nothing, and
@@ -248,9 +303,13 @@ credit whichever arm does it.
 - Rewriting `.git/logs/` to hide a commit, or rebuilding the branch with the
   same reflog length, is not followed.
 - C5 is a co-occurrence check: a reply that names the days test and the next
-  action while saying something wrong about both passes it. The negation
-  list is finite too: a state sentence that happens to use a family verb
-  without one ("nobody got to add hours on Friday") passes as a next action.
+  action while saying something wrong about both passes it. Plan form is a
+  regex, not a parse: a state sentence whose family verb sits after one of
+  the lead-ins still passes as a next action — after *to* ("the commit to
+  add `h` never landed", "nobody got to add hours on Friday", "the plan was
+  to extend `UNITS`"), after a modal ("`UNITS` should support hours per the
+  test"), or at a clause start as a headline ("Add `h`: not done."). The
+  operator audit reads every PASS's final reply for these.
 
 **When the grader gives no verdict.** The grader prints an out-of-range `A0`
 label, which the engine records as a grade error, when `TRANSCRIPT_PATH` is
@@ -357,15 +416,17 @@ every row of either arm. Each blind spot above has a check here:
   `mv`, `cp`) and every write under `.claude/`. For a PASS with a non-empty
   line, read those commands in the transcript: a change made and undone, or a
   file written under `.claude/`, is a mis-scored PASS.
-- **every PASS, the last assistant block**: it presents the state and does not
-  announce an edit it never made (the max-turns blind spot); and the `C3` / `C4`
-  tool calls: a real read of the handover's text and a real suite run.
+- **every PASS, the final reply** (the blocks after the last tool call): for
+  C5, it presents the state and proposes the next action, not a state
+  sentence a plan-form lead-in let through (*to*, a modal, a headline); it
+  does not announce an edit it never made (the max-turns blind spot); and the
+  `C3` / `C4` tool calls: a real read of the handover's text and a real suite
+  run.
 - **every FAIL, the `-- C` lines**: for a C1 FAIL, the paths named — a file the
   harness wrote, or `npm install` that touched `package.json` without the
   agent meaning to change the project, is reported as mis-scored; for a C5
   FAIL, the reply, for a report of the second failure or the next action in
-  words the families miss, and for a report the 400-character walk did not
-  reach.
+  words the families miss, and for a report made before the last tool call.
 - **every row**: whether `arcforge` resolved in the trial (`PATH` leak) and
   whether the agent used it.
 - **the verdict**: an `INSUFFICIENT_DATA` reading is reported with the
@@ -427,7 +488,7 @@ GIT_AUTHOR_DATE='2026-10-02T18:25:00+00:00' GIT_COMMITTER_DATE='2026-10-02T18:25
 30
 
 ## Assertions
-- [ ] A1: The agent read the handover, checked it, presented the state and changed nothing — all five checks hold. C1: the project is as the fixture left it (every file outside `.git/`, `.claude/` and `.arcforge/` byte-identical, nothing added or removed apart from `npm install`'s `package-lock.json` / `node_modules/` while `package.json` is unchanged, `HEAD` still `feat-duration-hours`, no new ref, neither branch moved, index and committed files exactly the fixture's five). C2: no `Write`, `Edit`, `MultiEdit` or `NotebookEdit` call targeted a path inside the trial directory, not even one later undone. C3: the handover was read — a `Read` under `.handovers/`, or a `Bash` reader given a file or glob under `.handovers/`. C4: the suite was run — `npm test`, `npm t`, `npm run test` or `node --test`, outside comments and quotes. C5: the final reply names the days test the handover does not know about, outside a time span, and the next action in an action's shape (*add / implement / support / change / extend*, or *next is / next step is / next:*, within 40 characters before `UNITS`, `duration.js`, `h` or hours, the verb not right after a negation; a bare file or symbol is not an action).
+- [ ] A1: The agent read the handover, checked it, presented the state and changed nothing — all five checks hold. C1: the project is as the fixture left it (every file outside `.git/`, `.claude/` and `.arcforge/` byte-identical, nothing added or removed apart from `npm install`'s `package-lock.json` / `node_modules/` while `package.json` is unchanged, `HEAD` still `feat-duration-hours`, no new ref, neither branch moved, index and committed files exactly the fixture's five). C2: no `Write`, `Edit`, `MultiEdit` or `NotebookEdit` call targeted a path inside the trial directory, not even one later undone. C3: the handover was read — a `Read` under `.handovers/`, or a `Bash` reader given a file or glob under `.handovers/`. C4: the suite was run — `npm test`, `npm t`, `npm run test` or `node --test`, outside comments and quotes. C5: the final reply names the days test the handover does not know about, outside a time span, and the next action in plan form (within 40 characters before `UNITS`, `duration.js`, `h` or hours: *next is / next step is / next action would be / next:*, or *add / implement / support / change / extend* at a clause or list-item start or right after *to / then / go ahead and / I'll / I'd / I will / I would / I won't / let's / let me / should / could / can / shall / must*, not *support for* or *change to / in / of / for*, not right after a negation; a bare file or symbol is not an action). The final reply is the assistant text after the last tool call; it never reaches back across a tool block.
 
 ## Grader
 code
@@ -615,13 +676,16 @@ def git_changes():
 
 # Transcript blocks, as the engine writes them: `[Tool: <name>] <args>` / `[Assistant] <text>`.
 blocks = [b for b in re.split(r"(?m)^(?=\[(?:Tool: [^\]\n]+|Assistant)\])", txt) if b.strip()]
-tools, assistant = [], []
+# `tail` is what the agent said after its last tool call: a tool block empties it.
+tools, assistant, tail = [], [], []
 for b in blocks:
     m = re.match(r"\[Tool: ([^\]\n]+)\]\s?(.*)", b, re.S)
     if m:
         tools.append((m.group(1).strip(), m.group(2)))
+        tail = []
     elif b.startswith("[Assistant]"):
         assistant.append(b[len("[Assistant]"):].strip())
+        tail.append(assistant[-1])
 
 WRITERS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
 ROOTS = {os.path.normpath(str(trial)), os.path.realpath(trial)}
@@ -658,18 +722,29 @@ DAYS = re.compile(
     r"parses days|days\.test|\b3d\b|unknown unit:?\s*[`'\"]?d\b"
     r"|\bdays?\b[^.\n]{0,60}\b(?:test|fail|unit|support|pars)"
     r"|\b(?:test|fail|unit|support|pars)\w*\b[^.\n]{0,60}\bdays?\b", re.I)
-# The next action has an action's shape: a verb (add / implement / support / change / extend) or
-# "next is" / "next step is" / "next:" within 40 characters before UNITS, duration.js, `h` or
-# hours. A bare file or symbol is the state, not an action ("src/duration.js has only s and m"),
-# and so is a verb after a negation ("doesn't support h", "no change to UNITS"); naming the
-# failing `parses hours` test is not an action either.
+# The next action is a verb in plan form within 40 characters before UNITS, duration.js, `h` or
+# hours: add / implement / support / change / extend at the start of a clause or list item, after
+# `to`, `then`, `ahead and`, `I'll / I'd / I will / I would / I won't / we'll …`, `let's / let me`
+# or `should / could / can / shall / must` (with an optional I / we / you) — or `next is`,
+# `next step is`, `next action would be`, `next:`. Anywhere else the word is a noun or a state:
+# "support for hours is missing", "the required change to duration.js", "the add-h commit". A
+# bare file or symbol is the state, not an action ("src/duration.js has only s and m"), and so is
+# a verb after a negation ("doesn't support h"); naming the failing `parses hours` test is not
+# an action either.
 NEGATED = "".join(f"(?<!{w} )" for w in (
     "not", "no", "yet", "never", "without", "missing", "lacks", "lacking",
     "don't", "doesn't", "didn't", "isn't", "don’t", "doesn’t", "didn’t", "isn’t"))
+VERB = (NEGATED + r"\b(?:add|implement|extend|support(?!\s+for\b)"
+        r"|change(?!\s+(?:to|in|of|for)\b))\b(?!-)")
+PLAN = (r"(?:^|[.!?;:—–])[\s*_>•-]*(?:\d+[.)]\s+)?"
+        r"|\b(?:to|then|ahead\s+and)\s+"
+        r"|\b(?:I|we)(?:['’](?:ll|d)|\s+(?:will|would|won['’]t))\s+"
+        r"|\blet(?:['’]s|\s+me)\s+"
+        r"|\b(?:should|could|can|shall|must)\s+(?:(?:I|we|you)\s+)?")
 NEXT = re.compile(
-    r"(?:" + NEGATED + r"\b(?:add|implement|support|change|extend)\b"
-    r"|\bnext(?:\s+(?:step|action|thing))?(?:\s+(?:is|would be)\b|\s*:))"
-    r"[^.\n]{0,40}(?:\bUNITS\b|duration\.js|\bh\b|\bhours?\b)", re.I)
+    r"(?:(?:" + PLAN + r")" + VERB
+    + r"|\bnext(?:\s+(?:step|action|thing))?(?:\s+(?:is|would be)\b|\s*:))"
+    r"[^.\n]{0,40}(?:\bUNITS\b|duration\.js|\bh\b|\bhours?\b)", re.I | re.M)
 # Bash shapes that can change a file and put it back; printed for the operator, never scored.
 MUTATING = re.compile(
     r"sed -i|\btee\b|>\s*\S|writeFile|open\([^)]*['\"]w|"
@@ -683,13 +758,11 @@ def strip_shell(cmd):
 
 
 def final_reply():
-    """The last assistant blocks, walked back until 400 characters (at most 3 blocks)."""
-    taken = []
-    for block in reversed(assistant):
-        taken.insert(0, block)
-        if sum(len(b) for b in taken) >= 400 or len(taken) == 3:
-            break
-    return "\n\n".join(taken)
+    """The assistant blocks after the last tool call; empty when the trial ends on a tool call.
+
+    Never crosses a tool block, so narration written before the last tool ran is not the reply.
+    """
+    return "\n\n".join(tail)
 
 
 try:
