@@ -17,7 +17,7 @@ command resolves anywhere — in your project, in a worktree, in a subshell.
 That mechanism is Claude Code's, and it is the whole discovery story — which is
 why it is also the boundary. **Codex CLI does not put a plugin's `bin/` on
 `PATH`**, so on a Codex install the bare `arcforge` command does not resolve and
-the seven CLI-backed skills report `command not found` at their first engine
+the eight CLI-backed skills report `command not found` at their first engine
 step. Nothing is silently degraded: the failure is a missing command, at the
 moment the skill reaches for it. Fixing it needs a discovery mechanism arcforge
 does not have yet, not a workaround inside a skill — a skill never builds a path

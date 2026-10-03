@@ -265,7 +265,7 @@ function SessionLearning({theme:t}) {
 function Platforms({theme:t}) {
   const plats = [
     {name:'Claude Code',tag:'IN FULL',cmd:'/plugin install arcforge@arcforge-dev',note:'Skills, hooks, and the CLI engine all load natively from the plugin marketplace.',primary:true},
-    {name:'Codex CLI',tag:'SKILLS ONLY',cmd:['codex plugin marketplace add GregoryHo/arcforge','codex plugin add arcforge@arcforge-dev'],note:'All 16 skills load from the same tree \u2014 9 of them work in full. The other 7 shell out to the arcforge CLI, and those steps fail with command not found: Codex does not put a plugin\u2019s bin/ on PATH. Hooks, the learning subsystem, the eval harness and the unattended loop stay Claude Code\u2019s. The README names all 16 before you install.'},
+    {name:'Codex CLI',tag:'SKILLS ONLY',cmd:['codex plugin marketplace add GregoryHo/arcforge','codex plugin add arcforge@arcforge-dev'],note:'All 16 skills load from the same tree \u2014 8 of them work in full. The other 8 shell out to the arcforge CLI, and those steps fail with command not found: Codex does not put a plugin\u2019s bin/ on PATH. Hooks, the learning subsystem, the eval harness and the unattended loop stay Claude Code\u2019s. The README names all 16 before you install.'},
     {name:'Node.js',tag:'THAT IS ALL',cmd:'dependencies: {}',note:'The engine is standard library only. Nothing to audit, nothing to update, nothing to break.'},
   ];
   return (
@@ -455,7 +455,7 @@ function Install({theme:t}) {
             <div><span style={{color:t.dim}}>$ </span>codex plugin add arcforge@arcforge-dev</div>
           </div>
           <div style={{color:t.mute,fontSize:13,lineHeight:1.7,marginTop:18}}>
-            All 16 skills load, listed as <span style={{color:t.brass,fontFamily:'monospace'}}>arcforge:&lt;name&gt;</span>. Codex has no slash commands for skills: pick one from the composer{'\u2019'}s <span style={{color:t.brass,fontFamily:'monospace'}}>$</span> mention picker. The 7 skills that call the <span style={{color:t.brass,fontFamily:'monospace'}}>arcforge</span> CLI report command not found there, and hooks, learning, the eval harness and the loop do not run. For the whole toolkit, use Claude Code.
+            All 16 skills load, listed as <span style={{color:t.brass,fontFamily:'monospace'}}>arcforge:&lt;name&gt;</span>. Codex has no slash commands for skills: pick one from the composer{'\u2019'}s <span style={{color:t.brass,fontFamily:'monospace'}}>$</span> mention picker. The 8 skills that call the <span style={{color:t.brass,fontFamily:'monospace'}}>arcforge</span> CLI report command not found there, and hooks, learning, the eval harness and the loop do not run. For the whole toolkit, use Claude Code.
           </div>
         </div>
       </div>

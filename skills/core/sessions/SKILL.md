@@ -1,6 +1,6 @@
 ---
 name: sessions
-description: Continuity across a break in context. Use when a session is ending or being handed over, when you are stopping mid-task for the day, when picking work back up from an earlier handover note, or when a long session is filling up and you are deciding whether to compact.
+description: Continuity across a break in context. Use when a session is ending or handed over, when stopping mid-task, when resuming from a handover or a named session archive, when a session should be saved under a name, or when a long session is filling up and compaction is the question.
 ---
 
 # Sessions
@@ -65,16 +65,64 @@ else, ignore it when it is to yourself tomorrow.
 
 - [ ] Done when the file exists at that path, no slot holds a placeholder, and the user has been told the path and the next action.
 
+## Saving a named archive
+
+When the user asks to save, archive or name this session, or wants it reachable by
+name from another session, the archive is a second home for the handover — the
+same five sections, read later through `arcforge session resume`.
+
+### Step 1 — Write the handover file first
+
+Work *Writing a handover* to its end. The engine writes none of the narrative; it
+archives the file you give it.
+
+- [ ] Done when `.handovers/<YYYY-MM-DD>-<slug>.md` exists and meets that section's completion criterion.
+
+### Step 2 — Archive it
+
+```bash
+arcforge session save <alias> --from .handovers/<YYYY-MM-DD>-<slug>.md
+```
+
+The archive is an engine-written metrics header — duration, tool calls, user
+messages, files modified — followed by the five sections verbatim. It holds none
+of the user's message text. Each save writes a new `archive-<alias>-<UTC stamp>.md`;
+no archive is ever overwritten. The engine refuses, exits non-zero and writes
+nothing when a section is missing, empty, out of order or extra; when the alias is
+not letters, digits, `-` and `_` (at most 128); or with `alias "<name>" already
+exists — pass --force to overwrite it`. Fix the file or pick another name.
+`--force` only when the user has said to: it moves only that alias to the new
+archive; the old archive stays on disk and keeps any other aliases it had.
+
+If `arcforge` reports `command not found`, the CLI is not on this host's PATH:
+the handover file stands on its own, so tell the user the archive was not made.
+
+- [ ] Done when the command exited 0 and the user has been told the alias and the archive path it printed.
+
+### Finding and naming archives
+
+`arcforge session list` prints this project's archives, newest first: date,
+aliases, title, path. `--limit N` caps it, `--json` is for parsing.
+
+`arcforge session alias set <name> <archive-path>` gives an existing archive
+another name (`--force` to repoint a name in use), `alias remove <name>` drops a
+name and keeps the archive, and `alias list` shows every name with its archive.
+
 ## Resuming from a handover
 
 ### Step 1 — Read it, then check it against the repo
 
-Read the newest file in `.handovers/`, or the one the user named, end to end. It
-describes the repo as it was when the writer stopped, so check the claims that
-decide what happens next: the branch, whether the Next action already landed, and
-whether the suite still returns what the file records.
+Read the newest file in `.handovers/`, or the one the user named, end to end. For
+a named archive, run `arcforge session resume <alias|path>`: it prints the same
+five sections, and they are read and checked exactly like a handover file. An
+archive in v5's format (`Summary`, `What Worked`, ...) fails with `the v5 session
+archive format ... is not supported`; there is no converter, so report that
+rather than rebuilding the five sections from it. Either one describes the repo
+as it was when the writer stopped, so check the claims that decide what happens
+next: the branch, whether the Next action already landed, and whether the suite
+still returns what the file records.
 
-- [ ] Done when the file has been read whole and every item under Where it stands and Next has been checked against the repo as it is now.
+- [ ] Done when the file or the resume output has been read whole and every item under Where it stands and Next has been checked against the repo as it is now.
 
 ### Step 2 — Present, then stop
 
@@ -156,4 +204,7 @@ above. During active implementation the answer is usually "not yet".
 | Write "continue the refactor" under Next | One action, as a command to run or a named file to change |
 | Drop a slot that has nothing in it | Write `none` — an absent heading reads as forgotten |
 | Paste the transcript or the diff into the file | Both are reconstructable; the handover exists for what is not |
-| Start working right after reading a handover | Present the state and wait for the user to confirm the plan |
+| Start working right after reading a handover or `session resume` output | Present the state and wait for the user to confirm the plan |
+| Run `session save` before the handover file exists | Write `.handovers/<date>-<slug>.md` first; it is what `--from` archives |
+| Add `--force` because the name was taken | Ask the user — the name points at an archive someone kept, and `--force` moves that name off it |
+| Rebuild a v5 archive into the five sections | Report it unsupported; the old file is not a handover |
