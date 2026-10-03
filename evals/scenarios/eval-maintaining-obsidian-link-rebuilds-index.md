@@ -348,7 +348,11 @@ the five-assertion strings of the time, A5 last.
   (D-043): the engine runs a code grader with the trial directory as its cwd,
   `python3 -` puts the cwd on `sys.path`, and a `pathlib.py` at the trial root
   forged `1111` over an untouched index. The grader now runs as
-  `python3 -I -` (the engine-wide exposure is issue #250), and reads trial files only when they are regular files under
+  `python3 -I -` (the engine-wide exposure was issue #250, since fixed: the
+  engine now runs every code grader from a fresh empty directory, and the
+  grader reaches trial files only through the absolute `TRIAL_DIR` /
+  `PROJECT_ROOT` / `TRANSCRIPT_PATH`, so the `-I` is belt-and-braces), and
+  reads trial files only when they are regular files under
   1 MiB, so a FIFO `index.md` cannot hang it into the harness's 30 s kill (a
   silence the harness would count as a FAIL). Six more right-index layouts were
   read as wrong (a flat table with a `Type` column, `#` and `####` type

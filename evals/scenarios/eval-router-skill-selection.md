@@ -361,7 +361,10 @@ so no `## Version` bump.
   `subprocess.py`, `pathlib.py`, `os.py`, `re.py`, `stat.py`, `time.py`,
   `sitecustomize.py`, `usercustomize.py` and a `.pth` with a `pyvenv.cfg` all
   run nothing and score as the end state does. The same exposure in the engine
-  and in the corpus's other `python3 -` graders is issue #250.
+  and in the corpus's other `python3 -` graders was issue #250, since fixed:
+  the engine now runs every code grader from a fresh empty directory, and the
+  grader reaches trial files only through the absolute `TRIAL_DIR` /
+  `PROJECT_ROOT` / `TRANSCRIPT_PATH`, so the `-I` here is belt-and-braces.
 - **A planted hang counted as a FAIL.** The harness kills a grader at 30 s and
   scores the silence as an ordinary FAIL, which a preflight counts. Trial files
   — the reflog and every working-tree `.js` — are now read only when they are
