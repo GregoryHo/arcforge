@@ -35,7 +35,8 @@ const {
 } = require('./schema');
 const { isLegalInsertionStatus, LIFECYCLE_STATUS } = require('./lifecycle');
 const { SANITIZER_POLICY_VERSION } = require('../sanitize-observation');
-const { atomicWriteFile, sha256Truncated, getArcforgeHome } = require('../utils');
+const { atomicWriteFile } = require('../atomic-write');
+const { sha256Truncated, getArcforgeHome } = require('../utils');
 const { toolAccessFromArgv } = require('./curator-invocation');
 
 // Layer 4 transport_status values a failure manifest may carry; `cancelled` is

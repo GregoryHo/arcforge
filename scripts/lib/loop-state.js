@@ -10,7 +10,8 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
-const { atomicWriteFile, getTimestamp, readFileSafe } = require('./utils');
+const { atomicWriteFile } = require('./atomic-write');
+const { getTimestamp, readFileSafe } = require('./utils');
 
 const LOOP_STATE_FILE = '.arcforge-loop.json';
 const LOOP_ARCHIVE_DIR = '.arcforge-loop.archive';

@@ -20,7 +20,8 @@ const { parseConfidenceFrontmatter } = require('./confidence');
 const { readActivationState } = require('./learning-curator/activation-state');
 const { writeAuditEntry } = require('./learning-audit-log');
 const { getInstinctsDir, getInstinctsArchivedDir } = require('./session-utils');
-const { atomicWriteFile, getArcforgeHome, sanitizeFilename } = require('./utils');
+const { atomicWriteFile } = require('./atomic-write');
+const { getArcforgeHome, sanitizeFilename } = require('./utils');
 
 /**
  * The instinct id an archive file holds. The file's own `id` wins. Without one,

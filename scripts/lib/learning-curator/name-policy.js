@@ -21,9 +21,11 @@ const { redactObservationText } = require('../sanitize-observation');
  *
  * `NAME_MAX` is 255 *bytes* per path component on byte-limited filesystems —
  * ext4 and friends, which is where CI runs and where a large share of users
- * are. The binding write is not the `.md` draft: `atomicWriteFile` puts the
- * content in `<stem>.md.tmp` and renames it into place, so the temporary name,
- * 7 bytes longer than the stem, is the one that has to fit. 255 - 7 = 248.
+ * are. The bound was set when `atomicWriteFile` wrote through `<stem>.md.tmp`,
+ * 7 bytes longer than the stem: 255 - 7 = 248. Its temp name is now a fixed
+ * length independent of the stem (#253), so the binding name is the `<stem>.md`
+ * draft itself, 251 bytes at the bound. The bound stays at 248 so that a name
+ * keeps the verdict it had, and the user-facing limit keeps its number.
  *
  * A fixed byte bound rather than a probe of the target filesystem, because
  * the ingestion check and the write it protects can only be one rule if both

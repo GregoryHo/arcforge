@@ -1057,21 +1057,20 @@ describe('L7-12: path policy — reject path traversal in name', () => {
     expect(result.failure.reason).toBe('path_policy_rejected');
   });
 
-  // The bound is on the stem, in bytes, and it is 248 because `atomicWriteFile`
-  // writes `<stem>.md.tmp` first. ASCII so that bytes and characters agree and
-  // the boundary is unambiguous.
+  // The bound is on the stem, in bytes, and it is 248 (see MAX_DRAFT_NAME_BYTES
+  // for why). ASCII so that bytes and characters agree and the boundary is
+  // unambiguous.
   //
   // The accepting half is the ONE assertion in this file that leans on the host
-  // filesystem: it performs a real write whose temporary component is 248 + 7 =
-  // 255 bytes, i.e. `NAME_MAX` inclusive. That is deliberate and is what the
-  // assertion is for — the refusing half and the agreement case below already
-  // pin the policy boundary against engine logic alone, so the only thing left
-  // for a real write to catch is `atomicWriteFile`'s suffix growing past the 7
-  // bytes the bound reserves for it, which no host-independent assertion can
-  // see (`.tmp` is a literal inside that helper, not an exported constant). It
-  // passes on APFS, which counts characters, and on ext4, which allows 255. A
-  // host with a stricter component limit would fail it, and that failure would
-  // be a true report about the host rather than a flake.
+  // filesystem: it performs a real write whose longest component is the 251-byte
+  // `<stem>.md` draft, and whose temp name `atomicWriteFile` keeps at a fixed
+  // length. That is deliberate and is what the assertion is for — the refusing
+  // half and the agreement case below already pin the policy boundary against
+  // engine logic alone, so the only thing left for a real write to catch is a
+  // name in the write path growing past `NAME_MAX`, which no host-independent
+  // assertion can see. It passes on APFS, which counts characters, and on ext4,
+  // which allows 255. A host with a stricter component limit would fail it, and
+  // that failure would be a true report about the host rather than a flake.
   it('accepts a name at the byte limit and refuses the one byte past it', () => {
     expect(callMaterialize({ name: 'a'.repeat(248) }).ok).toBe(true);
 
