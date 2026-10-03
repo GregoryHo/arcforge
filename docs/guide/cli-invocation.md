@@ -210,10 +210,10 @@ skill sets them for you during vault setup.
 ## `session`
 
 ```bash
-arcforge session save <alias> [--file <path>]
+arcforge session save <alias> --from <path|-> [--session <id-prefix>] [--force]
 arcforge session resume <alias|path>
 arcforge session list [--limit N] [--json]
-arcforge session alias set <name> <alias|path>
+arcforge session alias set <name> <archive-path> [--force]
 arcforge session alias remove <name>
 arcforge session alias list [--json]
 ```
@@ -222,19 +222,28 @@ A session archive is your own record of where a piece of work stands, kept
 under `~/.arcforge/sessions/<project>/<date>/archive-<alias>.md` — outside the
 repository, so it never shows in `git status`. It holds the same five sections
 as a `.handovers/` file — `Where it stands`, `Done`, `Unfinished`, `Decisions`,
-`Next` — under a header arcforge fills in from its session record: duration,
-tool calls, user messages, and files modified. It never holds the text of your
-messages.
+`Next` — under a header arcforge fills in from its session record: the session
+id, when the record started, duration, tool calls, user messages, and files
+modified. It never holds the text of your messages.
 
-`save` reads the five sections from `--file` or, without it, from stdin; an
-optional `# ` title line names the archive. Every section must be there and none
-may be empty (write `none` in a slot with nothing in it). The `sessions` skill
-writes the sections for you. A second `save` under the same alias points it at
-the new archive; the old file stays.
+`save` reads the five sections from `--from`, which is required: a file —
+usually the `.handovers/<date>-<slug>.md` just written — or `-` for stdin. All
+five headings must be there, in that order, and none may be empty (write `none`
+in a slot with nothing in it); otherwise nothing is written. An optional `# `
+title line names the archive. The `sessions` skill writes the sections for you.
 
 ```bash
-arcforge session save parser-work --file .handovers/2026-10-03-parser.md
+arcforge session save parser-work --from .handovers/2026-10-03-parser.md
 ```
+
+The header's counts are as the session-tracker record holds them at its
+`lastUpdated` stamp, and a line of the header names that stamp. The record
+restarts its counts at each diary capture and its start time at each resume, so
+the counts run since the last of those, not since the session began. The record
+is stamped when a turn ends, so a `save` during a turn leaves that turn out, and
+below the diary threshold the record carries no files — the header then reads
+`none recorded`. `--session <id-prefix>` reads a named record instead of the
+project's most recent one.
 
 `resume` takes an alias or a path — an archive or a `.handovers/` file — and
 prints its five sections for you to pick the work back up. An archive written by
@@ -242,16 +251,19 @@ arcforge 5.x, in its Summary / What Worked / What Failed / Blockers / Next Step
 sections, is refused with an error naming that format; nothing converts one.
 
 `list` shows the project's archives newest first (default 20), each with every
-alias that points at it. Aliases are per project and live in
-`~/.arcforge/sessions/<project>/aliases.json`; an alias is letters, digits, `-`
-and `_`, at most 128 characters, and not one of the reserved words (`list`,
-`help`, `remove`, `delete`, `create`, `set`, `save`, `resume`, `aliases`).
-`<project>` is the project directory's name, so two projects with the same
-directory name share their archives and aliases.
+alias that points at it. `save` sets its alias for you; `alias set` points
+another name at an archive. Aliases are per project and live in
+`~/.arcforge/sessions/<project>/aliases.json`. A name is letters, digits, `-`
+and `_`, at most 128 characters; anything else is refused, never rewritten, and
+no name is reserved. Replacing a name that already exists, through `save` or
+`alias set`, needs `--force`. `<project>` is the project directory's name, so
+two projects with the same directory name share their archives and aliases.
 
 | Flag | Effect |
 |------|--------|
-| `--file` | Read the five sections from this file instead of stdin |
+| `--from` | Where `save` reads the five sections: a file, or `-` for stdin (required) |
+| `--session` | Read the session record whose id starts with this prefix |
+| `--force` | Replace an alias (or an archive) that already exists |
 | `--limit` | Maximum archives to list (default: 20) |
 | `--json` | Machine-readable `list` or `alias list` |
 

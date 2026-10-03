@@ -13,6 +13,7 @@ const {
   sanitizeFilename,
   atomicWriteFile,
 } = require('./utils');
+const { getDateDirs, findLatestSessionRecord, getSessionById } = require('./session-records');
 
 // The marker the diary draft template leaves in every unfilled section.
 const DIARY_PLACEHOLDER = 'TO BE ENRICHED';
@@ -169,6 +170,8 @@ const ARCHIVE_HEADER_FIELDS = [
   'Alias',
   'Saved',
   'Session',
+  'Metrics',
+  'Record started',
   'Duration',
   'Tool calls',
   'User messages',
@@ -176,22 +179,6 @@ const ARCHIVE_HEADER_FIELDS = [
 ];
 const ARCHIVE_PREFIX = 'archive-';
 const DEFAULT_LIST_LIMIT = 20;
-
-/**
- * Get all date directories sorted by date descending.
- * @param {string} parentDir - Directory containing YYYY-MM-DD subdirectories
- * @returns {string[]} Date directory names sorted newest-first
- */
-function getDateDirs(parentDir) {
-  return fs
-    .readdirSync(parentDir)
-    .filter((entry) => {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(entry)) return false;
-      return fs.statSync(path.join(parentDir, entry)).isDirectory();
-    })
-    .sort()
-    .reverse();
-}
 
 /**
  * Split markdown into its H1 title, the preamble before the first `## `
@@ -265,6 +252,13 @@ function readHandover(content, source, { strict = false } = {}) {
     throw new Error(`${source}: missing handover section(s): ${missing.join(', ')}`);
   }
   if (strict) {
+    const order = headings.filter((h) => HANDOVER_SECTIONS.includes(h));
+    if (order.join('\n') !== HANDOVER_SECTIONS.join('\n')) {
+      throw new Error(
+        `${source}: sections out of order (${order.join(', ')}) — they go ` +
+          `${HANDOVER_SECTIONS.join(', ')}`,
+      );
+    }
     const extra = headings.filter((h) => !HANDOVER_SECTIONS.includes(h));
     if (extra.length > 0) {
       throw new Error(
@@ -284,47 +278,22 @@ function readHandover(content, source, { strict = false } = {}) {
 }
 
 /**
- * The project's current session-tracker record: the most recently updated
- * `session-*.json` in the newest date directory that holds one.
- * @param {string} project
- * @returns {Object|null}
- */
-function findLatestSessionRecord(project) {
-  const sessionsDir = getProjectSessionsDir(project);
-  if (!fs.existsSync(sessionsDir)) return null;
-  for (const date of getDateDirs(sessionsDir)) {
-    const dir = path.join(sessionsDir, date);
-    const records = [];
-    for (const file of fs.readdirSync(dir)) {
-      if (!file.startsWith('session-') || !file.endsWith('.json')) continue;
-      try {
-        records.push(JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')));
-      } catch {
-        // A record mid-write or corrupt is not the current session's; skip it.
-      }
-    }
-    if (records.length > 0) {
-      records.sort((a, b) => String(b.lastUpdated).localeCompare(String(a.lastUpdated)));
-      return records[0];
-    }
-  }
-  return null;
-}
-
-/**
- * The metrics header lines. Only counts and paths are read from the record —
- * never userMessageContent (learning B-20).
+ * The metrics header lines, as the record stood at its lastUpdated stamp. The
+ * tracker resets its counters at each diary capture and `started` at each
+ * resume, so the counts are never session totals and the stamp line says so.
+ * Only counts and paths are read — never userMessageContent (learning B-20).
  */
 function archiveHeader(record, { project, alias, savedAt }) {
-  const unknown = 'unknown';
+  const none = 'none recorded';
   const lines = [
     `**Project:** ${project}`,
     `**Alias:** ${alias}`,
     `**Saved:** ${savedAt}`,
-    `**Session:** ${record?.sessionId || 'none recorded'}`,
+    `**Session:** ${record?.sessionId || none}`,
   ];
   if (!record) {
-    for (const field of ARCHIVE_HEADER_FIELDS.slice(4)) lines.push(`**${field}:** ${unknown}`);
+    lines.push('**Metrics:** no session-tracker record for this project');
+    for (const field of ARCHIVE_HEADER_FIELDS.slice(5)) lines.push(`**${field}:** ${none}`);
     return lines;
   }
   const minutes =
@@ -332,10 +301,16 @@ function archiveHeader(record, { project, alias, savedAt }) {
       ? Math.round((new Date(record.lastUpdated) - new Date(record.started)) / 60000)
       : null;
   const files = Array.isArray(record.filesModified) ? record.filesModified : [];
-  lines.push(`**Duration:** ${Number.isFinite(minutes) ? `~${minutes} minutes` : unknown}`);
-  lines.push(`**Tool calls:** ${record.toolCalls ?? 0}`);
-  lines.push(`**User messages:** ${record.userMessages ?? 0}`);
-  lines.push(`**Files modified:** ${files.length}`);
+  lines.push(
+    `**Metrics:** as the session-tracker record holds them at ${record.lastUpdated || none} — ` +
+      "since the record's last diary capture or resume, not since the session began; " +
+      'the current turn may not be counted',
+  );
+  lines.push(`**Record started:** ${record.started || none}`);
+  lines.push(`**Duration:** ${Number.isFinite(minutes) ? `~${minutes} minutes` : none}`);
+  lines.push(`**Tool calls:** ${record.toolCalls ?? none}`);
+  lines.push(`**User messages:** ${record.userMessages ?? none}`);
+  lines.push(`**Files modified:** ${files.length > 0 ? files.length : none}`);
   for (const f of files) lines.push(`- ${f}`);
   return lines;
 }
@@ -358,30 +333,39 @@ function generateSession(record, handover, meta) {
 
 /**
  * Save the caller's five sections as an archive and point the alias at it.
+ * Every refusal (alias, an existing name or file without force, input, an
+ * unknown --session) happens before anything is written.
  * @param {string} project
  * @param {string} alias
  * @param {string} input - Markdown holding the five sections (an optional H1 is the title)
- * @param {{ now?: Date }} [options]
+ * @param {{ now?: Date, sessionId?: string, force?: boolean }} [options]
  * @returns {{ alias: string, path: string, project: string, isNew: boolean, session: string|null }}
- * @throws {Error} on an invalid alias, input that is not the five sections, or a failed write
+ * @throws {Error} naming what was refused, or a failed write
  */
-function saveArchive(project, alias, input, { now = new Date() } = {}) {
-  const { validateAlias, setAlias } = require('./session-aliases');
+function saveArchive(project, alias, input, { now = new Date(), sessionId, force = false } = {}) {
+  const { validateAlias, resolveAlias, setAlias } = require('./session-aliases');
   const check = validateAlias(alias);
   if (!check.valid) throw new Error(`Invalid alias: ${check.error}`);
+  if (!force && resolveAlias(project, alias)) {
+    throw new Error(`alias "${alias}" already exists — pass --force to overwrite it`);
+  }
   const handover = readHandover(input, 'session input', { strict: true });
+  const record =
+    sessionId === undefined ? findLatestSessionRecord(project) : getSessionById(project, sessionId);
 
   const savedAt = now.toISOString();
   const date = savedAt.slice(0, 10);
-  const record = findLatestSessionRecord(project);
   const fileName = sanitizeFilename(`${ARCHIVE_PREFIX}${alias}.md`);
   const archivePath = path.join(getSessionDir(project, date), fileName);
+  if (!force && fs.existsSync(archivePath)) {
+    throw new Error(`archive ${archivePath} already exists — pass --force to overwrite it`);
+  }
   atomicWriteFile(
     archivePath,
     generateSession(record, handover, { project, alias, date, savedAt }),
   );
 
-  const result = setAlias(project, alias, archivePath, handover.title);
+  const result = setAlias(project, alias, archivePath, handover.title, { force });
   if (!result.success) {
     throw new Error(`Archive written to ${archivePath}, but alias "${alias}": ${result.error}`);
   }
@@ -653,10 +637,8 @@ module.exports = {
   // Session archive
   HANDOVER_SECTIONS,
   ARCHIVE_HEADER_FIELDS,
-  getDateDirs,
   parseSessionSections,
   readHandover,
-  findLatestSessionRecord,
   generateSession,
   saveArchive,
   listArchives,

@@ -8,8 +8,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+const { findLatestSessionRecord, getSessionById } = require('../../scripts/lib/session-records');
 const {
-  findLatestSessionRecord,
   saveArchive,
   listArchives,
   resolveSessionRef,
@@ -79,6 +79,36 @@ describe('findLatestSessionRecord', () => {
   });
 });
 
+describe('getSessionById', () => {
+  beforeEach(() => {
+    writeRecord('p', '2026-10-02', {
+      sessionId: 'session-abc1',
+      lastUpdated: '2026-10-02T09:00:00Z',
+    });
+    writeRecord('p', '2026-10-03', {
+      sessionId: 'session-abd2',
+      lastUpdated: '2026-10-03T09:00:00Z',
+    });
+  });
+
+  it('selects the one record whose id starts with the prefix, with or without session-', () => {
+    expect(getSessionById('p', 'abc').sessionId).toBe('session-abc1');
+    expect(getSessionById('p', 'session-abd').sessionId).toBe('session-abd2');
+  });
+
+  it('refuses an ambiguous prefix, naming the matches', () => {
+    expect(() => getSessionById('p', 'ab')).toThrow(
+      /--session "ab" matches 2 records: session-abc1, session-abd2/,
+    );
+  });
+
+  it('refuses a prefix that matches nothing, naming the project', () => {
+    expect(() => getSessionById('p', 'zzz')).toThrow(
+      /no session-tracker record matches --session "zzz" in project "p"/,
+    );
+  });
+});
+
 describe('saveArchive', () => {
   const now = new Date('2026-10-03T12:00:00.000Z');
 
@@ -102,20 +132,53 @@ describe('saveArchive', () => {
     });
     const md = fs.readFileSync(expected, 'utf8');
     expect(md).toContain('**Duration:** ~30 minutes');
-    expect(md).toContain('**Files modified:** 0');
+    expect(md).toContain('**Files modified:** none recorded');
     expect(resolveAlias('p', 'parser').sessionPath).toBe(expected);
   });
 
-  it('a second save under the same alias reports isNew false and repoints it', () => {
+  it('reads the record --session selects instead of the latest', () => {
+    writeRecord('p', '2026-10-03', {
+      sessionId: 'session-old',
+      lastUpdated: '2026-10-03T08:00:00Z',
+    });
+    writeRecord('p', '2026-10-03', {
+      sessionId: 'session-new',
+      lastUpdated: '2026-10-03T09:00:00Z',
+    });
+    const result = saveArchive('p', 'picked', FIVE, { now, sessionId: 'old' });
+    expect(result.session).toBe('session-old');
+  });
+
+  it('refuses a second save under the same alias without force, writing nothing', () => {
+    const first = saveArchive('p', 'parser', FIVE, { now });
+    const next = new Date('2026-10-04T08:00:00Z');
+    expect(() => saveArchive('p', 'parser', FIVE, { now: next })).toThrow(
+      /alias "parser" already exists.*--force/,
+    );
+    expect(fs.existsSync(path.join(home, 'sessions', 'p', '2026-10-04'))).toBe(false);
+    expect(resolveAlias('p', 'parser').sessionPath).toBe(first.path);
+  });
+
+  it('refuses to overwrite an archive file left without an alias, unless forced', () => {
+    const first = saveArchive('p', 'parser', FIVE, { now });
+    require('../../scripts/lib/session-aliases').deleteAlias('p', 'parser');
+    expect(() => saveArchive('p', 'parser', FIVE, { now })).toThrow(/already exists.*--force/);
+    expect(saveArchive('p', 'parser', FIVE, { now, force: true }).path).toBe(first.path);
+  });
+
+  it('with force, a second save repoints the alias and reports isNew false', () => {
     saveArchive('p', 'parser', FIVE, { now });
-    const later = saveArchive('p', 'parser', FIVE, { now: new Date('2026-10-04T08:00:00Z') });
+    const later = saveArchive('p', 'parser', FIVE, {
+      now: new Date('2026-10-04T08:00:00Z'),
+      force: true,
+    });
     expect(later.isNew).toBe(false);
     expect(resolveAlias('p', 'parser').sessionPath).toBe(later.path);
     expect(later.path).toContain(`${path.sep}2026-10-04${path.sep}`);
   });
 
   it('rejects an invalid alias before writing anything', () => {
-    for (const bad of ['../x', 'a/b', 'has space', 'list', 'x'.repeat(129), '']) {
+    for (const bad of ['../x', 'a/b', 'has space', 'a.b', 'x'.repeat(129), '']) {
       expect(() => saveArchive('p', bad, FIVE, { now })).toThrow(/alias/i);
     }
     expect(fs.existsSync(path.join(home, 'sessions', 'p'))).toBe(false);

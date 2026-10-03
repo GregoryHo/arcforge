@@ -6,17 +6,6 @@ const { readFileSafe, getProjectSessionsDir, log } = require('./utils');
 const ALIASES_FILENAME = 'aliases.json';
 const ALIAS_VERSION = '1.0';
 const MAX_ALIAS_LENGTH = 128;
-const RESERVED_NAMES = [
-  'list',
-  'help',
-  'remove',
-  'delete',
-  'create',
-  'set',
-  'save',
-  'resume',
-  'aliases',
-];
 
 /**
  * Get aliases file path for a project.
@@ -92,21 +81,20 @@ function validateAlias(alias) {
       error: 'Alias must contain only letters, numbers, dashes, and underscores',
     };
   }
-  if (RESERVED_NAMES.includes(alias.toLowerCase())) {
-    return { valid: false, error: `'${alias}' is a reserved name` };
-  }
   return { valid: true };
 }
 
 /**
- * Set or update an alias pointing to a saved session file.
+ * Set an alias pointing to a saved session file. An alias that already exists
+ * is overwritten only with `force` (cli B-9).
  * @param {string} project - Project name
  * @param {string} alias - Alias name
  * @param {string} sessionPath - Path to saved session file
  * @param {string} [title] - Optional description
+ * @param {{ force?: boolean }} [options]
  * @returns {{ success: boolean, isNew?: boolean, error?: string }}
  */
-function setAlias(project, alias, sessionPath, title = null) {
+function setAlias(project, alias, sessionPath, title = null, { force = false } = {}) {
   const validation = validateAlias(alias);
   if (!validation.valid) return { success: false, error: validation.error };
 
@@ -117,6 +105,12 @@ function setAlias(project, alias, sessionPath, title = null) {
   const data = loadAliases(project);
   const existing = data.aliases[alias];
   const isNew = !existing;
+  if (existing && !force) {
+    return {
+      success: false,
+      error: `alias "${alias}" already exists — pass --force to overwrite it`,
+    };
+  }
 
   data.aliases[alias] = {
     sessionPath,
@@ -225,6 +219,5 @@ module.exports = {
   resolveAlias,
   listAliases,
   deleteAlias,
-  RESERVED_NAMES,
   MAX_ALIAS_LENGTH,
 };

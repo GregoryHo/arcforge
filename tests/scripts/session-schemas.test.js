@@ -89,6 +89,8 @@ describe('session archive format', () => {
       'Alias',
       'Saved',
       'Session',
+      'Metrics',
+      'Record started',
       'Duration',
       'Tool calls',
       'User messages',
@@ -102,6 +104,7 @@ describe('session archive format', () => {
     expect(md).toContain('**Alias:** parser-work');
     expect(md).toContain('**Saved:** 2026-10-03T11:00:00.000Z');
     expect(md).toContain('**Session:** session-abc');
+    expect(md).toContain('**Record started:** 2026-10-03T10:00:00.000Z');
     expect(md).toContain('**Duration:** ~42 minutes');
     expect(md).toContain('**Tool calls:** 120');
     expect(md).toContain('**User messages:** 8');
@@ -130,11 +133,39 @@ describe('session archive format', () => {
     expect(md).not.toContain('Tools Used');
   });
 
-  it('marks every metric unknown when no session record exists', () => {
+  it('names the lastUpdated stamp on a line of its own, and never calls the counts totals', () => {
+    const md = archive();
+    expect(md).toContain(
+      '**Metrics:** as the session-tracker record holds them at 2026-10-03T10:42:00.000Z — ' +
+        "since the record's last diary capture or resume, not since the session began; " +
+        'the current turn may not be counted',
+    );
+    expect(md).not.toMatch(/total/i);
+  });
+
+  it('reads none recorded for files when the record has none, never 0 or a guess', () => {
+    const md = generateSession({ ...RECORD, filesModified: [] }, readHandover(FIVE, 'input'), META);
+    expect(md).toContain('**Files modified:** none recorded\n');
+    const noKey = { ...RECORD };
+    delete noKey.filesModified;
+    delete noKey.userMessages;
+    const md2 = generateSession(noKey, readHandover(FIVE, 'input'), META);
+    expect(md2).toContain('**Files modified:** none recorded');
+    expect(md2).toContain('**User messages:** none recorded');
+  });
+
+  it('marks every metric none recorded when no session record exists', () => {
     const md = generateSession(null, readHandover(FIVE, 'input'), META);
     expect(md).toContain('**Session:** none recorded');
-    for (const field of ['Duration', 'Tool calls', 'User messages', 'Files modified']) {
-      expect(md).toContain(`**${field}:** unknown`);
+    expect(md).toContain('**Metrics:** no session-tracker record for this project');
+    for (const field of [
+      'Record started',
+      'Duration',
+      'Tool calls',
+      'User messages',
+      'Files modified',
+    ]) {
+      expect(md).toContain(`**${field}:** none recorded`);
     }
   });
 
@@ -176,6 +207,15 @@ describe('archive reader rejects what is not the five sections', () => {
     const empty = FIVE.replace('- tokenizer — verified by npm test', '');
     expect(() => readHandover(empty, 'in', { strict: true })).toThrow(
       /empty section\(s\): Done.*none/,
+    );
+  });
+
+  it('strict: rejects the five out of order, naming the order', () => {
+    const swapped = FIVE.replace('## Done', '## TMP')
+      .replace('## Unfinished', '## Done')
+      .replace('## TMP', '## Unfinished');
+    expect(() => readHandover(swapped, 'in', { strict: true })).toThrow(
+      /out of order.*Where it stands, Done, Unfinished, Decisions, Next/,
     );
   });
 

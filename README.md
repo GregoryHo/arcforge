@@ -165,7 +165,7 @@ arcforge obsidian register --path <path> --name <name> --default
 arcforge obsidian list-vaults --json
 
 # 6. session — session archives: the five handover sections, saved and aliased
-arcforge session save <alias> --file .handovers/<date>-<slug>.md
+arcforge session save <alias> --from .handovers/<date>-<slug>.md
 arcforge session list
 arcforge session resume <alias>
 ```

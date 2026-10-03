@@ -49,8 +49,8 @@ function parseArgs(args) {
 
     if (arg.startsWith('--')) {
       const key = arg.slice(2);
-      // Check if next arg is a value (not another flag)
-      if (i + 1 < args.length && !args[i + 1].startsWith('-')) {
+      // Check if next arg is a value (not another flag); a lone `-` is a value (stdin)
+      if (i + 1 < args.length && (!args[i + 1].startsWith('-') || args[i + 1] === '-')) {
         result.options[key] = args[i + 1];
         i += 2;
       } else {

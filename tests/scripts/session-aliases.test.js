@@ -63,11 +63,18 @@ describe('session-aliases', () => {
       expect(validateAlias(long).valid).toBe(false);
     });
 
-    it('rejects reserved names', () => {
-      const { validateAlias, RESERVED_NAMES } = getAliasesModule();
-      for (const name of RESERVED_NAMES) {
+    it('reserves no name — a name only ever fills an operand (cli B-9)', () => {
+      const mod = getAliasesModule();
+      expect(mod.RESERVED_NAMES).toBeUndefined();
+      for (const name of ['list', 'help', 'remove', 'delete', 'create', 'set', 'save', 'resume']) {
+        expect(mod.validateAlias(name).valid).toBe(true);
+      }
+    });
+
+    it('refuses rather than rewrites a name outside letters, digits, - and _', () => {
+      const { validateAlias } = getAliasesModule();
+      for (const name of ['../x', 'a/b', 'a.b', 'naïve', 'a\nb']) {
         expect(validateAlias(name).valid).toBe(false);
-        expect(validateAlias(name.toUpperCase()).valid).toBe(false);
       }
     });
   });
@@ -81,12 +88,21 @@ describe('session-aliases', () => {
       expect(result.alias).toBe('new-alias-1');
     });
 
-    it('updates an existing alias', () => {
-      const { setAlias } = getAliasesModule();
+    it('refuses to overwrite an existing alias without force', () => {
+      const { setAlias, resolveAlias } = getAliasesModule();
       setAlias(project, 'update-test', '/path/old.md');
       const result = setAlias(project, 'update-test', '/path/new.md');
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/already exists.*--force/);
+      expect(resolveAlias(project, 'update-test').sessionPath).toBe('/path/old.md');
+    });
+
+    it('overwrites an existing alias with force', () => {
+      const { setAlias, resolveAlias } = getAliasesModule();
+      const result = setAlias(project, 'update-test', '/path/new.md', null, { force: true });
       expect(result.success).toBe(true);
       expect(result.isNew).toBe(false);
+      expect(resolveAlias(project, 'update-test').sessionPath).toBe('/path/new.md');
     });
 
     it('rejects invalid alias names', () => {

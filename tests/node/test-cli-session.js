@@ -100,13 +100,17 @@ fs.writeFileSync(
 
 // --- save ---
 let firstPath;
-test('save <alias>: sections on stdin → archive + alias', () => {
-  const { stdout } = runCli(['session', 'save', 'parser'], { input: FIVE });
+test('save <alias> --from -: sections on stdin → archive + alias', () => {
+  const { stdout } = runCli(['session', 'save', 'parser', '--from', '-'], { input: FIVE });
   firstPath = path.join(SESSIONS, today, 'archive-parser.md');
   assert.match(stdout, new RegExp(firstPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   const md = fs.readFileSync(firstPath, 'utf8');
   assert.match(md, /^# Parser work\n/);
   assert.match(md, /\*\*Session:\*\* session-abc/);
+  assert.match(
+    md,
+    /\*\*Metrics:\*\* as the session-tracker record holds them at \S+T10:42:00\.000Z — since the record's last diary capture or resume, not since the session began/,
+  );
   assert.match(md, /\*\*Duration:\*\* ~42 minutes/);
   assert.match(md, /\*\*Tool calls:\*\* 120/);
   assert.match(md, /\*\*User messages:\*\* 8/);
@@ -115,16 +119,16 @@ test('save <alias>: sections on stdin → archive + alias', () => {
   assert.strictEqual(readAliases().aliases.parser.sessionPath, firstPath);
 });
 
-test('save --file <path>: reads the sections from a file', () => {
+test('save --from <path>: reads the sections from a file', () => {
   const file = path.join(PROJECT_DIR, 'handover.md');
   fs.writeFileSync(file, FIVE.replace('# Parser work', '# Second'));
-  runCli(['session', 'save', 'second', '--file', 'handover.md']);
+  runCli(['session', 'save', 'second', '--from', 'handover.md']);
   const md = fs.readFileSync(path.join(SESSIONS, today, 'archive-second.md'), 'utf8');
   assert.match(md, /^# Second\n/);
 });
 
 test('save: input missing a section fails, naming it', () => {
-  const { exitCode, stderr } = runCli(['session', 'save', 'bad'], {
+  const { exitCode, stderr } = runCli(['session', 'save', 'bad', '--from', '-'], {
     input: FIVE.replace(/## Decisions[\s\S]*?(?=## Next)/, ''),
     expectFail: true,
   });
@@ -133,9 +137,9 @@ test('save: input missing a section fails, naming it', () => {
   assert.ok(!fs.existsSync(path.join(SESSIONS, today, 'archive-bad.md')));
 });
 
-test('save: a path-like or reserved alias is rejected', () => {
-  for (const alias of ['../escape', 'list']) {
-    const { exitCode, stderr } = runCli(['session', 'save', alias], {
+test('save: a path-like alias is refused, leaving no archive', () => {
+  for (const alias of ['../escape', 'a.b']) {
+    const { exitCode, stderr } = runCli(['session', 'save', alias, '--from', '-'], {
       input: FIVE,
       expectFail: true,
     });
@@ -145,10 +149,49 @@ test('save: a path-like or reserved alias is rejected', () => {
   assert.ok(!fs.existsSync(path.join(HOME, 'sessions', 'escape')));
 });
 
-test('save without an alias prints usage', () => {
-  const { exitCode, stderr } = runCli(['session', 'save'], { expectFail: true });
+test('save without an alias, or without --from, prints usage', () => {
+  for (const args of [
+    ['session', 'save'],
+    ['session', 'save', 'x'],
+  ]) {
+    const { exitCode, stderr } = runCli(args, { input: FIVE, expectFail: true });
+    assert.notStrictEqual(exitCode, 0);
+    assert.match(stderr, /Usage: arcforge session save <alias> --from <path\|->/);
+  }
+  assert.ok(!fs.existsSync(path.join(SESSIONS, today, 'archive-x.md')));
+});
+
+test('save: an existing alias is refused without --force, replaced with it', () => {
+  const { exitCode, stderr } = runCli(['session', 'save', 'second', '--from', '-'], {
+    input: FIVE,
+    expectFail: true,
+  });
   assert.notStrictEqual(exitCode, 0);
-  assert.match(stderr, /Usage: arcforge session save <alias>/);
+  assert.match(stderr, /alias "second" already exists — pass --force/);
+  assert.match(
+    fs.readFileSync(path.join(SESSIONS, today, 'archive-second.md'), 'utf8'),
+    /^# Second/,
+  );
+  runCli(['session', 'save', 'second', '--from', 'handover.md', '--force']);
+});
+
+test('save --session <id-prefix>: reads that record, and an unknown prefix is refused', () => {
+  fs.writeFileSync(
+    path.join(SESSIONS, today, 'session-zzz9.json'),
+    JSON.stringify({ sessionId: 'session-zzz9', lastUpdated: `${today}T09:00:00.000Z` }),
+  );
+  runCli(['session', 'save', 'picked', '--from', '-', '--session', 'zzz'], { input: FIVE });
+  const md = fs.readFileSync(path.join(SESSIONS, today, 'archive-picked.md'), 'utf8');
+  assert.match(md, /\*\*Session:\*\* session-zzz9/);
+  assert.match(md, /\*\*Files modified:\*\* none recorded/);
+  const { exitCode, stderr } = runCli(
+    ['session', 'save', 'nope', '--from', '-', '--session', 'qqq'],
+    { input: FIVE, expectFail: true },
+  );
+  assert.notStrictEqual(exitCode, 0);
+  assert.match(stderr, /no session-tracker record matches --session "qqq"/);
+  runCli(['session', 'alias', 'remove', 'picked']);
+  fs.rmSync(path.join(SESSIONS, today, 'archive-picked.md'));
 });
 
 // --- resume ---
@@ -213,11 +256,36 @@ test('list (text): one line per archive', () => {
 });
 
 // --- alias ---
-test('alias set <name> <alias|path>: points a new name at an archive', () => {
-  runCli(['session', 'alias', 'set', 'pw', 'parser']);
+test('alias set <name> <archive-path>: points a new name at an archive', () => {
+  runCli(['session', 'alias', 'set', 'pw', firstPath]);
   assert.strictEqual(readAliases().aliases.pw.sessionPath, firstPath);
   runCli(['session', 'alias', 'set', 'pw2', firstPath]);
   assert.strictEqual(readAliases().aliases.pw2.sessionPath, firstPath);
+});
+
+test('alias set: an existing name is refused without --force, repointed with it', () => {
+  const secondPath = path.join(SESSIONS, today, 'archive-second.md');
+  const { exitCode, stderr } = runCli(['session', 'alias', 'set', 'pw', secondPath], {
+    expectFail: true,
+  });
+  assert.notStrictEqual(exitCode, 0);
+  assert.match(stderr, /alias "pw" already exists — pass --force/);
+  runCli(['session', 'alias', 'set', 'pw', secondPath, '--force']);
+  assert.strictEqual(readAliases().aliases.pw.sessionPath, secondPath);
+});
+
+test('alias set: the target is a path, never another alias', () => {
+  const { exitCode, stderr } = runCli(['session', 'alias', 'set', 'pw3', 'parser'], {
+    expectFail: true,
+  });
+  assert.notStrictEqual(exitCode, 0);
+  assert.match(stderr, /not a file: .*parser/);
+});
+
+test('alias set: a former reserved word is an ordinary name', () => {
+  runCli(['session', 'alias', 'set', 'list', firstPath]);
+  assert.strictEqual(readAliases().aliases.list.sessionPath, firstPath);
+  runCli(['session', 'alias', 'remove', 'list']);
 });
 
 test('alias set: a target that is not the five sections is refused', () => {
@@ -259,6 +327,15 @@ test('session without subcommand fails with usage', () => {
   const { exitCode, stderr } = runCli(['session'], { expectFail: true });
   assert.notStrictEqual(exitCode, 0);
   assert.match(stderr, /Usage: arcforge session <save\|resume\|list\|alias>/);
+});
+
+// --- help names what the counts are ---
+test('--help says the save header counts are not session totals', () => {
+  const help = runCli(['--help']).stdout.replace(/\s+/g, ' ');
+  assert.match(
+    help,
+    /as the session-tracker record holds them at its lastUpdated stamp — since the record's last diary capture or resume, not since the session began/,
+  );
 });
 
 // --- independence (B-3, B-9): works with learning off and no worktree ---

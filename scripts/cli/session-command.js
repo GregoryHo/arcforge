@@ -1,10 +1,11 @@
 /**
  * session-command.js - Handler for the `session` CLI command (cli B-9).
  *
- * save <alias> [--file <path>]   archive the five handover sections (stdin when no --file)
+ * save <alias> --from <path|-> [--session <id-prefix>] [--force]
+ *                                archive the five handover sections (`-` = stdin)
  * resume <alias|path>            print an archive or a .handovers/ file
  * list [--limit N] [--json]      the project's archives, newest first
- * alias set|remove|list          manage the project's alias index
+ * alias set <name> <archive-path> [--force] | remove <name> | list [--json]
  */
 
 const fs = require('node:fs');
@@ -25,11 +26,11 @@ function usage(line) {
   process.exit(1);
 }
 
-function readInput(file) {
-  if (file) return fs.readFileSync(path.resolve(process.cwd(), file), 'utf-8');
-  if (process.stdin.isTTY) {
-    usage('save <alias> [--file <path>]  (pipe the five sections on stdin, or pass --file)');
-  }
+const SAVE_USAGE = 'save <alias> --from <path|-> [--session <id-prefix>] [--force]';
+
+function readInput(from) {
+  if (from !== '-') return fs.readFileSync(path.resolve(process.cwd(), from), 'utf-8');
+  if (process.stdin.isTTY) usage(`${SAVE_USAGE}  (--from - reads the five sections on stdin)`);
   return fs.readFileSync(0, 'utf-8');
 }
 
@@ -44,8 +45,12 @@ function parseLimit(raw) {
 
 function runSave(args, project) {
   const alias = args.positional[1];
-  if (!alias) usage('save <alias> [--file <path>]');
-  const result = saveArchive(project, alias, readInput(args.options.file));
+  const from = args.options.from;
+  if (!alias || typeof from !== 'string') usage(SAVE_USAGE);
+  const result = saveArchive(project, alias, readInput(from), {
+    sessionId: args.options.session,
+    force: Boolean(args.flags.force),
+  });
   console.log(
     `Saved session archive: ${result.path} (alias "${result.alias}", ${result.isNew ? 'new' : 'updated'})`,
   );
@@ -77,10 +82,11 @@ function runAlias(args, project, asJson) {
 
   if (action === 'set') {
     const target = args.positional[3];
-    if (!name || !target) usage('alias set <name> <alias|path>');
-    const file = resolveSessionRef(project, target, process.cwd());
+    if (!name || !target) usage('alias set <name> <archive-path> [--force]');
+    const file = path.resolve(process.cwd(), target);
+    if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Error(`not a file: ${file}`);
     const { title } = readHandover(fs.readFileSync(file, 'utf-8'), file);
-    const result = setAlias(project, name, file, title);
+    const result = setAlias(project, name, file, title, { force: Boolean(args.flags.force) });
     if (!result.success) throw new Error(`alias "${name}": ${result.error}`);
     console.log(`Alias "${name}" → ${file}`);
     return;

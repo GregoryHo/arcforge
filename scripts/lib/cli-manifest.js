@@ -208,13 +208,15 @@ const CLI_MANIFEST = {
 
   // Reads global ~/.arcforge/sessions state → not deterministic here.
   session: {
-    flags: ['--file', '--limit', '--json'],
+    flags: ['--from', '--session', '--force', '--limit', '--json'],
     subcommands: {
-      save: { flags: ['--file'] },
+      save: { flags: ['--from', '--session', '--force'] },
       resume: {},
       list: { flags: ['--limit', '--json'] },
       // `alias` takes an action as its second positional.
-      alias: { subcommands: { set: {}, remove: {}, list: { flags: ['--json'] } } },
+      alias: {
+        subcommands: { set: { flags: ['--force'] }, remove: {}, list: { flags: ['--json'] } },
+      },
     },
     output: null,
   },
