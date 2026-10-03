@@ -74,6 +74,13 @@ narrower — it controls the npm/plugin payload, so `docs/guide/` and `website/`
 are read on GitHub rather than installed — but everything in the Yes rows is
 written for a user, wherever they read it.
 
+One exception: `CHANGELOG.md` is the one user-facing surface that also
+carries contributor-only entries, each opening `Contributor-only:` after its
+bold lead, because it is the release's full history and the GitHub Release
+body. The label is what keeps the audience rule intact — a user can skip
+those entries. The procedure is the *Keep contributor-only changes,
+labelled* paragraph in step 4 of `.claude/skills/releasing/SKILL.md`.
+
 When you're writing or editing anything in a "User-facing = Yes" row, the
 audience is a fresh user installing arcforge tomorrow on their own
 project. Contributor-specific quirks, dev-environment warnings, footnotes
