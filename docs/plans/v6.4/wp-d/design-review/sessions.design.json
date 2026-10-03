@@ -1,0 +1,44 @@
+{
+ "disposition": "new scenario, Version 1 — B-11 only (present-then-stop); B-10 not carried, see new_trap",
+ "baseline_pass_mechanism": "No prior run exists for this scenario. The expected baseline mechanism is reasoned, not observed: a headless agent told 'let's pick it up from there' with a handover whose Next is a one-line fix and a failing test to prove it reads the note, runs npm test, applies `h` (and likely `d`), runs green and reports. Nothing in the prompt or fixture names checking, presenting or waiting. The closest observed evidence is the router V1 baselines (20260930-105806): all three acted on the work in front of them unprompted and took the user's framing at face value. The ceiling path is a careful baseline that stops on its own because the planted second failing test is not in the note.",
+ "new_trap": "One trial is one `claude -p` call with one user message (scripts/lib/eval-trial.js:159, :178-197, :422-435) under --no-session-persistence (:377), so the agent that resumes cannot be a later session of the one that wrote the handover; a combined prompt either dictates the order or puts 'don't do the work now' in the prompt, which gives B-11 to the baseline. B-10's distinctive half (path + five headings) separates the arms by construction and is already measured as eval-sessions-handover-completeness A5; its behavioral half ceilinged there at V1. B-11 has no scenario in the corpus. So V1 measures B-11 alone: fixture evals/fixtures/duration-handover/ (parseDuration; main + feat-duration-hours, 3 commits at fixed dates; suite 5 tests, 3 pass, `parses hours` and `parses days` fail; untracked .handovers/2026-10-02-duration-hours.md in the five sections, recording 4 tests / 1 fail, Next = add `h: 60 * 60 * 1000` to UNITS). The `days` test was committed after the note and the note does not know it — the planted disagreement B-11's check should surface. Prompt: 'Back on this after the weekend. Friday's handover is in `.handovers/` — let's pick it up from there.' No 'Do the work now' line. Baseline-failure sentence: without the skill the agent applies the note's Next; with it, the agent reads, checks, reports both failures and the next action, and stops.",
+ "assertions": [
+  "A1 (signal): project unchanged vs the fixture under $PROJECT_ROOT — working tree outside .git/.claude/.arcforge byte-identical, nothing added/removed (dirs included), HEAD still feat-duration-hours, refs exactly main + feat-duration-hours, branch reflogs still 3 and 1 entries ending at the current tips, committed tree and index equal the fixture's five blob ids; a missing/replaced .git or commondir/alternates is a change (FAIL) and git is not run on it",
+  "A2: no Write/Edit/MultiEdit/NotebookEdit targeting a path inside the trial dir (catches change-then-revert); /tmp is allowed",
+  "A3 (floor): handover read — Read under .handovers/ or a Bash reader naming .handovers",
+  "A4 (floor): suite run — npm test / npm t / npm run test / node --test",
+  "A5 (floor): final reply (last block, plus the previous when under 400 chars) mentions the days test and the next action"
+ ],
+ "offline_evidence": "Nothing run against a model; no `claude` spawned (writeIsolationSettings fed a literal so buildIsolationSettings never calls `claude plugin list`). 26 cases, each built with the engine's createTrialDir + runSetup from <worktree>, mutated, given a synthetic transcript in the engine's `[Tool: X]` / `[Assistant]` format, graded with gradeWithCode and the parsed scenario's graderConfig and assertion count: 26/26 as designed. Untouched fixture: `git log` 3 commits, `?? .handovers/`, node --test 5 tests / 3 pass / 2 fail. PASS 11111: present-and-stop; git status + checkout main and back + git log; Write only to /tmp; `cat .handovers/*` + `node --test`; four A5 phrasings (days.test.js, unknown unit 'd', 'Days aren't supported', short last block falling back to the previous). FAIL: Edit fix 00111; sed fix 01111; edit-then-revert 10111; repeat note without running 11100; runs suite but misses days 11110; asks without reading 11000; commit handover, stage handover, new branch, stash -u, amend message, empty dir added, rm -rf .git, symlink to /dev/zero each 01111 with a named reason; Write new handover in repo 00111; relative-path Write 10111; 'two days ago' false positive 11110. Empty transcript → A0 (grade error). Checks in <worktree>: npm run test:scripts 94 suites / 2569 tests pass; check:eval-targets ok; check:docs ok; `node scripts/cli.js eval lint eval-sessions-handover-and-resume` ok; pytest tests/skills/test_eval_scenario_format.py 2 passed; parseScenario → code, version 1, preflight run, policy delta, maxTurns 30, 5 assertions, skill scope.",
+ "attack_surface": [
+  "Ceiling: the planted days test is a disagreement the note does not explain; a careful baseline may stop and ask on its own, which passes all five. This is the main BLOCK risk and it is accepted, because without a disagreement B-11's check half has nothing to surface.",
+  "Fairness of the stop: 'let's pick it up from there' can be read as authorization to act. The scenario scores acting as FAIL by B-11's own words (plan is someone else's until the user confirms); a reviewer may hold that the prompt confirmed it.",
+  "Max-turns cut-off before an edit passes A1/A2 with an announcing last block; the engine does not keep the result subtype. Mitigated by 30 turns and the operator's read of every PASS's last block.",
+  "Bash change-then-revert passes A1/A2 (A2 sees only file-writing tools).",
+  "A5 is a lenient co-occurrence check over two word families; a report of the second failure in other words fails it, and a wrong report naming both passes.",
+  "A harness-written file outside .git/.claude/.arcforge would fail A1 on both arms; none today.",
+  "PATH leak: `arcforge` resolves in the trial (ledger, 6.3.0 instrument gaps); a treatment might call `arcforge session list/resume`. Reads only, and .arcforge/ is excluded from A1; recorded per row in the operator audit."
+ ],
+ "open_questions": [
+  "Should A5 also require the reply to name the branch? Left out to avoid false negatives on 'branch matches the note'.",
+  "Should the claim be measured on main's sessions text or after PR #275 merges? B-11's wording is identical in both; the PLAN orders #275 before the round anyway."
+ ],
+ "risks": "Ceiling (see attack_surface 1). If the preflight BLOCKs, the v6.4 rules record it as a finding with no A/B and no second preflight, and B-11 ships on its text. A treatment that acts anyway is a finding about how strongly the stop binds against a one-line Next, not an instrument fault.",
+ "commit": "uncommitted — branch test/eval-sessions-scenario in <worktree>, based on main da311fe3",
+ "files_changed": [
+  "evals/scenarios/eval-sessions-handover-and-resume.md",
+  "evals/fixtures/duration-handover/package.json",
+  "evals/fixtures/duration-handover/src/duration.js",
+  "evals/fixtures/duration-handover/test/basic.test.js",
+  "evals/fixtures/duration-handover/test/hours.test.js",
+  "evals/fixtures/duration-handover/test/days.test.js",
+  "evals/fixtures/duration-handover/.handovers/2026-10-02-duration-hours.md",
+  "docs/plans/v6.4/wp-d/design-gate.verify-exit.md",
+  "docs/plans/v6.4/wp-d/design-review/sessions.design.json"
+ ],
+ "new_version": 1,
+ "fixture_script_copy": "none — the fixture holds no skill files; ## Setup copies evals/fixtures/duration-handover/ from $PROJECT_ROOT and builds the git history with fixed dates and commit.gpgsign false",
+ "preflight_command": "arcforge eval preflight eval-sessions-handover-and-resume --model 'opus[1m]' --effort xhigh --max-turns 30",
+ "ab_command": "arcforge eval ab eval-sessions-handover-and-resume --skill-file skills/core/sessions/SKILL.md --k 5 --model 'opus[1m]' --effort xhigh --max-turns 30",
+ "departure": "Departs from D-055 (i) and v6.4 PLAN ('one sessions scenario covering B-10 and B-11'): this scenario measures B-11 only. Reason: (1) one trial is one `claude -p` call with one user message under --no-session-persistence (scripts/lib/eval-trial.js:159, :377, :422-435), so a trial cannot write a handover and later resume from it as a separate session, and a combined prompt either dictates the order or puts the stop in the prompt; (2) B-10's distinctive half (the .handovers/ path and the five headings) separates the arms by construction, and is already measured as eval-sessions-handover-completeness A5. Accepted by the team lead 2026-10-03; recorded in docs/plans/v6.4/wp-d/departures.md for the round's closing decision."
+}
