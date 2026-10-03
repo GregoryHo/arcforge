@@ -288,7 +288,8 @@ a whole, prepended to the user turn.
   baseline passes fewer than 80% of its trials (0, 1 or 2 of 3). A BLOCK is
   recorded as a finding — present-then-stop is what this model already does on
   this prompt — with no A/B and no second preflight (v6.4 plan, rules). A
-  preflight with a grade or infra error measured nothing and is rerun once.
+  preflight that measured nothing because of grade or infrastructure errors is
+  rerun once; a BLOCK is not rerun.
 - **Direction.** Treatment above baseline on mean grader score. Because the
   score is binary, the mean is the pass rate: the fraction of trials that read,
   checked, presented and changed nothing.
@@ -312,7 +313,9 @@ a whole, prepended to the user turn.
     round ends `INSUFFICIENT_DATA`, ONE full 10-session replacement run of
     that A/B is allowed: 26 + 10 = 36, under the cap of about 40. A second
     `INSUFFICIENT_DATA` — in this scenario or the other — is recorded as
-    unmeasured, because a second replacement (46) crosses the cap. The
+    unmeasured, because a second replacement (46) crosses the cap. With the
+    one preflight error rerun (3) as well, the worst case is
+    26 + 10 + 3 = 39, and the 1 reserve session is used for nothing. The
     replacement reuses the existing preflight record (same scenario hash, same
     conditions); it is not a second preflight. The first run's rows stay in
     `evals/results/`, which the engine cannot drop by run: `eval report` and
