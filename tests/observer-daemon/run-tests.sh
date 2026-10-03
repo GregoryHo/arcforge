@@ -1247,6 +1247,93 @@ assert_eq \
 lr_reap "$LR_LITTER"
 
 # ─────────────────────────────────────────────
+# NP-T1: without a usable ps, a live holder is never reclaimed (#247)
+# ─────────────────────────────────────────────
+# On a host with no ps, or a ps that rejects -p, the daemon cannot tell a live
+# daemon from a reused PID. A process that is alive is then treated as holding
+# the lock: no second daemon, no signal, no removal. A dead PID is still stale.
+# The stub ps fails the way busybox's does on -p: no output, non-zero exit.
+
+echo ""
+echo "=== NP-T1: no usable ps fails closed ==="
+
+TMPDIR_NP=$(mktemp -d)
+trap 'rm -rf "$TMPDIR_UP" "$TMPDIR_LR" "$TMPDIR_NP"' EXIT
+NP_STUB="${TMPDIR_NP}/bin"
+mkdir -p "$NP_STUB"
+printf '#!/bin/sh\nexit 1\n' > "${NP_STUB}/ps"
+chmod +x "${NP_STUB}/ps"
+
+# Like lr_start, with the stub ps first on PATH; prints start's own output.
+np_start() {
+  env -u ARCFORGE_HOME HOME="$1" PATH="${NP_STUB}:${PATH}" bash -c '
+    source "$1"
+    daemon_loop() {
+      touch "${HOME}/daemon.$(exec sh -c "echo \$PPID")"
+      while :; do sleep 1; done
+    }
+    cmd_start
+  ' _ "$DAEMON_SCRIPT" 2>&1 | head -1
+}
+
+NP_LIVE="${TMPDIR_NP}/live"
+mkdir -p "${NP_LIVE}/.arcforge/instincts"
+lr_start "$NP_LIVE"
+lr_settle "$NP_LIVE"
+NP_LIVE_PID=$(lr_daemons "$NP_LIVE")
+NP_OUT1=$(np_start "$NP_LIVE")
+NP_OUT2=$(np_start "$NP_LIVE")
+sleep 0.5
+assert_eq \
+  'NP-T1: two starts without ps leave the live daemon the only one, lock unchanged' \
+  "1|${NP_LIVE_PID}" \
+  "$(lr_daemons "$NP_LIVE" | grep -c .)|$(cat "${NP_LIVE}/.arcforge/instincts/.observer.lock/pid")"
+assert_match \
+  'NP-T1: a start without ps reports the daemon as already running' \
+  'already running' \
+  "${NP_OUT1} ${NP_OUT2}"
+assert_match \
+  'NP-T1: the log says why the lock was not reclaimed' \
+  'cannot verify' \
+  "$(cat "${NP_LIVE}/.arcforge/instincts/observer.log" 2>/dev/null)"
+
+env -u ARCFORGE_HOME HOME="$NP_LIVE" PATH="${NP_STUB}:${PATH}" \
+  bash "$DAEMON_SCRIPT" stop > /dev/null 2>&1 || true
+sleep 0.3
+assert_eq \
+  'NP-T1: stop without ps neither signals nor unlocks a live holder it cannot identify' \
+  "1|yes" \
+  "$(lr_daemons "$NP_LIVE" | grep -c .)|$([ -d "${NP_LIVE}/.arcforge/instincts/.observer.lock" ] && echo yes || echo no)"
+lr_reap "$NP_LIVE"
+
+# A live daemon whose lock names another script directory is not replaced
+# without ps either: nothing is signaled that cannot be shown to be a daemon.
+NP_FOREIGN="${TMPDIR_NP}/foreign"
+NP_FOREIGN_LOCK="${NP_FOREIGN}/.arcforge/instincts/.observer.lock"
+mkdir -p "$NP_FOREIGN_LOCK"
+bash "${UP_OLD_DIR}/observer-daemon.sh" &
+NP_FOREIGN_PID=$!
+echo "$UP_OLD_DIR" > "${NP_FOREIGN_LOCK}/script"
+echo "$NP_FOREIGN_PID" > "${NP_FOREIGN_LOCK}/pid"
+np_start "$NP_FOREIGN" > /dev/null
+sleep 0.5
+assert_eq \
+  'NP-T1: without ps a live holder from another copy is neither signaled nor replaced' \
+  "yes|${NP_FOREIGN_PID}|0" \
+  "$(kill -0 "$NP_FOREIGN_PID" 2>/dev/null && echo yes || echo no)|$(cat "${NP_FOREIGN_LOCK}/pid")|$(lr_daemons "$NP_FOREIGN" | grep -c .)"
+kill "$NP_FOREIGN_PID" 2>/dev/null || true
+
+NP_DEAD="${TMPDIR_NP}/dead"
+lr_stale_lock "$NP_DEAD" > /dev/null
+np_start "$NP_DEAD" > /dev/null
+lr_settle "$NP_DEAD"
+assert_eq \
+  'NP-T1: without ps a lock whose PID is dead is still reclaimed' \
+  '1' \
+  "$(lr_daemons "$NP_DEAD" | grep -c .)"
+lr_reap "$NP_DEAD"
+
+# ─────────────────────────────────────────────
 # Results
 # ─────────────────────────────────────────────
 

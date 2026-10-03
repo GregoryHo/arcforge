@@ -79,12 +79,31 @@ read_lock_pid() {
   fi
 }
 
-# Whether PID $1 is a live observer daemon. A daemon that died without removing
-# its lock leaves a PID the OS can hand to an unrelated process, so being alive
-# is not enough: nothing here signals a process, or treats a lock as held,
-# unless its command line runs this script.
+# What PID $1 is: `daemon` (its command line runs this script), `other` (ps
+# shows it running something else), `dead` (no such process), or `unknown`
+# (alive, but ps could not say what it runs — missing, or rejecting -p). A
+# daemon that died without removing its lock leaves a PID the OS can hand to an
+# unrelated process, so being alive is not enough to signal it; and a failed ps
+# is no evidence either way, so `unknown` is never treated as stale. ps is asked
+# even when kill -0 fails, since that also fails for another user's process.
+daemon_pid_status() {
+  local command alive=yes
+  [ -n "$1" ] || { echo dead; return 0; }
+  kill -0 "$1" 2>/dev/null || alive=no
+  if command=$(ps -o command= -p "$1" 2>/dev/null) && [ -n "$command" ]; then
+    case "$command" in
+      *observer-daemon.sh*) echo daemon ;;
+      *) echo other ;;
+    esac
+  elif [ "$alive" = yes ]; then
+    echo unknown
+  else
+    echo dead
+  fi
+}
+
 is_daemon_pid() {
-  [ -n "$1" ] && ps -o command= -p "$1" 2>/dev/null | grep -q 'observer-daemon\.sh'
+  [ "$(daemon_pid_status "$1")" = daemon ]
 }
 
 # Whether path $1 is past the claim window: changed more than CLAIM_WINDOW_SECS
@@ -114,8 +133,14 @@ acquire_lock() {
     # No valid PID: another start is mid-claim, unless the lock is old enough
     # to be one that crashed there, or holds something that is not a PID.
     claim_window_expired "$LOCK_DIR" || return 1
-  elif is_daemon_pid "$old_pid"; then
-    return 1  # genuinely running
+  else
+    case "$(daemon_pid_status "$old_pid")" in
+      daemon) return 1 ;;  # genuinely running
+      unknown)
+        log_msg "Lock PID ${old_pid} is alive but ps cannot verify it — treating the lock as held"
+        return 1
+        ;;
+    esac
   fi
   # Read the PID again: a lock that changed between the two reads is changing
   # hands, not stale. `start` rewrites the PID from its own to the daemon's
@@ -722,7 +747,20 @@ cmd_start() {
   echo "Observer daemon started (PID $!)"
 }
 
+# A lock whose holder is alive but cannot be identified (no usable ps) is left
+# alone by stop and status alike: it may be a running daemon.
+holder_unverifiable() {
+  [ -d "$LOCK_DIR" ] || return 1
+  local pid
+  pid=$(read_lock_pid)
+  [ -n "$pid" ] && [ "$(daemon_pid_status "$pid")" = unknown ]
+}
+
 cmd_stop() {
+  if holder_unverifiable; then
+    echo "Observer daemon state unknown (PID $(read_lock_pid) is alive; ps cannot verify it) — lock left in place"
+    return 0
+  fi
   if ! is_running; then
     echo "Observer daemon is not running"
     remove_lock
@@ -738,6 +776,10 @@ cmd_stop() {
 }
 
 cmd_status() {
+  if holder_unverifiable; then
+    echo "Observer daemon: UNKNOWN (PID $(read_lock_pid) is alive; ps cannot verify it)"
+    return 0
+  fi
   if is_running; then
     local pid
     pid=$(read_lock_pid)
