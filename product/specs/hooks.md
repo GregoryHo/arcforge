@@ -1,6 +1,6 @@
 # hooks — spec
 
-> Status: shipped v6.3.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.3.0 · extended by 6.4.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -127,6 +127,12 @@ down, never block the user, and never observe them uninvited.
   it reads and decodes every line of the transcript, however long the session
   has run, although what it keeps is a capped tail — about 5 ms per MB on real
   transcripts.
+- **B-9 The diary threshold counts every tool call (6.4.0).** The per-session
+  tool count behind B-7's 50-call threshold gains exactly one for every
+  PostToolUse, however many of those hooks run at the same moment, so a session
+  with many tool calls and few prompts reaches the threshold at the Stop that
+  crossed it — not one Stop later, and not never when that was its last Stop.
+  The increment stays on B-7's bounded synchronous path (#260, D-055).
 
 ### Continuity
 - **B-8 The session leaves a record; the next session does not read it
@@ -195,3 +201,5 @@ implements fail-open is pinned in `.claude/rules/coding-standards.md`.
   scope is disabled (B-6).
 - **D-053** — only a disable a 6.3 engine recorded keeps the floor; one an
   older engine recorded is not counted (B-6).
+- **D-055** — 6.4.0 stops the diary tool counter losing increments under
+  concurrent PostToolUse hooks (B-9).

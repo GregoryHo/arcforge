@@ -1,6 +1,6 @@
 # skill-system — spec
 
-> Status: shipped v6.3.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.3.0 · extended by 6.4.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -93,6 +93,40 @@ situations to skills.
   registers) are enforced mechanically per skill-schema §6, so review effort
   goes to behavior, not formatting.
 
+### The `sessions` skill
+- **B-10 A handover is five sections, every one filled.** Before writing, the
+  skill runs the project's test or build command in the working tree and
+  labels every piece of work in flight **verified** by a run just watched,
+  **written but never exercised**, or **not started** — a green suite is
+  evidence only about the code it covers. The handover is `Where it stands`,
+  `Done`, `Unfinished`, `Decisions` and `Next`, a slot with nothing in it
+  reads `none` rather than losing its heading, `Next` is one action as a
+  command or a named file, and a decision carries the alternative it rejected.
+  From 6.4.0 the same five sections are the narrative of a session archive
+  ([cli](cli.md) B-9), so a `.handovers/<date>-<slug>.md` file and an archive
+  differ only in where they live and who reads them (D-056).
+- **B-11 Resuming presents, then stops.** The skill reads the handover or
+  archive whole, checks the claims that decide what happens next — the branch,
+  whether `Next` already landed, whether the suite still returns what was
+  recorded — against the repo as it is now, and reports the state, the next
+  action and every point where the repo disagrees. Then it changes nothing
+  until the user confirms the plan: a handover's plan is someone else's until
+  then. From 6.4.0 it reads an archive through `arcforge session resume`
+  as well as a `.handovers/` file, either one in the five sections of B-10;
+  an archive in v5's section set is not supported (D-056).
+- **B-12 Save, list and alias go through the CLI (6.4.0).** The skill tells
+  the agent to write the five sections itself, in-session, and to hand them to
+  `arcforge session save <alias> --from <path|->` — the `.handovers/` file it
+  just wrote, or stdin — which adds the metrics header; to find earlier
+  archives with `arcforge session list`; and to name them with
+  `arcforge session alias set <name> <archive-path>`, drop a name with
+  `arcforge session alias remove <name>` and see the names with
+  `arcforge session alias list` ([cli](cli.md) B-9). The `.handovers/` file needs no CLI, so it still
+  works on a host where `arcforge` does not resolve
+  ([codex-harness](codex-harness.md) B-3). B-10 and B-11 are measured at skill
+  scope in 6.4.0's round; B-12's CLI half ships on contract tests (D-055,
+  D-056).
+
 ## Data / domain model
 
 The one format is a skill's `SKILL.md` frontmatter, frozen in
@@ -119,6 +153,11 @@ asserted by test (B-3).
 - **D-054** — the router's text measured +1.00 CI[1, 1] IMPROVED at skill
   scope; executing's claim is a finding, its baseline already at the
   behavior (B-3, B-9).
+- **D-055** — 6.4.0 measures the `sessions` handover and present-then-stop
+  behaviours at skill scope and re-runs the router scenario (B-9, B-10,
+  B-11).
+- **D-056** — `sessions` gains save, resume, list and alias over
+  `arcforge session`, on the handover's five sections (B-10, B-11, B-12).
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
 
