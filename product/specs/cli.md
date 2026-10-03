@@ -74,9 +74,10 @@ underneath without breaking anything written against it.
   narrative and calls no model. The header — duration, tool calls, user
   messages, files modified ([hooks](hooks.md) B-8) — is read from the
   project's most recent session-tracker record, or from the record
-  `--session <id-prefix>` selects, as that record stood at its `lastUpdated`
-  stamp, and a line of its own names that stamp. No live hook counter feeds
-  it. `save` then performs `alias set` for `<alias>` on the new archive, and
+  `--session <id-prefix>` selects, and gives the counts the session-tracker
+  record holds at its `lastUpdated` stamp — since the record's last diary
+  capture or resume, not since the session began; a line of its own names
+  that stamp. No live hook counter feeds it. `save` then performs `alias set` for `<alias>` on the new archive, and
   checks the alias before it writes, so a refused alias leaves no archive.
   `resume` takes an alias or a path, reads either an archive or a
   `.handovers/` file in the five sections, and prints it for the caller to
@@ -93,7 +94,13 @@ underneath without breaking anything written against it.
   the Stop hook, after a turn ends, so a `save` made during a turn reads
   counts that leave that turn out; below the diary threshold the record
   carries no files, and the header's files-modified line reads `none recorded`.
-  The stamp line is what tells a reader how old the counts are.
+  The counts are not session totals either: a diary capture resets the
+  tool-call and user-message counters and the next Stop writes the smaller
+  counts into the record, and a SessionStart on `startup`, `resume` or `clear`
+  rewrites the record, resetting `started` and the tool-call count. After a
+  capture the counters sit below the threshold again, so a `save` in the
+  middle of a long session usually reads `none recorded` too. The stamp line
+  is what tells a reader how old the counts are.
 
 ### Output contracts
 - **B-5 Exit codes are the API.** `0` on success and non-zero on any failure,

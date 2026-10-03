@@ -1507,7 +1507,13 @@ reverse one, append a superseding entry (see AGENTS.md).
   on `opus[1m]` / `xhigh`, capped at about 40 trial sessions, under a plan
   fixed before any result is read: (i) the `sessions` skill's handover and
   present-then-stop behaviour, at skill scope; (ii) a router regression run of
-  `eval-router-skill-selection` Version 2; and (iii) the `diagramming-obsidian`
+  `eval-router-skill-selection` Version 2, behind a fresh 3-session preflight,
+  because #250's fix edits that scenario file and `eval ab` looks its
+  preflight record up by the file's hash — a BLOCK there means the baseline
+  now passes Version 2 without the skill text, contradicting 6.3.0's 0/5
+  baseline (D-054), and is recorded as a finding with no A/B, the 6.3.0
+  result annotated in the ledger as not reproduced on the 6.4.0 tree; and
+  (iii) the `diagramming-obsidian`
   verify-exit sentence (`SKILL.md`, the paragraph after the verifier command)
   only if a scenario designer first shows that the current engine can make the
   two arms differ — otherwise it is recorded as a finding, with no session
@@ -1539,8 +1545,9 @@ reverse one, append a superseding entry (see AGENTS.md).
   pieces and the five engine fixes ship on contract tests, not on a live
   session. Every wish D-049's Residual kept back stays in the backlog, along
   with #256, #184 and #185.
-- Cost accepted: up to about 40 trial sessions, plus any model-grader calls
-  the cap does not count. The engine fixes reach users later than a 6.3.1
+- Cost accepted: up to about 40 trial sessions — a worst case of 39, three
+  preflights of 3 and three A/Bs of 10, the third pair only if (iii)'s design
+  gate passes — plus any model-grader calls the cap does not count. The engine fixes reach users later than a 6.3.1
   would have, because they wait for the round.
 - Verification: the round's preflight records and A/B pools, written down the
   way D-054's were; the 6.4.0 CHANGELOG entry carries both corrections; and
@@ -1556,10 +1563,12 @@ reverse one, append a superseding entry (see AGENTS.md).
   `alias list [--json]`, exposes the engine modules that
   survived v5 unexposed — `scripts/lib/session-utils.js` and
   `scripts/lib/session-aliases.js`. (2) An archive is an engine-written
-  metrics header, taken from the project's most recent session-tracker record
-  (or the one `--session <id-prefix>` selects) as of its `lastUpdated` stamp,
-  which the header names (duration, tool calls, user messages, files
-  modified), followed by the handover file's five
+  metrics header — duration, tool calls, user messages, files modified —
+  taken from the project's most recent session-tracker record (or the one
+  `--session <id-prefix>` selects): the counts that record holds at its
+  `lastUpdated` stamp, since its last diary capture or resume rather than
+  since the session began, with a line of its own naming that stamp;
+  followed by the handover file's five
   sections — `Where it stands`, `Done`, `Unfinished`, `Decisions`, `Next` —
   verbatim, which the agent writes in-session and hands to `save --from` as a
   file or on stdin; the engine refuses input that lacks one of the five, has
