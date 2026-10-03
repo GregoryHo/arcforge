@@ -51,7 +51,7 @@ function BeforeAfter({theme:t}) {
 // ─── Day in the life ───
 function DayInLife({theme:t}) {
   const steps = [
-    ['09:02', 'session start', 'SessionStart hooks fire. session-tracker opens the session record. Nothing from yesterday is injected — sessions resumes from the handover when you ask.', t.brass],
+    ['09:02', 'session start', 'SessionStart hooks fire. session-tracker opens the session record. No handover is injected — sessions resumes from the file when you ask.', t.brass],
     ['09:04', '"add OAuth login"', 'Vague intent, several plausible designs. brainstorming picks it up before a single line is written.', t.ember],
     ['09:12', 'design settled', 'One approach chosen, its tradeoffs written down. executing turns it into a checkbox task list.', t.brass],
     ['09:24', 'split the work', 'Two independent tracks. dispatching gives each writer its own worktree so neither can stomp the other.', t.brass],
