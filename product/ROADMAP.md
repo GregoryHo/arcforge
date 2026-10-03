@@ -15,7 +15,7 @@ decision *and* every reversal. How to maintain this file: [`product/AGENTS.md`](
 | 6.2.0 | `v6.2.0` | learning lifecycle · eval corpus repairs | **shipped** | Exits for candidates stuck at `approved` or `materialized`, `learn instinct deactivate` and `learn instinct restore`, a policy for candidate names, and worktree paths derived from the repo root; plus the scenario rubric fixes, measured in their own, smaller round. A minor because it adds CLI commands. | [learning](specs/learning.md) · [cli](specs/cli.md) · [worktrees-loop](specs/worktrees-loop.md) · [codex-harness](specs/codex-harness.md) · [eval](specs/eval.md) · [sdd](specs/sdd.md) |
 | 6.2.1 | `v6.2.1` | instrument and state repairs, no measurement | **shipped** | Repairs to promises already shipped: same-day benchmark snapshots stop overwriting each other and `eval history` lists them all, the eval dashboard shows an instrument-failure pool instead of hiding it, loop run state is written atomically, the observe hook's lazy daemon start reclaims a dead process's lock, `check:product` rejects a relation aimed at an already-dead decision, and the `releasing` skill describes what a squash-only ruleset does to the flip commit. Nothing under `skills/`, `evals/scenarios/` or `evals/fixtures/`, so it ships without a live eval session. | [eval](specs/eval.md) · [worktrees-loop](specs/worktrees-loop.md) · [learning](specs/learning.md) |
 | 6.3.0 | `v6.3.0` | ceiling redesigns · skill-local script fixes · the enable stamp | **shipped** | Two of the five scenarios whose baseline sat at ceiling on the repaired instrument are redesigned to Version 2 — router skill selection and the LINK-mode index rebuild — and the round, capped at about 80 trial sessions, spent 16 for one A/B result (router skill selection) and four findings without an A/B (D-054); the `diagramming-obsidian` helpers and `lint_vault` fixes ship in it on contract tests because they sit under `skills/`; and the stale-draft floor stops losing an overlapping opt-in, through additive `enabled_at` and `disabled_at` stamps in the learning config. | [skill-system](specs/skill-system.md) · [obsidian](specs/obsidian.md) · [sdd](specs/sdd.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) |
-| 6.4.0 | — | session archive returns · daemon, write and counter races · grader isolation | **next ← we are here** | v5's session archive, dropped at 6.0.0 without a record, returns as a sixth CLI group, `arcforge session` (`save`, `resume`, `list`, `alias`), over the engine modules that survived unexposed: an engine-written metrics header plus the handover file's five sections, written by the agent in-session, and the `sessions` skill learns to drive it (D-056). The engine fixes planned as 6.3.1 ride along — observer daemon starts and stops that can leave two daemons (#247, #252), the shared atomic-write helper's temporary-file race (#253), the diary tool counter that loses increments (#260), and code graders that can import from the trial directory (#250) — with the README naming `speccing` as the v5 pipeline's file-based replacement and two corrections to past CHANGELOG entries. A minor because it adds a CLI group; one round of about 40 trial sessions measures the `sessions` edit and the `diagramming-obsidian` sentence already on `main` (#267) together (D-055). | [cli](specs/cli.md) · [skill-system](specs/skill-system.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) · [eval](specs/eval.md) · [obsidian](specs/obsidian.md) |
+| 6.4.0 | — | session archive returns · daemon, write and counter races · grader isolation | **next ← we are here** | v5's session archive, dropped at 6.0.0 without a record, returns as a sixth CLI group, `arcforge session` (`save`, `resume`, `list`, `alias`), over the engine modules that survived unexposed: an engine-written metrics header plus the handover file's five sections, written by the agent in-session, and the `sessions` skill learns to drive it (D-056). The engine fixes planned as 6.3.1 ride along — observer daemon starts and stops that can leave two daemons (#247, #252), the shared atomic-write helper's temporary-file race (#253), the diary tool counter that loses increments (#260), and code graders that can import from the trial directory (#250) — with the README naming `speccing` as the v5 pipeline's file-based replacement and two corrections to past CHANGELOG entries. A minor because it adds a CLI group; one round of about 40 trial sessions measures the `sessions` skill's present-then-stop behaviour (B-11) and re-checks the router reading, while the `diagramming-obsidian` verify-exit sentence already on `main` (#267) was found not measurable on the current engine and is recorded as a finding (D-055, D-057). | [cli](specs/cli.md) · [skill-system](specs/skill-system.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) · [eval](specs/eval.md) · [obsidian](specs/obsidian.md) |
 
 > Un-scheduled ideas live in the [Backlog](BACKLOG.md); a wish graduates into a
 > version (row + spec + Decision Log entry) when picked.
@@ -1620,3 +1620,82 @@ reverse one, append a superseding entry (see AGENTS.md).
   engine owner. The `sessions` `SKILL.md` grows from a body of 155 lines,
   already over the 150-line soft cap (the **skill-body-trim** wish), toward
   the 250-line hard cap.
+
+### D-057 — 6.4.0's round: the `sessions` scenario measures B-11 alone, and the verify-exit sentence is a finding
+- Date: 2026-10-03
+- Version: 6.4.0
+- Refines: D-055 (clause 5)
+- Refines: D-056 (clause 6)
+- Status: Accepted
+- Decision: Three changes to D-055's clause 5, fixed before any session of
+  the round is read. (i) The one `sessions` scenario,
+  `eval-sessions-handover-and-resume` Version 1, measures present-then-stop
+  ([skill-system](specs/skill-system.md) B-11) alone, not the five-section
+  handover (B-10) with it; still one scenario, preflight 3 and an A/B of 10
+  on a PASS. (iii) The `diagramming-obsidian` verify-exit sentence is NOT
+  MEASURABLE on the current engine and is recorded as a finding at 0
+  sessions — the outcome clause 5 (iii) already allows, recorded here
+  because it sets the budget. The budget is now pre-registered as 26
+  scheduled sessions (`sessions` 3 + 10, router 3 + 10), at most two
+  top-ups of one trial per arm (`eval ab --k 1`, 4 sessions) for each A/B
+  that ends with fewer than 5 scorable rows in an arm — its verdict read
+  from the pooled rows of the scenario's Version, no row discarded, and
+  INSUFFICIENT_DATA if an arm is still short after the second — and at most
+  one 3-session rerun of a preflight that measured nothing because of grade
+  or infrastructure errors: a worst case of 26 + 8 + 3 = 37, under the cap
+  of about 40. The cap, the router regression run (ii) and the round's rules stand
+  unchanged; the same narrowing applies to D-056's clause 6, whose
+  "handover and present-then-stop behaviours are measured" now covers
+  present-then-stop only.
+- Why: One trial is one `claude -p` turn with one user message under
+  `--no-session-persistence` (`scripts/lib/eval-trial.js`, the stdin prompt
+  and `buildClaudeArgs`), so a trial cannot write a handover and later
+  resume from it as a second session; a prompt asking for both either
+  dictates the order or puts the stop in the prompt, which hands B-11 to the
+  baseline. B-10's distinctive half — the `.handovers/<date>-<slug>.md` path
+  and the five headings — separates the arms by construction, since an arm
+  that never saw the convention cannot produce it, so an A/B on it would
+  measure exposure, not behaviour; that shape is already checked by
+  `eval-sessions-handover-completeness` A5. No scenario in the corpus covered
+  B-11. The verify-exit gate found three independent blocks: an injected
+  `SKILL.md` carries no skill base directory, so a treatment cannot reach
+  `references/verify_saved_diagram.py` without leaving the trial, and a
+  fixture copy reaches the baseline too; a scenario cannot set a trial's
+  `PATH` or `HOME`, so the missing-dependency exit cannot be produced, and an
+  install would write user caches the write guard does not watch and leak
+  into later trials; and `eval ab` compares no skill text against one, while
+  only the pre-#267 `SKILL.md` against the current one isolates the
+  sentence, and a no-skill baseline that follows the error line's install
+  command is likely already at ceiling. Any one block alone stops the
+  measurement, so 13 sessions there would buy no evidence. The
+  rerun and top-up allowances exist because `eval ab` has no arm or trial
+  selector, so a one-arm rerun is impossible, and a top-up keeps every
+  scorable row where a full replacement would discard them and re-roll the
+  reading. The 37 sits under the cap of about 40, and under D-055's own worst case
+  of 39. This is a refinement, not a supersession: clause 5's
+  cap, its router run and its rules still govern, and (iii)'s outcome is one
+  the clause foresaw.
+- Residual: B-10 has no A/B evidence in 6.4.0 — its shape stays on
+  `eval-sessions-handover-completeness` A5's existing reading — and B-11 is
+  measured only on a fixture-planted `.handovers/` file, not on a handover
+  the agent wrote in an earlier session nor on an archive read through
+  `arcforge session resume`. The verify-exit sentence ships on its text, as
+  #228's and #210's script changes did (D-049), and stays unmeasured until
+  three engine changes all land: the **eval-skill-files-outside-trial** wish
+  (a host-format base-directory line for the treatment, with the skill's
+  files outside the trial tree); a per-trial `PATH` and `HOME` override a
+  scenario can declare, narrower than the **eval-trial-sandbox** wish; and an
+  A/B between two skill texts rather than none against one.
+- Cost accepted: B-10 and the verify-exit sentence both ship without A/B
+  evidence this round. The worst case is 26 scheduled sessions, up to 8 for
+  top-ups (at most two `--k 1` top-ups per scenario, 4 sessions per scenario,
+  across the two scenarios) and up to 3 for one preflight error rerun: 37 of the cap
+  of about 40, leaving 3 unused. The 13 sessions D-055 held for (iii) are what
+  fund the optional 11.
+- Verification: `evals/scenarios/eval-sessions-handover-and-resume.md`
+  Version 1 (PR #276); the design review in
+  `docs/plans/v6.4/wp-d/design-review/` — `sessions.design.json` (its
+  `departure` field), `sessions.attack.json`, `sessions.revise.json` and
+  `sessions.gate.json` (its `rerun_policy` field); the departure note
+  `docs/plans/v6.4/wp-d/departures.md`; and the gate
+  `docs/plans/v6.4/wp-d/design-gate.verify-exit.md`.

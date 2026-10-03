@@ -261,3 +261,6 @@ its rationale is inline at B-10.
   modules are never importable (#250), and its round
   measures the `diagramming-obsidian` verify-exit sentence only if a scenario
   can make the arms differ (B-3, B-12, B-14).
+- **D-057** — that sentence is not measurable on the current engine, which
+  injects `SKILL.md` alone, overrides no trial's `PATH` or `HOME`, and has no
+  two-skill-text A/B, so it is a finding at 0 sessions (B-1, B-7).
