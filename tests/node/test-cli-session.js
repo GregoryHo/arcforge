@@ -1,0 +1,273 @@
+#!/usr/bin/env node
+/**
+ * Contract tests for the `session` CLI group (cli B-9): save, resume, list,
+ * alias set|remove|list.
+ *
+ * Each test runs `node scripts/cli.js session ...` with ARCFORGE_HOME and
+ * CLAUDE_PROJECT_DIR pointed at tmp dirs, so the archive tree and aliases.json
+ * can be inspected directly.
+ */
+
+const assert = require('node:assert');
+const { execFileSync } = require('node:child_process');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+
+const CLI_PATH = path.resolve(__dirname, '../../scripts/cli.js');
+
+console.log('Testing cli.js session subcommands...\n');
+
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'arcforge-cli-session-'));
+const HOME = path.join(tmp, 'home');
+const PROJECT_DIR = path.join(tmp, 'my-proj');
+const SESSIONS = path.join(HOME, 'sessions', 'my-proj');
+fs.mkdirSync(PROJECT_DIR, { recursive: true });
+
+const FIVE = `# Parser work
+
+## Where it stands
+feat/parser; npm test — 41 passed
+
+## Done
+- tokenizer — verified by npm test
+
+## Unfinished
+- parser wiring — written but untested
+
+## Decisions
+- hand-rolled parser — because zero deps; rejected a PEG library
+
+## Next
+1. node scripts/cli.js parse fixtures/a.txt
+`;
+
+function runCli(args, { input = '', expectFail = false } = {}) {
+  const env = { ...process.env, ARCFORGE_HOME: HOME, CLAUDE_PROJECT_DIR: PROJECT_DIR };
+  try {
+    const stdout = execFileSync('node', [CLI_PATH, ...args], {
+      encoding: 'utf8',
+      env,
+      cwd: PROJECT_DIR,
+      input,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    if (expectFail) throw new Error(`expected failure, but got: ${stdout}`);
+    return { stdout, stderr: '', exitCode: 0 };
+  } catch (err) {
+    if (!expectFail) {
+      console.error('STDOUT:', err.stdout);
+      console.error('STDERR:', err.stderr);
+      throw err;
+    }
+    return { stdout: err.stdout || '', stderr: err.stderr || '', exitCode: err.status || 1 };
+  }
+}
+
+function readAliases() {
+  return JSON.parse(fs.readFileSync(path.join(SESSIONS, 'aliases.json'), 'utf8'));
+}
+
+let passed = 0;
+let failed = 0;
+function test(name, fn) {
+  try {
+    fn();
+    console.log(`  ✓ ${name}`);
+    passed++;
+  } catch (err) {
+    console.error(`  ✗ ${name}\n    ${err.message}`);
+    failed++;
+  }
+}
+
+// A tracker record the metrics header reads — with user message text that
+// must never reach an archive (learning B-20).
+const today = new Date().toISOString().slice(0, 10);
+fs.mkdirSync(path.join(SESSIONS, today), { recursive: true });
+fs.writeFileSync(
+  path.join(SESSIONS, today, 'session-abc.json'),
+  JSON.stringify({
+    sessionId: 'session-abc',
+    started: `${today}T10:00:00.000Z`,
+    lastUpdated: `${today}T10:42:00.000Z`,
+    toolCalls: 120,
+    userMessages: 8,
+    filesModified: ['src/a.js'],
+    userMessageContent: ['please fix the secret-sauce bug'],
+  }),
+);
+
+// --- save ---
+let firstPath;
+test('save <alias>: sections on stdin → archive + alias', () => {
+  const { stdout } = runCli(['session', 'save', 'parser'], { input: FIVE });
+  firstPath = path.join(SESSIONS, today, 'archive-parser.md');
+  assert.match(stdout, new RegExp(firstPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  const md = fs.readFileSync(firstPath, 'utf8');
+  assert.match(md, /^# Parser work\n/);
+  assert.match(md, /\*\*Session:\*\* session-abc/);
+  assert.match(md, /\*\*Duration:\*\* ~42 minutes/);
+  assert.match(md, /\*\*Tool calls:\*\* 120/);
+  assert.match(md, /\*\*User messages:\*\* 8/);
+  assert.match(md, /\*\*Files modified:\*\* 1\n- src\/a\.js/);
+  assert.doesNotMatch(md, /secret-sauce|Conversation Trail/);
+  assert.strictEqual(readAliases().aliases.parser.sessionPath, firstPath);
+});
+
+test('save --file <path>: reads the sections from a file', () => {
+  const file = path.join(PROJECT_DIR, 'handover.md');
+  fs.writeFileSync(file, FIVE.replace('# Parser work', '# Second'));
+  runCli(['session', 'save', 'second', '--file', 'handover.md']);
+  const md = fs.readFileSync(path.join(SESSIONS, today, 'archive-second.md'), 'utf8');
+  assert.match(md, /^# Second\n/);
+});
+
+test('save: input missing a section fails, naming it', () => {
+  const { exitCode, stderr } = runCli(['session', 'save', 'bad'], {
+    input: FIVE.replace(/## Decisions[\s\S]*?(?=## Next)/, ''),
+    expectFail: true,
+  });
+  assert.notStrictEqual(exitCode, 0);
+  assert.match(stderr, /missing handover section\(s\): Decisions/);
+  assert.ok(!fs.existsSync(path.join(SESSIONS, today, 'archive-bad.md')));
+});
+
+test('save: a path-like or reserved alias is rejected', () => {
+  for (const alias of ['../escape', 'list']) {
+    const { exitCode, stderr } = runCli(['session', 'save', alias], {
+      input: FIVE,
+      expectFail: true,
+    });
+    assert.notStrictEqual(exitCode, 0);
+    assert.match(stderr, /Invalid alias/);
+  }
+  assert.ok(!fs.existsSync(path.join(HOME, 'sessions', 'escape')));
+});
+
+test('save without an alias prints usage', () => {
+  const { exitCode, stderr } = runCli(['session', 'save'], { expectFail: true });
+  assert.notStrictEqual(exitCode, 0);
+  assert.match(stderr, /Usage: arcforge session save <alias>/);
+});
+
+// --- resume ---
+test('resume <alias>: prints the header and the five sections', () => {
+  const { stdout } = runCli(['session', 'resume', 'parser']);
+  assert.match(stdout, /^Source: /);
+  assert.match(stdout, /\*\*Alias:\*\* parser/);
+  for (const h of ['Where it stands', 'Done', 'Unfinished', 'Decisions', 'Next']) {
+    assert.match(stdout, new RegExp(`## ${h}\n`));
+  }
+});
+
+test('resume <path>: reads a .handovers/ file', () => {
+  fs.mkdirSync(path.join(PROJECT_DIR, '.handovers'), { recursive: true });
+  fs.writeFileSync(path.join(PROJECT_DIR, '.handovers', `${today}-parser.md`), FIVE);
+  const { stdout } = runCli(['session', 'resume', `.handovers/${today}-parser.md`]);
+  assert.match(stdout, /# Parser work/);
+  assert.match(stdout, /## Next\n1\. node scripts\/cli\.js parse/);
+});
+
+test('resume: a v5 archive is refused, naming the format', () => {
+  const v5 = path.join(SESSIONS, '2026-04-17', 'session-old.md');
+  fs.mkdirSync(path.dirname(v5), { recursive: true });
+  fs.writeFileSync(v5, '# Session\n\n## Summary\nx\n\n## What Worked\ny\n\n## Next Step\nz\n');
+  const { exitCode, stderr } = runCli(['session', 'resume', v5], { expectFail: true });
+  assert.notStrictEqual(exitCode, 0);
+  assert.match(stderr, /v5 session archive format .* is not supported/);
+});
+
+test('resume: an unknown alias fails, naming it and the project', () => {
+  const { exitCode, stderr } = runCli(['session', 'resume', 'nope'], { expectFail: true });
+  assert.notStrictEqual(exitCode, 0);
+  assert.match(stderr, /no session alias "nope" in project "my-proj"/);
+});
+
+// --- list ---
+test('list --json: archives only, newest first, with aliases', () => {
+  const { stdout } = runCli(['session', 'list', '--json']);
+  const result = JSON.parse(stdout);
+  assert.strictEqual(result.project, 'my-proj');
+  assert.deepStrictEqual(
+    result.archives.map((a) => a.aliases),
+    [['second'], ['parser']],
+  );
+  for (const a of result.archives) {
+    assert.deepStrictEqual(Object.keys(a).sort(), ['aliases', 'date', 'path', 'title']);
+  }
+});
+
+test('list --limit 1: one entry; a bad limit fails', () => {
+  const { stdout } = runCli(['session', 'list', '--limit', '1', '--json']);
+  assert.strictEqual(JSON.parse(stdout).archives.length, 1);
+  const { exitCode, stderr } = runCli(['session', 'list', '--limit', '0'], { expectFail: true });
+  assert.notStrictEqual(exitCode, 0);
+  assert.match(stderr, /--limit must be a positive integer/);
+});
+
+test('list (text): one line per archive', () => {
+  const { stdout } = runCli(['session', 'list']);
+  assert.match(stdout, /parser/);
+  assert.match(stdout, /archive-second\.md/);
+});
+
+// --- alias ---
+test('alias set <name> <alias|path>: points a new name at an archive', () => {
+  runCli(['session', 'alias', 'set', 'pw', 'parser']);
+  assert.strictEqual(readAliases().aliases.pw.sessionPath, firstPath);
+  runCli(['session', 'alias', 'set', 'pw2', firstPath]);
+  assert.strictEqual(readAliases().aliases.pw2.sessionPath, firstPath);
+});
+
+test('alias set: a target that is not the five sections is refused', () => {
+  const v5 = path.join(SESSIONS, '2026-04-17', 'session-old.md');
+  const { exitCode, stderr } = runCli(['session', 'alias', 'set', 'old', v5], { expectFail: true });
+  assert.notStrictEqual(exitCode, 0);
+  assert.match(stderr, /v5 session archive format/);
+  assert.ok(!readAliases().aliases.old);
+});
+
+test('alias list --json: every alias with its path', () => {
+  const { stdout } = runCli(['session', 'alias', 'list', '--json']);
+  const result = JSON.parse(stdout);
+  assert.strictEqual(result.project, 'my-proj');
+  assert.deepStrictEqual(result.aliases.map((a) => a.name).sort(), [
+    'parser',
+    'pw',
+    'pw2',
+    'second',
+  ]);
+});
+
+test('alias remove <name>: drops it; an unknown name fails', () => {
+  runCli(['session', 'alias', 'remove', 'pw2']);
+  assert.ok(!readAliases().aliases.pw2);
+  const { exitCode, stderr } = runCli(['session', 'alias', 'remove', 'pw2'], { expectFail: true });
+  assert.notStrictEqual(exitCode, 0);
+  assert.match(stderr, /not found/);
+});
+
+test('alias without an action prints usage', () => {
+  const { exitCode, stderr } = runCli(['session', 'alias'], { expectFail: true });
+  assert.notStrictEqual(exitCode, 0);
+  assert.match(stderr, /Usage: arcforge session alias <set\|remove\|list>/);
+});
+
+// --- bare session ---
+test('session without subcommand fails with usage', () => {
+  const { exitCode, stderr } = runCli(['session'], { expectFail: true });
+  assert.notStrictEqual(exitCode, 0);
+  assert.match(stderr, /Usage: arcforge session <save\|resume\|list\|alias>/);
+});
+
+// --- independence (B-3, B-9): works with learning off and no worktree ---
+test('works with learning never enabled', () => {
+  assert.ok(!fs.existsSync(path.join(HOME, 'learning.json')));
+  runCli(['session', 'list']);
+});
+
+fs.rmSync(tmp, { recursive: true, force: true });
+
+console.log(`\n${passed} passed, ${failed} failed`);
+process.exit(failed > 0 ? 1 : 0);

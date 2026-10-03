@@ -19,9 +19,10 @@
  *   (learn analyze is DEPRECATED — use the dashboard for candidate review)
  *   learn dashboard [--port N]       Start localhost learning review dashboard (default: 3334)
  *   obsidian register|unregister|set-default|list-vaults  Manage the vault registry
+ *   session save|resume|list|alias   Session archives over the five handover sections
  *
  * Command handlers live in scripts/cli/ (eval-command, learn-command,
- * loop-command, obsidian-command, help); this file owns argument parsing and
+ * loop-command, obsidian-command, session-command, help); this file owns argument parsing and
  * dispatch only.
  */
 
@@ -31,6 +32,7 @@ const { printHelp } = require('./cli/help');
 const { runLearnCommand } = require('./cli/learn-command');
 const { runLoopCommand } = require('./cli/loop-command');
 const { runObsidianCommand } = require('./cli/obsidian-command');
+const { runSessionCommand } = require('./cli/session-command');
 
 // Parse command line arguments
 function parseArgs(args) {
@@ -115,6 +117,11 @@ async function main() {
 
       case 'obsidian': {
         runObsidianCommand(args, { asJson });
+        break;
+      }
+
+      case 'session': {
+        runSessionCommand(args, { asJson });
         break;
       }
 

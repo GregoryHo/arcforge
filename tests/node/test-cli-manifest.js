@@ -295,6 +295,7 @@ const liveFlagSets = {
   learn: liveFlagsFromSource(LEARN_FILES.map((f) => read(CLI_DIR, f)).join('\n')),
   loop: liveFlagsFromSource(read(CLI_DIR, 'loop-command.js')),
   obsidian: liveFlagsFromSource(read(CLI_DIR, 'obsidian-command.js')),
+  session: liveFlagsFromSource(read(CLI_DIR, 'session-command.js')),
   worktree: liveFlagsFromSource(
     `${read(LIB_DIR, 'worktree-generic.js')}\n${cliCaseBody('worktree')}`,
   ),
@@ -370,6 +371,7 @@ const liveSubcommands = {
   worktree: dispatchedNames(read(LIB_DIR, 'worktree-generic.js'), 'sub'),
   eval: dispatchedNames(read(CLI_DIR, 'eval-command.js'), 'subcommand'),
   obsidian: dispatchedNames(read(CLI_DIR, 'obsidian-command.js'), 'subcommand'),
+  session: dispatchedNames(read(CLI_DIR, 'session-command.js'), 'subcommand'),
   learn: [
     ...dispatchedNames(read(CLI_DIR, 'learn-command.js'), 'subcommand'),
     ...Object.keys(ACTION_FOR_VERB),
@@ -402,5 +404,16 @@ for (const [key, live] of Object.entries(liveActions)) {
   assert.deepStrictEqual(declared, uniqSorted(live), `${key}: manifest actions differ from live`);
 }
 console.log(`    ✓ ${WORKFLOW_GROUPS.size} learn workflow groups: action names match`);
+
+const sessionAliasActions = dispatchedNames(
+  functionBody(read(CLI_DIR, 'session-command.js'), 'runAlias'),
+  'action',
+);
+assert.deepStrictEqual(
+  uniqSorted(Object.keys(CLI_MANIFEST.session.subcommands.alias.subcommands)),
+  uniqSorted(sessionAliasActions),
+  'session alias: manifest actions differ from live',
+);
+console.log('    ✓ session alias: action names match');
 
 console.log('\n✅ All cli-manifest contract tests passed!\n');

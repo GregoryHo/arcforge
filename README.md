@@ -17,7 +17,7 @@ arcforge takes the middle path. Every skill is a self-contained unit that fires 
 Three pieces, and that is the whole system:
 
 1. **Skills** — 16 markdown skills under `skills/core/`, each a closed unit. A skill is selected because its description matches the situation in front of you, not because a pipeline scheduled it.
-2. **CLI engine** — the `arcforge` command, five subcommand groups. Skills reach engine functionality only by calling this CLI; nothing else crosses the boundary.
+2. **CLI engine** — the `arcforge` command, six subcommand groups. Skills reach engine functionality only by calling this CLI; nothing else crosses the boundary.
 3. **Hooks** — six background components on Claude Code lifecycle events: session continuity, observation logging, a secrets guard, and compaction handling.
 
 Start anywhere. `/arcforge:using` is a router and index if you want a map; otherwise invoke the skill you already know you need.
@@ -139,7 +139,7 @@ See the **[Hooks System guide](docs/guide/hooks-system.md)** for per-hook behavi
 
 Skills call the CLI for you; you rarely run it by hand. When you do, the bare `arcforge` form works anywhere Claude Code has loaded the plugin — it puts every plugin's `bin/` on PATH. From a local checkout with no plugin loaded, use `node scripts/cli.js <cmd>`. Codex does not add plugin `bin/` directories to PATH, so on Codex the bare command does not resolve.
 
-Five command groups:
+Six command groups:
 
 ```bash
 # 1. worktree — generic isolated workspaces
@@ -163,6 +163,11 @@ arcforge learn dashboard --port 3334
 # 5. obsidian — vault registry
 arcforge obsidian register --path <path> --name <name> --default
 arcforge obsidian list-vaults --json
+
+# 6. session — session archives: the five handover sections, saved and aliased
+arcforge session save <alias> --file .handovers/<date>-<slug>.md
+arcforge session list
+arcforge session resume <alias>
 ```
 
 `arcforge --help` prints the full flag surface for every group.

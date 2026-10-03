@@ -145,6 +145,18 @@ COMMANDS:
   obsidian set-default <name>        Set the default vault.
   obsidian list-vaults [--json]      List registered vaults.
 
+  session save <alias> [--file <path>]
+                                     Archive the five handover sections (Where it stands, Done,
+                                     Unfinished, Decisions, Next) read from --file or stdin, under
+                                     an engine-written metrics header, and point <alias> at it.
+                                     Stored in ~/.arcforge/sessions/<project>/<date>/.
+  session resume <alias|path>        Print an archive or a .handovers/ file — its five sections only.
+  session list [--limit N] [--json]  List this project's archives, newest first (default: 20).
+  session alias set <name> <alias|path>
+                                     Point an alias at an archive.
+  session alias remove <name>        Remove an alias (the archive stays).
+  session alias list [--json]        List this project's aliases.
+
 ENVIRONMENT:
   All optional; each has a default.
   CLAUDE_PROJECT_DIR              Project root directory (default: cwd)

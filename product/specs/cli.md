@@ -48,9 +48,9 @@ underneath without breaking anything written against it.
   test holds both to the variables the engine actually reads.
 
 ### Surface
-- **B-3 Five independent command groups.** `worktree`, `loop`, `eval`, `learn`,
-  `obsidian`. Independence is a contract: any group is usable without ever
-  touching the others — worktrees without learning, evals without loops.
+- **B-3 Six independent command groups.** `worktree`, `loop`, `eval`, `learn`,
+  `obsidian`, `session`. Independence is a contract: any group is usable without
+  ever touching the others — worktrees without learning, evals without loops.
 - **B-4 One manifest, no copies.** The command surface is defined once in the
   engine's CLI manifest; documentation checks and linters read it, and a second
   hardcoded copy of the command list is forbidden
