@@ -14,7 +14,7 @@ const {
   listArchives,
   resolveSessionRef,
   formatSessionBriefing,
-} = require('../../scripts/lib/session-utils');
+} = require('../../scripts/lib/session-archive');
 const { resolveAlias, setAlias } = require('../../scripts/lib/session-aliases');
 
 const FIVE = `# Parser work
@@ -207,11 +207,33 @@ describe('saveArchive', () => {
     expect(fs.existsSync(path.join(home, 'sessions', 'p'))).toBe(false);
   });
 
+  it('rejects text above the first section other than the # title, naming it', () => {
+    const stray = `# Parser work\nsome stray note\n\n${FIVE.replace('# Parser work\n', '')}`;
+    expect(() => saveArchive('p', 'stray', stray, { now })).toThrow(
+      /text above the first section: "some stray note"/,
+    );
+    expect(fs.existsSync(path.join(home, 'sessions', 'p'))).toBe(false);
+  });
+
   it('rejects input that is not the five sections, naming the problem', () => {
     expect(() => saveArchive('p', 'x', '## Done\nstuff\n', { now })).toThrow(
       /missing handover section\(s\): Where it stands, Unfinished, Decisions, Next/,
     );
     expect(() => saveArchive('p', 'x', 42, { now })).toThrow(/input must be a string/);
+  });
+});
+
+describe('save then resume', () => {
+  it('round-trips a record whose file path carries a newline and a ## heading', () => {
+    writeRecord('p', '2026-10-03', {
+      sessionId: 'session-b',
+      lastUpdated: '2026-10-03T11:30:00Z',
+      filesModified: ['ok.js', 'x\n## Done\ny.js'],
+    });
+    const saved = saveArchive('p', 'evil', FIVE, { now: new Date('2026-10-03T12:00:00Z') });
+    const briefing = formatSessionBriefing(fs.readFileSync(saved.path, 'utf8'), saved.path);
+    expect(briefing).toContain('- `ok.js`\n- `x## Doney.js`');
+    expect(briefing.match(/^## Done$/gm)).toHaveLength(1);
   });
 });
 

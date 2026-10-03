@@ -35,17 +35,22 @@ function loadAliases(project) {
   const content = readFileSafe(getAliasesPath(project));
   if (!content) return getDefaultAliases();
 
+  let data;
   try {
-    const data = JSON.parse(content);
-    if (!data.aliases || typeof data.aliases !== 'object') {
-      return getDefaultAliases();
-    }
-    if (!data.version) data.version = ALIAS_VERSION;
-    return data;
+    data = JSON.parse(content);
   } catch (err) {
     // Reading it as empty would let the next save overwrite every alias in it.
     throw new Error(`${getAliasesPath(project)} is not valid JSON (${err.message})`);
   }
+  const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+  if (!isObject(data) || !isObject(data.aliases)) {
+    // Same reason: a wrong shape read as empty would be overwritten.
+    throw new Error(
+      `${getAliasesPath(project)} is not an alias index: expected an object with an "aliases" object`,
+    );
+  }
+  if (!data.version) data.version = ALIAS_VERSION;
+  return data;
 }
 
 /**

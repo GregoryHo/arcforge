@@ -127,7 +127,7 @@ test('save <alias> --from -: sections on stdin → archive + alias', () => {
   assert.match(md, /\*\*Duration:\*\* ~42 minutes/);
   assert.match(md, /\*\*Tool calls:\*\* 120/);
   assert.match(md, /\*\*User messages:\*\* 8/);
-  assert.match(md, /\*\*Files modified:\*\* 1\n- src\/a\.js/);
+  assert.match(md, /\*\*Files modified:\*\* 1\n- `src\/a\.js`/);
   assert.doesNotMatch(md, /secret-sauce|Conversation Trail/);
   assert.strictEqual(readAliases().aliases.parser.sessionPath, firstPath);
 });
@@ -214,6 +214,26 @@ test('save --session <id-prefix>: reads that record, and an unknown prefix is re
   assert.match(stderr, /no session-tracker record matches --session "qqq"/);
   runCli(['session', 'alias', 'remove', 'picked']);
   fs.rmSync(picked);
+});
+
+test('save: a --session or --from with no value is refused, naming the flag', () => {
+  for (const [args, flag] of [
+    [['--from', '-', '--session'], '--session'],
+    [['--session', '--from', '-'], '--session'],
+    [['--from'], '--from'],
+    [['--from', '--force'], '--from'],
+    [['--from', '-', '--session=zzz'], '--session'],
+    [['--from=-'], '--from'],
+  ]) {
+    const { exitCode, stderr } = runCli(['session', 'save', 'dangling', ...args], {
+      input: FIVE,
+      expectFail: true,
+    });
+    assert.notStrictEqual(exitCode, 0);
+    assert.match(stderr, new RegExp(`${flag} needs a value`));
+  }
+  assert.deepStrictEqual(archivesOf('dangling'), []);
+  assert.ok(!readAliases().aliases.dangling);
 });
 
 // --- resume ---
@@ -316,6 +336,33 @@ test('alias set: a target that is not the five sections is refused', () => {
   assert.notStrictEqual(exitCode, 0);
   assert.match(stderr, /v5 session archive format/);
   assert.ok(!readAliases().aliases.old);
+});
+
+test('alias set: a .handovers/ file is refused, pointing at resume <path>', () => {
+  const { exitCode, stderr } = runCli(
+    ['session', 'alias', 'set', 'ho', `.handovers/${today}-parser.md`],
+    { expectFail: true },
+  );
+  assert.notStrictEqual(exitCode, 0);
+  assert.match(stderr, /not a session archive/);
+  assert.match(stderr, /arcforge session resume <path>/);
+  assert.ok(!readAliases().aliases.ho);
+});
+
+test('alias set: an archive outside this project, or one with no engine header, is refused', () => {
+  const outside = path.join(tmp, 'copied-archive.md');
+  fs.copyFileSync(firstPath, outside);
+  const noHeader = path.join(SESSIONS, today, 'archive-fake-20261003T000000Z.md');
+  fs.writeFileSync(noHeader, FIVE);
+  for (const target of [outside, noHeader]) {
+    const { exitCode, stderr } = runCli(['session', 'alias', 'set', 'fake', target], {
+      expectFail: true,
+    });
+    assert.notStrictEqual(exitCode, 0);
+    assert.match(stderr, /not a session archive of project "my-proj"/);
+  }
+  assert.ok(!readAliases().aliases.fake);
+  fs.rmSync(noHeader);
 });
 
 test('alias list --json: every alias with its path', () => {

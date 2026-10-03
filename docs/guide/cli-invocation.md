@@ -231,7 +231,8 @@ modified. It never holds the text of your messages.
 usually the `.handovers/<date>-<slug>.md` just written — or `-` for stdin. All
 five headings must be there, in that order, and none may be empty (write `none`
 in a slot with nothing in it); otherwise nothing is written. An optional `# `
-title line names the archive. The `sessions` skill writes the sections for you.
+title line names the archive; any other text above the first section is refused.
+Each section is kept verbatim, indentation included. The `sessions` skill writes the sections for you.
 Every `save` writes a new file and never replaces one: a second `save` under the
 same alias, with `--force`, points the alias at the new archive, and the old
 file stays.
@@ -258,7 +259,9 @@ sections, is refused with an error naming that format; nothing converts one.
 
 `list` shows the project's archives newest first (default 20), each with every
 alias that points at it. `save` sets its alias for you; `alias set` points
-another name at an archive. Aliases are per project and live in
+another name at an archive — only a file `save` wrote under this project's
+`~/.arcforge/sessions/<project>/`, so a `.handovers/` file is refused (read one
+with `resume <path>`). Aliases are per project and live in
 `~/.arcforge/sessions/<project>/aliases.json`. A name is letters, digits, `-`
 and `_`, at most 128 characters; anything else is refused, never rewritten, and
 no name is reserved. Replacing a name that already exists, through `save` or

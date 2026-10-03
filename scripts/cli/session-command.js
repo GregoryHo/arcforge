@@ -16,9 +16,9 @@ const {
   saveArchive,
   listArchives,
   resolveSessionRef,
-  readHandover,
+  readArchive,
   formatSessionBriefing,
-} = require('../lib/session-utils');
+} = require('../lib/session-archive');
 const { setAlias, deleteAlias, listAliases } = require('../lib/session-aliases');
 
 function usage(line) {
@@ -44,6 +44,15 @@ function parseLimit(raw) {
 }
 
 function runSave(args, project) {
+  // parseArgs reads neither a trailing --flag nor --flag=value as a value.
+  for (const flag of ['from', 'session']) {
+    if (Object.keys(args.flags).some((k) => k === flag || k.startsWith(`${flag}=`))) {
+      throw new Error(
+        `--${flag} needs a value as the next argument (--${flag} <value>, not ` +
+          `--${flag}=<value>) — ${SAVE_USAGE}`,
+      );
+    }
+  }
   const alias = args.positional[1];
   const from = args.options.from;
   if (!alias || typeof from !== 'string') usage(SAVE_USAGE);
@@ -85,7 +94,7 @@ function runAlias(args, project, asJson) {
     if (!name || !target) usage('alias set <name> <archive-path> [--force]');
     const file = path.resolve(process.cwd(), target);
     if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Error(`not a file: ${file}`);
-    const { title } = readHandover(fs.readFileSync(file, 'utf-8'), file);
+    const { title } = readArchive(project, file);
     const result = setAlias(project, name, file, title, { force: Boolean(args.flags.force) });
     if (!result.success) throw new Error(`alias "${name}": ${result.error}`);
     console.log(`Alias "${name}" → ${file}`);

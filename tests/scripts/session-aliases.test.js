@@ -89,6 +89,26 @@ describe('session-aliases', () => {
       expect(() => setAlias('corrupt-project', 'new', '/x.md')).toThrow(/not valid JSON/);
       expect(fs.readFileSync(file, 'utf8')).toBe('{"version":"1.0","aliases":{"keep":');
     });
+
+    it('fails loudly on JSON of the wrong shape, leaving the file as it was', () => {
+      const { getAliasesPath, setAlias, listAliases } = getAliasesModule();
+      const file = getAliasesPath('shape-project');
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      for (const bad of [
+        '[]',
+        'null',
+        '{"version":"1.0","Aliases":{"keep":{}}}',
+        '{"version":"1.0"}',
+        '{"version":"1.0","aliases":[]}',
+      ]) {
+        fs.writeFileSync(file, bad);
+        expect(() => listAliases('shape-project')).toThrow(
+          /aliases\.json is not an alias index: expected an object with an "aliases" object/,
+        );
+        expect(() => setAlias('shape-project', 'new', '/x.md')).toThrow(/not an alias index/);
+        expect(fs.readFileSync(file, 'utf8')).toBe(bad);
+      }
+    });
   });
 
   describe('setAlias', () => {

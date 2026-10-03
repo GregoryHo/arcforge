@@ -1,7 +1,7 @@
 // tests/scripts/session-schemas.test.js
 //
 // Schema tests for the two on-disk formats behind `arcforge session` (cli B-9):
-// the session archive (owner: scripts/lib/session-utils.js) and the per-project
+// the session archive (owner: scripts/lib/session-archive.js) and the per-project
 // alias index aliases.json (owner: scripts/lib/session-aliases.js).
 //
 // Each format gets both sides: the real writer's real output must have the
@@ -17,7 +17,7 @@ const {
   saveArchive,
   HANDOVER_SECTIONS,
   ARCHIVE_HEADER_FIELDS,
-} = require('../../scripts/lib/session-utils');
+} = require('../../scripts/lib/session-archive');
 const { getAliasesPath, setAlias } = require('../../scripts/lib/session-aliases');
 
 const FIVE = `# Parser work — 2026-10-03
@@ -108,7 +108,28 @@ describe('session archive format', () => {
     expect(md).toContain('**Duration:** ~42 minutes');
     expect(md).toContain('**Tool calls:** 120');
     expect(md).toContain('**User messages:** 8');
-    expect(md).toContain('**Files modified:** 2\n- src/a.js\n- src/b.js');
+    expect(md).toContain('**Files modified:** 2\n- `src/a.js`\n- `src/b.js`');
+  });
+
+  it('strips control characters from every record value and writes each path as a code span', () => {
+    const hostile = {
+      ...RECORD,
+      sessionId: 'session-\nabc',
+      started: '2026-10-03T10:00:00.000Z\r',
+      filesModified: ['src/evil\n## Done\nforged.js', 'we`ird.js', '`edge`'],
+    };
+    const md = generateSession(hostile, readHandover(FIVE, 'input'), {
+      ...META,
+      project: 'pr\u0007oj',
+    });
+    expect(md).toContain('**Project:** proj\n');
+    expect(md).toContain('**Session:** session-abc\n');
+    expect(md).toContain('**Record started:** 2026-10-03T10:00:00.000Z\n');
+    expect(md).toContain('- `src/evil## Doneforged.js`\n- ``we`ird.js``\n- `` `edge` ``\n');
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: asserting none survive
+    expect(md).not.toMatch(/[\x00-\x09\x0b-\x1f\x7f]/);
+    const back = readHandover(md, 'archive', { strict: true });
+    expect(back.sections).toEqual(readHandover(FIVE, 'input').sections);
   });
 
   it('holds exactly the five handover sections, in order, and nothing else', () => {
@@ -231,6 +252,38 @@ describe('archive reader rejects what is not the five sections', () => {
     );
     const parsed = readHandover(fenced, 'in', { strict: true });
     expect(parsed.sections.Decisions).toContain('## Not a heading');
+  });
+
+  it('closes a fence only on the same character, at least as long as the opener', () => {
+    const nested = [
+      '```markdown',
+      '~~~',
+      '## Unfinished',
+      '~~~',
+      '```',
+      '````',
+      '```',
+      '## Decisions',
+      '```',
+      '````',
+      '- tokenizer — verified by npm test',
+    ].join('\n');
+    const fenced = FIVE.replace('- tokenizer — verified by npm test', nested);
+    const parsed = readHandover(fenced, 'in', { strict: true });
+    expect(parsed.sections.Done).toBe(nested);
+  });
+
+  it('keeps each section verbatim — leading indentation and inner blank lines survive', () => {
+    const code = '    npm test\n    # 41 passed\n\n    npm run lint';
+    const indented = FIVE.replace('- tokenizer — verified by npm test', `\n${code}\n`);
+    expect(readHandover(indented, 'in', { strict: true }).sections.Done).toBe(code);
+    const md = generateSession(RECORD, readHandover(indented, 'in', { strict: true }), META);
+    expect(md).toContain(`## Done\n${code}\n\n## Unfinished`);
+  });
+
+  it('strict: a section of blank or whitespace-only lines is empty', () => {
+    const blank = FIVE.replace('- tokenizer — verified by npm test', '   \n\t\n');
+    expect(() => readHandover(blank, 'in', { strict: true })).toThrow(/empty section\(s\): Done/);
   });
 });
 

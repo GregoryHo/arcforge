@@ -143,7 +143,7 @@ command offers one (B-6).
 
 The `session` group (B-9) is the exception from 6.4.0, because no other area
 stands behind it: the archive is a markdown file under
-`~/.arcforge/sessions/<project>/<date>/`, owned by `scripts/lib/session-utils.js`
+`~/.arcforge/sessions/<project>/<date>/`, owned by `scripts/lib/session-archive.js`
 — an engine-written metrics header with a line naming the session-tracker
 record's `lastUpdated` stamp it was read at, then the five handover sections
 verbatim as `save --from` supplied them, and no text of the user's messages ([learning](learning.md) B-20). The alias index is `~/.arcforge/sessions/<project>/aliases.json`, owned by
