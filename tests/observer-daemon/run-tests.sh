@@ -65,6 +65,24 @@ assert_not_match() {
   fi
 }
 
+# Whether PID $1 is a live process. kill -0 alone is not enough: an exited
+# daemon is disowned, so its parent is PID 1, and a container whose PID 1 does
+# not reap leaves it a zombie that kill -0 still finds. Uses the real ps even
+# where a test hides it from the daemon.
+pid_live() {
+  local stat
+  kill -0 "$1" 2>/dev/null || return 1
+  if stat=$(cat "/proc/$1/stat" 2>/dev/null); then
+    stat="${stat##*) }"
+  else
+    stat=$(ps -o stat= -p "$1" 2>/dev/null) || return 0
+  fi
+  case "$stat" in
+    Z*) return 1 ;;
+  esac
+  return 0
+}
+
 # The daemon analyzes a project only where learning is enabled (learning B-1),
 # and only observations recorded at or after the opt-in took effect, so every
 # test that expects analysis opts in globally, stamped before its fixture rows.
@@ -955,7 +973,7 @@ up_start_against() {
     ' _ "$DAEMON_SCRIPT"
   )
   local alive=no
-  kill -0 "$old" 2>/dev/null && alive=yes
+  pid_live "$old" && alive=yes
   local new script
   new=$(cat "${lock}/pid" 2>/dev/null || true)
   script=$(cat "${lock}/script" 2>/dev/null || true)
@@ -1001,7 +1019,7 @@ sleep 30 &
 UP_STOP_PID=$!
 echo "$UP_STOP_PID" > "${UP_STOP_LOCK}/pid"
 env -u ARCFORGE_HOME HOME="${TMPDIR_UP}/stop" bash "$DAEMON_SCRIPT" stop > /dev/null 2>&1 || true
-UP_STOP_ALIVE=$(kill -0 "$UP_STOP_PID" 2>/dev/null && echo yes || echo no)
+UP_STOP_ALIVE=$(pid_live "$UP_STOP_PID" && echo yes || echo no)
 UP_STOP_LOCKED=$([ -d "$UP_STOP_LOCK" ] && echo yes || echo no)
 kill "$UP_STOP_PID" 2>/dev/null || true
 assert_eq \
@@ -1041,7 +1059,7 @@ lr_daemons() {
   local marker
   for marker in "$1"/daemon.*; do
     [ -e "$marker" ] || continue
-    kill -0 "${marker##*.}" 2>/dev/null && echo "${marker##*.}"
+    pid_live "${marker##*.}" && echo "${marker##*.}"
   done
 }
 
@@ -1320,7 +1338,7 @@ sleep 0.5
 assert_eq \
   'NP-T1: without ps a live holder from another copy is neither signaled nor replaced' \
   "yes|${NP_FOREIGN_PID}|0" \
-  "$(kill -0 "$NP_FOREIGN_PID" 2>/dev/null && echo yes || echo no)|$(cat "${NP_FOREIGN_LOCK}/pid")|$(lr_daemons "$NP_FOREIGN" | grep -c .)"
+  "$(pid_live "$NP_FOREIGN_PID" && echo yes || echo no)|$(cat "${NP_FOREIGN_LOCK}/pid")|$(lr_daemons "$NP_FOREIGN" | grep -c .)"
 kill "$NP_FOREIGN_PID" 2>/dev/null || true
 
 NP_DEAD="${TMPDIR_NP}/dead"
@@ -1398,8 +1416,8 @@ ow_exit_case() {
   echo "$other" > "${lock}/pid"
   if [ "$1" = term ]; then kill "$daemon"; fi
   local i
-  for i in $(seq 50); do kill -0 "$daemon" 2>/dev/null || break; sleep 0.1; done
-  echo "$(kill -0 "$daemon" 2>/dev/null && echo alive || echo exited)|$(cat "${lock}/pid" 2>/dev/null)|${other}"
+  for i in $(seq 50); do pid_live "$daemon" || break; sleep 0.1; done
+  echo "$(pid_live "$daemon" && echo alive || echo exited)|$(cat "${lock}/pid" 2>/dev/null)|${other}"
   kill "$daemon" "$other" 2>/dev/null || true
 }
 
@@ -1423,11 +1441,11 @@ env -u ARCFORGE_HOME HOME="$OW_OWN" bash -c '
 OW_OWN_PID=$(cat "${OW_OWN}/.arcforge/instincts/.observer.lock/pid")
 sleep 0.3
 ow_cmd "$OW_OWN" stop
-for i in $(seq 50); do kill -0 "$OW_OWN_PID" 2>/dev/null || break; sleep 0.1; done
+for i in $(seq 50); do pid_live "$OW_OWN_PID" || break; sleep 0.1; done
 assert_eq \
   'OW-T1: stop ends a live daemon, and the daemon removes its own lock' \
   'exited|no' \
-  "$(kill -0 "$OW_OWN_PID" 2>/dev/null && echo alive || echo exited)|$([ -d "${OW_OWN}/.arcforge/instincts/.observer.lock" ] && echo yes || echo no)"
+  "$(pid_live "$OW_OWN_PID" && echo alive || echo exited)|$([ -d "${OW_OWN}/.arcforge/instincts/.observer.lock" ] && echo yes || echo no)"
 
 # Concurrent starts with one stop (or one status) among them: every round ends
 # with at most one daemon. Daemons here are the LR-T1 stub (no exit trap), so
@@ -1463,6 +1481,62 @@ assert_eq \
   "OW-T1: ${OW_STARTS} concurrent starts and one status leave at most one daemon, every round" \
   "$OW_OK" \
   "$(ow_storm status)"
+
+# ─────────────────────────────────────────────
+# ZB-T1: a lock held by a zombie is stale
+# ─────────────────────────────────────────────
+# A daemon that exited but was never reaped (a container whose PID 1 does not
+# reap) is a zombie: kill -0 still succeeds on it. Without ps, a lock it held
+# would read as an unverifiable live holder and be kept for as long as the
+# zombie stood. Where /proc can say it is a zombie, the lock is stale. Where
+# neither /proc nor ps can, the holder is unverifiable and the lock is held.
+
+echo ""
+echo "=== ZB-T1: a zombie lock holder is not live ==="
+
+TMPDIR_ZB=$(mktemp -d)
+trap 'rm -rf "$TMPDIR_UP" "$TMPDIR_LR" "$TMPDIR_NP" "$TMPDIR_OW" "$TMPDIR_ZB"' EXIT
+
+# A lock under home $1 whose PID is a zombie: the child of a process that
+# exec'd into a sleep and so never reaps it. Prints the reaping parent's PID.
+zb_zombie_lock() {
+  local lock="$1/.arcforge/instincts/.observer.lock"
+  mkdir -p "$lock"
+  # Not on the caller's $(...) pipe, which would otherwise wait out the sleep.
+  bash -c 'sleep 0 & echo $! > "$1"; exec sleep 30' _ "${lock}/pid" > /dev/null 2>&1 &
+  local parent=$!
+  sleep 0.5
+  echo "$parent"
+}
+
+ZB_PS="${TMPDIR_ZB}/with-ps"
+ZB_PS_PARENT=$(zb_zombie_lock "$ZB_PS")
+lr_start "$ZB_PS"
+lr_settle "$ZB_PS"
+assert_eq \
+  'ZB-T1: with ps, a lock whose PID is a zombie is reclaimed' \
+  '1' \
+  "$(lr_daemons "$ZB_PS" | grep -c .)"
+lr_reap "$ZB_PS"
+kill "$ZB_PS_PARENT" 2>/dev/null || true
+
+ZB_NOPS="${TMPDIR_ZB}/no-ps"
+ZB_NOPS_PARENT=$(zb_zombie_lock "$ZB_NOPS")
+np_start "$ZB_NOPS" > /dev/null
+lr_settle "$ZB_NOPS"
+if [ -r /proc/self/stat ]; then
+  assert_eq \
+    'ZB-T1: without ps, /proc shows a zombie lock holder, and its lock is reclaimed' \
+    '1' \
+    "$(lr_daemons "$ZB_NOPS" | grep -c .)"
+else
+  assert_eq \
+    'ZB-T1: without ps or /proc, a zombie lock holder is unverifiable, and its lock is held' \
+    '0' \
+    "$(lr_daemons "$ZB_NOPS" | grep -c .)"
+fi
+lr_reap "$ZB_NOPS"
+kill "$ZB_NOPS_PARENT" 2>/dev/null || true
 
 # ─────────────────────────────────────────────
 # Results

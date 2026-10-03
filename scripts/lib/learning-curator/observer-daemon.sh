@@ -79,17 +79,39 @@ read_lock_pid() {
   fi
 }
 
+# Whether PID $1 is a zombie: it has exited, and only its parent has not
+# reaped it. kill -0 still succeeds on one, and a parent that never reaps (a
+# container whose PID 1 does not) keeps it that way. /proc answers without ps.
+is_zombie_pid() {
+  local stat
+  if stat=$(cat "/proc/$1/stat" 2>/dev/null); then
+    stat="${stat##*) }"
+  else
+    stat=$(ps -o stat= -p "$1" 2>/dev/null) || return 1
+  fi
+  case "$stat" in
+    Z*) return 0 ;;
+  esac
+  return 1
+}
+
 # What PID $1 is: `daemon` (its command line runs this script), `other` (ps
-# shows it running something else), `dead` (no such process), or `unknown`
-# (alive, but ps could not say what it runs — missing, or rejecting -p). A
-# daemon that died without removing its lock leaves a PID the OS can hand to an
-# unrelated process, so being alive is not enough to signal it; and a failed ps
-# is no evidence either way, so `unknown` is never treated as stale. ps is asked
-# even when kill -0 fails, since that also fails for another user's process.
+# shows it running something else), `dead` (no such process, or a zombie), or
+# `unknown` (alive, but ps could not say what it runs — missing, or rejecting
+# -p). A daemon that died without removing its lock leaves a PID the OS can
+# hand to an unrelated process, so being alive is not enough to signal it; and
+# a failed ps is no evidence either way, so `unknown` is never treated as
+# stale. ps is asked even when kill -0 fails, since that also fails for another
+# user's process.
 daemon_pid_status() {
   local command alive=yes
   [ -n "$1" ] || { echo dead; return 0; }
-  kill -0 "$1" 2>/dev/null || alive=no
+  if ! kill -0 "$1" 2>/dev/null; then
+    alive=no
+  elif is_zombie_pid "$1"; then
+    echo dead
+    return 0
+  fi
   if command=$(ps -o command= -p "$1" 2>/dev/null) && [ -n "$command" ]; then
     case "$command" in
       *observer-daemon.sh*) echo daemon ;;
