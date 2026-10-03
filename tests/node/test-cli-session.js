@@ -266,7 +266,14 @@ test('resume: a v5 archive is refused, naming the format', () => {
 test('resume: an unknown alias fails, naming it and the project', () => {
   const { exitCode, stderr } = runCli(['session', 'resume', 'nope'], { expectFail: true });
   assert.notStrictEqual(exitCode, 0);
-  assert.match(stderr, /no session alias "nope" in project "my-proj"/);
+  assert.match(stderr, /no session alias "nope" in project "my-proj", and no file \.\/nope/);
+});
+
+test('resume <name>: a file of that name in cwd is read when no alias has it', () => {
+  fs.writeFileSync(path.join(PROJECT_DIR, 'HANDOVER'), FIVE);
+  const { stdout } = runCli(['session', 'resume', 'HANDOVER']);
+  assert.match(stdout, /# Parser work/);
+  fs.rmSync(path.join(PROJECT_DIR, 'HANDOVER'));
 });
 
 // --- list ---
@@ -394,6 +401,20 @@ test('alias set: an archive outside this project, or one with no engine header, 
   }
   assert.ok(!readAliases().aliases.fake);
   fs.rmSync(noHeader);
+});
+
+test('alias set: a symlink inside the tree to an archive outside it is refused', () => {
+  const outside = path.join(tmp, 'linked-archive.md');
+  fs.copyFileSync(firstPath, outside);
+  const link = path.join(SESSIONS, today, 'archive-link-20261003T000000Z.md');
+  fs.symlinkSync(outside, link);
+  const { exitCode, stderr } = runCli(['session', 'alias', 'set', 'linked', link], {
+    expectFail: true,
+  });
+  assert.notStrictEqual(exitCode, 0);
+  assert.match(stderr, /not a session archive of project "my-proj"/);
+  assert.ok(!readAliases().aliases.linked);
+  fs.rmSync(link);
 });
 
 test('alias list --json: every alias with its path', () => {

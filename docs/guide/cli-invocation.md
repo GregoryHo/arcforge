@@ -254,7 +254,9 @@ project's most recent one. If two sessions run in the same project at once, the
 most recent record may be the other session's — name yours with `--session`.
 
 `resume` takes an alias or a path — an archive or a `.handovers/` file — and
-prints its five sections for you to pick the work back up. An archive written by
+prints its five sections for you to pick the work back up. A name with no `/`
+and no `.md` ending is looked up as an alias first; when no alias has it, a file
+of that name in the current directory is read instead. An archive written by
 arcforge 5.x, in its Summary / What Worked / What Failed / Blockers / Next Step
 sections, is refused with an error naming that format; nothing converts one.
 
@@ -262,7 +264,7 @@ sections, is refused with an error naming that format; nothing converts one.
 alias that points at it. `save` sets its alias for you; `alias set` points
 another name at an archive — only a file `save` wrote under this project's
 `~/.arcforge/sessions/<project>/`, so a `.handovers/` file is refused (read one
-with `resume <path>`). Aliases are per project and live in
+with `resume <path>`), and so is a symlink there that leads to a file outside it. Aliases are per project and live in
 `~/.arcforge/sessions/<project>/aliases.json`. A name is letters, digits, `-`
 and `_`, at most 128 characters; anything else is refused, never rewritten, and
 no name is reserved. Replacing a name that already exists, through `save` or

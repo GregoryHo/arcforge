@@ -372,10 +372,22 @@ describe('resolveSessionRef', () => {
     expect(resolveSessionRef('p', file, '/')).toBe(file);
   });
 
-  it('fails with the alias and project named when the alias is unknown', () => {
+  it('fails naming the alias, the project and the file when neither exists', () => {
     expect(() => resolveSessionRef('p', 'nope', home)).toThrow(
-      /no session alias "nope" in project "p"/,
+      /no session alias "nope" in project "p", and no file \.\/nope/,
     );
+  });
+
+  it('reads a bare name as a file in cwd when no alias has that name', () => {
+    const file = path.join(home, 'HANDOVER');
+    fs.writeFileSync(file, FIVE);
+    expect(resolveSessionRef('p', 'HANDOVER', home)).toBe(file);
+  });
+
+  it('prefers the alias when a bare name is both an alias and a file', () => {
+    const saved = saveArchive('p', 'parser', FIVE, { now: new Date() });
+    fs.writeFileSync(path.join(home, 'parser'), FIVE);
+    expect(resolveSessionRef('p', 'parser', home)).toBe(saved.path);
   });
 
   it('fails when a path does not name an existing file', () => {

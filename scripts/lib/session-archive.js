@@ -412,7 +412,9 @@ function listArchives(project, { limit = DEFAULT_LIST_LIMIT } = {}) {
 function readArchive(project, file) {
   const handover = readHandover(fs.readFileSync(file, 'utf-8'), file);
   const tree = getProjectSessionsDir(project);
-  const rel = path.relative(tree, file);
+  // Real paths on both sides: a symlink inside the tree must not carry an alias out of it.
+  const realTree = fs.existsSync(tree) ? fs.realpathSync(tree) : tree;
+  const rel = path.relative(realTree, fs.realpathSync(file));
   const fields = handover.preamble.split('\n').map((l) => l.match(/^\*\*([^*]+):\*\* /)?.[1]);
   if (
     rel.startsWith('..') ||
@@ -429,8 +431,9 @@ function readArchive(project, file) {
 }
 
 /**
- * Resolve `resume`'s argument: a bare name is an alias of this project; a
- * value with a path separator or ending `.md` is a file path (relative to cwd).
+ * Resolve `resume`'s argument: a value with a path separator or ending `.md` is
+ * a file path (relative to cwd); a bare name is an alias of this project, and
+ * when no alias has that name, an existing file of that name in cwd.
  * @param {string} project
  * @param {string} ref - Alias or path
  * @param {string} cwd - Base for a relative path
@@ -448,7 +451,11 @@ function resolveSessionRef(project, ref, cwd) {
     return resolved;
   }
   const entry = resolveAlias(project, ref);
-  if (!entry) throw new Error(`no session alias "${ref}" in project "${project}"`);
+  if (!entry) {
+    const asPath = path.resolve(cwd, ref);
+    if (isFile(asPath)) return asPath;
+    throw new Error(`no session alias "${ref}" in project "${project}", and no file ./${ref}`);
+  }
   const resolved = path.resolve(entry.sessionPath);
   if (!isFile(resolved)) throw new Error(`alias "${ref}" points at ${resolved}, not a file`);
   return resolved;
