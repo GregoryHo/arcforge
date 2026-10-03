@@ -7,6 +7,9 @@
  * Zero external dependencies — Node.js standard library only.
  */
 
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const { execCommand } = require('./utils');
 const { round2 } = require('./eval-stats');
 const { captureTrialArtifacts, splitTranscriptBlocks } = require('./eval-grader-io');
@@ -15,6 +18,10 @@ const { captureTrialArtifacts, splitTranscriptBlocks } = require('./eval-grader-
  * Grade a trial result using a code grader (test command).
  * Accepts test command as array (exec directly) or string (run via shell).
  * Injects TRIAL_DIR env var so grader commands can reference trial artifacts.
+ * The grader runs from a fresh empty directory, never the trial directory: an
+ * interpreter that puts its cwd on the import path (`python3 -`, `node -e`)
+ * would otherwise import modules the trial planted and let them forge the
+ * grade (#250, D-043). Graders reach trial files through TRIAL_DIR only.
  * Returns a new result object (does not mutate input).
  * @param {import('./eval').TrialResult} result - Trial result to grade
  * @param {string|string[]} testCommand - Test command to run
@@ -30,8 +37,14 @@ function gradeWithCode(result, testCommand, projectRoot, assertionCount = 0) {
   if (result.trialDir) env.TRIAL_DIR = result.trialDir;
   if (result.transcript) env.TRANSCRIPT_PATH = result.transcript;
   env.PROJECT_ROOT = projectRoot;
-  const cwd = result.trialDir || projectRoot;
-  const { exitCode, stdout, stderr } = execCommand(cmd, args, { cwd, env });
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'arcforge-grader-'));
+  let ran;
+  try {
+    ran = execCommand(cmd, args, { cwd, env });
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+  const { exitCode, stdout, stderr } = ran;
   const graderOutput = (stdout || stderr || '').trim() || undefined;
   const artifacts = captureTrialArtifacts(result.trialDir) || undefined;
   const extra = {
