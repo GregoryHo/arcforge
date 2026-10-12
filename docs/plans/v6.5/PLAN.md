@@ -16,11 +16,12 @@ D-059（版本）：
 
 1. 6.5.0 是 minor：新的 hook 行為、新的 eval 旗標，前例是 6.2.0（D-020）。內容是儀器修補（D-062）、session 延續（D-061）、`sessions` 的 `SKILL.md` 瘦身、D-060 的 `speccing` 措辭紀錄，加一輪量測。
 2. 量測四項，依此順序：(i) `eval-sessions-handover-and-resume` Version 2（skill-system B-11，經由真的 `arcforge session resume`）；(ii) `executing` → `dispatching` 交接（#184）；(iii) `diagramming-obsidian` 的 verify-exit 句子（obsidian B-10）；(iv) 該 skill 的 `references/` 版面（#185）。
-3. 每項量測前面有一道離線設計關卡，在 D-062 的引擎變更合併之後、花任何 session 之前寫。判定 NOT MEASURABLE 就記為發現，花 0 個 session。
-4. 上限約 80 個 trial session；整輪依序跑，一個 checkout 一次只跑一個 live eval（D-058）。
-5. `eval-router-skill-selection` 不重跑，本版任何變更都不得改它的 scenario 檔。
-6. 各關卡的判定、每支 scenario 的 k、補跑與重跑的額度，在讀任何結果之前另記一條 decision，`Refines: D-059`。量測輪的結果再記一條（照 D-058 的形狀）。這兩條的編號取當時的下一個空號，本文件不預先指定。
-7. #256 不在範圍內，維持開啟。
+3. 有條件的第五項（維護者 2026-10-12 對 Codex 意見的裁示）：(i) 到 (iv) 結束時花掉的 session 不超過 67（80 − 13），就以 `--stage-skill-files` 跑 `eval-sessions-handover-completeness` 的現行 Version（preflight 3、A/B 10、不補跑），讓瘦身後的 handover 撰寫路徑有一次看得到範本的 A/B；否則維持 D-059 的 Residual。它排最後，而且比 (i) 到 (iv) 的任何補跑先被放棄。不延後 #283。
+4. 每項量測前面有一道離線設計關卡，在 D-062 的引擎變更合併之後、花任何 session 之前寫。判定 NOT MEASURABLE 就記為發現，花 0 個 session。
+5. 上限約 80 個 trial session；整輪依序跑，一個 checkout 一次只跑一個 live eval（D-058）。
+6. `eval-router-skill-selection` 不重跑，本版任何變更都不得改它的 scenario 檔。
+7. 各關卡的判定、每支 scenario 的 k、補跑與重跑的額度，在讀任何結果之前另記一條 decision，`Refines: D-059`。量測輪的結果再記一條（照 D-058 的形狀）。這兩條的編號取當時的下一個空號，本文件不預先指定。
+8. #256 不在範圍內，維持開啟。
 
 D-060（`speccing`）：`Refines: D-055`（第 3 點）。6.4.0 出貨的文字是產品的說法：README 與 `docs/guide/skills-reference.md` 稱 `speccing` 是 v5 spec-driven pipeline 的檔案式「後繼者」，保留產品意圖、不保留自動化；D-055 第 3 點的「replaces」依這句話解讀。這一條只記錄，沒有程式或文件要改。
 
@@ -36,7 +37,7 @@ D-062（儀器），七項：
 
 | 項 | 內容 | spec |
 |---|---|---|
-| (a) | run lock：`eval run`、`eval preflight`、`eval ab` 在 `.eval-trials/` 底下取鎖，記 PID；第二個立刻被拒絕並指出持有者；行程已不存在的鎖會被回收 | eval B-15 |
+| (a) | run lock：`eval run`、`eval preflight`、`eval ab`、`eval report` 在 `.eval-trials/` 底下取鎖，記 PID，每條結束路徑都釋放（含 preflight BLOCK）；第二個立刻被拒絕並指出持有者；行程已不存在的鎖會被回收 | eval B-15 |
 | (b) | preflight 每個 trial 寫一筆 result row，標籤獨立，任何 pool 讀取端都不回傳它 | eval B-16 |
 | (c) | 每筆 row 與每筆 preflight 紀錄帶 Node 版本與 scenario hash（`node_version`、`scenario_hash`）；只記錄、不分組 | eval B-17 |
 | (d) | trial 環境重建：operator 的 `PATH` 不進 trial 與 fixture Setup，`claude`、`node` 仍解析得到；scenario 以 `## Environment` 宣告 `PATH` 增減與放進 trial 內的快取目錄；`HOME` 保留；兩臂相同，記進 row | eval B-18 |
@@ -78,7 +79,7 @@ D-062（儀器），七項：
 | WP-A 儀器 | D-062 的七項，五個 PR（A1 到 A5），見下方 | eval B-15 到 B-21 | A4：#281；其餘 — |
 | WP-B session 延續 | D-061：`inject-context.js` 的一行指引 | hooks B-8 | #282 |
 | WP-C `sessions` 瘦身 | D-059 第 1 點：`SKILL.md` 206 → ≤150，`references/` | skill-system B-12 | #283 |
-| WP-D 量測 | D-059 第 2 到 6 點：四道設計關卡 → 預先登記的 decision → 一輪 → 稽核 → 結果的 decision | skill-system B-11、obsidian B-10 | — |
+| WP-D 量測 | D-059 第 2 到 7 點：四道設計關卡 → 預先登記的 decision → 一輪 → 稽核 → 結果的 decision | skill-system B-11、obsidian B-10 | — |
 | WP-E 發版 | `releasing` skill | — | — |
 
 ### WP-A 儀器
@@ -99,7 +100,7 @@ D-062（儀器），七項：
 | A4 `eval compare --no-analyzer` | (g) | `eval-compare-skip-analyzer` | #281 |
 | A5 staged skill 目錄與兩文字 A/B | (e)、(f) | `eval-skill-files-outside-trial` | — |
 
-**A1 run lock。** `scripts/lib/locking.js` 不能直接用：mtime 超過 30 秒就當 stale、等 5 秒才放棄、不查 PID 是否存活。做法二選一：新 helper（約 40 行，O_EXCL 開檔、寫 PID、查存活、拿不到就立刻拒絕），或給 `locking.js` 加 `staleThreshold` 與 PID 檢查。鎖檔放 `.eval-trials/` 底下（write guard 跳過它，`.gitignore` 已含）。`eval-command.js` 的 `run`（:178）、`preflight`（:248）、`ab`（:375）三個分支都包 try/finally。preflight 判定 BLOCK 時現在是 `process.exit(1)`（:317），`finally` 不會執行，鎖會留下來：改成設 `process.exitCode = 1` 後正常返回，或在 exit 之前明確釋放鎖；A1 的測試要涵蓋 BLOCK 之後鎖已不存在。不把 `evals/preflight/` 加進 guard 的 skip list，那會藏住真的 trial 寫入。
+**A1 run lock。** `scripts/lib/locking.js` 不能直接用：mtime 超過 30 秒就當 stale、等 5 秒才放棄、不查 PID 是否存活。做法二選一：新 helper（約 40 行，O_EXCL 開檔、寫 PID、查存活、拿不到就立刻拒絕），或給 `locking.js` 加 `staleThreshold` 與 PID 檢查。鎖檔放 `.eval-trials/` 底下（write guard 跳過它，`.gitignore` 已含）。`eval-command.js` 的 `run`（:178）、`preflight`（:248）、`ab`（:375）三個分支都包 try/finally；`eval report` 也取同一把鎖（PR #287），因為它寫 `evals/benchmarks/`，live trial 的 write guard 會把這次寫入算在 trial 頭上。preflight 判定 BLOCK 時現在是 `process.exit(1)`（:317），`finally` 不會執行，鎖會留下來：改成設 `process.exitCode = 1` 後正常返回，或在 exit 之前明確釋放鎖；A1 的測試要涵蓋 BLOCK 之後鎖已不存在。不把 `evals/preflight/` 加進 guard 的 skip list，那會藏住真的 trial 寫入。
 
 **A2 preflight row、Node 版本與 hash。**
 
@@ -186,6 +187,8 @@ PR #283。
 - 關卡要寫明：拿舊 reference 的 baseline 除了抄 200 px 之外還能做什麼。分隔線淨空 ≥30 作輔助斷言。
 - `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000`；k=5 兩臂約 2 小時。
 
+**D5 `sessions` handover 撰寫（有條件）。** `eval-sessions-handover-completeness` 的現行 Version，不改 scenario 檔，加 `--stage-skill-files`，所以自成一池（eval B-19），不與瘦身前的 pool 合併。只在 D1 到 D4 結束時花掉的 session 不超過 67 才跑；preflight 3、A/B 10、不補跑。不跑就維持 D-059 的 Residual。D5 不新增 scenario，跑或不跑都要寫進預先登記的 decision。
+
 **#184、#185 的處置**：量到結果就關閉，留言附帳本連結；關卡判定 NOT MEASURABLE 就維持開啟，留言寫判定與缺的引擎能力。verify-exit 沒有 issue，結果只進帳本與結果的 decision。
 
 ### WP-E 發版
@@ -235,7 +238,7 @@ PR #283。
 | preflight 出錯重跑（整輪至多 2 次） | 6 | 0 | 6 |
 | 最壞情況 | 18 | 56 | 74 |
 
-最壞情況 74，不超過上限約 80，其餘 6 個不作任何用途。這張表是排程用的骨架；正式的預先登記是 `Refines: D-059` 的那條 decision，在四道關卡判定之後、讀任何結果之前寫，被判 NOT MEASURABLE 的項目在那裡記成 0。
+最壞情況 74，不超過上限約 80。D5（13 個 session）不在這張表裡：D1 到 D4 花掉的不超過 67 才跑，而且額度不夠時先放棄 D5，不動 D1 到 D4 的補跑。這張表是排程用的骨架；正式的預先登記是 `Refines: D-059` 的那條 decision，在四道關卡判定之後、讀任何結果之前寫，被判 NOT MEASURABLE 的項目在那裡記成 0。
 
 **規則**（沿用 v6.4 PLAN，收窄）：
 
@@ -244,7 +247,7 @@ PR #283。
 - 會讓總數超過上限的 A/B 不開跑，記為未量測，絕不改用較小的 k。
 - 補跑規則與 v6.4 相同：A/B 結束時任一臂可評分的列少於 5 筆，以相同的 skill 檔與旗標執行 `arcforge eval ab <scenario> --k 1`，兩臂各加一列；判定用 `arcforge eval compare <scenario>` 讀合併池；每支 scenario 至多補跑 2 次。已寫入的列一筆都不丟。
 - preflight 的列若全是 grade 或基礎設施錯誤，等於沒有量到，可重跑，整輪至多 2 次。
-- **一個 checkout 一次只跑一個 live eval**（D-058；A1 合併後由引擎的鎖執行）。四項依序，最長的 D4 放最後，中途超時不卡住其他三項。
+- **一個 checkout 一次只跑一個 live eval**（D-058；A1 合併後由引擎的鎖執行）。四項依序，最長的 D4 放最後，中途超時不卡住其他三項；有條件的 D5 排在 D4 之後。
 
 **稽核義務**：
 

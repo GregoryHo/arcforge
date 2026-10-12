@@ -88,7 +88,8 @@ underneath without breaking anything written against it.
   the project's archives. `alias set` points a name at an archive in the
   project's alias index, `alias remove` drops a name, and `alias list` prints
   the index. A name is letters, digits, `-` and `_`, at most 128 characters,
-  and anything else is refused rather than rewritten; no name is reserved,
+  and may not begin with a hyphen, which the CLI would read as a flag;
+  anything else is refused rather than rewritten; no name is reserved,
   because a name only ever fills an operand. Overwriting a name that already
   exists, through `alias set` or `save`, needs `--force`. The group sits in
   the one manifest (B-4) and under the exit-code API (B-5) (D-055, D-056).

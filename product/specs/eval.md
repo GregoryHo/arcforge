@@ -110,7 +110,9 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   and `--effort` are both given, which is all that keeps the arms on one model
   and one effort. Opting out
   (`--no-isolate`) readmits the surrounding toolkit into the trial — never the
-  user's real state. Isolation is not a sandbox, and that is a limit rather
+  user's real state. From 6.5.0 the engine also builds a contained trial's
+  environment variables and `PATH` rather than passing the operator's on
+  (B-18); a `--no-isolate` trial inherits the operator's environment. Isolation is not a sandbox, and that is a limit rather
   than a promise: the agent runs with the operator's filesystem permissions.
   What the runner adds is detection after the fact, within the blind spots the
   guide lists: a trial that wrote inside the repository it ran from is
@@ -186,17 +188,20 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
 
 ### The instrument in 6.5.0
 - **B-15 One live eval per checkout, held by a lock (6.5.0).** `eval run`,
-  `eval preflight` and `eval ab` take a lock under `.eval-trials/` before any
-  fixture `Setup` or session, and release it when the run ends, however it
-  ends. The lock records the holder's process id. A second of those commands
+  `eval preflight`, `eval ab` and `eval report` take a lock under
+  `.eval-trials/` before any fixture `Setup`, session or benchmark write,
+  and release it on every exit path — a preflight that ends in BLOCK and
+  exits non-zero included. `eval report` takes it because it writes
+  `evals/benchmarks/`, a write a live trial's guard would blame on the
+  trial. The lock records the holder's process id. A second of those commands
   in the same checkout is refused at once — it does not wait — with a
   message naming the holder's process id and the lock's path. A lock whose
   process no longer exists is reclaimed, not honoured. The rule exists
   because the write guard (B-7) cannot tell another run's write from a
   trial's, and the lock sits under `.eval-trials/` because the guard does not
-  watch that directory (D-058, D-062). Residual: only those three commands
-  take the lock, so `eval report`, or an operator's edit, during a live run
-  is still reported as the trial's write; the lock is per checkout, so two
+  watch that directory (D-058, D-062). Residual: only those four commands
+  take the lock, so an operator's edit, or any other write in the checkout,
+  during a live run is still reported as the trial's write; the lock is per checkout, so two
   worktrees do not exclude each other; and a recycled process id can make a
   dead lock read as held.
 - **B-16 Preflight writes a result row per trial, apart from every pool
@@ -208,7 +213,8 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   wrote to the repository has its row recorded and the preflight then
   stops, as an A/B arm does (B-7). No reader of pools returns that row: not `eval list`, not the verdict
   `eval run` prints, not `eval compare`, not `eval report`, not the
-  dashboard. So a preflight trial's grade is read from its row, not rebuilt
+  dashboard's comparison or scenario views; the dashboard's run listing
+  shows preflight rows, labelled as such. So a preflight trial's grade is read from its row, not rebuilt
   from the trial's end state, and a preflight never moves an A/B verdict or
   a benchmark. The record under `evals/preflight/` stays what the `eval ab`
   gate reads (B-2, B-3). Because a row file's name ends in its condition, a
@@ -232,12 +238,12 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   starts each contained trial session, and its fixture `Setup`, with an
   environment it builds from an allowlist: the identity, shell, locale and
   temporary-directory variables (`HOME`, `USER`, `LOGNAME`, `SHELL`, `TERM`,
-  `LANG`, `LC_*`, `TZ`, `TMPDIR`, `XDG_CONFIG_HOME`), the variables the
-  session authenticates and reaches its provider with, the proxy and
-  certificate variables, and `ARCFORGE_HOME`, redirected as B-7 says.
-  Everything else the operator's shell exports is dropped, among it
-  `ANTHROPIC_MODEL` and every `CLAUDE_CODE_*` session variable an eval
-  started from inside a Claude Code session would otherwise pass on. `PATH`
+  `LANG`, `LC_*`, `TZ`, `TMPDIR`, `XDG_CONFIG_HOME`), the provider, proxy
+  and certificate families the session authenticates and connects with,
+  forwarded by prefix — `docs/guide/eval-system.md` holds the list — and
+  `ARCFORGE_HOME`, redirected as B-7 says. Everything else the operator's
+  shell exports is dropped, among it the session variables an eval started
+  from inside a Claude Code session would otherwise pass on. `PATH`
   is built too: a shim directory under `.eval-trials/` holding links to
   `claude`, to `node`, and to the `npm` and `npx` beside it, followed by the
   system directories `/usr/bin`, `/bin`, `/usr/sbin` and `/sbin`. So
@@ -249,10 +255,12 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   the operator's own toolkit (B-7), so it inherits the operator's
   environment, with `ARCFORGE_HOME` alone redirected. A scenario makes its
   statement in an `## Environment` section, which adds to the built `PATH`:
-  it may add `PATH` entries, remove them, and point cache directories — a
-  package manager's, a browser download's — at a place inside the trial
-  directory. Nothing else can be declared, and `HOME` is never overridden,
-  because the session authenticates from `~/.claude`. The declaration
+  it may append `PATH` entries, prepend them, remove them, and point cache
+  directories — a package manager's, a browser download's, from a fixed
+  list of cache variables — at a place under `${TRIAL_DIR}`. Nothing else
+  can be declared: `HOME` and a whole-`PATH` assignment are refused, `HOME`
+  because the session authenticates from `~/.claude`. The guide,
+  `docs/guide/eval-system.md`, holds the full grammar. The declaration
   applies to both arms alike, since the arms differ in the injection only
   (B-7); `eval lint` checks its form; and every row records it. Toolkit
   state stays redirected as B-7 says (D-057, D-062). Residual: this is not
@@ -268,7 +276,12 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   `PATH` is a statement about what the engine passes, not a proof of what a
   trial's shell resolves: a measurement that depends on a tool being absent
   shows the absence inside a real trial, in its design gate, before it
-  spends a session. The environment is not a pooling
+  spends a session. A code grader runs on the engine's side with the
+  operator's full environment — seven graders in the corpus call
+  `arcforge` and nine call `npm` — so this item bounds the trial, not the
+  grader. And a scenario that prepends a directory of its own can shadow
+  `claude` itself, an authoring error `eval lint` does not catch. The
+  environment is not a pooling
   condition, so rows from before and after this change pool together though
   their trials did not see the same `PATH`.
 - **B-19 A skill's files can be staged for the arm injected with it
@@ -409,7 +422,9 @@ its rationale is inline at B-10.
   can make the arms differ (B-3, B-12, B-14).
 - **D-057** — that sentence is not measurable on the current engine, which
   injects `SKILL.md` alone, overrides no trial's `PATH` or `HOME`, and has no
-  two-skill-text A/B, so it is a finding at 0 sessions (B-1, B-7).
+  two-skill-text A/B, so it is a finding at 0 sessions (B-1, B-7) — the
+  three limits it names are lifted in 6.5.0 by B-18, B-19 and B-20
+  (D-062).
 - **D-058** — 6.4.0's round: the write guard cannot tell another run's write
   from a trial's, so one checkout runs one live eval at a time (B-7).
 - **D-059** — 6.5.0's round puts four measurements each behind an offline

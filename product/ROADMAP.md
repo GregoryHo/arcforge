@@ -1828,7 +1828,14 @@ reverse one, append a superseding entry (see AGENTS.md).
   sessions. A gate that passes leads to a preflight at k=3; a BLOCK there is
   a finding, not rerun, with no A/B; a PASS goes to an A/B at the scenario's
   own trial count. An A/B that would take the round past the cap is not
-  started and is recorded as not measured, never run at a smaller k. The
+  started and is recorded as not measured, never run at a smaller k. A
+  fifth measurement is conditional: if (i) to (iv) end with at most 67
+  sessions spent — the cap less 13 —
+  `eval-sessions-handover-completeness` runs at its current Version with
+  `--stage-skill-files`, a preflight of 3 and an A/B of 10 with no top-up,
+  so that the trimmed handover-writing path has an A/B whose treatment sees
+  the moved template; otherwise that path stays the Residual below. It runs
+  last, and it is dropped before any top-up of (i) to (iv) is. The
   round is serial — one live eval per checkout (D-058) — so a measurement
   starts only when the one before it has ended.
   `eval-router-skill-selection` is not rerun, and no change in this version
@@ -1893,7 +1900,8 @@ reverse one, append a superseding entry (see AGENTS.md).
   **skill-body-trim**.
 - Cost accepted: up to about 80 trial sessions — 52 scheduled, four
   preflights of 3 and four A/Bs of 10, with the top-up and preflight-rerun
-  allowances fixed in the pre-registration entry and kept under the cap —
+  allowances fixed in the pre-registration entry and kept under the cap,
+  and 13 more for the conditional fifth measurement only where they fit —
   plus any model-grader calls the cap does not count. Running one scenario at
   a time costs wall-clock time, and (iv) is planned under a 1800 s trial
   ceiling, reported as eval B-10 requires. The instrument and hook changes
@@ -1983,12 +1991,15 @@ reverse one, append a superseding entry (see AGENTS.md).
   or should, is not measured. A `.handovers/` file is never named, only an
   archive. The line is Claude Code's alone: hooks do not run on Codex
   (D-013). An alias index that cannot be parsed, or one edited by hand so
-  that its keys are not valid aliases, yields the path form of the line,
-  not the alias.
+  that its keys are not valid aliases — one that begins with a hyphen
+  among them, which the CLI would read as a flag ([cli](specs/cli.md)
+  B-9) — yields the path form of the line, not the alias.
 - Cost accepted: one more line in the model's context and the user's summary
-  at every `startup` and `clear` of a project that has an archive, and a
-  directory listing plus one small file read on the synchronous SessionStart
-  path.
+  at every `startup` and `clear` of a project that has an archive, and, on
+  the synchronous SessionStart path, a listing of each date directory,
+  newest first, until one holds an archive — all of them when none does,
+  about 54 on the maintainer's machine, 1.3 ms warm and 13.6 ms cold — then
+  one read of the alias index.
 - Verification: cases in `hooks/__tests__/inject-context.test.js` for an
   archive at `startup`, for silence on `resume`, for silence with no
   archive, and for silence at `startup` in a session arcforge spawned
@@ -2001,10 +2012,11 @@ reverse one, append a superseding entry (see AGENTS.md).
 - Version: 6.5.0
 - Status: Accepted
 - Decision: Seven changes to the eval instrument. (a) One live eval per
-  checkout is enforced: `eval run`, `eval preflight` and `eval ab` take a
-  lock under `.eval-trials/` that records the holder's process id, a second
-  one in the same checkout is refused at once with the holder named, and a
-  lock whose process is gone is reclaimed. (b) Preflight writes a result row
+  checkout is enforced: `eval run`, `eval preflight`, `eval ab` and
+  `eval report` take a lock under `.eval-trials/` that records the holder's
+  process id and is released on every exit path, a preflight BLOCK
+  included; a second one in the same checkout is refused at once with the
+  holder named, and a lock whose process is gone is reclaimed. (b) Preflight writes a result row
   for each trial, to `preflight.jsonl` in its run's directory under the
   condition label `preflight`, which no A/B pool, `eval report`,
   `eval list` or the dashboard reads; since a row file's name ends in its
@@ -2016,10 +2028,11 @@ reverse one, append a superseding entry (see AGENTS.md).
   `repo_commit`); none is a pooling condition, so eval B-8's
   conditions do not change. (d) A trial's environment is rebuilt rather than
   inherited: a contained trial and its fixture setup get an allowlist — the
-  identity, shell and locale variables, what the session authenticates and
-  reaches its provider with, the proxy and certificate variables, and the
-  redirected `ARCFORGE_HOME` — and everything else is dropped, among it
-  `ANTHROPIC_MODEL` and every `CLAUDE_CODE_*` session variable; `PATH` is a
+  identity, shell and locale variables, the provider, proxy and certificate
+  families the session authenticates and connects with, and the
+  redirected `ARCFORGE_HOME` — and everything else is dropped, among it the
+  session variables an eval started inside a Claude Code session would
+  pass on; `PATH` is a
   shim directory under `.eval-trials/` linking `claude`, `node`, `npm` and
   `npx`, followed by the system directories, so the operator's `PATH` no
   longer reaches such a trial while `claude` and `node` stay resolvable. A
@@ -2047,10 +2060,16 @@ reverse one, append a superseding entry (see AGENTS.md).
   trial's own write there. The existing lock helper waits and treats an old
   lock as stale by age; a live eval holds for minutes to hours, so this lock
   refuses immediately and decides staleness by whether the process is alive.
+  `eval report` takes it too because it writes `evals/benchmarks/`, which a
+  live trial's write guard would blame on the trial.
   (b) A preflight trial's grade had to be rebuilt by hand from its end state
   (D-054, D-058). The label has to be its own because a preflight trial runs
   under the scenario's bare name, the name `eval run` writes and `eval list`
-  falls back to. (c) D-054's verification recorded the Node version and
+  falls back to. The three name suffixes are reserved, rather than the
+  condition moving into a row field, because the condition already lives in
+  the result file's name: a separate field would change every reader's
+  lookup and the layout on disk for a case no shipped scenario hits, and
+  `eval lint` reports the collision before any session. (c) D-054's verification recorded the Node version and
   commit by hand. None of the three fields pools because none changes the
   question a row answers: Node runs the engine, not the model, and making it a
   condition would split every pool at the next Node upgrade and orphan the
@@ -2093,8 +2112,8 @@ reverse one, append a superseding entry (see AGENTS.md).
   test establishes whether it does, so a gate of D-059 whose measurement
   depends on a tool being absent — the verify-exit one — shows that
   absence inside a real trial before it passes.
-  The lock covers the three commands that run trials: `eval report`, an
-  edit, or any other write in the checkout during a live run still reads to
+  The lock covers the three commands that run trials and `eval report`: an
+  edit, or any other write in the checkout during a live run, still reads to
   the write guard as the trial's. It is per checkout, so two worktrees are
   two locks, and a recycled process id can make a dead lock look held. The
   rebuilt environment is not a pooling condition, so rows from before and
@@ -2107,7 +2126,10 @@ reverse one, append a superseding entry (see AGENTS.md).
   recorded identity — row, pool and preflight key — is settled with the
   engine change, and (iv) is not gated, and spends no session, until it
   has. A code grader's
-  environment is not rebuilt: a grader is not a trial. Unmeasured after
+  environment is not rebuilt: a grader is not a trial, and it runs with the
+  operator's full environment — seven graders in the corpus call `arcforge`
+  and nine call `npm`. A scenario that prepends a directory of its own can
+  shadow `claude`, an authoring error `eval lint` does not catch. Unmeasured after
   this: routing under a real plugin load (D-024, D-044), a save into a live
   Obsidian vault, and anything that needs more than one turn in a trial
   (D-057).
