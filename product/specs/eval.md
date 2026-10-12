@@ -306,7 +306,12 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   but, as before 6.5.0, is not a pooling condition, so a skill edited and
   re-measured under an unchanged scenario version joins the earlier
   treatment pool; and when both arms are given one text and differ only in
-  their staged files, the text hashes do not tell the arms apart.
+  their staged files, the text hashes do not tell the arms apart: a
+  preflight record keyed on the baseline text alone would also be found by
+  a run whose baseline was staged with different files, and the rows of two
+  such runs would pool. Until the staged directory's content is part of
+  the recorded identity — of the row, of the pool and of the preflight
+  key — no measurement of that shape is run (D-059, D-062).
 - **B-21 `eval compare` can skip the analyzer (6.5.0).** On a model- or
   human-graded scenario `eval compare` computes the verdict and then starts
   an eval-analyzer session for a qualitative reading. With `--no-analyzer`

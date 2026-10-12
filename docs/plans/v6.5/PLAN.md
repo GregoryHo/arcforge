@@ -128,7 +128,7 @@ D-062（儀器），七項：
 - **preflight 也要懂這個旗標**：兩文字 A/B 的 preflight 臂是「舊文字」臂（v6.4 的關卡文件說 no-skill baseline 很可能在天花板），紀錄的鍵要含 baseline 文字的 hash，否則 `eval ab` 找不到對應紀錄會拒跑，或 preflight 量到錯的那一臂。
 - **staging 是 pool 條件**（eval B-8、B-19）：`--stage-skill-files` 是 opt-in，進 `ranWith()`；不開旗標的 run 與 6.3.0／6.4.0 的 treatment pool 仍可合併，開了的自成一池。D1 不需要它，D2 到 D4 需要。
 - #184 需要第二支 skill 的 body 進 treatment：旗標可重複（多個 `--skill-dir`），或由 scenario 的 fixture 放進兩臂。由 WP-D 的設計關卡決定，A5 只要不堵死前者。
-- D-062 的 Residual 留給 A5 定案：兩臂 `SKILL.md` 文字相同、只有 staged 檔案不同時（D4 的形狀），文字 hash 分不出兩臂；staged 目錄的內容是否併入記錄的身分，要在 D4 的關卡之前決定。
+- D-062 的 Residual 留給 A5 定案：兩臂 `SKILL.md` 文字相同、只有 staged 檔案不同時（D4 的形狀），文字 hash 分不出兩臂；staged 目錄的內容是否併入記錄的身分，要在 D4 的關卡之前決定。只以 baseline 文字為鍵的 preflight 紀錄，會被 staged 檔案不同的另一次 run 找到，兩次 run 的 row 也會併成一池；所以 A5 要把 staged 目錄的 digest 放進 row、pool 條件與 preflight 的鍵，否則 D4 不寫關卡、不花 session。
 
 ### WP-B session 延續
 

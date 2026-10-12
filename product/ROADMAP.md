@@ -2101,8 +2101,12 @@ reverse one, append a superseding entry (see AGENTS.md).
   after it pool together though their trials did not see the same `PATH`.
   With one `SKILL.md` text in both arms and different staged files — the
   shape (iv) of D-059 takes — the text hashes alone do not tell the arms
-  apart; whether the staged directory's content joins the recorded identity
-  is settled with the engine change, before that gate. A code grader's
+  apart, so a preflight record keyed on the baseline text would also be
+  found by a run whose baseline was staged with different files, and their
+  rows would pool; whether the staged directory's content joins the
+  recorded identity — row, pool and preflight key — is settled with the
+  engine change, and (iv) is not gated, and spends no session, until it
+  has. A code grader's
   environment is not rebuilt: a grader is not a trial. Unmeasured after
   this: routing under a real plugin load (D-024, D-044), a save into a live
   Obsidian vault, and anything that needs more than one turn in a trial
