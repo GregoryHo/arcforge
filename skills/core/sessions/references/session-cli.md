@@ -21,7 +21,7 @@ On each of these it exits non-zero and writes nothing:
 | Refusal | Fix |
 |---|---|
 | A section is missing, empty, out of order or extra | Fix the handover file |
-| The alias is not letters, digits, `-` and `_` (at most 128) | Pick another name |
+| The alias is not letters, digits, `-` and `_` (at most 128), or begins with `-` | Pick another name |
 | `alias "<name>" already exists — pass --force to overwrite it` | Pick another name |
 
 `--force` moves only that alias to the new archive; the old archive stays on
