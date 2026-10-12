@@ -2275,11 +2275,13 @@ reverse one, append a superseding entry (see AGENTS.md).
   engine's delta is recorded and is never read as evidence of improvement,
   whatever its size, and the preflight's PASS is never cited as
   discrimination. "Treatment not regressed, A1 to A4 not discriminating" is
-  written only when every baseline row passes A1 to A4 and the only
-  assertions lost in either arm are the two the arms differ on by
-  construction, the write under `.handovers/` and A5; a row of either arm
-  that fails any of A1 to A4 is reported per assertion and per arm as a
-  behavioural difference, outside that sentence. (8) One checkout runs one
+  written only when every treatment row passes all seven assertions, every
+  baseline row passes A1 to A4, and the only assertions a baseline row
+  loses are the two the arms differ on by construction, the write under
+  `.handovers/` and A5. A treatment row that loses either of those two is
+  the regression this run exists to find and is reported as one; a row of
+  either arm that fails any of A1 to A4 is reported per assertion and per
+  arm as a behavioural difference, outside that sentence. (8) One checkout runs one
   live eval at a time ([eval](specs/eval.md) B-15), so a run starts only
   when the one before it has ended, and the operator audits every row of
   every preflight and every A/B. The audit carries, per row: in D1, the
