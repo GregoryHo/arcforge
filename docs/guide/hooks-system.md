@@ -12,7 +12,7 @@ session stops. What follows is what each one actually does to your session.
 
 | Event | Registration | What you notice |
 |-------|--------------|-----------------|
-| SessionStart | `inject-context` | A short summary of what carried over — activated instincts, pending actions, session aliases |
+| SessionStart | `inject-context` | A short summary of what carried over — activated instincts, pending actions, session aliases, and where your newest session archive is |
 | SessionStart | `session-start` | Nothing; it creates this session's record in the background |
 | UserPromptSubmit | `user-message-counter` | Nothing; it counts your messages |
 | PreToolUse | `secrets-guard` | A warning if an edit, a write, or a `git commit` command looks like it contains a credential |
@@ -63,10 +63,23 @@ loop run, or drafts that never got enriched. You also see how many session
 aliases this project has and how many patterns were promoted to global in the
 past week.
 
-It does not tell the new session where the previous one left off. Each session
-leaves a record (see below), but no hook reads that record back into a new
-session. To hand work over to your next session, write a handover with
-`/arcforge:sessions`.
+When a session starts fresh — on startup or after `/clear`, not on a resume or
+a compaction — and this project has a saved session archive, the hook adds one
+more line, to you and to the model alike:
+
+```
+Previous session archive: parser, saved 2026-10-03. Read it: arcforge session resume parser
+```
+
+It names the newest archive by its alias, or by its file name and full path when
+no alias points at it. That line is all it carries: the archive is not opened
+and none of its text is injected, so reading it is still a step someone takes.
+It appears whether or not learning is enabled. With no archive saved, there is
+no line.
+
+An archive exists only if a session saved one — `/arcforge:sessions` writes the
+handover and saves it under a name. The record each session leaves by itself
+(see below) is not read back into a new session by any hook.
 
 If you have never enabled learning, there are no instincts and this is close to
 silent.

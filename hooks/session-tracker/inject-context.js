@@ -11,6 +11,7 @@
  * additionalContext (Claude-visible):
  * - Full instinct details with confidence scores
  * - Pending action notifications
+ * - On startup and clear, one line naming the newest session archive (both outputs)
  */
 
 const fs = require('node:fs');
@@ -44,6 +45,8 @@ const {
 const { getPendingActions, consumeAction } = require('../../scripts/lib/pending-actions');
 
 const { draftIsStale, learningCaptureEnabled } = require('../../scripts/lib/diary-capture');
+
+const { loadSessionContinuity } = require('./session-continuity');
 
 // Max activated instincts injected into SessionStart context (ICL-4).
 const MAX_INJECTED_INSTINCTS = 5;
@@ -398,6 +401,15 @@ function main() {
   if (staleWarning) {
     contextParts.push(staleWarning.message);
     userParts.push(`${staleWarning.count} unenriched draft${staleWarning.count === 1 ? '' : 's'}`);
+  }
+
+  // Where the previous session left off: one line naming the newest archive
+  // and the command that reads it, on a fresh context only. Not gated on the
+  // learning opt-in — an archive holds no text of the user's messages.
+  const continuity = loadSessionContinuity(project, input?.source);
+  if (continuity) {
+    contextParts.push(continuity);
+    userParts.push(continuity);
   }
 
   // Session aliases + recent global promotions — surfaced to the USER summary

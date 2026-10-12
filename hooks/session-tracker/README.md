@@ -29,6 +29,15 @@ Emits one combined JSON with two channels (see `hooks.md` → Output Visibility)
   read now.
 - **systemMessage** (user-visible): a brief one-line summary, plus
   discoverability hints (available session aliases, recent global promotions).
+- **Both channels**, when the SessionStart `source` is `startup` or `clear` and
+  the project has a session archive: one line naming the newest one and the
+  command that reads it —
+  `Previous session archive: <alias>, saved <YYYY-MM-DD>. Read it: arcforge session resume <alias>`
+  (the file name and the full path stand in when no alias points at the
+  archive). `resume` and `compact` continue a session, so they get no line.
+  The newest archive is found from file names alone; no archive is opened, so
+  nothing of its text is injected. Not gated on the learning opt-in, and
+  skipped in a session arcforge spawned itself (diary enricher, loop task).
 
 Activated instincts are **activation-gated** (ICL-4): an instinct is injected
 only when a reviewer explicitly activated it on the dashboard and has not since
@@ -165,4 +174,5 @@ Below threshold (stderr only, not shown to the user):
 The session JSON is not read back by any hook — editing it does not
 communicate anything to a future session. To leave yourself a message for
 next time, write a handover with `/sessions` instead of editing the
-session JSON directly.
+session JSON directly. Saved as a named archive, that handover is what the
+next fresh session is pointed at (see context injection above).
