@@ -462,6 +462,17 @@ describe('a scenario declares its own trial environment (## Environment)', () =>
     expect(env.UV_CACHE_DIR).toBe(path.join(trialDir, '.cache', 'uv'));
   });
 
+  it('leaves an inherited entry with a ".." segment as the operator wrote it', () => {
+    // Past a symlink, /opt/link/../bin need not be /opt/bin: the two are not one directory.
+    parentEnv.PATH = ['/opt/link/../bin', ...SYSTEM_PATH].join(':');
+    expect(build(['PATH+=/opt/bin'], { contained: false }).PATH.split(':')).toEqual([
+      '/opt/link/../bin',
+      ...SYSTEM_PATH,
+      '/opt/bin',
+    ]);
+    expect(build(['PATH-=/opt/bin'], { contained: false }).PATH).toBe(parentEnv.PATH);
+  });
+
   it.each([
     ['PATH=/usr/local/bin', /PATH cannot be replaced/],
     ['HOME=/tmp/elsewhere', /HOME is not a variable a scenario may declare/],

@@ -111,9 +111,11 @@ const CONTROL_CHAR_RE = /[\x00-\x1f\x7f]/;
 
 // One spelling per directory, so that two spellings of it compare equal and
 // `//` stays the root: trimmed to nothing it would be an empty PATH entry,
-// which a shell reads as the working directory.
+// which a shell reads as the working directory. An entry with a `..` segment is
+// left as written: collapsed as text, `/opt/link/../bin` would pass for `/opt/bin`,
+// which it is not when `link` is a symlink. Only an inherited entry can hold one.
 function withoutTrailingSlash(dir) {
-  const normal = path.posix.normalize(dir);
+  const normal = dir.split('/').includes('..') ? dir : path.posix.normalize(dir);
   return normal.length > 1 ? normal.replace(/\/+$/, '') : normal;
 }
 
