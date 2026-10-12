@@ -414,7 +414,15 @@ describe('eval command', () => {
 
     it('runs its trials under the preflight label and leaves one row per trial', async () => {
       writeScenario(tempDir, 'preflight-rows');
-      evalLib.runTrial.mockImplementation((s, t, k, opts) => ({
+      const file = path.join(tempDir, evalLib.SCENARIOS_DIR, 'preflight-rows.md');
+      const { computeScenarioHash } = require('../../scripts/lib/eval-preflight');
+      const parsedHash = computeScenarioHash(fs.readFileSync(file, 'utf8'));
+      evalLib.runTrial.mockImplementation((s, t, k, opts) => {
+        // The file changes once the trials are under way; the run keeps the hash it parsed.
+        if (t === 1) fs.appendFileSync(file, '\nEdited mid-preflight.\n');
+        return trialRow(s, t, k, opts);
+      });
+      const trialRow = (s, t, k, opts) => ({
         eval: `${s.name}-${opts.label}`,
         trial: t,
         k,
@@ -423,7 +431,7 @@ describe('eval command', () => {
         grader: 'code',
         timestamp: '2026-10-12T00:00:00.000Z',
         runId: opts.runId,
-      }));
+      });
       evalLib.gradeTrialResult.mockImplementation((row) => ({ ...row, graded: true }));
 
       await runEvalCommand(args(['preflight', 'preflight-rows']), {
@@ -440,6 +448,7 @@ describe('eval command', () => {
       expect(rows.every((r) => r.node_version === process.version)).toBe(true);
       const hash = logs.find((l) => l.startsWith('Hash:')).replace(/^Hash:\s+/, '');
       expect(rows.map((r) => r.scenario_hash)).toEqual([hash, hash, hash]);
+      expect(hash).toBe(parsedHash);
       // Nothing an `eval run` or `eval ab` reader opens.
       for (const name of [
         'preflight-rows',

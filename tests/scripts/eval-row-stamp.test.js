@@ -275,6 +275,36 @@ describe('rows and preflight records carry scenario_hash, node_version and repo_
       expect(record.scenario_hash).toBe(HASH);
     });
 
+    it('given the parsed scenario, stamps rows and record from that one parse', () => {
+      const scenario = findScenario(NAME, tempDir);
+      // The file moves on after the caller parsed it; preflight does not re-read it.
+      fs.appendFileSync(scenarioFile, '\nEdited after the caller parsed it.\n');
+      const record = runPreflight(NAME, tempDir, {
+        scenario,
+        runTrial: (t, k) =>
+          runTrial(scenario, t, k, { projectRoot: tempDir, runId: RUN_ID, label: PREFLIGHT_LABEL }),
+        gradeResult: (row) => gradePreflightTrial(row, scenario, tempDir),
+      });
+      expect(findScenario(NAME, tempDir).scenarioHash).not.toBe(HASH);
+      expect(record.scenario_hash).toBe(HASH);
+      const rows = loadResults(`${NAME}-preflight`, tempDir);
+      expect(rows.map((r) => r.scenario_hash)).toEqual([HASH, HASH, HASH]);
+      expect(fs.readdirSync(path.join(tempDir, PREFLIGHT_DIR))).toEqual([preflightFilename(HASH)]);
+    });
+
+    it('refuses a scenario object that carries no hash, before any trial', () => {
+      const runTrialSpy = jest.fn();
+      expect(() =>
+        runPreflight(NAME, tempDir, {
+          scenario: { name: NAME, grader: 'code' },
+          runTrial: runTrialSpy,
+          gradeResult: (r) => r,
+        }),
+      ).toThrow('has no scenarioHash');
+      expect(runTrialSpy).not.toHaveBeenCalled();
+      expect(fs.existsSync(path.join(tempDir, PREFLIGHT_DIR))).toBe(false);
+    });
+
     it('writes a record with exactly the documented keys, on disk as returned', () => {
       const record = runPreflightTrials();
       expect(Object.keys(record).sort()).toEqual(RECORD_KEYS);

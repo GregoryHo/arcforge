@@ -140,18 +140,30 @@ function resolveScenarioFile(name, projectRoot) {
  * @param {string} [opts.model] - Model identifier; included in cache key so
  *   per-model preflight records stay distinct (baseline pass rate is
  *   model-dependent). Pass the same value the trials were actually run with.
+ * @param {Object} [opts.scenario] - The scenario as the caller parsed it to
+ *   build the trials. Pass it so one read of the file stamps the trials, the
+ *   rows and the record; without it the scenario is resolved and parsed here.
  * @returns {{ scenario_hash: string, scenario_name: string, model: string|null, max_turns: number|null, plugin_dir: boolean, effort: string|null, trial_timeout_ms: number, node_version: string, repo_commit: string|null, pass_rate: number|null, k: number, errored?: number, verdict: 'PASS'|'BLOCK', reason: string, timestamp: string }}
  */
 function runPreflight(name, projectRoot, opts = {}) {
   const { runTrial, gradeResult, model, conditions = {} } = opts;
 
-  const filePath = resolveScenarioFile(name, projectRoot);
-  if (!filePath) {
-    throw new Error(`Scenario "${name}" not found in evals/scenarios/`);
+  let scenario = opts.scenario;
+  if (!scenario) {
+    const filePath = resolveScenarioFile(name, projectRoot);
+    if (!filePath) {
+      throw new Error(`Scenario "${name}" not found in evals/scenarios/`);
+    }
+    scenario = parseScenario(filePath, projectRoot);
   }
-
-  const contents = fs.readFileSync(filePath, 'utf8');
-  const hash = computeScenarioHash(contents);
+  // The hash of the text the trials were built from: the record is filed
+  // under it and every row carries it (stampRow), from the one parse.
+  const hash = scenario.scenarioHash;
+  if (!hash) {
+    throw new Error(
+      `runPreflight: the scenario passed for "${name}" has no scenarioHash; pass the object parseScenario returned`,
+    );
+  }
   const cacheFile = preflightFilename(hash, model, conditions);
   const ranUnder = {
     max_turns: conditions.maxTurns ?? null,
@@ -182,8 +194,6 @@ function runPreflight(name, projectRoot, opts = {}) {
 
   // Rows are labelled here, whatever the injected runner called them: a
   // preflight trial must not be able to land in another condition's file.
-  // They carry the hash the record is filed under, so the two can be matched.
-  const scenario = { ...parseScenario(filePath, projectRoot), scenarioHash: hash };
   const evalName = `${scenario.name}-${PREFLIGHT_LABEL}`;
   const results = [];
   for (let t = 1; t <= PREFLIGHT_K; t++) {

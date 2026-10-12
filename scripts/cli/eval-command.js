@@ -290,6 +290,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     const stubGrade = (result) => gradePreflightTrial(result, scenario, projectRoot);
 
     const outcome = runPreflight(scenarioName, projectRoot, {
+      scenario,
       runTrial: stubRunTrial,
       gradeResult: stubGrade,
       model,
