@@ -323,8 +323,10 @@ copy's path. The trial's instruction to stay inside its own directory names
 that path as its one exception. A skill directory that is itself a symlink
 (`linked-skill -> real-skill`) is staged as the directory it points to.
 
-The copy is removed when the run ends, and when the command exits early. A run
-that is killed (Ctrl-C, `kill`) cannot remove it. The copy is named
+Each trial gets a copy of its own, made when the trial starts and removed when
+it ends, and when the command exits early. No trial is given a copy another
+trial has used. A run that is killed (Ctrl-C, `kill`) cannot remove the copy of
+the trial that was running. The copy is named
 `arcforge-eval-skill-<PID>-<random>` under the system temp directory, and the
 next command that stages skill files removes every such directory whose
 process is gone. Until then it stays where it is, so that name is what to look
@@ -345,21 +347,32 @@ gets no copy and no line, and cannot list one from inside its trial directory.
 Do not put the same files into the trial with `## Setup` instead: both arms run
 the same Setup, so the baseline would see them too.
 
-Both arms watch the copy for writes, the same way they watch the project. A
-trial that writes into it is recorded as `trial_wrote_repo` and stops the run,
-since every later trial would be given the changed files. A skill whose script
-writes into its own folder trips this check.
+A trial's copy is watched for writes while the trial runs, the same way the
+project is. A trial that writes into its copy is recorded as an infra error
+(`trial_wrote_skill_files`) naming what it wrote, and never scores. The run
+goes on: the copy was that trial's alone, and the next trial starts from a
+fresh one. A skill whose script writes into its own folder trips this check on
+every trial, so its arm ends the run with no row to score.
+
+A write into the project is different. It is recorded as `trial_wrote_repo` and
+stops the run, since every later trial would run against the changed files.
+That holds for a trial that wrote into its copy as well.
 
 The write check compares each file's modification time, size and permissions,
-not its content. So after every trial each staged copy is also digested again
-and compared with the digest taken when it was staged. A trial that left a
-copy with other content is recorded as an infra error
-(`trial_wrote_skill_files`) naming the copy, never scores, and stops the run
-like `trial_wrote_repo`. Neither check sees a write that stays inside a `.git`
+not its content. So when a trial ends its copy is also digested again and
+compared with the digest taken when it was staged. A trial that left its copy
+with other content is recorded as `trial_wrote_skill_files` too, naming the
+copy. Neither check sees a write that stays inside a `.git`
 or `node_modules` folder in the copy: the write check skips both names and the
 digest leaves them out. A script that only installs into `node_modules` there
 goes unnoticed. A write into `.venv` or `__pycache__` is caught by the write
 check.
+
+Before the first trial each arm's directory is staged once and that copy
+removed. A directory that cannot be staged is refused there, before any trial
+has run, and the digest taken there is the one every row of the arm records. If
+the skill directory is edited while the run is going, the next trial's copy has
+another digest and the run stops with an error naming the directory.
 
 Staging is a run condition. A run with the flag records `stageSkillFiles: true`
 on every row of both arms and forms a pool of its own. A run without it records

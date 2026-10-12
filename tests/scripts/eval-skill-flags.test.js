@@ -305,25 +305,24 @@ describe('eval ab skill flags', () => {
       expect(evalLib.runSkillEval).toHaveBeenCalledTimes(1);
     });
 
-    it('stages the baseline files with --stage-skill-files, watched and then removed', async () => {
+    it('stages the baseline files with --stage-skill-files, a copy for each trial', async () => {
       await preflight({ 'baseline-skill-file': old }, { 'stage-skill-files': true });
       const [first] = seen;
       expect(first.staged.startsWith(os.tmpdir())).toBe(true);
       expect(first.staged).not.toContain('.eval-trials');
-      expect(first.stagedFiles).toEqual(['SKILL.md', 'verify.sh']);
-      // One copy for the whole preflight, watched by every trial.
+      // A copy of its own for each trial, gone once the trial has ended.
+      expect(new Set(seen.map((trial) => trial.staged)).size).toBe(seen.length);
       for (const trial of seen) {
-        expect(trial.staged).toBe(first.staged);
-        expect(trial.options.watchRoots).toContain(first.staged);
+        expect(trial.stagedFiles).toEqual(['SKILL.md', 'verify.sh']);
         expect(trial.options.skillInjection).toEqual(
-          expect.objectContaining({ baseDir: first.staged, staged: true }),
+          expect.objectContaining({ baseDir: trial.staged, staged: true }),
         );
-        // What each trial is checked against once it ends.
+        // What each trial watches while it runs and is checked against once it ends.
         expect(trial.options.skillInjection.copies).toEqual([
-          { dir: first.staged, filesHash: trial.options.skillInjection.filesHash },
+          { dir: trial.staged, filesHash: first.options.skillInjection.filesHash },
         ]);
+        expect(fs.existsSync(trial.staged)).toBe(false);
       }
-      expect(fs.existsSync(first.staged)).toBe(false);
       const oldDir = path.join(tempDir, 'skills', 'demo-old');
       expect(first.options.skillInjection.filesHash).toBe(digestSkillDir(oldDir));
       expect(first.options.skillInjection.baselineFilesHash).toBe(digestSkillDir(oldDir));
