@@ -117,6 +117,91 @@ describe('trial isolation keeps the operator user config out (B-7, #170)', () =>
   });
 });
 
+describe('the operator environment stays out of a contained trial (B-7)', () => {
+  const { runSkillEval } = require('../../scripts/lib/eval');
+  const OPERATOR_ONLY = '/operator/only/bin';
+  const SYSTEM = ['/usr/bin', '/bin', '/usr/sbin', '/sbin'];
+  let tempDir;
+  let saved;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-trial-env-'));
+    saved = { PATH: process.env.PATH, OPERATOR_ONLY_VAR: process.env.OPERATOR_ONLY_VAR };
+    process.env.PATH = [OPERATOR_ONLY, saved.PATH].join(path.delimiter);
+    process.env.OPERATOR_ONLY_VAR = 'set by the operator';
+    mockUtils.execCommand.mockReset();
+    stubExec();
+  });
+
+  afterEach(() => {
+    process.env.PATH = saved.PATH;
+    if (saved.OPERATOR_ONLY_VAR === undefined) delete process.env.OPERATOR_ONLY_VAR;
+    else process.env.OPERATOR_ONLY_VAR = saved.OPERATOR_ONLY_VAR;
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const SETUP = 'echo fixture';
+  const envs = (isWanted) =>
+    mockUtils.execCommand.mock.calls
+      .filter(isWanted)
+      .map((c) => ({ env: c[2].env, cwd: c[2].cwd }));
+  const sessionEnvs = () => envs((c) => c[0] === 'claude' && c[1].includes('-p'));
+  // The code grader also runs `sh -c`, on the operator's side; only Setup is wanted.
+  const setupEnvs = () => envs((c) => c[0] === 'sh' && c[1][1] === SETUP);
+  /** An env with its trial directory named, so two trials' envs can be compared. */
+  const portable = ({ env, cwd }) =>
+    Object.fromEntries(Object.entries(env).map(([k, v]) => [k, v.split(cwd).join('<TRIAL_DIR>')]));
+
+  it('spawns the session on a PATH with no operator entry', () => {
+    runTrial(SCENARIO, 1, 1, { projectRoot: tempDir });
+    const [{ env, cwd }] = sessionEnvs();
+    const shims = path.join(path.resolve(tempDir), '.eval-trials', '.bin');
+    expect(env.PATH.split(path.delimiter)).toEqual([shims, ...SYSTEM]);
+    expect(env.PATH).not.toContain(OPERATOR_ONLY);
+    expect(env).not.toHaveProperty('OPERATOR_ONLY_VAR');
+    expect(env.HOME).toBe(process.env.HOME);
+    expect(env.ARCFORGE_HOME).toBe(path.join(cwd, '.arcforge'));
+  });
+
+  it('contains a plugin-dir trial the same way', () => {
+    runTrial(SCENARIO, 1, 1, { projectRoot: tempDir, pluginDir: tempDir, isolated: false });
+    const [{ env }] = sessionEnvs();
+    expect(env.PATH).not.toContain(OPERATOR_ONLY);
+    expect(env).not.toHaveProperty('OPERATOR_ONLY_VAR');
+  });
+
+  it('runs Setup in the environment the session gets', () => {
+    runTrial({ ...SCENARIO, setup: SETUP }, 1, 1, { projectRoot: tempDir });
+    const [setup] = setupEnvs();
+    const [session] = sessionEnvs();
+    const { PROJECT_ROOT, TRIAL_DIR, ...rest } = setup.env;
+    expect(rest).toEqual(session.env);
+    expect([PROJECT_ROOT, TRIAL_DIR]).toEqual([tempDir, setup.cwd]);
+    // The session is not handed the two Setup-only names.
+    expect(session.env).not.toHaveProperty('PROJECT_ROOT');
+    expect(session.env).not.toHaveProperty('TRIAL_DIR');
+  });
+
+  it('gives both arms of a comparison the same environment', () => {
+    runSkillEval({ ...SCENARIO, setup: SETUP }, 1, {
+      projectRoot: tempDir,
+      skillInstruction: 'BODY',
+    });
+    const [baseline, treatment] = sessionEnvs().map(portable);
+    expect(treatment).toEqual(baseline);
+    const [baselineSetup, treatmentSetup] = setupEnvs().map(portable);
+    expect(treatmentSetup).toEqual(baselineSetup);
+  });
+
+  it('leaves a --no-isolate trial on the operator environment', () => {
+    runTrial(SCENARIO, 1, 1, { projectRoot: tempDir, isolated: false });
+    const [{ env, cwd }] = sessionEnvs();
+    expect(env.PATH).toBe(process.env.PATH);
+    expect(env.OPERATOR_ONLY_VAR).toBe('set by the operator');
+    expect(env.ARCFORGE_HOME).toBe(path.join(cwd, '.arcforge'));
+  });
+});
+
 describe('a trial that writes outside its directory is an instrument failure (eval-10)', () => {
   let tempDir;
 

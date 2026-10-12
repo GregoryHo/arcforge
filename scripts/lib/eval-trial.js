@@ -24,6 +24,7 @@ const {
   writeIsolationSettings,
   buildIsolationSettings,
 } = require('./eval-trial-env');
+const { trialEnv } = require('./eval-trial-environment');
 const { parseStreamJsonOutput, parseActionsFromTranscript } = require('./eval-transcript');
 const { isTrialKilled, isOutputComplete, isProviderRefusal } = require('./eval-trial-outcome');
 const { watchForWrites } = require('./eval-trial-guard');
@@ -152,8 +153,13 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
 
   // Always run in trial dir for workspace safety
   const trialDir = createTrialDir(scenario.name, trialNumber, projectRoot);
+  // One environment for Setup and the session; an arm never gets its own.
+  const env = trialEnv(trialDir, scenario, {
+    projectRoot,
+    contained: isolated || Boolean(pluginDir),
+  });
   try {
-    if (scenario.setup) runSetup(scenario.setup, trialDir, projectRoot);
+    if (scenario.setup) runSetup(scenario.setup, trialDir, projectRoot, env);
   } catch (error) {
     return buildInfraError(error.message || String(error), 'setup_failed', { trialDir });
   }
@@ -200,12 +206,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     // ARCFORGE_EVAL_TRIAL_TIMEOUT_MS moves the ceiling for one run.
     timeout: trialTimeoutMs,
     maxBuffer: CLAUDE_MAX_BUFFER,
-    // Redirect ONLY the arcforge data home (not HOME) to the trial's isolated
-    // fixture. getArcforgeHome() honors ARCFORGE_HOME before falling back to
-    // ~/.arcforge, so the trial's SessionStart hook reads the Setup-written
-    // fixture under TRIAL_DIR/.arcforge instead of the real ~/.arcforge. Real
-    // HOME is preserved so the claude trial still resolves ~/.claude auth.
-    env: { ...process.env, ARCFORGE_HOME: path.join(trialDir, '.arcforge') },
+    env,
   });
   const wallDuration = Date.now() - t0;
   const repoWrites = writesSince();

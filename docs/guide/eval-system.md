@@ -144,10 +144,30 @@ excluded, the output style is pinned to the default and hooks are disabled. Your
 user settings file (`~/.claude/settings.json`) is not read at all, so nothing
 set there reaches the trial: not your hooks, output style, `model` or effort
 level, `env`, permissions, or an `apiKeyHelper`. Credentials stored in your
-keychain still work, and environment variables from your shell are passed
-through. A `--plugin-dir` trial is contained the same way, `CLAUDE.md` excludes
-included, except that it loads the plugin under test and leaves hooks on so the
-plugin's own hooks run.
+keychain still work. A `--plugin-dir` trial is contained the same way,
+`CLAUDE.md` excludes included, except that it loads the plugin under test and
+leaves hooks on so the plugin's own hooks run.
+
+Your shell's environment does not reach a contained trial either. Its `PATH` is
+rebuilt: first `.eval-trials/.bin`, which holds links to `claude`, to the `node`
+running arcforge and to the `npm` and `npx` beside that `node`, then
+`/usr/bin:/bin:/usr/sbin:/sbin`. A tool you installed anywhere else (Homebrew,
+`~/.local/bin`, a version manager) is not found, even when it shares a
+directory with `claude`. Only these variables are forwarded:
+
+| Group | Variables |
+|-------|-----------|
+| You and your terminal | `HOME`, `USER`, `LOGNAME`, `SHELL`, `TERM`, `LANG`, `LC_*`, `TZ`, `TMPDIR`, `XDG_CONFIG_HOME` |
+| Claude Code's credentials and provider | `CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_CUSTOM_HEADERS`, `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`, `ANTHROPIC_VERTEX_PROJECT_ID`, `CLOUD_ML_REGION`, `GOOGLE_APPLICATION_CREDENTIALS`, `AWS_PROFILE`, `AWS_REGION`, `AWS_DEFAULT_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `AWS_BEARER_TOKEN_BEDROCK` |
+| Network | `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` and their lowercase forms, `NODE_EXTRA_CA_CERTS`, `SSL_CERT_FILE` |
+
+Everything else is dropped, a model picked through `ANTHROPIC_MODEL` included:
+pass `--model` so the row records it. `## Setup` runs in this same environment,
+plus `PROJECT_ROOT` and `TRIAL_DIR`, so a fixture is built with the tools the
+trial will find. `HOME` is kept because that is where `claude` finds your login,
+which has one side effect: Claude Code loads the functions and aliases of your
+shell startup file (`~/.zshrc` or `~/.bashrc`) into the commands the agent runs,
+so a function or alias defined there is still visible to a trial.
 
 Both kinds of contained trial, isolated and `--plugin-dir`, run with permission
 prompts skipped (`--dangerously-skip-permissions`) inside their trial
@@ -157,7 +177,8 @@ either, and without the flag the agent would be denied every command, write
 and edit. What contains the trial instead is the write check described below
 and arcforge's redirected state. This holds for `eval run`, `eval preflight` and
 both arms of `eval ab`. A `--no-isolate` trial with no plugin dir is not
-contained: it reads your settings file and runs under your own permission mode.
+contained: it reads your settings file, runs under your own permission mode and
+keeps your shell's environment, `PATH` included.
 
 In a comparison, both arms run `claude` with the same flags apart from the
 injection itself. They share the settings sources, the turn budget, the
