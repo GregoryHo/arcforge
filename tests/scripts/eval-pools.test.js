@@ -44,6 +44,7 @@ describe('conditionOf', () => {
       'pluginDir',
       'isolation',
       'stageSkillFiles',
+      'baselineSkillHash',
     ]);
     expect(conditionOf({ model: 'opus' })).toEqual({
       model: 'opus',
@@ -53,6 +54,7 @@ describe('conditionOf', () => {
       pluginDir: null,
       isolation: null,
       stageSkillFiles: null,
+      baselineSkillHash: null,
     });
   });
 });
@@ -419,6 +421,32 @@ describe('pairArms', () => {
     expect(paired.baseline).toEqual(staged);
     expect(paired.treatment).toEqual(staged);
     expect(paired.unpaired.map((p) => p.rows)).toEqual([2, 2]);
+  });
+
+  it('pools a two-text run per baseline text, never with a no-text baseline (B-20)', () => {
+    const at = (hour) => `2026-10-12T${hour}:00:00.000Z`;
+    const noText = [row({ trial: 1 })];
+    const oldA = [row({ trial: 1, baselineSkillHash: 'aaaaaaaaaaaaaaaa', timestamp: at(10) })];
+    const oldB = [row({ trial: 1, baselineSkillHash: 'bbbbbbbbbbbbbbbb', timestamp: at(11) })];
+
+    const split = splitPools([...noText, ...oldA, ...oldB]);
+    expect(split.current).toEqual(oldB);
+    expect(split.others.map((p) => p.conditions.baselineSkillHash)).toEqual([
+      'aaaaaaaaaaaaaaaa',
+      null,
+    ]);
+    expect(describeCondition(split.conditions)).toMatch(/, baseline text bbbbbbbbbbbbbbbb$/);
+
+    // The treatment rows of a two-text run carry the baseline's hash too, so
+    // they pair with that run's baseline and no other.
+    expect(pairArms(noText, oldA).error).toMatch(/no run conditions in common/);
+    expect(pairArms(oldA, oldB).error).toMatch(/baseline text/);
+    const paired = pairArms([...noText, ...oldA, ...oldB], [...noText, ...oldA]);
+    expect(paired.baseline).toEqual(oldA);
+    expect(paired.treatment).toEqual(oldA);
+    // The treatment's own text hash is recorded but does not split a pool.
+    const mixed = [row({ skillTextHash: 'one' }), row({ trial: 2, skillTextHash: 'two' })];
+    expect(splitPools(mixed).others).toEqual([]);
   });
 
   it('refuses when the arms share no condition pair, listing every pool', () => {

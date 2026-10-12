@@ -94,6 +94,7 @@ const { buildInjection, removeStagedDir } = require('./eval-skill-staging');
  * @property {string|null} [repo_commit] - Commit of the checkout the trial ran from (null: not a git repository, or git unavailable); absent on rows written before 6.5.0
  * @property {boolean} [stageSkillFiles] - true when the run staged skill files (both arms record it)
  * @property {string} [skillTextHash] - Hash of the skill text this arm was injected with
+ * @property {string} [baselineSkillHash] - Hash of the text the run's baseline was given (both arms record it)
  * @property {number[]} [assertionScores] - Per-assertion scores (0.0-1.0)
  * @property {string[]} [evidence] - Per-assertion evidence notes from grader
  * @property {number[][]} [blockRefs] - Per-assertion transcript block references (1-indexed)
@@ -235,7 +236,9 @@ function sharedArmOptions(scenario, { maxTurns, pluginDir }) {
 
 /**
  * Run a skill eval as A/B comparison: baseline (without skill) vs treatment (with skill).
- * Both arms run isolated; the treatment prepends the skill body. There is no
+ * Both arms run isolated; the treatment prepends the skill body. Given a
+ * baseline text, the baseline prepends that instead of nothing, so the arms
+ * differ in which text each was given (B-20). There is no
  * plugin dir in skill scope: a plugin-routed comparison is a workflow (B-1), and
  * a single skill's trigger rate is `claude plugin eval`'s question (B-11).
  * @param {EvalScenario} scenario - Scenario with scope='skill'
@@ -244,9 +247,12 @@ function sharedArmOptions(scenario, { maxTurns, pluginDir }) {
  * @param {string} [options.projectRoot] - Project root
  * @param {string} [options.skillInstruction] - Instruction to prepend for treatment trials
  * @param {string} [options.skillFile] - Absolute path the instruction was read from
- * @param {boolean} [options.stageSkillFiles=false] - Copy the skill file's directory
- *   outside the trial tree for the injected arm and open its injection with the
- *   base-directory line (B-19); the copy is removed when the run ends
+ * @param {string} [options.baselineSkillInstruction] - Text to prepend for baseline
+ *   trials; without it the baseline is injected with nothing
+ * @param {string} [options.baselineSkillFile] - Absolute path that text was read from
+ * @param {boolean} [options.stageSkillFiles=false] - Copy each injected arm's skill
+ *   directory outside the trial tree and open its injection with the
+ *   base-directory line (B-19); the copies are removed when the run ends
  * @param {boolean} [options.interleave=false] - Alternate baseline/treatment trials
  * @returns {{ baseline: TrialResult[], treatment: TrialResult[], delta: number }}
  */
@@ -255,6 +261,8 @@ function runSkillEval(scenario, k, options = {}) {
     projectRoot = process.cwd(),
     skillInstruction,
     skillFile,
+    baselineSkillInstruction,
+    baselineSkillFile,
     stageSkillFiles = false,
     onTrialComplete,
     interleave = false,
@@ -273,14 +281,21 @@ function runSkillEval(scenario, k, options = {}) {
   resolveTrialTimeoutMs(); // refuse a bad ceiling before any trial spawns (B-10)
   const isolationSettings = buildIsolationSettings();
 
-  const treatment = buildInjection({ text: skillInstruction, skillFile, stage: stageSkillFiles });
+  const staged = [];
   try {
+    const inject = (text, file) => {
+      const injection = buildInjection({ text, skillFile: file, stage: stageSkillFiles });
+      staged.push(injection.baseDir);
+      return injection;
+    };
+    const baseline = inject(baselineSkillInstruction, baselineSkillFile);
+    const treatment = inject(skillInstruction, skillFile);
     const injected = ({ text }) =>
       text ? { ...scenario, context: `${text}\n\n${scenario.context}` } : scenario;
     const shared = sharedArmOptions(scenario, { maxTurns });
-    // Both arms watch a staged copy: a write into it changes what the trials
-    // after it are given, whichever arm made it.
-    const watchRoots = [...shared.watchRoots, treatment.baseDir].filter(Boolean);
+    // Both arms watch every staged copy: a write into one changes what the
+    // trials after it are given, whichever arm made it.
+    const watchRoots = [...shared.watchRoots, ...staged].filter(Boolean);
     const armOptions = (label, { baseDir, textHash }) => ({
       projectRoot,
       label,
@@ -291,13 +306,24 @@ function runSkillEval(scenario, k, options = {}) {
       runId,
       ...shared,
       watchRoots,
-      skillInjection: { baseDir, textHash, staged: stageSkillFiles },
+      skillInjection: {
+        baseDir,
+        textHash,
+        staged: stageSkillFiles,
+        baselineHash: baseline.textHash,
+      },
     });
-    const bOpts = armOptions('baseline', {});
-    const tOpts = armOptions('treatment', treatment);
-    return runAbTrials(scenario, injected(treatment), scenario, k, bOpts, tOpts, interleave);
+    return runAbTrials(
+      injected(baseline),
+      injected(treatment),
+      scenario,
+      k,
+      armOptions('baseline', baseline),
+      armOptions('treatment', treatment),
+      interleave,
+    );
   } finally {
-    removeStagedDir(treatment.baseDir);
+    for (const dir of staged) removeStagedDir(dir);
   }
 }
 

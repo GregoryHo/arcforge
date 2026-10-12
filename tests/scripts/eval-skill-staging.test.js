@@ -1,6 +1,7 @@
 /**
- * eval-skill-staging.test.js - Staged skill files for the injected arm (B-19).
- * The `claude` subprocess is stubbed; no session is spawned.
+ * eval-skill-staging.test.js - Staged skill files for the injected arm (B-19)
+ * and an A/B between two skill texts (B-20). The `claude` subprocess is
+ * stubbed; no session is spawned.
  */
 
 const fs = require('node:fs');
@@ -46,6 +47,23 @@ function writeSkill(root, name, body) {
   fs.writeFileSync(path.join(dir, 'node_modules', 'dep', 'index.js'), '');
   fs.writeFileSync(path.join(dir, 'references', '.venv', 'pyvenv.cfg'), '');
   return path.join(dir, 'SKILL.md');
+}
+
+/** Record every directory staged while `fn` runs, whether or not a trial saw it. */
+function recordingStaged(fn) {
+  const made = [];
+  const realMkdtemp = fs.mkdtempSync;
+  jest.spyOn(fs, 'mkdtempSync').mockImplementation((prefix, ...rest) => {
+    const dir = realMkdtemp(prefix, ...rest);
+    if (path.basename(dir).startsWith('arcforge-eval-skill-')) made.push(dir);
+    return dir;
+  });
+  try {
+    fn(made);
+  } finally {
+    fs.mkdtempSync.mockRestore();
+  }
+  return made;
 }
 
 describe('staged skill files for the injected arm (B-19)', () => {
@@ -170,22 +188,94 @@ describe('staged skill files for the injected arm (B-19)', () => {
     expect(fs.existsSync(trials[1].staged)).toBe(false);
   });
 
-  it('the baseline watches the staged copy too', () => {
-    let staged;
-    const realMkdtemp = fs.mkdtempSync;
-    jest.spyOn(fs, 'mkdtempSync').mockImplementation((prefix, ...rest) => {
-      const dir = realMkdtemp(prefix, ...rest);
-      if (path.basename(dir).startsWith('arcforge-eval-skill-')) staged = dir;
-      return dir;
+  describe('with a baseline text (B-20)', () => {
+    let oldFile;
+    const twoText = (options = {}) =>
+      run({ baselineSkillInstruction: 'OLD BODY', baselineSkillFile: oldFile, ...options });
+
+    beforeEach(() => {
+      oldFile = writeSkill(tempDir, 'demo-old', 'OLD BODY');
     });
-    onTrial = () => fs.writeFileSync(path.join(staged, 'SKILL.md'), 'edited by the baseline');
-    try {
+
+    it('injects each arm with its own text, the argv identical', () => {
+      twoText();
+      const [baseline, treatment] = trials;
+      expect(baseline.prompt).toBe('## Context\nOLD BODY\n\nA fixture.\n\n## Task\nTest.');
+      expect(treatment.prompt).toBe('## Context\nBODY\n\nA fixture.\n\n## Task\nTest.');
+      expect(treatment.argv).toEqual(baseline.argv);
+    });
+
+    it('records the baseline text hash on both arms and each arm own text hash', () => {
+      twoText();
+      const oldHash = hashSkillText('OLD BODY');
+      expect(rows.map((r) => r.baselineSkillHash)).toEqual([oldHash, oldHash]);
+      expect(rows.map((r) => r.skillTextHash)).toEqual([oldHash, hashSkillText('BODY')]);
+      for (const row of rows) expect(row).not.toHaveProperty('stageSkillFiles');
+    });
+
+    it('records no baseline text hash when the baseline was given none', () => {
+      run();
+      for (const row of rows) expect(row).not.toHaveProperty('baselineSkillHash');
+    });
+
+    it('stages a directory of its own for each arm, taken from where its file sits', () => {
+      twoText({ stageSkillFiles: true });
+      const [baseline, treatment] = trials;
+      expect(baseline.prompt).toBe(
+        `## Context\nBase directory for this skill: ${baseline.staged}\n\nOLD BODY\n\nA fixture.\n\n## Task\nTest.`,
+      );
+      expect(treatment.prompt).toMatch(BASE_LINE);
+      expect(baseline.staged).not.toBe(treatment.staged);
+      for (const { staged } of trials) {
+        expect(staged.startsWith(os.tmpdir())).toBe(true);
+        expect(staged).not.toContain('.eval-trials');
+      }
+      // Each arm's advisory names its own directory, and only that one.
+      expect(baseline.advisory.match(ADVISORY_EXCEPTION)[1]).toBe(baseline.staged);
+      expect(baseline.advisory).not.toContain(treatment.staged);
+      expect(treatment.advisory.match(ADVISORY_EXCEPTION)[1]).toBe(treatment.staged);
+      const strip = (argv) => argv.map((a) => a.replace(ADVISORY_EXCEPTION, ''));
+      expect(strip(treatment.argv)).toEqual(strip(baseline.argv));
+      expect(rows.map((r) => r.stageSkillFiles)).toEqual([true, true]);
+    });
+
+    it('removes both copies when the run ends, and when it throws', () => {
+      twoText({ stageSkillFiles: true });
+      for (const { staged } of trials) expect(fs.existsSync(staged)).toBe(false);
+
+      // The first trial throws: the treatment's copy was staged but never used.
+      onTrial = () => {
+        throw new Error('spawn failed');
+      };
+      const made = recordingStaged(() => {
+        expect(() => twoText({ stageSkillFiles: true })).toThrow('spawn failed');
+      });
+      expect(made).toHaveLength(2);
+      for (const dir of made) expect(fs.existsSync(dir)).toBe(false);
+    });
+
+    it('stops the run when the baseline writes into the copy staged for the treatment', () => {
+      const made = recordingStaged((dirs) => {
+        onTrial = (trial) => {
+          const other = dirs.find((dir) => dir !== trial.staged);
+          fs.writeFileSync(path.join(other, 'SKILL.md'), 'edited by the baseline');
+        };
+        expect(() => twoText({ stageSkillFiles: true })).toThrow(
+          /baseline trial 1 wrote outside its directory: .*SKILL\.md/,
+        );
+      });
+      expect(made).toHaveLength(2);
+      expect(trials).toHaveLength(1);
+    });
+  });
+
+  it('the baseline watches the staged copy too', () => {
+    recordingStaged((dirs) => {
+      onTrial = () => fs.writeFileSync(path.join(dirs[0], 'SKILL.md'), 'edited by the baseline');
       expect(() => run({ stageSkillFiles: true })).toThrow(
         /baseline trial 1 wrote outside its directory: .*SKILL\.md/,
       );
-    } finally {
-      fs.mkdtempSync.mockRestore();
-    }
+    });
     expect(trials).toHaveLength(1);
   });
 });

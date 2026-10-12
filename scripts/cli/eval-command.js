@@ -393,6 +393,7 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
     const { resolveSkillOptions } = require('./eval-skill-options');
     const skill = resolveSkillOptions(scenario, projectRoot, {
       skillFile: args.options['skill-file'],
+      baselineSkillFile: args.options['baseline-skill-file'],
       stage: args.flags['stage-skill-files'],
     });
     const { skillFile } = skill;
@@ -426,6 +427,8 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
           pluginDir: abPluginDir,
           effort,
           trialTimeoutMs: eval_.resolveTrialTimeoutMs(),
+          baselineSkillHash: skill.baselineSkillHash,
+          stageSkillFiles: skill.stageSkillFiles,
         },
       });
       if (gateError) {
@@ -463,11 +466,15 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
       console.log(
         `A/B eval (skill): ${scenario.name} (k=${k})${interleave ? ' [interleaved]' : ''}`,
       );
-      console.log(`Skill: ${skillFile}${skill.stageSkillFiles ? ' (files staged)' : ''}\n`);
+      const given = args.options['baseline-skill-file'];
+      console.log(`Skill: ${skillFile}${skill.stageSkillFiles ? ' (files staged)' : ''}`);
+      console.log(given ? `Baseline text: ${given}\n` : '');
       result = eval_.runSkillEval(scenario, k, {
         projectRoot,
         skillInstruction: skill.skillInstruction,
         skillFile: skill.skillPath,
+        baselineSkillInstruction: skill.baselineSkillInstruction,
+        baselineSkillFile: skill.baselineSkillFile,
         stageSkillFiles: skill.stageSkillFiles,
         interleave,
         onTrialComplete,

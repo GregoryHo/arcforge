@@ -120,6 +120,7 @@ Runs both arms and stores every trial. Useful flags:
 | `--interleave` | Alternate the arms instead of running each in a block, so drift over the run hits both equally |
 | `--max-turns` | Turn budget per trial, overriding the scenario |
 | `--skill-file` | Skill-scope only: inject this skill body into the treatment prompt. Falls back to the scenario's `## Target` |
+| `--baseline-skill-file` | Skill-scope only: inject the baseline with this file's text instead of nothing. See [Comparing two skill texts](#comparing-two-skill-texts) |
 | `--stage-skill-files` | Skill-scope only: also give the injected arm the skill's files. See [Staging a skill's files](#staging-a-skills-files) |
 | `--plugin-dir` | `workflow` scope only: load this plugin into the treatment arm. Refused for any other scope |
 
@@ -336,6 +337,34 @@ given.
 
 One run stages one directory, the one `--skill-file` sits in. A run that needs
 a second skill's files in the injected arm is not supported yet.
+
+### Comparing two skill texts
+
+A skill A/B normally asks whether the skill beats no skill. To ask whether one
+wording beats another, give the baseline a text of its own:
+
+```bash
+arcforge eval ab <name> --skill-file path/to/SKILL.md --baseline-skill-file path/to/old/SKILL.md
+```
+
+The baseline is injected with the `--baseline-skill-file` text where it would
+otherwise get none, so the arms differ in which text each was given. Use it when
+an edit fixes something the old wording caused: an agent with no skill at all
+was never misled by the old wording, so it cannot show the fix.
+
+With `--stage-skill-files`, each arm gets a staged directory and a
+base-directory line of its own. The baseline's copy is taken from the directory
+its file sits in, so keep the old text in a directory that holds the old files.
+
+Every row records `skillTextHash`, a hash of the text its arm was injected
+with. The baseline's text is a run condition: both arms' rows record its hash
+as `baselineSkillHash`. A two-text run's rows form a pool of their own per
+baseline text, and are never combined with a run whose baseline was given no
+text. A run without the flag records nothing and pools as before.
+
+The treatment's text hash is recorded but does not pool. When both arms are
+given one text and differ only in their staged files, the hashes do not tell
+the arms apart.
 
 To run one condition on its own, without a comparison:
 
@@ -584,8 +613,9 @@ when only its prose did.
 A pool is narrower than a version. Every row also records the conditions it ran
 under: `model`, `effort`, the per-trial ceiling (`trialTimeoutMs`), the turn
 budget (`maxTurns`), whether a plugin was loaded (`pluginDir`), the isolation
-mode (`isolation`: `isolated`, `plugin-dir`, or `toolkit` for `--no-isolate`), and
-whether the run staged skill files (`stageSkillFiles`, recorded only when it did). Rows under
+mode (`isolation`: `isolated`, `plugin-dir`, or `toolkit` for `--no-isolate`),
+whether the run staged skill files (`stageSkillFiles`, recorded only when it did), and
+the text its baseline was given (`baselineSkillHash`, recorded only when it was given one). Rows under
 different conditions answered different questions, so no reader combines them.
 `eval run`, `list`, `compare`, `report` and the dashboard judge the newest
 condition's pool. Each other pool is listed beside it with its row count and

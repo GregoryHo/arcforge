@@ -80,9 +80,10 @@ function resolveTrialTimeoutMs(env = process.env) {
  * @param {number} [options.maxTurns] - Max turns for Claude CLI
  * @param {string[]} [options.watchRoots] - Extra directories the write check watches;
  *   nothing is loaded from them (a comparison's baseline watches the plugin root)
- * @param {{ baseDir?: string, textHash?: string, staged?: boolean }} [options.skillInjection] -
- *   What this arm was injected with: its staged skill directory, the hash of its
- *   skill text, and whether the run stages skill files (a condition both arms record)
+ * @param {{ baseDir?: string, textHash?: string, staged?: boolean, baselineHash?: string }} [options.skillInjection] -
+ *   What this arm was injected with: its staged skill directory and the hash of
+ *   its skill text. And two conditions both arms record: whether the run stages
+ *   skill files, and the hash of the text the baseline was given, if any
  * @returns {TrialResult} Trial result
  */
 function runTrial(scenario, trialNumber, totalTrials, options = {}) {
@@ -161,6 +162,9 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
       // Recorded only by a run that staged skill files, so a run that did not
       // pools with rows written before the field existed (B-19).
       ...(skillInjection.staged ? { stageSkillFiles: true } : {}),
+      // Which text the baseline of this run was given, on both arms' rows; a
+      // run whose baseline was given none records nothing (B-20).
+      ...(skillInjection.baselineHash ? { baselineSkillHash: skillInjection.baselineHash } : {}),
       // Not a pooling condition: which text this arm was injected with.
       ...(skillInjection.textHash ? { skillTextHash: skillInjection.textHash } : {}),
     };

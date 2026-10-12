@@ -74,17 +74,30 @@ function preflightFilename(hash, model, conditions = {}) {
  * set does not unlock an A/B run under another. Plain conditions (no budget,
  * no plugin dir, no effort) add nothing to the file name, so records written
  * before this key existed still match them.
- * @param {{ maxTurns?: number, pluginDir?: string, effort?: string }} conditions
- * @returns {string} '' or e.g. '-t10-pd', '-ehigh', '-t10-pd-ehigh'
+ * A baseline given a skill text is another baseline: its record is keyed on the
+ * text's hash, and on whether its skill files were staged for it (B-20).
+ * @param {{ maxTurns?: number, pluginDir?: string, effort?: string, trialTimeoutMs?: number, baselineSkillHash?: string, stageSkillFiles?: boolean }} conditions
+ * @returns {string} '' or e.g. '-t10-pd', '-ehigh', '-t10-pd-ehigh', '-b0123456789abcdef-s'
  */
-function conditionsSuffix({ maxTurns, pluginDir, effort, trialTimeoutMs } = {}) {
+function conditionsSuffix({
+  maxTurns,
+  pluginDir,
+  effort,
+  trialTimeoutMs,
+  baselineSkillHash,
+  stageSkillFiles,
+} = {}) {
   const budget =
     maxTurns == null && !pluginDir ? '' : `-t${maxTurns ?? 'none'}${pluginDir ? '-pd' : ''}`;
   const effortKey = effort ? `-e${String(effort).replace(/[^A-Za-z0-9._]/g, '_')}` : '';
   // The ceiling only when it was moved, so records at the default keep matching.
   const ceiling =
     trialTimeoutMs && trialTimeoutMs !== DEFAULT_TRIAL_TIMEOUT_MS ? `-c${trialTimeoutMs}` : '';
-  return `${budget}${effortKey}${ceiling}`;
+  // Staging reaches the baseline only when it is given a text to stage for.
+  const baselineText = baselineSkillHash
+    ? `-b${String(baselineSkillHash).replace(/[^A-Za-z0-9]/g, '_')}${stageSkillFiles ? '-s' : ''}`
+    : '';
+  return `${budget}${effortKey}${ceiling}${baselineText}`;
 }
 
 /** Human-readable conditions, as the gate names them. */

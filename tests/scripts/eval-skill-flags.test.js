@@ -1,6 +1,7 @@
 /**
- * eval-skill-flags.test.js - `eval ab --stage-skill-files` (B-19), trial runner
- * stubbed: what the command hands the runner, and what it refuses.
+ * eval-skill-flags.test.js - `eval ab --stage-skill-files` (B-19) and
+ * `--baseline-skill-file` (B-20), trial runner stubbed: what the command hands
+ * the runner, and what it refuses.
  */
 
 const fs = require('node:fs');
@@ -22,6 +23,8 @@ jest.mock('../../scripts/lib/eval-blind-autotrigger', () => ({
   runBlindAutoTrigger: jest.fn(() => ({ skipped: true })),
 }));
 const { runEvalCommand } = require('../../scripts/cli/eval-command');
+const { runPreflight } = require('../../scripts/lib/eval-preflight');
+const { hashSkillText } = require('../../scripts/lib/eval-skill-staging');
 
 const SCENARIO = (name, scope, extra = '') => `# Eval: ${name}
 
@@ -111,6 +114,117 @@ describe('eval ab skill flags', () => {
         run(args(['ab', 'flow'], { model: 'opus', effort: 'high' }, { 'stage-skill-files': true })),
       ).rejects.toThrow(/--stage-skill-files is refused for a workflow-scope scenario/);
       expect(evalLib.runWorkflowEval).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('--baseline-skill-file (B-20)', () => {
+    it('hands the runner the baseline text and the path it was read from', async () => {
+      writeScenario('two-text');
+      const skill = writeSkill('demo', 'NEW');
+      const old = writeSkill('demo-old', 'OLD');
+      await run(
+        args(
+          ['ab', 'two-text'],
+          { 'skill-file': skill, 'baseline-skill-file': old },
+          { 'stage-skill-files': true },
+        ),
+      );
+      expect(skillEvalOptions()).toEqual(
+        expect.objectContaining({
+          skillInstruction: 'NEW',
+          skillFile: path.join(tempDir, skill),
+          baselineSkillInstruction: 'OLD',
+          baselineSkillFile: path.join(tempDir, old),
+          stageSkillFiles: true,
+        }),
+      );
+      expect(logs.join('\n')).toContain(`Baseline text: ${old}`);
+    });
+
+    it('gives the baseline no text without the flag', async () => {
+      writeScenario('one-text');
+      await run(args(['ab', 'one-text'], { 'skill-file': writeSkill('demo', 'NEW') }));
+      expect(skillEvalOptions().baselineSkillInstruction).toBeUndefined();
+      expect(skillEvalOptions().baselineSkillFile).toBeUndefined();
+    });
+
+    it('refuses a baseline skill file that does not exist', async () => {
+      writeScenario('missing');
+      await expect(
+        run(
+          args(['ab', 'missing'], {
+            'skill-file': writeSkill('demo', 'NEW'),
+            'baseline-skill-file': 'skills/gone/SKILL.md',
+          }),
+        ),
+      ).rejects.toThrow('skill file not found: skills/gone/SKILL.md');
+      expect(evalLib.runSkillEval).not.toHaveBeenCalled();
+    });
+
+    it('is refused for a workflow scenario', async () => {
+      writeScenario('flow-text', { scope: 'workflow' });
+      await expect(
+        run(
+          args(['ab', 'flow-text'], {
+            model: 'opus',
+            effort: 'high',
+            'baseline-skill-file': writeSkill('demo-old', 'OLD'),
+          }),
+        ),
+      ).rejects.toThrow(/--baseline-skill-file is refused for a workflow-scope scenario/);
+      expect(evalLib.runWorkflowEval).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('the preflight gate is keyed on the baseline text (B-20)', () => {
+    const preflight = (conditions = {}) =>
+      runPreflight('gated', tempDir, {
+        runTrial: () => ({ passed: false, score: 0 }),
+        gradeResult: (r) => r,
+        conditions,
+      });
+    const ab = (options, flags) => run(args(['ab', 'gated'], options, flags));
+    let skill;
+    let old;
+
+    beforeEach(() => {
+      writeScenario('gated', { extra: '' });
+      skill = writeSkill('demo', 'NEW');
+      old = writeSkill('demo-old', 'OLD');
+    });
+
+    it('a no-text preflight does not unlock a two-text A/B', async () => {
+      preflight();
+      await ab({ 'skill-file': skill });
+      expect(evalLib.runSkillEval).toHaveBeenCalledTimes(1);
+
+      const { message } = await ab({ 'skill-file': skill, 'baseline-skill-file': old }).catch(
+        (err) => err,
+      );
+      expect(message).toContain('No preflight record found for scenario "gated"');
+      expect(evalLib.runSkillEval).toHaveBeenCalledTimes(1);
+    });
+
+    it('a preflight for that baseline text unlocks it, and no other text', async () => {
+      preflight({ baselineSkillHash: hashSkillText('OLD') });
+      await ab({ 'skill-file': skill, 'baseline-skill-file': old });
+      expect(evalLib.runSkillEval).toHaveBeenCalledTimes(1);
+
+      const other = writeSkill('demo-older', 'OLDER');
+      await expect(ab({ 'skill-file': skill, 'baseline-skill-file': other })).rejects.toThrow(
+        /No preflight record found/,
+      );
+      // The same text with its files staged is another baseline.
+      await expect(
+        ab({ 'skill-file': skill, 'baseline-skill-file': old }, { 'stage-skill-files': true }),
+      ).rejects.toThrow(/No preflight record found/);
+      expect(evalLib.runSkillEval).toHaveBeenCalledTimes(1);
+    });
+
+    it('staging alone leaves a no-text baseline as it was, so its preflight still holds', async () => {
+      preflight();
+      await ab({ 'skill-file': skill }, { 'stage-skill-files': true });
+      expect(evalLib.runSkillEval).toHaveBeenCalledTimes(1);
     });
   });
 });
