@@ -67,7 +67,7 @@
   - `uv run`。prompt 說了不建置，但 agent 仍可能把計畫轉成 `.excalidraw` 再以 `uv run python check_overlaps.py` 檢查，`.venv` 寫進 staged 複本。真 trial 裡 `uv` 是否解析得到沒有離線證明；`design-gate.verify-exit.md` 的離線證據指向解析得到。
 
   兩條路的後果相同（`5945d308`，事實 3）：那一列是 `trial_wrote_skill_files`，不進池；複本是那個 trial 自己的，run 繼續，下一個 trial 拿到新的一份。損失的只有那一列。
-- **少掉的列由補跑補上。** 預先登記的補跑是 2 次 `--k 1`，每次兩臂各加一列；A/B 結束時任一臂可評分的列少於 5 筆就動用。兩次補跑之後仍不足 5 筆，照 PLAN 記為 `INSUFFICIENT_DATA` 的發現，不再加跑。不計分的列逐臂列在稽核表，連同它寫了什麼路徑。task 要帶的緩解不變：prompt 指明 `layout.json` 寫在專案目錄，並要求絕對路徑（見上面的 prompt），agent 就算已經 `cd` 進 `references/`，輸出也落在 trial 目錄。
+- **少掉的列由補跑補上。** 預先登記的補跑是 2 次 `--k 1`，每次兩臂各加一列；A/B 結束時任一臂可評分的列少於 5 筆就動用。兩次補跑之後仍不足 5 筆，照 PLAN 記為 `INSUFFICIENT_DATA` 的發現，不再加跑。不計分的列逐臂列在稽核表，連同它寫了什麼路徑；兩臂各有幾列寫進結果的 decision。這一輪量的是「檔案放對位置之後，座標間距對不對」，不是 agent 有沒有照絕對路徑寫：`cd` 的指示在兩臂共用的 `SKILL.md` 裡，放錯位置與 reference 的新舊無關。兩臂不計分的列數若相差懸殊，照實寫出，不解讀成鑑別。task 要帶的緩解不變：prompt 指明 `layout.json` 寫在專案目錄，並要求絕對路徑（見上面的 prompt），agent 就算已經 `cd` 進 `references/`，輸出也落在 trial 目錄。
 - **preflight 遇到 `trial_wrote_skill_files`。** preflight 跑得完三個 trial，但只要有一列是 `infraError` 就判 BLOCK、`pass_rate: null`（`eval-preflight.js:247-255`）。這不是天花板的 BLOCK，是沒有量到；它動用 preflight 出錯重跑的額度（整輪至多 2 次），不是補跑。
 - **寫到專案根目錄仍然中止 run。** staged 複本以外的寫入（例如沿著 `../../skills/` 寫回 repo）還是 `trial_wrote_repo`，run 在那一個 trial 結束（`eval-trial.js:334-346`、`:438-445`，`5945d308`）。prompt 沒有任何理由讓 agent 這樣做；發生了就照 PLAN 記為發現。
 - **skill 目錄在 run 中途被改。** 每臂在第一個 trial 之前先 stage 一次取 digest，之後每個 trial 的複本 digest 不同就拒絕（`eval-skill-staging.js:332-345`，`5945d308`）。量測期間不動 `skills/` 與 baseline 目錄。
