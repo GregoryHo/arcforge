@@ -658,7 +658,7 @@ scenario's verdict, and show `NO SCORED RUNS` when nothing was ever scored.
 An A/B comparison (`compare`, the benchmark's `compared` entry, the dashboard's
 A/B view) pairs its arms rather than taking each arm's newest pool on its own.
 It uses the newest pair of pools, one per arm, that ran under the same model,
-effort, ceiling, turn budget and isolation mode. The one allowed difference is
+effort, ceiling, turn budget, isolation mode, staging and baseline text. The one allowed difference is
 the treatment itself: an isolated baseline against a treatment that loads a
 plugin dir or the full toolkit. When the newest runs of the two arms don't match, the
 older matching pair is judged and the rest are listed as "Not combined". When
@@ -688,10 +688,13 @@ at once. `latest.json` holds the most recent report.
 A per-trial export goes to `evals/benchmarks/raw/` the same way, under the same
 file name as its aggregate. Each raw row
 carries its run conditions (`model`, `effort`, `trialTimeoutMs`, `maxTurns`,
-`pluginDir`, `isolation`) and its `scenario_hash`, `node_version` and
-`repo_commit`, `null` for a row recorded before those existed. Its baseline-relative fields (`baseline_score_avg`,
+`pluginDir`, `isolation`, `stageSkillFiles`, `baselineSkillHash`), the
+`skillTextHash` of the text its arm was injected with, and its `scenario_hash`,
+`node_version` and `repo_commit`, each `null` when the row recorded none. Its
+baseline-relative fields (`baseline_score_avg`,
 `score_delta_vs_baseline_avg` and the rest) are computed against the baseline
-pool that ran under the same model, effort, ceiling and turn budget. That
+pool that ran under the same model, effort, ceiling, turn budget, staging and
+baseline text. That
 average leaves out the pool's infra and grade errors, which stay in the export
 as rows of their own. A row with no such baseline gets `null` there.
 

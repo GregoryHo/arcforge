@@ -449,6 +449,49 @@ describe('pairArms', () => {
     expect(splitPools(mixed).others).toEqual([]);
   });
 
+  it('compares a raw two-text treatment row with the baseline of its own run only', () => {
+    const { generateRawBenchmarkData } = require('../../scripts/lib/eval-benchmark');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'test-raw-two-text-'));
+    try {
+      const dir = path.join(root, SCENARIOS_DIR);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, 'tt.md'),
+        '# Eval: tt\n\n## Scope\nskill\n\n## Scenario\nDo it.\n\n## Grader\ncode\n',
+      );
+      const put = (arm, runId, overrides) =>
+        appendResult(row({ eval: `tt-${arm}`, runId, ...overrides }), root);
+      // A no-text run, then a two-text run with staged files.
+      put('baseline', 'r1', { score: 0.2 });
+      put('treatment', 'r1', { score: 1, skillTextHash: 'new' });
+      const twoText = { baselineSkillHash: 'old', stageSkillFiles: true };
+      put('baseline', 'r2', { score: 0.8, skillTextHash: 'old', ...twoText });
+      put('treatment', 'r2', { score: 1, skillTextHash: 'new', ...twoText });
+
+      const { rows } = generateRawBenchmarkData(root, 'now');
+      const treatment = (runId) =>
+        rows.find((r) => r.condition === 'treatment' && r.run_id === runId);
+      expect(treatment('r1').baseline_score_avg).toBe(0.2);
+      expect(treatment('r2').baseline_score_avg).toBe(0.8);
+      expect(treatment('r1')).toEqual(
+        expect.objectContaining({
+          stageSkillFiles: null,
+          baselineSkillHash: null,
+          skillTextHash: 'new',
+        }),
+      );
+      expect(treatment('r2')).toEqual(
+        expect.objectContaining({
+          stageSkillFiles: true,
+          baselineSkillHash: 'old',
+          skillTextHash: 'new',
+        }),
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('refuses when the arms share no condition pair, listing every pool', () => {
     const paired = pairArms([row({ model: 'opus' })], [row({ model: 'sonnet' })]);
     expect(paired.error).toMatch(/no run conditions in common/);
