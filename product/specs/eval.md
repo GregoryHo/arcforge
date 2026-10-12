@@ -257,7 +257,7 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   `CLOUD_ML_REGION`, and the certificate variables `NODE_EXTRA_CA_CERTS`,
   `CURL_CA_BUNDLE`, `REQUESTS_CA_BUNDLE` and
   `NODE_TLS_REJECT_UNAUTHORIZED`), by prefix (`LC_`, `ANTHROPIC_`,
-  `CLAUDE_CODE_USE_`, `AWS_`, `GOOGLE_`, `GCLOUD_`, `CLOUDSDK_`,
+  `CLAUDE_CODE_USE_`, `AWS_`, `AZURE_`, `GOOGLE_`, `GCLOUD_`, `CLOUDSDK_`,
   `SSL_CERT_`) or by suffix (`_PROXY`, `_proxy`), and `ARCFORGE_HOME` is
   set, redirected as B-7 says. A deny list wins over all three:
   `ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_*_MODEL` and

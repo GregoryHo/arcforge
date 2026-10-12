@@ -146,6 +146,14 @@ describe('a contained trial does not inherit the operator environment', () => {
     ['AWS_CONTAINER_CREDENTIALS_RELATIVE_URI', true],
     ['AWS_CONFIG_FILE', true],
     ['AWS_SHARED_CREDENTIALS_FILE', true],
+    // Microsoft Foundry with Entra ID: the Azure SDK's default credential chain
+    ['ANTHROPIC_FOUNDRY_RESOURCE', true],
+    ['AZURE_CLIENT_ID', true],
+    ['AZURE_TENANT_ID', true],
+    ['AZURE_CLIENT_SECRET', true],
+    ['AZURE_CLIENT_CERTIFICATE_PATH', true],
+    ['AZURE_FEDERATED_TOKEN_FILE', true],
+    ['AZURE_AUTHORITY_HOST', true],
     // Google Cloud
     ['GOOGLE_APPLICATION_CREDENTIALS', true],
     ['GOOGLE_CLOUD_PROJECT', true],
@@ -184,6 +192,8 @@ describe('a contained trial does not inherit the operator environment', () => {
     ['CLAUDE_PROJECT_DIR', false],
     // Near misses of a family
     ['AWS', false],
+    ['AZURE', false],
+    ['MY_AZURE_CLIENT_ID', false],
     ['PROXY', false],
     ['MY_PROXY_HOST', false],
     ['GITHUB_TOKEN', false],
@@ -401,6 +411,42 @@ describe('a scenario declares its own trial environment (## Environment)', () =>
   it('applies PATH declarations in the order written, without duplicates', () => {
     const env = build(['PATH+=/opt/a', 'PATH^=/opt/b', 'PATH+=/opt/b/', 'PATH-=/opt/a']);
     expect(env.PATH.split(':')).toEqual([shims(), ...SYSTEM_PATH, '/opt/b']);
+  });
+
+  // `//` once trimmed to an empty entry, which a shell reads as the trial cwd.
+  it.each([
+    ['//', '/'],
+    ['///', '/'],
+    ['/usr//bin/', '/usr/bin'],
+    ['/opt/./tools', '/opt/tools'],
+    ['/opt/tools', '/opt/tools'],
+  ])('prepends %s as the one directory %s, never an empty entry', (declared, dir) => {
+    const entries = build([`PATH^=${declared}`]).PATH.split(':');
+    expect(entries[0]).toBe(dir);
+    expect(entries).not.toContain('');
+    expect(entries.filter((entry) => entry === dir)).toHaveLength(1);
+  });
+
+  it('removes a directory however its slashes are doubled', () => {
+    expect(build(['PATH-=/usr//sbin/']).PATH.split(':')).toEqual([
+      shims(),
+      '/usr/bin',
+      '/bin',
+      '/sbin',
+    ]);
+  });
+
+  it('refuses a declaration that expands to no absolute directory', () => {
+    expect(() =>
+      trialEnv(
+        '',
+        { name: 'scn', environment: [FAKE_BIN.replace('/fakebin', '')] },
+        {
+          projectRoot,
+          parentEnv,
+        },
+      ),
+    ).toThrow(/"\$\{TRIAL_DIR\}" expands to "\.", not an absolute directory/);
   });
 
   it('points cache directories inside the trial', () => {

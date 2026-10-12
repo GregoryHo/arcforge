@@ -45,12 +45,14 @@ const FORWARDED = {
     'REQUESTS_CA_BUNDLE',
     'NODE_TLS_REJECT_UNAUTHORIZED',
   ],
-  // ANTHROPIC_ covers ANTHROPIC_VERTEX_* and ANTHROPIC_BEDROCK_* as well.
+  // ANTHROPIC_ covers ANTHROPIC_VERTEX_*, ANTHROPIC_BEDROCK_* and
+  // ANTHROPIC_FOUNDRY_* as well. AZURE_ is what Foundry's Entra ID sign-in reads.
   prefixes: [
     'LC_',
     'ANTHROPIC_',
     'CLAUDE_CODE_USE_',
     'AWS_',
+    'AZURE_',
     'GOOGLE_',
     'GCLOUD_',
     'CLOUDSDK_',
@@ -107,7 +109,13 @@ const TRIAL_DIR_PREFIX = '${TRIAL_DIR}/';
 // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional control char validation
 const CONTROL_CHAR_RE = /[\x00-\x1f\x7f]/;
 
-const withoutTrailingSlash = (dir) => (dir.length > 1 ? dir.replace(/\/+$/, '') : dir);
+// One spelling per directory, so that two spellings of it compare equal and
+// `//` stays the root: trimmed to nothing it would be an empty PATH entry,
+// which a shell reads as the working directory.
+function withoutTrailingSlash(dir) {
+  const normal = path.posix.normalize(dir);
+  return normal.length > 1 ? normal.replace(/\/+$/, '') : normal;
+}
 
 function isForwarded(name) {
   if (NEVER_FORWARDED.includes(name)) return false;
@@ -327,6 +335,7 @@ function declaredEnvironment(scenario = {}, projectRoot = process.cwd()) {
  * @param {Object} trialEnvironment - Environment to change (the caller's own copy)
  * @param {Object[]} directives - From declaredEnvironment()
  * @param {{ projectRoot: string, trialDir: string }} roots - Placeholder values
+ * @throws {Error} when a value does not expand to an absolute directory
  */
 function applyDirectives(trialEnvironment, directives, { projectRoot, trialDir }) {
   const expand = (value) =>
@@ -340,6 +349,9 @@ function applyDirectives(trialEnvironment, directives, { projectRoot, trialDir }
     .filter(Boolean);
   for (const { name, op, value } of directives) {
     const dir = expand(value);
+    if (!path.posix.isAbsolute(dir)) {
+      throw new Error(`"${value}" expands to "${dir}", not an absolute directory`);
+    }
     if (op === 'set') {
       trialEnvironment[name] = dir;
       continue;
@@ -371,7 +383,8 @@ function applyDirectives(trialEnvironment, directives, { projectRoot, trialDir }
  * @param {boolean} [opts.contained=true] - False for a `--no-isolate` trial
  * @param {Object} [opts.parentEnv] - Environment to build from (injectable for tests)
  * @returns {Object} Environment for the trial's subprocesses
- * @throws {Error} when a `## Environment` line is not valid
+ * @throws {Error} when a `## Environment` line is not valid, or expands to no
+ *   absolute directory
  */
 function trialEnv(trialDir, scenario = {}, opts = {}) {
   const { projectRoot = process.cwd(), contained = true, parentEnv = process.env } = opts;

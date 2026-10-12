@@ -176,18 +176,18 @@ function scenarioSections(content) {
   let fence = null;
   let heredocMarker = null;
   content.split('\n').forEach((line, index) => {
-    fence = fenceAfter(fence, line);
-    const insideFence = Boolean(fence);
-
-    // Ignore ## headers inside heredocs (they contain arbitrary text)
-    if (!insideFence && !heredocMarker) {
-      const heredocMatch = line.match(/<<-?\s*['"]?(\w+)['"]?\s*$/);
+    // A heredoc body and a fenced block are both arbitrary text, so whichever
+    // opened first runs to its own terminator: a fence line inside a heredoc
+    // opens no fence, and a `<<EOF` inside a fence starts no heredoc.
+    if (heredocMarker) {
+      if (line.trim() === heredocMarker) heredocMarker = null;
+    } else {
+      fence = fenceAfter(fence, line);
+      const heredocMatch = !fence && line.match(/<<-?\s*['"]?(\w+)['"]?\s*$/);
       if (heredocMatch) heredocMarker = heredocMatch[1];
-    } else if (heredocMarker && line.trim() === heredocMarker) {
-      heredocMarker = null;
     }
 
-    const headerMatch = !insideFence && !heredocMarker && line.match(/^##\s+(.+)/);
+    const headerMatch = !fence && !heredocMarker && line.match(/^##\s+(.+)/);
     if (headerMatch) {
       currentSection = { startLine: index + 1, lines: [] };
       sections.set(headerMatch[1].trim().toLowerCase(), currentSection);
