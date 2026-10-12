@@ -104,9 +104,12 @@ Printed, never scored:
 How the grader finds a worker: any object in the JSON with numeric `x`, `y`,
 `width`, `height` is a shape; a worker is the shape whose `id` or `label`
 carries the worker's name as a whole token (`auth`, `worker-auth`,
-`Auth Service`). When several shapes carry one name, an exact `id` wins, then an
-exact `label`, then the largest area (a box contains its own text label); the
-audit line says which rule was used. The file may be a bare list or a list
+`Auth Service`). When several shapes carry one name, a box beats what is drawn
+on or between boxes: a shape whose `type` is text or a connector, or whose name
+also carries another pipeline node (`router-auth`), gives way when another
+candidate remains. Among the rest an exact `id` wins, then the largest area — a
+box contains its own text label, so a small text node labelled `auth` never
+stands in for the `Auth Service` box. The audit line says which rule was used. The file may be a bare list or a list
 wrapped in an object.
 
 The grader reads `layout.json` and the transcript as data and runs nothing
@@ -354,23 +357,38 @@ def placed(s):
 
 
 # ---- the six workers ----
+NOT_A_BOX = {"text", "label", "arrow", "line", "connector", "edge"}
+OTHER_NODES = {"router", "event", "log"}
+
+
+def is_annotation(s, name):
+    kind = s["o"].get("type")
+    if isinstance(kind, str) and kind.lower() in NOT_A_BOX:
+        return True
+    return bool((OTHER_NODES | (set(WORKERS) - {name})) & set(s["named"]))
+
+
 workers, problems = {}, []
 for name in WORKERS:
     cands = [s for s in shapes if name in s["named"]]
     if not cands:
         problems.append(f"{name}: no shape with that id or label")
         continue
-    exact_id = [s for s in cands if tokens(s["o"].get("id")) == [name]]
-    exact_label = [s for s in cands if tokens(s["o"].get("label")) == [name]]
+    # A box beats what is drawn on or between boxes: a text or connector type, and
+    # a shape naming a second pipeline node (`router-auth`), give way when another
+    # candidate remains. Then an exact id, then the largest area — a box contains
+    # its own label, so a small text node never stands in for it.
+    boxes = [s for s in cands if not is_annotation(s, name)] or cands
+    exact_id = [s for s in boxes if tokens(s["o"].get("id")) == [name]]
     if len(cands) == 1:
         pick, rule = cands[0], "only match"
+    elif len(boxes) == 1:
+        pick, rule = boxes[0], "only box"
     elif len(exact_id) == 1:
         pick, rule = exact_id[0], "exact id"
-    elif len(exact_label) == 1:
-        pick, rule = exact_label[0], "exact label"
     else:
-        sized = [s for s in cands if placed(s)]
-        pick = max(sized, key=lambda s: s["w"] * s["h"]) if sized else cands[0]
+        sized = [s for s in boxes if placed(s)]
+        pick = max(sized, key=lambda s: s["w"] * s["h"]) if sized else boxes[0]
         rule = "largest area"
     if len(cands) > 1:
         print(f"-- audit: {name}: {len(cands)} shapes carry the name, took {rule}")
