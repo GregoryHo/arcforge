@@ -118,7 +118,8 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   guide lists: a trial that wrote inside the repository it ran from is
   recorded as an instrument failure (`trial_wrote_repo`), as is one whose
   repository was too large to check (`repo_check_skipped`), and neither
-  enters a scored pool.
+  enters a scored pool. A session that never started is a third instrument
+  failure (`trial_spawn_failed`, B-18), excluded the same way.
 - **B-8 Results pool by scenario version.** Every result records the version
   it ran under and every read filters to the current one — editing a
   scenario's *meaning* (task, fixture, assertions) bumps the version and
@@ -169,7 +170,10 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   already delivered its answer is a valid measurement and scores. A provider
   refusal — a session-limit or quota message returned in place of the agent's
   turn — is an instrument failure of the same kind: its row carries
-  `infraError` and leaves every scored pool (D-018). The ceiling is part of
+  `infraError` and leaves every scored pool (D-018). So is a session that
+  never started — the exec fails with no exit status, nothing killed it and
+  it printed nothing: `trial_spawn_failed`, with `infraError`, excluded from
+  every scored pool, its trial directory removed (B-18, D-062). The ceiling is part of
   the measurement conditions, so a run that moved it MUST be reported with the
   value it used, the way B-9 treats a `--since`-bounded snapshot, and every
   result row records the ceiling its trial ran under (D-018). Residual: a
@@ -272,19 +276,35 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   `PATH` do not carry over — not even the directory `claude` is installed
   in, which can hold other tools — so a tool the operator happens to have
   installed — `arcforge` included — is not something a trial can run unless
-  the scenario says so. A `--no-isolate` trial is the exception: it measures
+  the scenario says so. The session itself is not looked up on that `PATH`:
+  a contained trial spawns `claude` by the shim's full path,
+  `<projectRoot>/.eval-trials/.bin/claude`, so a directory the scenario
+  prepends with `PATH^=`, or a `claude` its fixture `Setup` writes there,
+  stays on the session's `PATH` and cannot run in the session's place.
+  Fixture `Setup` keeps the declared `PATH`. A `--no-isolate` trial is the
+  exception: it measures
   the operator's own toolkit (B-7), so it inherits the operator's
   environment, with `ARCFORGE_HOME` redirected and the scenario's
-  `## Environment` directives applied. A scenario makes its
+  `## Environment` directives applied, and its session is the bare `claude`
+  the operator's `PATH` resolves. A scenario makes its
   statement in an `## Environment` section, which adds to the built `PATH`:
   it may append `PATH` entries, prepend them, remove them, and point cache
   directories — a package manager's, a browser download's, from a fixed
   list of cache variables — at a place under `${TRIAL_DIR}`. Nothing else
   can be declared: `HOME` and a whole-`PATH` assignment are refused, `HOME`
   because the session authenticates from `~/.claude`. The guide,
-  `docs/guide/eval-system.md`, holds the full grammar. The declaration
+  `docs/guide/eval-system.md`, holds the full grammar. A line holding a
+  control character — a NUL among them — is refused: `eval lint` reports
+  it, and a trial refuses it before the fixture exists. The declaration
   applies to both arms alike, since the arms differ in the injection only
-  (B-7); `eval lint` checks its form; and every row records it. Toolkit
+  (B-7); `eval lint` checks its form; and every row records it. A session
+  that never started — the exec fails with no exit status, nothing killed
+  it and it printed nothing, as when there is no `claude` to run or Node
+  refuses to pass the environment on — is an instrument failure of its own
+  kind, `trial_spawn_failed`: its row carries `infraError: true`, it is
+  excluded from every scored pool exactly like `trial_killed_incomplete`
+  (B-10) and `trial_wrote_repo` (B-7), and its trial directory is removed.
+  Toolkit
   state stays redirected as B-7 says (D-057, D-062). Residual: this is not
   a sandbox. A trial still runs with the operator's filesystem permissions
   and `HOME`, and a cache no scenario redirected is still the operator's,
@@ -305,7 +325,11 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   operator's full environment — seven graders in the corpus call
   `arcforge` and nine call `npm` — so this item bounds the trial, not the
   grader. And a scenario that prepends a directory of its own can shadow
-  `claude` itself, an authoring error `eval lint` does not catch. The
+  the `claude` a trial's own commands look up by name — not the session,
+  which is spawned by path — an authoring error `eval lint` does not catch.
+  A `claude` that starts, exits non-zero and prints nothing parseable is
+  not a spawn failure: it is still scored as a behavioural `error` row, as
+  it was before 6.5.0. The
   environment is not a pooling
   condition, so rows from before and after this change pool together though
   their trials did not see the same `PATH`.
@@ -398,9 +422,11 @@ module invents a verdict. Delta-CI judging returns `IMPROVED`, `REGRESSED`,
 fails the bar rather than deferring. That `PASS` is a distinct token from the
 preflight `PASS` in B-3, which is a discriminability outcome (`PASS` / `BLOCK`), not
 an A/B verdict. A result the runner killed before the agent finished carries
-`errorType: trial_killed_incomplete` and `infraError: true` —
-`scripts/lib/eval-trial-outcome.js` owns the three predicates (killed, output
-complete, provider refusal) — and `scorableResults` in `eval-stats.js` drops every `infraError` /
+`errorType: trial_killed_incomplete` and `infraError: true`, and from 6.5.0 one
+whose session never started carries `errorType: trial_spawn_failed` and the same
+flag (B-18) —
+`scripts/lib/eval-trial-outcome.js` owns the four predicates (killed, output
+complete, provider refusal, spawn failure) — and `scorableResults` in `eval-stats.js` drops every `infraError` /
 `gradeError` row from every scored pool (`eval run`, A/B, benchmark), while
 preflight fails closed on the same flags (B-10). Every result row records
 `trialTimeoutMs`, the ceiling its trial ran under, so a pool that mixes ceilings

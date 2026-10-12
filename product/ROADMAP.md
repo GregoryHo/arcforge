@@ -2063,9 +2063,18 @@ reverse one, append a superseding entry (see AGENTS.md).
   shim directory under `.eval-trials/` linking `claude`, `node`, `npm` and
   `npx`, followed by the system directories, so the operator's `PATH` no
   longer reaches such a trial while `claude` and `node` stay resolvable. A
+  contained trial spawns `claude` by the shim's full path,
+  `<projectRoot>/.eval-trials/.bin/claude`, so a scenario's `PATH^=`
+  directive cannot shadow the session binary; fixture `Setup` keeps the
+  declared `PATH`. A
   `--no-isolate` trial inherits the operator's environment, with
   `ARCFORGE_HOME` redirected and the scenario's `## Environment`
-  directives applied. A scenario may declare, in
+  directives applied, and keeps the bare `claude` lookup. A session that
+  never started — the exec fails with no exit status, nothing killed it
+  and it printed nothing — is an instrument failure of a new kind,
+  `trial_spawn_failed`, with `infraError: true`: it is excluded from every
+  scored pool exactly like `trial_killed_incomplete` and
+  `trial_wrote_repo`, and its trial directory is removed. A scenario may declare, in
   an `## Environment` section, `PATH` entries to add or remove and cache
   directories to place inside the trial; `HOME` is kept, since the session
   authenticates from `~/.claude`. The declaration applies to both arms alike
@@ -2172,7 +2181,11 @@ reverse one, append a superseding entry (see AGENTS.md).
   environment is not rebuilt: a grader is not a trial, and it runs with the
   operator's full environment — seven graders in the corpus call `arcforge`
   and nine call `npm`. A scenario that prepends a directory of its own can
-  shadow `claude`, an authoring error `eval lint` does not catch. Unmeasured after
+  shadow the `claude` a trial's own commands look up by name — not the
+  session, which is spawned by path — an authoring error `eval lint` does
+  not catch. A `claude` that starts, exits non-zero and prints nothing
+  parseable is not a spawn failure and is still scored as a behavioural
+  `error` row, as before. Unmeasured after
   this: routing under a real plugin load (D-024, D-044), a save into a live
   Obsidian vault, and anything that needs more than one turn in a trial
   (D-057).

@@ -119,6 +119,7 @@ D-062（儀器），七項：
 - Setup 的 env（`eval-trial-env.js:84-92`）同步。
 - `eval-scenario.js` 加 `## Environment` 的解析與 lint。
 - 兩臂相同，記進 row 的條件欄。
+- PR #286 最後三個 commit 補上的四件事：contained trial 以 shim 的完整路徑 `<projectRoot>/.eval-trials/.bin/claude` 啟動 session（scenario 的 `PATH^=` 蓋不掉 session 的執行檔；`--no-isolate` 仍用裸 `claude`，Setup 仍用宣告後的 `PATH`）；沒啟動成功的 session 記為 `trial_spawn_failed`（`infraError: true`，不進任何計分 pool，trial 目錄移除）；`## Environment` 的行含控制字元時，`eval lint` 與 trial 都在 fixture 建立前拒絕；scenario 的 code fence 依 CommonMark 判讀（eval B-18）。
 
 **A4 `eval compare --no-analyzer`**（PR #281）。`compareResults`（`eval-benchmark.js:504`）加 options，`scenario.grader !== 'code'` 的 `compareWithModel` 分支（:523-534）看旗標；`eval-command.js:512` 讀 `args.flags['no-analyzer']`（同 `no-isolate` 的樣式），:540-541 的 banner 換成一行說明 analyzer 已略過（eval B-21：operator 才分得出這與 code-graded scenario 的差別，後者兩行都不印），:667 的 usage 更新。
 
