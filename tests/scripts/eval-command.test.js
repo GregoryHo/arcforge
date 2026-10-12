@@ -406,6 +406,41 @@ describe('eval command', () => {
       expect(evalLib.gradeTrialResult).not.toHaveBeenCalled();
       expect(logs).toContain('Verdict: BLOCK');
     });
+
+    it('runs its trials under the preflight label and leaves one row per trial', async () => {
+      writeScenario(tempDir, 'preflight-rows');
+      evalLib.runTrial.mockImplementation((s, t, k, opts) => ({
+        eval: `${s.name}-${opts.label}`,
+        trial: t,
+        k,
+        passed: false,
+        score: 0,
+        grader: 'code',
+        timestamp: '2026-10-12T00:00:00.000Z',
+        runId: opts.runId,
+      }));
+      evalLib.gradeTrialResult.mockImplementation((row) => ({ ...row, graded: true }));
+
+      await runEvalCommand(args(['preflight', 'preflight-rows']), {
+        projectRoot: tempDir,
+        asJson: false,
+      });
+
+      expect(logs).toContain('Verdict: PASS');
+      const labels = evalLib.runTrial.mock.calls.map(([, , , opts]) => opts.label);
+      expect(labels).toEqual(['preflight', 'preflight', 'preflight']);
+      const rows = evalLib.loadResults('preflight-rows-preflight', tempDir);
+      expect(rows.map((r) => r.trial)).toEqual([1, 2, 3]);
+      expect(rows.every((r) => r.graded && r.eval === 'preflight-rows-preflight')).toBe(true);
+      // Nothing an `eval run` or `eval ab` reader opens.
+      for (const name of [
+        'preflight-rows',
+        'preflight-rows-baseline',
+        'preflight-rows-treatment',
+      ]) {
+        expect(evalLib.loadResults(name, tempDir)).toEqual([]);
+      }
+    });
   });
 
   describe('eval preflight turn budget', () => {

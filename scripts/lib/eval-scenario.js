@@ -78,16 +78,22 @@ function compactDate(isoTimestamp) {
 }
 
 /**
+ * The condition suffixes an eval name may carry. Each names its own JSONL file
+ * in a run directory, so rows under one are never read as another's: a reader
+ * of `<name>-baseline` opens baseline.jsonl and nothing else.
+ */
+const CONDITION_SUFFIX = /-(baseline|treatment|preflight)$/;
+
+/**
  * Parse an eval name into scenario name and condition.
  * Used by appendResult, saveTranscript, and loadResults to derive storage paths.
- * @param {string} evalName - Eval name (may include -baseline or -treatment suffix)
+ * @param {string} evalName - Eval name (may include a -baseline, -treatment or -preflight suffix)
  * @returns {{ scenarioName: string, condition: string }}
  */
 function parseEvalName(evalName) {
-  const isBaseline = evalName.endsWith('-baseline');
-  const isTreatment = evalName.endsWith('-treatment');
-  const condition = isBaseline ? 'baseline' : isTreatment ? 'treatment' : 'results';
-  const scenarioName = sanitizeFilename(evalName.replace(/-(baseline|treatment)$/, ''));
+  const match = evalName.match(CONDITION_SUFFIX);
+  const condition = match ? match[1] : 'results';
+  const scenarioName = sanitizeFilename(evalName.replace(CONDITION_SUFFIX, ''));
   return { scenarioName, condition };
 }
 
@@ -233,6 +239,7 @@ module.exports = {
   normalizeClaimType,
   inferClaimType,
   compactDate,
+  CONDITION_SUFFIX,
   parseEvalName,
   resolveMaxTurns,
   parseScenario,

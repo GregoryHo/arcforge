@@ -12,6 +12,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const eval_ = require('../eval');
 const stats = require('../eval-stats');
+const { CONDITION_SUFFIX } = require('../eval-scenario');
 const { pairArms, otherPoolLines } = require('../eval-pools');
 const { classifyAssertions } = require('../eval-graders');
 const { sanitizeFilename } = require('../utils');
@@ -305,7 +306,7 @@ function handleApiRuns(res, projectRoot, scenarioName) {
 
 function handleApiResults(res, projectRoot, evalName, query) {
   const opts = filterOpts(query);
-  const baseName = evalName.replace(/-(baseline|treatment)$/, '');
+  const baseName = evalName.replace(CONDITION_SUFFIX, '');
   const scenario = eval_.findScenario(baseName, projectRoot);
   if (scenario?.version) opts.version = scenario.version;
   const pools = eval_.loadResultPools(evalName, projectRoot, opts);

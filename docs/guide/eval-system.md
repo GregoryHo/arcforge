@@ -73,6 +73,16 @@ does not unblock A/B runs under another. When `ab` finds no record for its own
 conditions, it stops. It names the conditions it needed and any it found
 instead, and gives the exact `preflight` command to run.
 
+Each preflight trial also leaves a result row, in `preflight.jsonl` under that
+run's directory in `evals/results/`, beside its transcripts
+(`preflight-trial-<n>.txt`). A row carries what an A/B row carries: the score,
+the grader's evidence, tokens, duration, and the conditions the trial ran under.
+So a preflight can be audited trial by trial, not only from its verdict.
+`preflight` is a condition of its own: `eval run`, `compare`, `report` and the
+dashboard's comparison never read these rows into a baseline or treatment pool,
+and the dashboard lists such a run under the `preflight` condition. The record
+that unlocks `ab` is still the one under `evals/preflight/`.
+
 A scenario that measures "this must not get worse" rather than "this must
 improve" opts out by declaring `skip`:
 

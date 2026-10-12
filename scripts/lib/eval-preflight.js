@@ -13,7 +13,13 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { listScenarios, parseScenario } = require('./eval');
+const {
+  listScenarios,
+  parseScenario,
+  appendResult,
+  gradeTrialResult,
+  cleanupTrialDir,
+} = require('./eval');
 const { stopIfTrialWroteRepo, DEFAULT_TRIAL_TIMEOUT_MS } = require('./eval-trial');
 
 /** Directory where preflight JSON files are stored */
@@ -24,6 +30,13 @@ const CEILING_THRESHOLD = 0.8;
 
 /** Number of baseline trials to run during preflight */
 const PREFLIGHT_K = 3;
+
+/**
+ * The label preflight trials run and are recorded under. Their rows land in
+ * `<runId>/preflight.jsonl`, a file no baseline, treatment or `eval run` reader
+ * opens, so a preflight trial is on record without ever joining an A/B pool.
+ */
+const PREFLIGHT_LABEL = 'preflight';
 
 /**
  * Return true only for an explicit scenario-level `## Preflight\nskip` policy.
@@ -117,7 +130,8 @@ function resolveScenarioFile(name, projectRoot) {
  * Run a preflight for a named scenario.
  *
  * Executes PREFLIGHT_K baseline trials (no skill injection) and computes the
- * pass rate. Writes evals/preflight/<hash>.json with the result.
+ * pass rate. Writes evals/preflight/<hash>.json with the result, and one result
+ * row per trial to evals/results/<scenario>/<runId>/preflight.jsonl.
  *
  * Verdicts:
  *   PASS  — pass_rate < CEILING_THRESHOLD (scenario is discriminative)
@@ -154,11 +168,19 @@ function runPreflight(name, projectRoot, opts = {}) {
     trial_timeout_ms: conditions.trialTimeoutMs || DEFAULT_TRIAL_TIMEOUT_MS,
   };
 
+  // Rows are labelled here, whatever the injected runner called them: a
+  // preflight trial must not be able to land in another condition's file.
+  const scenario = parseScenario(filePath, projectRoot);
+  const evalName = `${scenario.name}-${PREFLIGHT_LABEL}`;
   const results = [];
   for (let t = 1; t <= PREFLIGHT_K; t++) {
     const raw = runTrial(t, PREFLIGHT_K);
-    stopIfTrialWroteRepo(raw, `preflight trial ${t}`);
     const graded = gradeResult(raw, t);
+    const row = { ...graded, eval: evalName };
+    appendResult(scenario.version ? { ...row, version: scenario.version } : row, projectRoot);
+    // Recorded first, as an A/B arm does, so the row of the trial that stops
+    // the run is kept.
+    stopIfTrialWroteRepo(graded, `preflight trial ${t}`);
     results.push(graded);
   }
 
@@ -219,6 +241,24 @@ function runPreflight(name, projectRoot, opts = {}) {
   fs.writeFileSync(path.join(preflightDir, cacheFile), JSON.stringify(record, null, 2));
 
   return record;
+}
+
+/**
+ * Grade one preflight trial and remove its directory. An infra error is
+ * returned as it is: there is no agent turn to grade, and grading a refusal
+ * would spawn a grader session while the account is limited.
+ * @param {Object} result - Row from runTrial
+ * @param {Object} scenario - Parsed eval scenario
+ * @param {string} projectRoot - Project root directory
+ * @returns {Object} Graded row
+ */
+function gradePreflightTrial(result, scenario, projectRoot) {
+  try {
+    if (result.infraError) return result;
+    return gradeTrialResult(result, scenario, projectRoot, result.actions);
+  } finally {
+    cleanupTrialDir(result.trialDir);
+  }
 }
 
 /**
@@ -353,9 +393,11 @@ module.exports = {
   // pattern.
   resolveScenarioFile,
   runPreflight,
+  gradePreflightTrial,
   checkPreflightGate,
   shouldSkipPreflightGate,
   PREFLIGHT_DIR,
   CEILING_THRESHOLD,
   PREFLIGHT_K,
+  PREFLIGHT_LABEL,
 };
