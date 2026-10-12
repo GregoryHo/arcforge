@@ -448,7 +448,8 @@ not a section: neither `eval lint` nor the trial reads it. The rules, which
 
 `${TRIAL_DIR}` is each trial's own directory, so `PATH^=${TRIAL_DIR}/fakebin`
 names a different directory in every trial; have `## Setup` fill it. Under
-`--no-isolate` the same declarations are applied on top of your own environment.
+`--no-isolate` with no plugin dir the same declarations are applied on top of
+your own environment.
 
 Both arms of a comparison and their Setup get the identical declarations: the
 arms still differ only by the injection. Every result row records them as
