@@ -166,6 +166,8 @@ function rawRowsForScenario(scenario, projectRoot, options = {}) {
         maxTurns: result.maxTurns ?? null,
         pluginDir: result.pluginDir ?? null,
         isolation: result.isolation ?? null,
+        scenario_hash: result.scenario_hash ?? null,
+        node_version: result.node_version ?? null,
         passed: result.passed,
         score: result.score,
         duration_ms: durationMs,

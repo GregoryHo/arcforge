@@ -11,6 +11,7 @@
  * Zero external dependencies — Node.js standard library only.
  */
 
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { getTimestamp, sanitizeFilename } = require('./utils');
@@ -113,6 +114,16 @@ function resolveMaxTurns(opts = {}) {
 }
 
 /**
+ * Compute a stable scenario hash from file contents.
+ * Returns the first 16 hex characters of the SHA-256 digest.
+ * @param {string} contents - Raw scenario file contents
+ * @returns {string} 16-char lowercase hex prefix
+ */
+function computeScenarioHash(contents) {
+  return crypto.createHash('sha256').update(contents).digest('hex').slice(0, 16);
+}
+
+/**
  * Parse an eval scenario from a markdown file
  * @param {string} filePath - Path to scenario markdown file
  * @param {string} [projectRoot] - Project root for ${PROJECT_ROOT} expansion
@@ -186,6 +197,9 @@ function parseScenario(filePath, projectRoot) {
 
   return {
     name,
+    // Of the file as parsed: a run parses its scenario once, so every row of
+    // the run is stamped with the hash of the text its trials were built from.
+    scenarioHash: computeScenarioHash(content),
     scope: section('scope') || 'skill',
     scenario: section('scenario'),
     context: section('context'),
@@ -240,6 +254,7 @@ module.exports = {
   inferClaimType,
   compactDate,
   CONDITION_SUFFIX,
+  computeScenarioHash,
   parseEvalName,
   resolveMaxTurns,
   parseScenario,

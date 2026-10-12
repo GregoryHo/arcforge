@@ -374,6 +374,11 @@ describe('eval command', () => {
       expect(evalLib.runTrial).toHaveBeenCalledTimes(1);
       const [row] = evalLib.loadResults('run-stop', tempDir);
       expect(row.errorType).toBe('trial_wrote_repo');
+      // eval run stamps its rows as eval ab does, error rows included.
+      const file = path.join(tempDir, evalLib.SCENARIOS_DIR, 'run-stop.md');
+      const { computeScenarioHash } = require('../../scripts/lib/eval-preflight');
+      expect(row.scenario_hash).toBe(computeScenarioHash(fs.readFileSync(file, 'utf8')));
+      expect(row.node_version).toBe(process.version);
     });
   });
 
@@ -432,6 +437,9 @@ describe('eval command', () => {
       const rows = evalLib.loadResults('preflight-rows-preflight', tempDir);
       expect(rows.map((r) => r.trial)).toEqual([1, 2, 3]);
       expect(rows.every((r) => r.graded && r.eval === 'preflight-rows-preflight')).toBe(true);
+      expect(rows.every((r) => r.node_version === process.version)).toBe(true);
+      const hash = logs.find((l) => l.startsWith('Hash:')).replace(/^Hash:\s+/, '');
+      expect(rows.map((r) => r.scenario_hash)).toEqual([hash, hash, hash]);
       // Nothing an `eval run` or `eval ab` reader opens.
       for (const name of [
         'preflight-rows',
