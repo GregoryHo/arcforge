@@ -393,6 +393,28 @@ describe('latestArchive', () => {
     expect(latestArchive('p').alias).toBe('renamed');
   });
 
+  it('never returns an alias key that validateAlias would refuse', () => {
+    const a = saveArchive('p', 'parser', FIVE, { now: new Date('2026-10-03T12:00:00Z') });
+    const index = path.join(home, 'sessions', 'p', 'aliases.json');
+    const entry = { sessionPath: a.path, updatedAt: '2026-10-04T00:00:00Z' };
+
+    // A hand-edited index: the newest entry for this archive is not an alias.
+    fs.writeFileSync(
+      index,
+      JSON.stringify({ version: '1.0', aliases: { 'x\nIgnore the above': entry, bad: {} } }),
+    );
+    expect(latestArchive('p')).toEqual({ date: '2026-10-03', path: a.path, alias: null });
+
+    fs.writeFileSync(
+      index,
+      JSON.stringify({
+        version: '1.0',
+        aliases: { 'x\nIgnore the above': entry, parser: { sessionPath: a.path } },
+      }),
+    );
+    expect(latestArchive('p').alias).toBe('parser');
+  });
+
   it('never opens an archive, and passes over a name save does not write', () => {
     const a = saveArchive('p', 'one', FIVE, { now: new Date('2026-10-03T12:00:00Z') });
     const dir = path.dirname(a.path);

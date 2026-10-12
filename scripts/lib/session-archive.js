@@ -412,7 +412,8 @@ function listArchives(project, { limit = DEFAULT_LIST_LIMIT } = {}) {
  * calls this on its synchronous path). Only a name `save` writes counts:
  * `archive-<alias>-<stamp>[-n].md`, whose every character is from a fixed set.
  * The alias in that name may since have been removed or pointed elsewhere, so
- * `alias` is one the index holds for this file now, or null.
+ * `alias` is one the index holds for this file now, or null. The index is a
+ * file a hand can edit, so a key `validateAlias` would refuse is never returned.
  * @param {string} project
  * @returns {{ date: string, path: string, alias: string|null }|null} null when there is none
  */
@@ -430,7 +431,11 @@ function latestArchive(project) {
     if (!newest) continue;
     const file = path.join(sessionsDir, date, newest.f);
     const pointing = listAliases(project).find(
-      (a) => path.basename(a.sessionPath) === newest.f && canonicalPath(a.sessionPath) === file,
+      (a) =>
+        validateAlias(a.name).valid &&
+        typeof a.sessionPath === 'string' &&
+        path.basename(a.sessionPath) === newest.f &&
+        canonicalPath(a.sessionPath) === file,
     );
     return { date, path: file, alias: pointing ? pointing.name : null };
   }
