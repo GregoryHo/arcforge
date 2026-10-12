@@ -34,6 +34,7 @@ const {
   isSpawnFailure,
 } = require('./eval-trial-outcome');
 const { watchForWrites } = require('./eval-trial-guard');
+const { changedCopies } = require('./eval-skill-staging');
 
 // Roots already reported as too large for the write check in this process.
 const warnedTooLarge = new Set();
@@ -80,6 +81,12 @@ function resolveTrialTimeoutMs(env = process.env) {
  * @param {number} [options.maxTurns] - Max turns for Claude CLI
  * @param {string[]} [options.watchRoots] - Extra directories the write check watches;
  *   nothing is loaded from them (a comparison's baseline watches the plugin root)
+ * @param {{ baseDir?: string, textHash?: string, filesHash?: string, staged?: boolean, copies?: Array<{ dir: string, filesHash: string }>, baselineHash?: string, baselineFilesHash?: string }} [options.skillInjection] -
+ *   What this arm was injected with: its staged skill directory, the hash of
+ *   its skill text and the digest of its staged files. And the conditions both
+ *   arms record: whether the run stages skill files, the hash of the text the
+ *   baseline was given, if any, and the digest of the files staged for it.
+ *   copies is every directory the run staged, each digested again after the trial
  * @returns {TrialResult} Trial result
  */
 function runTrial(scenario, trialNumber, totalTrials, options = {}) {
@@ -94,6 +101,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     pluginDir: rawPluginDir,
     maxTurns: rawMaxTurns,
     watchRoots = [],
+    skillInjection = {},
   } = options;
   // Refused before any session: no row of such a run could be filed correctly.
   const reserved = reservedNameError(scenario.name);
@@ -154,6 +162,21 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
       pluginDir: Boolean(pluginDir),
       isolation: pluginDir ? 'plugin-dir' : isolated ? 'isolated' : 'toolkit',
       environment: scenario.environment || [],
+      // Recorded only by a run that staged skill files, so a run that did not
+      // pools with rows written before the field existed (B-19).
+      ...(skillInjection.staged ? { stageSkillFiles: true } : {}),
+      // Which text the baseline of this run was given, on both arms' rows; a
+      // run whose baseline was given none records nothing (B-20).
+      ...(skillInjection.baselineHash ? { baselineSkillHash: skillInjection.baselineHash } : {}),
+      // And which files were staged for that baseline: the same text over
+      // other files is another baseline.
+      ...(skillInjection.baselineFilesHash
+        ? { baselineSkillFilesHash: skillInjection.baselineFilesHash }
+        : {}),
+      // Not a pooling condition: which text this arm was injected with.
+      ...(skillInjection.textHash ? { skillTextHash: skillInjection.textHash } : {}),
+      // Nor is this: the digest of the directory staged for this arm.
+      ...(skillInjection.filesHash ? { skillFilesHash: skillInjection.filesHash } : {}),
     };
   }
 
@@ -198,6 +221,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     maxTurns: resolvedMaxTurns,
     model,
     effort,
+    skillBaseDir: skillInjection.baseDir,
   });
 
   // A contained trial's session is the shim, by its full path: a directory the
@@ -314,6 +338,20 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     };
   }
 
+  // A write the snapshot above cannot see (it compares mtime, size and mode,
+  // not content) still changes what later trials are given, so every staged
+  // copy is digested again (B-19).
+  const copiesChanged = changedCopies(skillInjection.copies);
+  if (copiesChanged.length > 0) {
+    return {
+      ...base,
+      output: parsedOutput || '',
+      error: `Trial changed the staged skill files: ${copiesChanged.join(', ')}`,
+      errorType: 'trial_wrote_skill_files',
+      infraError: true,
+    };
+  }
+
   // A trial the runner killed before the agent finished its turn is an
   // instrument failure, not behaviour: its half transcript otherwise grades as
   // if the agent had chosen to stop there (P4 defect A — four of five two-axis
@@ -384,9 +422,17 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
  * repository is not restored here: that is the operator's call.
  * @param {Object} row - The TrialResult the trial produced
  * @param {string} where - Which trial, for the message (e.g. 'baseline trial 2')
- * @throws {Error} when the row is trial_wrote_repo
+ * A trial that left a staged skill copy changed (trial_wrote_skill_files) ends
+ * the run the same way: the copy is what every later trial is given.
+ * @throws {Error} when the row is trial_wrote_repo or trial_wrote_skill_files
  */
 function stopIfTrialWroteRepo(row, where) {
+  if (row?.errorType === 'trial_wrote_skill_files') {
+    const dirs = String(row.error || '').replace(/^Trial changed the staged skill files:\s*/, '');
+    throw new Error(
+      `${where} changed the staged skill files: ${dirs}. The run is stopped so no later trial is given the changed files; rows already recorded are kept. The copy is removed with the run.`,
+    );
+  }
   if (row?.errorType !== 'trial_wrote_repo') return;
   const paths = String(row.error || '').replace(/^Trial wrote outside its directory:\s*/, '');
   throw new Error(
@@ -414,9 +460,19 @@ function stopIfTrialWroteRepo(row, where) {
  * @param {number} [opts.maxTurns] - Resolved turn budget
  * @param {string} [opts.model] - Model flag value
  * @param {string} [opts.effort] - Effort flag value
+ * @param {string} [opts.skillBaseDir] - Staged skill directory this arm was given;
+ *   the advisory names it as the one exception (B-19)
  * @returns {string[]} argv after `claude`
  */
-function buildClaudeArgs({ trialDir, contained, pluginDir, maxTurns, model, effort }) {
+function buildClaudeArgs({
+  trialDir,
+  contained,
+  pluginDir,
+  maxTurns,
+  model,
+  effort,
+  skillBaseDir,
+}) {
   const args = [
     '-p',
     '--output-format',
@@ -432,7 +488,11 @@ function buildClaudeArgs({ trialDir, contained, pluginDir, maxTurns, model, effo
     // trials that ignore it.
     args.push(
       '--append-system-prompt',
-      `You are running in an isolated eval trial. Your working directory is ${trialDir}, and every file you need is already in it — do not read, search, or access files outside this directory.`,
+      `You are running in an isolated eval trial. Your working directory is ${trialDir}, and every file you need is already in it — do not read, search, or access files outside this directory.${
+        skillBaseDir
+          ? ` The one exception is ${skillBaseDir}, the base directory of the skill you were given: you may read and run the files in it, and must not write to it.`
+          : ''
+      }`,
     );
   }
   if (pluginDir) args.push('--plugin-dir', path.resolve(pluginDir));

@@ -330,6 +330,9 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   grader. And a scenario that prepends a directory of its own can shadow
   the `claude` a trial's own commands look up by name — not the session,
   which is spawned by path — an authoring error `eval lint` does not catch.
+  When the operator's `python3` is a virtualenv's, the shim sits outside
+  the venv, so Python run through it is the base interpreter, without the
+  venv's packages.
   A `claude` that starts, exits non-zero and prints nothing parseable is
   not a spawn failure: it is still scored as a behavioural `error` row, as
   it was before 6.5.0. The
@@ -347,16 +350,41 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   an arm injected with nothing gets no staged directory and cannot list one
   from inside its trial. The trial's instruction to stay inside its own
   directory names the staged directory as its one exception, and the copy
-  is removed when the run ends. Staging is a run condition that pools (B-8):
+  is removed when the run ends or the command exits. The skill directory is
+  resolved through any symlink before it is digested and copied, so a
+  directory that is itself a link is staged as the directory it names. An
+  entry that is neither a file nor a symlink is refused, by name, before
+  anything is copied. A symlink is copied as a link, and staging
+  refuses one whose target is an absolute path, resolves outside the skill
+  directory, or does not resolve; the check runs on the source directory and
+  again on the staged copy, where a relative target can resolve differently.
+  After every trial each staged copy is digested again; a trial that left
+  one with other content than was staged is an instrument failure
+  (`trial_wrote_skill_files`), excluded from scored pools, and stops the run
+  as `trial_wrote_repo` does (B-7).
+  Staging is a run condition that pools (B-8):
   a run without the flag records none and pools with rows written before
   6.5.0, and a run with it forms a pool of its own (D-049, D-057, D-062).
   Residual: nothing but the write guard and the advice in the prompt keeps
-  an arm away from a directory it was not given.
+  an arm away from a directory it was not given. A link into `.venv` or
+  `node_modules` is refused too, since those directories are left out of the
+  copy and the link does not resolve there.
+  Residual: a write confined to a `.git` or `node_modules` directory inside
+  the copy is not detected. The write guard skips both names and the digest
+  leaves them out; `.venv` and `__pycache__` are left out of the digest too,
+  but the write guard sees them.
+  Residual: a run that is killed leaves its copy behind. No signal is
+  handled, because a trial is a synchronous child and a handler would keep
+  the run from being interrupted. The copy is named
+  `arcforge-eval-skill-<PID>-` under `os.tmpdir()`, and the next staging
+  command removes those whose process is gone; one whose PID was reused by a
+  live process stays until removed by hand.
 - **B-20 An A/B can compare two skill texts (6.5.0).**
   `eval ab --baseline-skill-file <path>` injects the baseline with that
   file's text where it otherwise gets none, so the arms differ in which text
   each was given — the comparison that isolates an edit to a skill, where
-  text against no text measures the skill as a whole (B-1). With
+  text against no text measures the skill as a whole (B-1). An empty file
+  is refused, since an empty text would be injected as none. With
   `--stage-skill-files` each arm gets a staged directory and a
   base-directory line of its own (B-19), the baseline's taken from the
   directory its file sits in. Every row records a hash of the text its arm

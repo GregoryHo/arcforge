@@ -43,6 +43,9 @@ describe('conditionOf', () => {
       'maxTurns',
       'pluginDir',
       'isolation',
+      'stageSkillFiles',
+      'baselineSkillHash',
+      'baselineSkillFilesHash',
     ]);
     expect(conditionOf({ model: 'opus' })).toEqual({
       model: 'opus',
@@ -51,6 +54,9 @@ describe('conditionOf', () => {
       maxTurns: null,
       pluginDir: null,
       isolation: null,
+      stageSkillFiles: null,
+      baselineSkillHash: null,
+      baselineSkillFilesHash: null,
     });
   });
 });
@@ -391,6 +397,130 @@ describe('pairArms', () => {
       const treatment = rows.find((r) => r.condition === 'treatment');
       expect(treatment.baseline_score_avg).toBe(0.6);
       expect(treatment.score_delta_vs_baseline_avg).toBe(0.4);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('pools a run that staged skill files apart from one that did not (B-19)', () => {
+    const later = '2026-10-12T10:00:00.000Z';
+    const plain = [row({ trial: 1 }), row({ trial: 2 })];
+    // Rows written before 6.5.0 carry no staging field and pool with a plain run.
+    const { stageSkillFiles: _absent, ...before650 } = row({ trial: 3 });
+    const staged = [row({ trial: 1, stageSkillFiles: true, timestamp: later })];
+
+    const split = splitPools([...plain, before650, ...staged]);
+    expect(split.current).toEqual(staged);
+    expect(split.others).toEqual([
+      { conditions: expect.objectContaining({ stageSkillFiles: null }), rows: 3 },
+    ]);
+    expect(describeCondition(split.conditions)).toMatch(/, staged skill files yes$/);
+    expect(describeCondition(split.others[0].conditions)).not.toMatch(/staged/);
+
+    // A staged treatment never pairs with a baseline from a run that staged nothing.
+    expect(pairArms(plain, staged).error).toMatch(/no run conditions in common/);
+    const paired = pairArms([...plain, ...staged], [...plain, ...staged]);
+    expect(paired.baseline).toEqual(staged);
+    expect(paired.treatment).toEqual(staged);
+    expect(paired.unpaired.map((p) => p.rows)).toEqual([2, 2]);
+  });
+
+  it('pools a two-text run per baseline text, never with a no-text baseline (B-20)', () => {
+    const at = (hour) => `2026-10-12T${hour}:00:00.000Z`;
+    const noText = [row({ trial: 1 })];
+    const oldA = [row({ trial: 1, baselineSkillHash: 'aaaaaaaaaaaaaaaa', timestamp: at(10) })];
+    const oldB = [row({ trial: 1, baselineSkillHash: 'bbbbbbbbbbbbbbbb', timestamp: at(11) })];
+
+    const split = splitPools([...noText, ...oldA, ...oldB]);
+    expect(split.current).toEqual(oldB);
+    expect(split.others.map((p) => p.conditions.baselineSkillHash)).toEqual([
+      'aaaaaaaaaaaaaaaa',
+      null,
+    ]);
+    expect(describeCondition(split.conditions)).toMatch(/, baseline text bbbbbbbbbbbbbbbb$/);
+
+    // The treatment rows of a two-text run carry the baseline's hash too, so
+    // they pair with that run's baseline and no other.
+    expect(pairArms(noText, oldA).error).toMatch(/no run conditions in common/);
+    expect(pairArms(oldA, oldB).error).toMatch(/baseline text/);
+    const paired = pairArms([...noText, ...oldA, ...oldB], [...noText, ...oldA]);
+    expect(paired.baseline).toEqual(oldA);
+    expect(paired.treatment).toEqual(oldA);
+    // The treatment's own text hash is recorded but does not split a pool.
+    const mixed = [row({ skillTextHash: 'one' }), row({ trial: 2, skillTextHash: 'two' })];
+    expect(splitPools(mixed).others).toEqual([]);
+  });
+
+  it('pools one baseline text apart by the files staged for it (B-20)', () => {
+    const at = (hour) => `2026-10-12T${hour}:00:00.000Z`;
+    const staged = (files, overrides) =>
+      row({
+        stageSkillFiles: true,
+        baselineSkillHash: 'aaaaaaaaaaaaaaaa',
+        baselineSkillFilesHash: files,
+        ...overrides,
+      });
+    // Same baseline text, the staged references differ.
+    const oldFiles = [staged('1111111111111111', { timestamp: at(10) })];
+    const newFiles = [staged('2222222222222222', { timestamp: at(11) })];
+    const sameAgain = [staged('2222222222222222', { trial: 2, timestamp: at(12) })];
+
+    const split = splitPools([...oldFiles, ...newFiles, ...sameAgain]);
+    expect(split.current).toEqual([...newFiles, ...sameAgain]);
+    expect(split.others).toEqual([
+      {
+        conditions: expect.objectContaining({ baselineSkillFilesHash: '1111111111111111' }),
+        rows: 1,
+      },
+    ]);
+    expect(describeCondition(split.conditions)).toMatch(/, baseline files 2222222222222222$/);
+    expect(pairArms(oldFiles, newFiles).error).toMatch(/baseline text and files/);
+    expect(pairArms(newFiles, sameAgain).error).toBeUndefined();
+    // Each arm's own staged digest is recorded but does not split a pool.
+    const mixed = [row({ skillFilesHash: 'one' }), row({ trial: 2, skillFilesHash: 'two' })];
+    expect(splitPools(mixed).others).toEqual([]);
+  });
+
+  it('compares a raw two-text treatment row with the baseline of its own run only', () => {
+    const { generateRawBenchmarkData } = require('../../scripts/lib/eval-benchmark');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'test-raw-two-text-'));
+    try {
+      const dir = path.join(root, SCENARIOS_DIR);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, 'tt.md'),
+        '# Eval: tt\n\n## Scope\nskill\n\n## Scenario\nDo it.\n\n## Grader\ncode\n',
+      );
+      const put = (arm, runId, overrides) =>
+        appendResult(row({ eval: `tt-${arm}`, runId, ...overrides }), root);
+      // A no-text run, then a two-text run with staged files.
+      put('baseline', 'r1', { score: 0.2 });
+      put('treatment', 'r1', { score: 1, skillTextHash: 'new' });
+      const twoText = { baselineSkillHash: 'old', stageSkillFiles: true };
+      put('baseline', 'r2', { score: 0.8, skillTextHash: 'old', ...twoText });
+      put('treatment', 'r2', { score: 1, skillTextHash: 'new', ...twoText });
+
+      const { rows } = generateRawBenchmarkData(root, 'now');
+      const treatment = (runId) =>
+        rows.find((r) => r.condition === 'treatment' && r.run_id === runId);
+      expect(treatment('r1').baseline_score_avg).toBe(0.2);
+      expect(treatment('r2').baseline_score_avg).toBe(0.8);
+      expect(treatment('r1')).toEqual(
+        expect.objectContaining({
+          stageSkillFiles: null,
+          baselineSkillHash: null,
+          skillTextHash: 'new',
+        }),
+      );
+      expect(treatment('r2')).toEqual(
+        expect.objectContaining({
+          stageSkillFiles: true,
+          baselineSkillHash: 'old',
+          baselineSkillFilesHash: null,
+          skillTextHash: 'new',
+          skillFilesHash: null,
+        }),
+      );
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

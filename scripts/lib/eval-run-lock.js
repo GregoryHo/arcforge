@@ -180,4 +180,4 @@ async function withRunLock(projectRoot, fn) {
   }
 }
 
-module.exports = { acquireRunLock, withRunLock, RUN_LOCK_RELATIVE };
+module.exports = { acquireRunLock, withRunLock, isProcessAlive, RUN_LOCK_RELATIVE };

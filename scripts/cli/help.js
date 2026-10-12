@@ -51,11 +51,15 @@ COMMANDS:
   eval preflight <name>              Run baseline trials to check scenario discriminability
       --plugin-dir   Plugin dir the A/B will load (sets the baseline budget; nothing is loaded)
       --max-turns    Max turns for the baseline trials (pass what you will pass to eval ab)
+      --baseline-skill-file  Run the baseline a two-text eval ab will run, injected with this file's text
+      --stage-skill-files  With --baseline-skill-file: stage that file's directory for the baseline
       --effort       Reasoning effort passed to spawned trials
   eval lint <name>                   Validate scenario file (sections, assertion shape)
   eval ab <name> [--skill-file path] A/B skill/workflow eval (requires prior PASS preflight)
       --plugin-dir   Plugin directory for treatment trials (workflow scope only)
       --max-turns    Max turns for both arms (overrides scenario)
+      --stage-skill-files  Skill scope: copy the skill file's directory outside the trial for the injected arm
+      --baseline-skill-file  Skill scope: inject the baseline with this file's text, comparing two skill texts
       --interleave   Alternate baseline/treatment trials instead of running arms back-to-back
       --effort       Reasoning effort passed to spawned trials
   eval compare <name>                Compare A/B results

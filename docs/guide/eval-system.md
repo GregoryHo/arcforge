@@ -69,10 +69,17 @@ budget; nothing is loaded into the baseline. Like `ab`,
 scenario's `## Plugin Dir` counts on its own. With a plugin dir and no other limit, the
 budget is 10 turns.
 
+For an A/B between two skill texts, give `preflight` the same
+`--baseline-skill-file`, and `--stage-skill-files` if `ab` will get it. Preflight
+then runs the baseline that A/B will run, injected with that text and given its
+staged files. Without `--baseline-skill-file` the baseline is injected with
+nothing, so `--stage-skill-files` on its own changes nothing in preflight:
+nothing is staged, and its rows record no staging.
+
 Preflight results are cached per scenario **and per model**, keyed on the
-scenario's content, and per turn budget, plugin dir, `--effort` and per-trial
-ceiling (`ARCFORGE_EVAL_TRIAL_TIMEOUT_MS`). Edit the scenario, switch models, or
-change the budget, plugin dir, effort or ceiling, and you need a fresh one:
+scenario's content, and per turn budget, plugin dir, `--effort`, per-trial
+ceiling (`ARCFORGE_EVAL_TRIAL_TIMEOUT_MS`), baseline text and the baseline's staged files. Edit the scenario, switch models, or
+change the budget, plugin dir, effort, ceiling, baseline text or a staged baseline file, and you need a fresh one:
 baseline competence is not transferable between conditions, and a PASS earned under one
 does not unblock A/B runs under another. When `ab` finds no record for its own
 conditions, it stops. It names the conditions it needed and any it found
@@ -120,6 +127,8 @@ Runs both arms and stores every trial. Useful flags:
 | `--interleave` | Alternate the arms instead of running each in a block, so drift over the run hits both equally |
 | `--max-turns` | Turn budget per trial, overriding the scenario |
 | `--skill-file` | Skill-scope only: inject this skill body into the treatment prompt. Falls back to the scenario's `## Target` |
+| `--baseline-skill-file` | Skill-scope only: inject the baseline with this file's text instead of nothing. See [Comparing two skill texts](#comparing-two-skill-texts) |
+| `--stage-skill-files` | Skill-scope only: also give the injected arm the skill's files. See [Staging a skill's files](#staging-a-skills-files) |
 | `--plugin-dir` | `workflow` scope only: load this plugin into the treatment arm. Refused for any other scope |
 
 Each trial's `claude -p` session is capped at 900 s; a trial killed at the cap is
@@ -295,6 +304,130 @@ single skill triggers from its description is `claude plugin eval`'s question,
 not this harness's. No run ever injects a skill body while also loading the
 plugin.
 
+### Staging a skill's files
+
+By default the treatment gets the text of the skill file and nothing else. A
+skill that tells the agent to run a script from its own folder then has a
+script the agent cannot find. `--stage-skill-files` gives the injected arm the
+files as well:
+
+```bash
+arcforge eval ab <name> --skill-file path/to/SKILL.md --stage-skill-files
+```
+
+`eval ab` copies the directory the skill file sits in to a temporary directory
+outside the trial tree, leaving out any `.git`, `node_modules`, `.venv` and
+`__pycache__` folder. The injection then opens with the line a host puts in
+front of a loaded skill, `Base directory for this skill:` followed by the
+copy's path. The trial's instruction to stay inside its own directory names
+that path as its one exception. A skill directory that is itself a symlink
+(`linked-skill -> real-skill`) is staged as the directory it points to.
+
+The copy is removed when the run ends, and when the command exits early. A run
+that is killed (Ctrl-C, `kill`) cannot remove it. The copy is named
+`arcforge-eval-skill-<PID>-<random>` under the system temp directory, and the
+next command that stages skill files removes every such directory whose
+process is gone. Until then it stays where it is, so that name is what to look
+for after a killed run.
+
+A symlink in the directory is copied as a link, so its target has to be inside
+the directory too. `eval ab` and `eval preflight` refuse to stage a directory
+holding a link whose target is an absolute path, resolves outside the
+directory, or does not resolve, and name the link. Through such a link an arm
+would reach files the write check does not watch and the digest does not cover.
+The target is checked again in the copy. A link that stays inside only by naming
+the directory itself (`../my-skill/run.sh` from a subfolder of `my-skill`) is
+refused, and so is a link into a folder staging leaves out, since neither
+resolves inside the copy.
+
+The files belong to the injection. The baseline is injected with nothing, so it
+gets no copy and no line, and cannot list one from inside its trial directory.
+Do not put the same files into the trial with `## Setup` instead: both arms run
+the same Setup, so the baseline would see them too.
+
+Both arms watch the copy for writes, the same way they watch the project. A
+trial that writes into it is recorded as `trial_wrote_repo` and stops the run,
+since every later trial would be given the changed files. A skill whose script
+writes into its own folder trips this check.
+
+The write check compares each file's modification time, size and permissions,
+not its content. So after every trial each staged copy is also digested again
+and compared with the digest taken when it was staged. A trial that left a
+copy with other content is recorded as an infra error
+(`trial_wrote_skill_files`) naming the copy, never scores, and stops the run
+like `trial_wrote_repo`. Neither check sees a write that stays inside a `.git`
+or `node_modules` folder in the copy: the write check skips both names and the
+digest leaves them out. A script that only installs into `node_modules` there
+goes unnoticed. A write into `.venv` or `__pycache__` is caught by the write
+check.
+
+Staging is a run condition. A run with the flag records `stageSkillFiles: true`
+on every row of both arms and forms a pool of its own. A run without it records
+nothing and pools with earlier rows. Each injected arm's row also records
+`skillTextHash`, a hash of the skill text it was given, and `skillFilesHash`, a
+digest of the directory staged for it. Those two identify what the arm was
+given; they do not pool.
+
+The digest covers every file and symlink in the copy, dotfiles included, in
+sorted order of path: each one's path, whether its owner may execute it, and
+its bytes. A symlink is not followed; its target path stands for it. Empty
+directories and timestamps are left out, and so are the folders staging leaves
+out. Two directories with the same files give the same digest wherever they
+sit. A directory holding anything else, such as a named pipe or a socket, is
+refused before anything is copied, and the refusal names the entry.
+
+The limit is the same as for the trial directory. Nothing but the write check
+and the advice in the prompt keeps an arm away from a directory it was not
+given.
+
+Each injected arm gets one staged directory, the one its skill file sits in:
+`--skill-file` for the treatment and, in a two-text A/B, `--baseline-skill-file`
+for the baseline (next section). An arm that needs a second skill's files is
+not supported yet.
+
+### Comparing two skill texts
+
+A skill A/B normally asks whether the skill beats no skill. To ask whether one
+wording beats another, give the baseline a text of its own:
+
+```bash
+arcforge eval ab <name> --skill-file path/to/SKILL.md --baseline-skill-file path/to/old/SKILL.md
+```
+
+The baseline is injected with the `--baseline-skill-file` text where it would
+otherwise get none, so the arms differ in which text each was given. Use it when
+an edit fixes something the old wording caused: an agent with no skill at all
+was never misled by the old wording, so it cannot show the fix. An empty file
+is refused, by `eval ab` and by `eval preflight`: an empty text is no text.
+
+With `--stage-skill-files`, each arm gets a staged directory and a
+base-directory line of its own. The baseline's copy is taken from the directory
+its file sits in, so keep the old text in a directory that holds the old files.
+
+Every row records `skillTextHash`, a hash of the text its arm was injected
+with. The baseline's text is a run condition: both arms' rows record its hash
+as `baselineSkillHash`. A two-text run's rows form a pool of their own per
+baseline text, and are never combined with a run whose baseline was given no
+text. A run without the flag records nothing and pools as before.
+
+When the baseline's files are staged, what they contain is a run condition
+too. Both arms' rows record the digest of the baseline's staged directory as
+`baselineSkillFilesHash`, so two runs that give the baseline one text over
+different `references/` or scripts form two pools.
+
+Preflight has to measure the same baseline. Run `eval preflight` with the same
+`--baseline-skill-file`, and with `--stage-skill-files` if the A/B stages. Its
+record is keyed on the baseline text's hash, and on the digest of that
+baseline's staged directory when it is staged, so `eval ab` is refused until a
+preflight exists for that exact baseline. A preflight of the no-skill baseline
+does not unlock a two-text A/B, and editing a script in the baseline's
+directory after its preflight means running preflight again. The record carries
+both as `baseline_skill_hash` and `baseline_skill_files_hash`.
+
+The treatment's text hash and staged digest are recorded but do not pool. When
+both arms are given one text and differ only in their staged files, the text
+hashes are equal and `skillFilesHash` is what tells the arms apart.
+
 To run one condition on its own, without a comparison:
 
 ```bash
@@ -366,7 +499,7 @@ When every assertion in a scenario is model-graded, `eval ab` also runs a
 **blind comparator** on each baseline/treatment pair and prints a preference
 count (treatment / baseline / tie / errors). It is a supplementary signal, never
 a verdict. The two outputs are shuffled into A and B, and condition labels and the
-skill name are redacted. The comparator writes a rubric of weighted criteria
+skill name are redacted; with `--baseline-skill-file`, the names of both skills are. The comparator writes a rubric of weighted criteria
 derived from the task and scores each output from 0 to 1 per criterion. The
 harness then does the arithmetic: each output's total is its weighted mean
 score, and one output wins only when its total beats the other's by more than
@@ -541,8 +674,11 @@ when only its prose did.
 
 A pool is narrower than a version. Every row also records the conditions it ran
 under: `model`, `effort`, the per-trial ceiling (`trialTimeoutMs`), the turn
-budget (`maxTurns`), whether a plugin was loaded (`pluginDir`), and the isolation
-mode (`isolation`: `isolated`, `plugin-dir`, or `toolkit` for `--no-isolate`). Rows under
+budget (`maxTurns`), whether a plugin was loaded (`pluginDir`), the isolation
+mode (`isolation`: `isolated`, `plugin-dir`, or `toolkit` for `--no-isolate`),
+whether the run staged skill files (`stageSkillFiles`, recorded only when it did),
+the text its baseline was given (`baselineSkillHash`, recorded only when it was given one), and
+the files staged for that baseline (`baselineSkillFilesHash`, recorded only when some were). Rows under
 different conditions answered different questions, so no reader combines them.
 `eval run`, `list`, `compare`, `report` and the dashboard judge the newest
 condition's pool. Each other pool is listed beside it with its row count and
@@ -573,7 +709,7 @@ scenario's verdict, and show `NO SCORED RUNS` when nothing was ever scored.
 An A/B comparison (`compare`, the benchmark's `compared` entry, the dashboard's
 A/B view) pairs its arms rather than taking each arm's newest pool on its own.
 It uses the newest pair of pools, one per arm, that ran under the same model,
-effort, ceiling, turn budget and isolation mode. The one allowed difference is
+effort, ceiling, turn budget, isolation mode, staging, baseline text and baseline files. The one allowed difference is
 the treatment itself: an isolated baseline against a treatment that loads a
 plugin dir or the full toolkit. When the newest runs of the two arms don't match, the
 older matching pair is judged and the rest are listed as "Not combined". When
@@ -603,10 +739,13 @@ at once. `latest.json` holds the most recent report.
 A per-trial export goes to `evals/benchmarks/raw/` the same way, under the same
 file name as its aggregate. Each raw row
 carries its run conditions (`model`, `effort`, `trialTimeoutMs`, `maxTurns`,
-`pluginDir`, `isolation`) and its `scenario_hash`, `node_version` and
-`repo_commit`, `null` for a row recorded before those existed. Its baseline-relative fields (`baseline_score_avg`,
+`pluginDir`, `isolation`, `stageSkillFiles`, `baselineSkillHash`,
+`baselineSkillFilesHash`), what its own arm was given (`skillTextHash`,
+`skillFilesHash`), and its `scenario_hash`, `node_version` and `repo_commit`,
+each `null` when the row recorded none. Its baseline-relative fields (`baseline_score_avg`,
 `score_delta_vs_baseline_avg` and the rest) are computed against the baseline
-pool that ran under the same model, effort, ceiling and turn budget. That
+pool that ran under the same model, effort, ceiling, turn budget, staging,
+baseline text and baseline files. That
 average leaves out the pool's infra and grade errors, which stay in the export
 as rows of their own. A row with no such baseline gets `null` there.
 

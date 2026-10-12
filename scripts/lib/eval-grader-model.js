@@ -314,7 +314,7 @@ function scoreBlindRubric(rubric, scoresA, scoresB) {
  * @param {string} baselineOutput - Output from the baseline (control) condition
  * @param {string} treatmentOutput - Output from the treatment (modified) condition
  * @param {string} projectRoot - Project root directory
- * @param {string} [skillName] - Skill name to strip from the prompt (optional)
+ * @param {string|string[]} [skillName] - Skill name, or names, to strip from the prompt (optional)
  * @returns {{ winner_original_label: 'baseline'|'treatment'|'tie', reasoning: string, rubric: Array<{criterion: string, weight: number}>, score_baseline: number, score_treatment: number }|null}
  */
 function runBlindComparator(taskPrompt, baselineOutput, treatmentOutput, projectRoot, skillName) {
@@ -326,9 +326,10 @@ function runBlindComparator(taskPrompt, baselineOutput, treatmentOutput, project
   const outputB = baselineIsA ? treatmentOutput : baselineOutput;
 
   // Sanitize task prompt: strip forbidden strings and skill name.
-  const forbidden = skillName
-    ? [...BLIND_COMPARATOR_FORBIDDEN, skillName]
-    : BLIND_COMPARATOR_FORBIDDEN;
+  // Longest first: redacting `demo` ahead of `demo-old` would leave `[redacted]-old`.
+  const forbidden = [...BLIND_COMPARATOR_FORBIDDEN, ...[].concat(skillName || [])].sort(
+    (a, b) => b.length - a.length,
+  );
 
   function sanitize(text) {
     let result = text || '';

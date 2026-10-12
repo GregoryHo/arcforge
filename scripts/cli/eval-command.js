@@ -7,12 +7,6 @@ const path = require('node:path');
 const { output } = require('./shared');
 
 /**
- * The name the blind comparator redacts for a skill file: its basename, or for
- * a `SKILL.md` the skill's directory (the basename "SKILL" names nothing).
- * @param {string} file - Skill file path
- * @returns {string}
- */
-/**
  * --plugin-dir belongs to workflow scope. B-1: a plugin-routed comparison
  * measures a workflow, never a skill; B-11: one skill's trigger rate is measured
  * by `claude plugin eval`, outside this harness. Refusing it elsewhere also
@@ -45,11 +39,6 @@ function requirePinnedToolkitFlags(scenario, options, cmd) {
   throw new Error(
     `eval ${cmd} on a workflow scenario with no plugin dir runs the treatment on your full user config, so both arms need --model and --effort pinned (missing: ${missing.join(', ')}).`,
   );
-}
-
-function skillNameFromFile(file) {
-  const base = path.basename(file, '.md');
-  return base.toUpperCase() === 'SKILL' ? path.basename(path.dirname(file)) : base;
 }
 
 /**
@@ -278,6 +267,12 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
     refusePluginDirOutsideWorkflow(scenario, args.options['plugin-dir'], 'preflight');
     requirePinnedToolkitFlags(scenario, args.options, 'preflight');
     eval_.resolveTrialTimeoutMs(); // refuse a bad ceiling before any Setup or session (B-10)
+    // The baseline the A/B will run: given a text, and its staged files, if the
+    // A/B's baseline will be (B-20).
+    const baseline = require('./eval-skill-options').preflightBaseline(scenario, projectRoot, {
+      baselineSkillFile: args.options['baseline-skill-file'],
+      stage: args.flags['stage-skill-files'],
+    });
     const runLock = takeRunLock('preflight');
     console.log(`Running preflight for "${scenarioName}"...`);
     const runId = generateRunId();
@@ -293,8 +288,9 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
       maxTurns: args.options['max-turns'] ? parseInt(args.options['max-turns'], 10) : undefined,
       pluginDir: abPluginDir,
     });
-    const stubRunTrial = (t, totalK) =>
-      eval_.runTrial(scenario, t, totalK, {
+    const stubRunTrial = (t, totalK) => {
+      const arm = baseline.arm();
+      return eval_.runTrial(arm.scenario, t, totalK, {
         projectRoot,
         model,
         effort,
@@ -302,22 +298,31 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
         isolated: true,
         label: PREFLIGHT_LABEL,
         ...baselineArm,
+        watchRoots: [...baselineArm.watchRoots, ...arm.watchRoots],
+        skillInjection: arm.skillInjection,
       });
+    };
     const stubGrade = (result) => gradePreflightTrial(result, scenario, projectRoot);
 
-    const outcome = runPreflight(scenarioName, projectRoot, {
-      scenario,
-      runTrial: stubRunTrial,
-      gradeResult: stubGrade,
-      model,
-      effort,
-      conditions: {
-        maxTurns: baselineArm.maxTurns,
-        pluginDir: abPluginDir,
+    let outcome;
+    try {
+      outcome = runPreflight(scenarioName, projectRoot, {
+        scenario,
+        runTrial: stubRunTrial,
+        gradeResult: stubGrade,
+        model,
         effort,
-        trialTimeoutMs: eval_.resolveTrialTimeoutMs(),
-      },
-    });
+        conditions: {
+          maxTurns: baselineArm.maxTurns,
+          pluginDir: abPluginDir,
+          effort,
+          trialTimeoutMs: eval_.resolveTrialTimeoutMs(),
+          ...baseline.conditions,
+        },
+      });
+    } finally {
+      baseline.remove();
+    }
 
     console.log(`Verdict: ${outcome.verdict}`);
     console.log(`Reason:  ${outcome.reason}`);
@@ -390,63 +395,30 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
     const model = args.options.model;
     const effort = args.options.effort;
     // A skill-scope A/B needs its skill body; refuse before any progress line.
-    const skillFile = args.options['skill-file'] || scenario.target;
-    let skillInstruction;
-    if (scenario.scope !== 'workflow') {
-      if (!skillFile) {
-        throw new Error(
-          'eval ab for skill scope requires --skill-file <path> or ## Target in scenario',
-        );
-      }
-      const resolvedSkillFile = path.resolve(projectRoot, skillFile);
-      if (!fs.existsSync(resolvedSkillFile)) {
-        throw new Error(`skill file not found: ${skillFile}`);
-      }
-      skillInstruction = fs.readFileSync(resolvedSkillFile, 'utf8');
-    }
+    const { resolveSkillOptions, skillNameFromFile } = require('./eval-skill-options');
+    const skill = resolveSkillOptions(scenario, projectRoot, {
+      skillFile: args.options['skill-file'],
+      baselineSkillFile: args.options['baseline-skill-file'],
+      stage: args.flags['stage-skill-files'],
+    });
+    const { skillFile } = skill;
     // Before the gate: it reads the record a running preflight is still writing.
     takeRunLock('ab');
 
-    // Preflight gate: require a PASS preflight for this (scenario, model)
-    // before running A/B eval. Gate is keyed by both — a PASS produced
-    // under one model does NOT unblock A/B runs on another model.
-    // Non-regression/non-interference scenarios may explicitly opt out
-    // with `## Preflight\nskip`; all existing scenarios continue to gate
-    // by default.
-    const { checkPreflightGate, shouldSkipPreflightGate } = require('../lib/eval-preflight');
-    if (shouldSkipPreflightGate(scenario)) {
-      console.log(`Preflight: skipped by scenario policy (${scenario.name})`);
-    } else {
-      // Keyed on the conditions this A/B's baseline will run under (the same
-      // resolution preflight used), so a PASS under another budget or without
-      // a plugin dir does not unlock it.
-      const abPluginDir =
-        args.options['plugin-dir'] ||
-        (scenario.scope === 'workflow' ? scenario.pluginDir : undefined);
-      const { maxTurns: abMaxTurns } = eval_.sharedArmOptions(scenario, {
-        maxTurns: args.options['max-turns'] ? parseInt(args.options['max-turns'], 10) : undefined,
-        pluginDir: abPluginDir,
-      });
-      const gateError = checkPreflightGate(scenario.name, projectRoot, {
-        model,
-        conditions: {
-          maxTurns: abMaxTurns,
-          pluginDir: abPluginDir,
-          effort,
-          trialTimeoutMs: eval_.resolveTrialTimeoutMs(),
-        },
-      });
-      if (gateError) {
-        throw new Error(gateError);
-      }
-    }
-
-    const k = parseK(scenario, true);
-    const interleave = !!args.flags.interleave;
     const pluginDir = args.options['plugin-dir'];
     const maxTurns = args.options['max-turns']
       ? parseInt(args.options['max-turns'], 10)
       : undefined;
+    require('./eval-preflight-gate').requirePreflightPass(scenario, projectRoot, {
+      model,
+      effort,
+      pluginDir,
+      maxTurns,
+      skill,
+    });
+
+    const k = parseK(scenario, true);
+    const interleave = !!args.flags.interleave;
     const onTrialComplete = (label, t, graded) => {
       console.log(`  [${label}] Trial ${t}/${k}: ${formatStatus(graded)}`);
     };
@@ -471,10 +443,15 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
       console.log(
         `A/B eval (skill): ${scenario.name} (k=${k})${interleave ? ' [interleaved]' : ''}`,
       );
-      console.log(`Skill: ${skillFile}\n`);
+      console.log(`Skill: ${skillFile}${skill.stageSkillFiles ? ' (files staged)' : ''}`);
+      console.log(skill.baselineSkillGiven ? `Baseline text: ${skill.baselineSkillGiven}\n` : '');
       result = eval_.runSkillEval(scenario, k, {
         projectRoot,
-        skillInstruction,
+        skillInstruction: skill.skillInstruction,
+        skillFile: skill.skillPath,
+        baselineSkillInstruction: skill.baselineSkillInstruction,
+        baselineSkillFile: skill.baselineSkillFile,
+        stageSkillFiles: skill.stageSkillFiles,
         interleave,
         onTrialComplete,
         model,
@@ -495,7 +472,8 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
 
     // fr-gr-005: blind-comparator auto-trigger
     const { runBlindAutoTrigger } = require('../lib/eval-blind-autotrigger');
-    const skillName = skillFile ? skillNameFromFile(skillFile) : undefined;
+    // Both arms' names in a two-text A/B: a baseline that repeats its own is as identifying.
+    const skillName = [skillFile, skill.baselineSkillFile].filter(Boolean).map(skillNameFromFile);
     const blindResult = runBlindAutoTrigger(
       scenario,
       result.baseline,
