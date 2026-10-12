@@ -140,9 +140,9 @@ PR #282。
 - 檔案是 `hooks/session-tracker/inject-context.js`（436 行，已超過 400 行的軟上限；新函式約 30 行，必要時抽一個 `session-continuity.js` 到 `hooks/session-tracker/`）。`start.js` 不送任何 context，不要改它。
 - 找最新的 archive：`scripts/lib/session-archive.js:370-405` 的 `listArchives` 會先讀每份 archive 的第一行再套 `limit`，這在 SessionStart 的同步路徑上，成本隨存檔數成長。D-061 定為只看名稱，所以加一個只看檔名的 `latestArchive`（時間戳在檔名裡）；project 鍵與 session-tracker 一致。
 - 有 archive 就推一行到 `contextParts` 與 `userParts`：上一份 archive 的 alias 或檔名、Saved 日期、`arcforge session resume <alias|path>`；alias 欄是 `-` 的用路徑。沒有 archive 就什麼都不加。只在 `source` 為 `startup`／`clear` 時加。
-- `try/catch` 全包（hooks 的錯誤策略是靜默）。不受 learning 開關影響。
+- `try/catch` 全包（hooks 的錯誤策略是靜默）。不受 learning 開關影響。alias 索引的失敗要另外處理，不能落進這個 `try/catch`：`loadAliases` 遇到壞掉的 JSON 會 throw，`listAliases` 不過濾無效的 alias 鍵，兩種情況都要退回路徑形式，不是整行消失，也不是印出不能用的 alias（hooks B-8）。路徑形式的路徑要寫成一個 shell word（含空白或 shell 特殊字元時加單引號），指令才能照印出來的樣子執行；路徑含控制字元就不出這一行。
 - 文件在同一個 PR：`docs/guide/hooks-system.md:66-69`、`hooks/README.md`、README 的 SessionStart 句子。hooks B-8 的重寫已在 WP-P。`.claude/rules/architecture.md` 的「minimal bootstrap」句子不動（一行符合）。
-- 測試：`hooks/__tests__/inject-context.test.js` 加四個 case（有 archive 的 `startup`、`resume` 不出現、無 archive 靜默、設了 `ARCFORGE_SPAWNED` 的 `startup` 不出現）。既有的 spawned 檢查只在 `loadPendingActions` 裡，管不到另外加在 `main()` 的 archive 載入，所以指引要有自己的檢查。
+- 測試：`hooks/__tests__/inject-context.test.js` 加四個 case（有 archive 的 `startup`、`resume` 不出現、無 archive 靜默、設了 `ARCFORGE_SPAWNED` 的 `startup` 不出現）。既有的 spawned 檢查只在 `loadPendingActions` 裡，管不到另外加在 `main()` 的 archive 載入，所以指引要有自己的檢查。另外三個 case 守住退回路徑的行為：alias 索引無法解析、alias 鍵無效（含控制字元）、alias 鍵以 `-` 開頭，三者都印出路徑形式（PR #282 已有這三個 case）。
 
 ### WP-C `sessions` 瘦身
 

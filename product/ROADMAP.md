@@ -1993,7 +1993,9 @@ reverse one, append a superseding entry (see AGENTS.md).
   (D-013). An alias index that cannot be parsed, or one edited by hand so
   that its keys are not valid aliases — one that begins with a hyphen
   among them, which the CLI would read as a flag ([cli](specs/cli.md)
-  B-9) — yields the path form of the line, not the alias.
+  B-9) — yields the path form of the line, not the alias. In the path form
+  the path is one shell word, single-quoted when it needs to be, and a path
+  that holds a control character yields no line at all.
 - Cost accepted: one more line in the model's context and the user's summary
   at every `startup` and `clear` of a project that has an archive, and, on
   the synchronous SessionStart path, a listing of each date directory,
@@ -2019,7 +2021,9 @@ reverse one, append a superseding entry (see AGENTS.md).
   holder named, and a lock whose process is gone is reclaimed. (b) Preflight writes a result row
   for each trial, to `preflight.jsonl` in its run's directory under the
   condition label `preflight`, which no A/B pool, `eval report`,
-  `eval list` or the dashboard reads; since a row file's name ends in its
+  `eval list` or the dashboard's comparison and scenario views read — the
+  dashboard's run listing shows them, labelled `preflight`
+  ([eval](specs/eval.md) B-16); since a row file's name ends in its
   condition, a scenario name ending in `-baseline`, `-treatment` or
   `-preflight` is refused. (c) Every result row and every
   preflight record carries the Node version that ran the engine, the hash

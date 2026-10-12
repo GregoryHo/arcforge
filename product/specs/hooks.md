@@ -155,7 +155,9 @@ down, never block the user, and never observe them uninvited.
   `Previous session archive: <alias>, saved <YYYY-MM-DD>. Read it: arcforge
   session resume <alias>`; when no valid alias points at the newest archive,
   its file name stands in for the alias and its absolute path is what the
-  command is given. "Newest" is the newest engine-written archive by the
+  command is given, written as one shell word — single-quoted when it holds
+  a space or a shell metacharacter — so the command runs as printed; a path
+  that holds a control character yields no line. "Newest" is the newest engine-written archive by the
   stamp in its file name (`archive-<alias>-<YYYYMMDDTHHMMSSZ>[-n].md`); a
   hand-named file under the sessions directory is not considered, and the
   saved date is the UTC date of the archive's directory. A `resume` or
