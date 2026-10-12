@@ -39,7 +39,7 @@ D-062（儀器），七項：
 |---|---|---|
 | (a) | run lock：`eval run`、`eval preflight`、`eval ab`、`eval report` 在 `.eval-trials/` 底下取鎖，記 PID，每條結束路徑都釋放（含 preflight BLOCK）；第二個立刻被拒絕並指出持有者；行程已不存在的鎖會被回收 | eval B-15 |
 | (b) | preflight 每個 trial 寫一筆 result row，標籤獨立，任何 pool 讀取端都不回傳它 | eval B-16 |
-| (c) | 每筆 row 與每筆 preflight 紀錄帶 Node 版本與 scenario hash（`node_version`、`scenario_hash`）；只記錄、不分組 | eval B-17 |
+| (c) | 每筆 row 與每筆 preflight 紀錄帶 Node 版本、scenario hash 與 checkout 的 commit（`node_version`、`scenario_hash`、`repo_commit`）；只記錄、不分組 | eval B-17 |
 | (d) | trial 環境重建：operator 的 `PATH` 不進 trial 與 fixture Setup，`claude`、`node` 仍解析得到；scenario 以 `## Environment` 宣告 `PATH` 增減與放進 trial 內的快取目錄；`HOME` 保留；兩臂相同，記進 row | eval B-18 |
 | (e) | `--stage-skill-files`（opt-in）：skill 檔所在目錄複製到 trial 樹外，注入以 host 格式的「Base directory for this skill」開頭；是 pool 條件 | eval B-19 |
 | (f) | `--baseline-skill-file`：兩份 skill 文字的 A/B；每筆 row 記該臂注入文字的 hash；baseline 文字是 pool 條件；`eval preflight` 接受同一旗標，紀錄以 baseline 文字的 hash 為鍵 | eval B-20 |
@@ -76,7 +76,7 @@ D-062（儀器），七項：
 | 工作包 | 事項 | spec | PR |
 |---|---|---|---|
 | WP-P product | D-059 到 D-062、roadmap 的 6.5.0 列（`next`）、B-item、墓碑、本文件與 `README.md` | 全部 | 本 PR |
-| WP-A 儀器 | D-062 的七項，五個 PR（A1 到 A5），見下方 | eval B-15 到 B-21 | A4：#281；其餘 — |
+| WP-A 儀器 | D-062 的七項，五個 PR（A1 到 A5），見下方 | eval B-15 到 B-21 | A1 #287、A2 #284、A3 #286、A4 #281、A5 #288 |
 | WP-B session 延續 | D-061：`inject-context.js` 的一行指引 | hooks B-8 | #282 |
 | WP-C `sessions` 瘦身 | D-059 第 1 點：`SKILL.md` 206 → ≤150，`references/` | skill-system B-12 | #283 |
 | WP-D 量測 | D-059 第 2 到 7 點：四道設計關卡 → 預先登記的 decision → 一輪 → 稽核 → 結果的 decision | skill-system B-11、obsidian B-10 | — |
@@ -94,11 +94,11 @@ D-062（儀器），七項：
 
 | PR | D-062 | 墓碑 | 編號 |
 |---|---|---|---|
-| A1 run lock | (a) | `eval-concurrent-run-guard` | — |
-| A2 preflight row、Node 版本與 hash | (b)、(c) | `preflight-result-rows`、`eval-record-node-and-hash` | — |
-| A3 trial 環境 | (d) | `eval-trial-path` | — |
+| A1 run lock | (a) | `eval-concurrent-run-guard` | #287 |
+| A2 preflight row、Node 版本與 hash | (b)、(c) | `preflight-result-rows`、`eval-record-node-and-hash` | #284 |
+| A3 trial 環境 | (d) | `eval-trial-path` | #286 |
 | A4 `eval compare --no-analyzer` | (g) | `eval-compare-skip-analyzer` | #281 |
-| A5 staged skill 目錄與兩文字 A/B | (e)、(f) | `eval-skill-files-outside-trial` | — |
+| A5 staged skill 目錄與兩文字 A/B | (e)、(f) | `eval-skill-files-outside-trial` | #288 |
 
 **A1 run lock。** `scripts/lib/locking.js` 不能直接用：mtime 超過 30 秒就當 stale、等 5 秒才放棄、不查 PID 是否存活。做法二選一：新 helper（約 40 行，O_EXCL 開檔、寫 PID、查存活、拿不到就立刻拒絕），或給 `locking.js` 加 `staleThreshold` 與 PID 檢查。鎖檔放 `.eval-trials/` 底下（write guard 跳過它，`.gitignore` 已含）。`eval-command.js` 的 `run`（:178）、`preflight`（:248）、`ab`（:375）三個分支都包 try/finally；`eval report` 也取同一把鎖（PR #287），因為它寫 `evals/benchmarks/`，live trial 的 write guard 會把這次寫入算在 trial 頭上。preflight 判定 BLOCK 時現在是 `process.exit(1)`（:317），`finally` 不會執行，鎖會留下來：改成設 `process.exitCode = 1` 後正常返回，或在 exit 之前明確釋放鎖；A1 的測試要涵蓋 BLOCK 之後鎖已不存在。不把 `evals/preflight/` 加進 guard 的 skip list，那會藏住真的 trial 寫入。
 
@@ -131,7 +131,7 @@ D-062（儀器），七項：
 - **preflight 也要懂這個旗標**：兩文字 A/B 的 preflight 臂是「舊文字」臂（v6.4 的關卡文件說 no-skill baseline 很可能在天花板），紀錄的鍵要含 baseline 文字的 hash，否則 `eval ab` 找不到對應紀錄會拒跑，或 preflight 量到錯的那一臂。
 - **staging 是 pool 條件**（eval B-8、B-19）：`--stage-skill-files` 是 opt-in，進 `ranWith()`；不開旗標的 run 與 6.3.0／6.4.0 的 treatment pool 仍可合併，開了的自成一池。D1 不需要它，D2 到 D4 需要。
 - #184 需要第二支 skill 的 body 進 treatment：旗標可重複（多個 `--skill-dir`），或由 scenario 的 fixture 放進兩臂。由 WP-D 的設計關卡決定，A5 只要不堵死前者。
-- D-062 的 Residual 留給 A5 定案：兩臂 `SKILL.md` 文字相同、只有 staged 檔案不同時（D4 的形狀），文字 hash 分不出兩臂；staged 目錄的內容是否併入記錄的身分，要在 D4 的關卡之前決定。只以 baseline 文字為鍵的 preflight 紀錄，會被 staged 檔案不同的另一次 run 找到，兩次 run 的 row 也會併成一池；所以 A5 要把 staged 目錄的 digest 放進 row、pool 條件與 preflight 的鍵，否則 D4 不寫關卡、不花 session。
+- 兩臂 `SKILL.md` 文字相同、只有 staged 檔案不同時（D4 的形狀），文字 hash 分不出兩臂，所以 A5（PR #288）把 staged 目錄的 digest 放進 row（`skillFilesHash`，每臂各記）、pool 條件（`baselineSkillFilesHash`）與 preflight 的鍵（`baseline_skill_files_hash`，檔名 `-b<文字 hash>-s<檔案 digest>`）。treatment 的 digest 只記錄、不分組，與它的文字 hash 相同（eval B-20）。
 
 ### WP-B session 延續
 

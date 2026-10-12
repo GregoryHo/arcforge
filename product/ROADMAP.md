@@ -16,7 +16,7 @@ decision *and* every reversal. How to maintain this file: [`product/AGENTS.md`](
 | 6.2.1 | `v6.2.1` | instrument and state repairs, no measurement | **shipped** | Repairs to promises already shipped: same-day benchmark snapshots stop overwriting each other and `eval history` lists them all, the eval dashboard shows an instrument-failure pool instead of hiding it, loop run state is written atomically, the observe hook's lazy daemon start reclaims a dead process's lock, `check:product` rejects a relation aimed at an already-dead decision, and the `releasing` skill describes what a squash-only ruleset does to the flip commit. Nothing under `skills/`, `evals/scenarios/` or `evals/fixtures/`, so it ships without a live eval session. | [eval](specs/eval.md) · [worktrees-loop](specs/worktrees-loop.md) · [learning](specs/learning.md) |
 | 6.3.0 | `v6.3.0` | ceiling redesigns · skill-local script fixes · the enable stamp | **shipped** | Two of the five scenarios whose baseline sat at ceiling on the repaired instrument are redesigned to Version 2 — router skill selection and the LINK-mode index rebuild — and the round, capped at about 80 trial sessions, spent 16 for one A/B result (router skill selection) and four findings without an A/B (D-054); the `diagramming-obsidian` helpers and `lint_vault` fixes ship in it on contract tests because they sit under `skills/`; and the stale-draft floor stops losing an overlapping opt-in, through additive `enabled_at` and `disabled_at` stamps in the learning config. | [skill-system](specs/skill-system.md) · [obsidian](specs/obsidian.md) · [sdd](specs/sdd.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) |
 | 6.4.0 | `v6.4.0` | session archive returns · daemon, write and counter races · grader isolation | **shipped** | v5's session archive, dropped at 6.0.0 without a record, returns as a sixth CLI group, `arcforge session` (`save`, `resume`, `list`, `alias`), over the engine modules that survived unexposed: an engine-written metrics header plus the handover file's five sections, written by the agent in-session, and the `sessions` skill learns to drive it (D-056). The engine fixes planned as 6.3.1 ride along — observer daemon starts and stops that can leave two daemons (#247, #252), the shared atomic-write helper's temporary-file race (#253), the diary tool counter that loses increments (#260), and code graders that can import from the trial directory (#250) — with the README naming `speccing` as the v5 pipeline's file-based replacement and two corrections to past CHANGELOG entries. A minor because it adds a CLI group; the round, capped at about 40 trial sessions, spent 29 and read the `sessions` skill's present-then-stop behaviour (B-11) at baseline 0/5 against treatment 5/5 and the router at 0/5 against 5/5 again, reproducing 6.3.0 — direction only, at k=5 on one fixture and one model each, for injected skill text — while the `diagramming-obsidian` verify-exit sentence already on `main` (#267) was found not measurable on the current engine and is recorded as a finding (D-055, D-057, D-058). | [cli](specs/cli.md) · [skill-system](specs/skill-system.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) · [eval](specs/eval.md) · [obsidian](specs/obsidian.md) |
-| 6.5.0 | — | eval instrument debts · session continuity · four gated measurements | **next ← we are here** | The debts two measurement rounds left on the eval instrument are paid first: one live eval per checkout becomes a lock the engine holds instead of a rule the operator keeps, preflight writes result rows under a label of its own, every row records the Node version and the scenario hash, the operator's `PATH` stops reaching trials and a scenario can declare its trial environment, and `eval compare` can skip the analyzer session. Two additions then open what 6.4.0's design gate found not measurable: a skill's files staged outside the trial tree, and an A/B between two skill texts (D-062). SessionStart names the project's newest session archive and the command that reads it — the promise D-031 withdrew, which 6.4.0's archive makes keepable — in one line, never the archive's contents (D-061), and the `sessions` body moves its reference material into its own `references/`. A minor because it adds hook behaviour and eval flags; the round, capped at about 80 trial sessions and run one scenario at a time, puts four measurements each behind an offline design gate: `sessions` on an archive read through `arcforge session resume`, the `executing` to `dispatching` handoff (#184), the `diagramming-obsidian` verify-exit sentence, and that skill's `references/` layout change (#185) (D-059). | [eval](specs/eval.md) · [hooks](specs/hooks.md) · [skill-system](specs/skill-system.md) · [obsidian](specs/obsidian.md) |
+| 6.5.0 | — | eval instrument debts · session continuity · four gated measurements | **next ← we are here** | The debts two measurement rounds left on the eval instrument are paid first: one live eval per checkout becomes a lock the engine holds instead of a rule the operator keeps, preflight writes result rows under a label of its own, every row records the Node version and the scenario hash, the operator's `PATH` stops reaching trials and a scenario can declare its trial environment, and `eval compare` can skip the analyzer session. Two additions then open what 6.4.0's design gate found not measurable: a skill's files staged outside the trial tree, and an A/B between two skill texts (D-062). SessionStart names the project's newest session archive and the command that reads it — the promise D-031 withdrew, which 6.4.0's archive makes keepable — in one line, never the archive's contents (D-061), and the `sessions` body moves its reference material into its own `references/`. A minor because it adds hook behaviour and eval flags; the round, capped at about 80 trial sessions and run one scenario at a time, puts four measurements each behind an offline design gate: `sessions` on an archive read through `arcforge session resume`, the `executing` to `dispatching` handoff (#184), the `diagramming-obsidian` verify-exit sentence, and that skill's `references/` layout change (#185) (D-059). | [eval](specs/eval.md) · [hooks](specs/hooks.md) · [skill-system](specs/skill-system.md) · [obsidian](specs/obsidian.md) · [cli](specs/cli.md) |
 
 > Un-scheduled ideas live in the [Backlog](BACKLOG.md); a wish graduates into a
 > version (row + spec + Decision Log entry) when picked.
@@ -2018,7 +2018,10 @@ reverse one, append a superseding entry (see AGENTS.md).
   `eval report` take a lock under `.eval-trials/` that records the holder's
   process id and is released on every exit path, a preflight BLOCK
   included; a second one in the same checkout is refused at once with the
-  holder named, and a lock whose process is gone is reclaimed. (b) Preflight writes a result row
+  holder named, and a lock whose process is gone is reclaimed: the run
+  reserves the reclaim, and under that reservation removes only the dead
+  lock whose `pid` and `started` match what it observed before reserving;
+  anything else is refused. (b) Preflight writes a result row
   for each trial, to `preflight.jsonl` in its run's directory under the
   condition label `preflight`, which no A/B pool, `eval report`,
   `eval list` or the dashboard's comparison and scenario views read — the
@@ -2049,21 +2052,26 @@ reverse one, append a superseding entry (see AGENTS.md).
   `npx`, followed by the system directories, so the operator's `PATH` no
   longer reaches such a trial while `claude` and `node` stay resolvable. A
   `--no-isolate` trial inherits the operator's environment, with
-  `ARCFORGE_HOME` alone redirected. A scenario may declare, in
+  `ARCFORGE_HOME` redirected and the scenario's `## Environment`
+  directives applied. A scenario may declare, in
   an `## Environment` section, `PATH` entries to add or remove and cache
   directories to place inside the trial; `HOME` is kept, since the session
   authenticates from `~/.claude`. The declaration applies to both arms alike
   and is recorded on the row. (e) Opt-in, by `--stage-skill-files`: the
   directory the skill file sits in is copied outside the trial tree, and the
   injection opens with a host-style "Base directory for this skill" line
-  naming the copy, so the line and the files are part of the injection. It
+  naming the copy, so the line and the files are part of the injection.
+  Every row of a staged arm records a digest of the directory staged for
+  it. Staging
   is a pooling condition: a run without the flag pools with the rows written
   before 6.5.0, a run with it forms a pool of its own. (f) An A/B between
   two skill texts, by `--baseline-skill-file`: the baseline is injected with
   that text in place of none, every row records a hash of the text its arm
-  was injected with, the baseline's injected text is a pooling condition,
-  and `eval preflight` takes the same flag, runs that baseline, and keys its
-  record on the baseline text's hash. (g) `eval compare --no-analyzer`
+  was injected with, the baseline's injected text is a pooling condition —
+  and so, when the baseline is staged, is the digest of its staged
+  directory — and `eval preflight` takes the same flag, runs that baseline,
+  and keys its record on the baseline text's hash and, when the baseline
+  is staged, on that digest. (g) `eval compare --no-analyzer`
   prints the verdict without starting the eval-analyzer session.
 - Why: (a) D-058 made one-run-per-checkout a rule after a second run's
   write under `evals/preflight/` aborted a preflight; a rule the operator
@@ -2130,17 +2138,25 @@ reverse one, append a superseding entry (see AGENTS.md).
   The lock covers the three commands that run trials and `eval report`: an
   edit, or any other write in the checkout during a live run, still reads to
   the write guard as the trial's. It is per checkout, so two worktrees are
-  two locks, and a recycled process id can make a dead lock look held. The
+  two locks, and a recycled process id can make a dead lock look held. A
+  run killed while its trial is running can leave the trial's `claude`
+  process alive — the trial is a synchronous child the signal does not
+  reach — so the lock is reclaimed when the holder's PID is dead, not when
+  the trial is, and the orphan's writes can be blamed on the next run's
+  trial. A lock file that names no process, or a leftover
+  `run.lock.reclaim`, is refused, not reclaimed, until the operator
+  removes it by hand; the refusal names the file. The
   rebuilt environment is not a pooling condition, so rows from before and
   after it pool together though their trials did not see the same `PATH`.
   With one `SKILL.md` text in both arms and different staged files — the
   shape (iv) of D-059 takes — the text hashes alone do not tell the arms
-  apart, so a preflight record keyed on the baseline text would also be
-  found by a run whose baseline was staged with different files, and their
-  rows would pool; whether the staged directory's content joins the
-  recorded identity — row, pool and preflight key — is settled with the
-  engine change, and (iv) is not gated, and spends no session, until it
-  has. A code grader's
+  apart, so the baseline's staged content is part of the recorded
+  identity: its digest is a pooling condition and part of the preflight
+  key, a preflight record is not found by a run whose baseline was staged
+  with different files, and the rows of two such runs do not pool. The
+  treatment's digest is recorded and, like its text hash, not pooled, so a
+  treatment whose staged files changed under an unchanged scenario version
+  joins the earlier treatment pool. A code grader's
   environment is not rebuilt: a grader is not a trial, and it runs with the
   operator's full environment — seven graders in the corpus call `arcforge`
   and nine call `npm`. A scenario that prepends a directory of its own can
@@ -2149,18 +2165,22 @@ reverse one, append a superseding entry (see AGENTS.md).
   Obsidian vault, and anything that needs more than one turn in a trial
   (D-057).
 - Cost accepted: four more things an operator can pass or a scenario can
-  declare, and three more pooling distinctions for a reader to keep apart.
+  declare, and three more pooling distinctions for a reader to keep apart:
+  staging, the baseline's text, and the baseline's staged files.
   A scenario that leaned on a tool from the operator's `PATH` stops finding
   it and must declare it. A staged run copies a skill directory per run. A
   second eval in a checkout now fails at once where it used to start.
 - Verification: contract tests per item — the lock refusing a second holder
   and reclaiming a dead one; a preflight row that no pool reader returns;
-  both fields on a row and on a record, with pools unchanged by them; a
+  the three fields (`node_version`, `scenario_hash`, `repo_commit`) on a
+  row and on a record, with pools unchanged by them; a
   trial's environment without the operator's `PATH` entries and with the
   scenario's declared ones; the base-directory line in the treatment's
   prompt and absent from the baseline's, the staged path outside the trial
   tree; both arms' text hashes on a two-text run, and a preflight record
-  that `eval ab` finds only under the same baseline text; and
+  that `eval ab` finds only under the same baseline text and, when the
+  baseline is staged, the same staged-files digest, with two baselines
+  staged differently in two pools; and
   `eval compare --no-analyzer` spawning no session. `npm run check:docs`
   holds each new flag to the CLI manifest. The live proofs are a second preflight refused
   while a first runs, and the four design gates of D-059, which cite the

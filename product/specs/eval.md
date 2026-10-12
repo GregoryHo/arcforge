@@ -125,9 +125,11 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   empties the pool, because old rows answered a different question; cosmetic
   prose edits do not. A pool is the scenario version plus the run conditions
   (model, effort, ceiling, turn budget, plugin dir, isolation), and readers never combine
-  conditions (D-021). From 6.5.0 two more conditions apply to a run that opts
-  into them — staged skill files (B-19) and a baseline skill text (B-20); a
-  run that uses neither records neither, so its rows pool with those written
+  conditions (D-021). From 6.5.0 three more conditions apply to a run that opts
+  into them — staged skill files (`stageSkillFiles`, B-19), a baseline skill
+  text (`baselineSkillHash`, B-20) and, when that baseline is staged, the
+  digest of its staged files (`baselineSkillFilesHash`, B-20); a
+  run that uses none records none, so its rows pool with those written
   before 6.5.0 (D-062).
 - **B-12 A grader reads what a trial produced; it never runs it.** No grader
   executes code a trial wrote — no probe, no import, no test run over the
@@ -196,14 +198,23 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   trial. The lock records the holder's process id. A second of those commands
   in the same checkout is refused at once — it does not wait — with a
   message naming the holder's process id and the lock's path. A lock whose
-  process no longer exists is reclaimed, not honoured. The rule exists
+  process no longer exists is reclaimed, not honoured: the run reserves the
+  reclaim, and under that reservation removes only the dead lock whose
+  `pid` and `started` match what it observed before reserving; anything
+  else is refused. A lock file that names no process, or a leftover
+  `run.lock.reclaim`, is refused, not reclaimed, until the operator
+  removes it by hand; the refusal names the file. The rule exists
   because the write guard (B-7) cannot tell another run's write from a
   trial's, and the lock sits under `.eval-trials/` because the guard does not
   watch that directory (D-058, D-062). Residual: only those four commands
   take the lock, so an operator's edit, or any other write in the checkout,
   during a live run is still reported as the trial's write; the lock is per checkout, so two
-  worktrees do not exclude each other; and a recycled process id can make a
-  dead lock read as held.
+  worktrees do not exclude each other; a recycled process id can make a
+  dead lock read as held; and a run killed while its trial is running can
+  leave the trial's `claude` process alive — the trial is a synchronous
+  child the signal does not reach — so the lock is reclaimed when the
+  holder's PID is dead, not when the trial is, and the orphan's writes can
+  be blamed on the next run's trial.
 - **B-16 Preflight writes a result row per trial, apart from every pool
   (6.5.0).** Each preflight trial leaves a result row in its run's directory,
   `evals/results/<scenario>/<runId>/preflight.jsonl` — its grade, its
@@ -263,7 +274,8 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   installed — `arcforge` included — is not something a trial can run unless
   the scenario says so. A `--no-isolate` trial is the exception: it measures
   the operator's own toolkit (B-7), so it inherits the operator's
-  environment, with `ARCFORGE_HOME` alone redirected. A scenario makes its
+  environment, with `ARCFORGE_HOME` redirected and the scenario's
+  `## Environment` directives applied. A scenario makes its
   statement in an `## Environment` section, which adds to the built `PATH`:
   it may append `PATH` entries, prepend them, remove them, and point cache
   directories — a package manager's, a browser download's, from a fixed
@@ -321,23 +333,26 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   `--stage-skill-files` each arm gets a staged directory and a
   base-directory line of its own (B-19), the baseline's taken from the
   directory its file sits in. Every row records a hash of the text its arm
-  was injected with. The baseline's text is a run condition that pools
+  was injected with and, for a staged arm, a digest of the directory
+  staged for it. The baseline's text, and its staged files' digest when it
+  is staged, are run conditions that pool
   (B-8): a two-text run's rows form a pool of their own per baseline text
-  and are never combined with a run whose baseline was given no text, and a
+  and per baseline staged content, and are never combined with a run whose baseline was given no text, and a
   run without the flag pools as before. `eval preflight` takes the same
   flag, and `--stage-skill-files` with it, and runs the baseline the A/B
-  will run; its record is keyed on the baseline text's hash on top of B-3's
+  will run; its record is keyed on the baseline text's hash and, when the
+  baseline is staged, on its staged files' digest, on top of B-3's
   conditions, so `eval ab` is refused until a preflight exists for that
   baseline (D-057, D-062). Residual: the treatment's text hash is recorded
   but, as before 6.5.0, is not a pooling condition, so a skill edited and
   re-measured under an unchanged scenario version joins the earlier
-  treatment pool; and when both arms are given one text and differ only in
-  their staged files, the text hashes do not tell the arms apart: a
-  preflight record keyed on the baseline text alone would also be found by
-  a run whose baseline was staged with different files, and the rows of two
-  such runs would pool. Until the staged directory's content is part of
-  the recorded identity — of the row, of the pool and of the preflight
-  key — no measurement of that shape is run (D-059, D-062).
+  treatment pool. When both arms are given one text and differ only in
+  their staged files, the text hashes do not tell the arms apart, so the
+  baseline's staged content is part of the pool's identity and of the
+  preflight key: a preflight record is not found by a run whose baseline
+  was staged with different files, and the rows of two such runs do not
+  pool. The treatment's digest is recorded, not pooled, like its text
+  hash (D-059, D-062).
 - **B-21 `eval compare` can skip the analyzer (6.5.0).** On a model- or
   human-graded scenario `eval compare` computes the verdict and then starts
   an eval-analyzer session for a qualitative reading. With `--no-analyzer`
@@ -391,8 +406,10 @@ preflight fails closed on the same flags (B-10). Every result row records
 `trialTimeoutMs`, the ceiling its trial ran under, so a pool that mixes ceilings
 can be seen from its rows. From 6.5.0 a row also records the Node version, the repository commit, the
 scenario hash, the scenario's declared trial environment, whether skill files were
-staged, and a hash of the text its arm was injected with (B-17 to B-20). Of those,
-only staging and the baseline's text are pool conditions, and
+staged, a hash of the text its arm was injected with, and a digest of the files
+staged for its arm (`skillFilesHash`) (B-17 to B-20). Of those,
+only staging, the baseline's text and the baseline's staged files' digest are
+pool conditions, and
 `scripts/lib/eval-pools.js` owns the list of fields that are.
 
 ## Decisions
