@@ -537,14 +537,20 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     const treatment = paired.treatment;
 
     console.log(`A/B Comparison: ${name}`);
+    const skipAnalyzer = Boolean(args.flags['no-analyzer']);
     if (scenario && scenario.grader !== 'code') {
-      console.log('(Using eval-analyzer agent for qualitative analysis...)\n');
+      console.log(
+        skipAnalyzer
+          ? '(Analyzer skipped: --no-analyzer. The verdict below is the harness verdict.)\n'
+          : '(Using eval-analyzer agent for qualitative analysis...)\n',
+      );
     }
     const comparison = benchmark_.compareResults(
       scenario || { grader: 'code' },
       baseline,
       treatment,
       projectRoot,
+      { skipAnalyzer },
     );
     printAbSummary('  ', {
       baseline,

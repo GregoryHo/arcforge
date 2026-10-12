@@ -98,6 +98,7 @@ const CLI_MANIFEST = {
       '--model',
       '--effort',
       '--no-isolate',
+      '--no-analyzer',
       '--plugin-dir',
       '--max-turns',
       '--since',

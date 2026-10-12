@@ -11,7 +11,7 @@
  *   eval lint <name>                 Validate scenario file structure
  *   eval report [name] [--model <name>] [--since ISO] Show eval benchmark report
  *   eval ab <name> [--skill-file <path>] [--k N] [--model <name>] [--interleave] [--plugin-dir <path>] [--max-turns N]
- *   eval compare <name> [--model <name>]      Compare A/B results
+ *   eval compare <name> [--model <name>] [--no-analyzer]  Compare A/B results
  *   eval history                     List benchmark snapshots
  *   eval audit [--top N]             Audit grading history for promotion/retirement candidates
  *   eval dashboard [--port N]        Start live eval dashboard (default: 3333)

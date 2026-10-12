@@ -115,7 +115,7 @@ arcforge eval lint <name>
 arcforge eval preflight <name>
 arcforge eval run <name> [--k N] [--model <m>]
 arcforge eval ab <name> [--skill-file <path>]
-arcforge eval compare <name>
+arcforge eval compare <name> [--no-analyzer]
 arcforge eval report [name] [--since <ISO>] [--json]
 arcforge eval history
 arcforge eval audit [--top N]
@@ -132,6 +132,7 @@ arcforge eval dashboard [--port N]
 | `--max-turns` | `run`, `ab` | Turn budget, overriding the scenario's own |
 | `--skill-file` | `ab` | The skill body injected into the treatment arm |
 | `--interleave` | `ab` | Alternate baseline and treatment trials instead of running each arm in a block |
+| `--no-analyzer` | `compare` | Print the verdict without spawning the analyzer session; the verdict itself does not change |
 | `--since` | `report` | Bound the report to results at or after an ISO timestamp |
 | `--json` | `report` | Print the benchmark as JSON |
 | `--top` | `audit` | How many candidates to surface |
