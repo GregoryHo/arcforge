@@ -1,6 +1,6 @@
 # skill-system — spec
 
-> Status: shipped v6.4.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.4.0 · extended by 6.5.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -113,7 +113,11 @@ situations to skills.
   until the user confirms the plan: a handover's plan is someone else's until
   then. From 6.4.0 it reads an archive through `arcforge session resume`
   as well as a `.handovers/` file, either one in the five sections of B-10;
-  an archive in v5's section set is not supported (D-056).
+  an archive in v5's section set is not supported (D-056). From 6.5.0 this
+  behaviour is measured on an archive the agent reads through
+  `arcforge session resume` — `eval-sessions-handover-and-resume` Version 2,
+  behind an offline design gate — where 6.4.0 measured it on a planted
+  `.handovers/` file only (D-059).
 - **B-12 Save, list and alias go through the CLI (6.4.0).** The skill tells
   the agent to write the five sections itself, in-session, and to hand them to
   `arcforge session save <alias> --from <path|->` — the `.handovers/` file it
@@ -126,7 +130,13 @@ situations to skills.
   ([codex-harness](codex-harness.md) B-3). B-10 is not measured in 6.4.0's
   round; B-11 is measured at skill scope by `eval-sessions-handover-and-resume`
   Version 1, on a `.handovers/` file the fixture plants (D-057). B-12's CLI
-  half ships on contract tests (D-055, D-056).
+  half ships on contract tests (D-055, D-056). From 6.5.0 the `sessions`
+  body moves its reference material into the skill's own `references/` and
+  cuts no behavioural instruction, which brings it back under the 150-line
+  soft cap; the files stay inside the skill directory, so B-6 holds. That
+  edit rests for non-regression on 6.5.0's B-11 measurement, which injects
+  the body alone, so the moved material is not itself in front of the
+  treatment (D-059).
 
 ## Data / domain model
 
@@ -165,6 +175,10 @@ asserted by test (B-3).
 - **D-058** — present-then-stop measured +1.00 CI[1, 1] IMPROVED at skill
   scope, baseline 0/5 against treatment 5/5, direction only at k=5; the
   router's reading reproduced on the 6.4.0 tree (B-3, B-9, B-11).
+- **D-059** — 6.5.0 re-measures present-then-stop on an archive read
+  through `arcforge session resume`, trims the `sessions` body into its
+  `references/`, and measures the `executing` to `dispatching` handoff
+  (#184), each measurement behind a design gate (B-9, B-11, B-12).
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
 

@@ -1,6 +1,6 @@
 # hooks — spec
 
-> Status: shipped v6.4.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.4.0 · extended by 6.5.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -135,25 +135,38 @@ down, never block the user, and never observe them uninvited.
   The increment stays on B-7's bounded synchronous path (#260, D-055).
 
 ### Continuity
-- **B-8 The session leaves a record; the next session does not read it
-  back.** Session tracking maintains a durable record of each session
-  (duration, activity) that the learning loop and diary build from — kept
-  unconditionally, because continuity is not a learning feature (B-6 bounds
-  what that record holds); `session-start` opens it, and `pre-compact` captures
-  what compaction is about to drop so the worthwhile part of a long session
-  survives the boundary. What a new session starts with is `inject-context`'s,
-  drawn from learning and pending-action state and never from the previous
-  session's record (D-031). The model receives up to five activated instincts
-  — only ids the user activated, ranked and capped by confidence — the queued
-  notices (a diary draft ready, a finished loop run, and the reflection nudge
-  under the opt-in only, B-6), and, once learning is on, the stale-draft
-  warning. The user sees a one-line summary of the same, plus counts of
-  session aliases and of patterns promoted to global in the past week. With
-  learning never enabled no instinct, nudge or stale-draft warning appears, so
-  the injection is close to silent.
-  *Residual:* carrying over where the last session left off is not built; it
-  waits as the `session-continuity-injection` wish in
-  [BACKLOG](../BACKLOG.md).
+- **B-8 The session leaves a record, and the next one is told where the
+  newest archive is (6.5.0).** Session tracking maintains a durable record of
+  each session (duration, activity) that the learning loop and diary build
+  from — kept unconditionally, because continuity is not a learning feature
+  (B-6 bounds what that record holds); `session-start` opens it, and
+  `pre-compact` captures what compaction is about to drop so the worthwhile
+  part of a long session survives the boundary. What a new session starts
+  with is `inject-context`'s. From learning and pending-action state the
+  model receives up to five activated instincts — only ids the user
+  activated, ranked and capped by confidence — the queued notices (a diary
+  draft ready, a finished loop run, and the reflection nudge under the
+  opt-in only, B-6), and, once learning is on, the stale-draft warning. From
+  6.5.0 it also receives one line of continuity: on a SessionStart whose
+  source is `startup` or `clear`, the line names the project's newest
+  session archive ([cli](cli.md) B-9) — by an alias that points at it, or by
+  its file when none does — with the date it was saved, and the command that
+  reads it, `arcforge session resume <alias|path>`. A `resume` or `compact`
+  start gets no such line, since that is the same session going on, and a
+  project with no archive gets none. The line is all that crosses over: the
+  archive's five sections are never injected, and nothing is read from the
+  previous session's record, so reading the archive stays something the
+  session does, not something done to it (D-061). The line does not wait on
+  the learning opt-in, because an archive holds none of the user's words
+  ([learning](learning.md) B-20). Finding the archive stays on B-7's bounded
+  path: the lookup reads names only — the date directories, the archive
+  file names, which carry the save stamp, and the project's alias index —
+  and never opens an archive. "The project" is the sanitized directory
+  basename, so two same-named projects share one newest archive (D-037). The
+  user sees a one-line summary of the same, plus counts of session aliases
+  and of patterns promoted to global in the past week. With learning never
+  enabled and no archive saved, no instinct, nudge, warning or pointer
+  appears, so the injection is close to silent.
 
 ## Data / domain model
 
@@ -195,8 +208,11 @@ implements fail-open is pinned in `.claude/rules/coding-standards.md`.
   ([learning](learning.md) B-9).
 - **D-029** — B-4 says the guard scans the commit command, not the
   committed content; a staged-content scan waits as a wish (B-4).
-- **D-031** — B-8 stops promising where the last session left off
-  (B-8).
+- **D-031** — B-8 stopped promising where the last session left off;
+  superseded by D-061 (B-8).
+- **D-061** — from 6.5.0 SessionStart names the project's newest session
+  archive and the command that reads it, in one line, on `startup` and
+  `clear` only, never the archive's contents (B-7, B-8).
 - **D-051** — the stale-draft floor no longer advances when an overlapping
   scope is disabled (B-6).
 - **D-053** — only a disable a 6.3 engine recorded keeps the floor; one an

@@ -1,6 +1,6 @@
 # eval — spec
 
-> Status: shipped v6.4.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.4.0 · extended by 6.5.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -123,7 +123,10 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   empties the pool, because old rows answered a different question; cosmetic
   prose edits do not. A pool is the scenario version plus the run conditions
   (model, effort, ceiling, turn budget, plugin dir, isolation), and readers never combine
-  conditions (D-021).
+  conditions (D-021). From 6.5.0 two more conditions apply to a run that opts
+  into them — staged skill files (B-19) and a baseline skill text (B-20); a
+  run that uses neither records neither, so its rows pool with those written
+  before 6.5.0 (D-062).
 - **B-12 A grader reads what a trial produced; it never runs it.** No grader
   executes code a trial wrote — no probe, no import, no test run over the
   trial's files — because the agent under test wrote it, it would run on the
@@ -181,6 +184,101 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   lines in place of a comparison, never another pool's verdict or a run
   history standing alone (#212, D-048).
 
+### The instrument in 6.5.0
+- **B-15 One live eval per checkout, held by a lock (6.5.0).** `eval run`,
+  `eval preflight` and `eval ab` take a lock under `.eval-trials/` before any
+  fixture `Setup` or session, and release it when the run ends, however it
+  ends. The lock records the holder's process id. A second of those commands
+  in the same checkout is refused at once — it does not wait — with a
+  message naming the holder's process id and the lock's path. A lock whose
+  process no longer exists is reclaimed, not honoured. The rule exists
+  because the write guard (B-7) cannot tell another run's write from a
+  trial's, and the lock sits under `.eval-trials/` because the guard does not
+  watch that directory (D-058, D-062). Residual: only those three commands
+  take the lock, so `eval report`, or an operator's edit, during a live run
+  is still reported as the trial's write; the lock is per checkout, so two
+  worktrees do not exclude each other; and a recycled process id can make a
+  dead lock read as held.
+- **B-16 Preflight writes a result row per trial, apart from every pool
+  (6.5.0).** Each preflight trial leaves a result row in its run's directory
+  under `evals/results/` — its grade, its assertion results, the conditions
+  it ran under, and any `infraError` or `gradeError` — under a label of its
+  own. No reader of pools returns that row: not `eval list`, not the verdict
+  `eval run` prints, not `eval compare`, not `eval report`, not the
+  dashboard. So a preflight trial's grade is read from its row, not rebuilt
+  from the trial's end state, and a preflight never moves an A/B verdict or
+  a benchmark. The record under `evals/preflight/` stays what the `eval ab`
+  gate reads (B-2, B-3) (D-062).
+- **B-17 Every row names the Node version and the scenario hash (6.5.0).**
+  Every result row — A/B, `eval run` and preflight — and every preflight
+  record carries the Node version that ran the engine and the hash of the
+  scenario file as the run found it. Neither is a pooling condition: B-8's
+  conditions are unchanged, a pool is split neither by a Node upgrade nor by
+  a cosmetic edit to a scenario, and rows written before 6.5.0, which carry
+  neither, pool as they did. The two fields are there so a reader can see
+  that a pool mixes them, not so the engine refuses one that does (D-062).
+- **B-18 A trial's environment is built, not inherited (6.5.0).** The engine
+  starts each trial session, and each fixture `Setup`, with a `PATH` it
+  builds: `claude` and `node` resolve, and the entries of the operator's own
+  `PATH` do not carry over, so a tool the operator happens to have
+  installed — `arcforge` included — is not something a trial can run unless
+  the scenario says so. A scenario says so in an `## Environment` section,
+  which may add `PATH` entries, remove them, and point cache directories — a
+  package manager's, a browser download's — at a place inside the trial
+  directory. Nothing else can be declared, and `HOME` is never overridden,
+  because the session authenticates from `~/.claude`. The declaration
+  applies to both arms alike, since the arms differ in the injection only
+  (B-7); `eval lint` checks its form; and every row records it. Toolkit
+  state stays redirected as B-7 says (D-057, D-062). Residual: this is not
+  a sandbox. A trial still runs with the operator's filesystem permissions
+  and `HOME`, and a cache no scenario redirected is still the operator's,
+  shared from one trial to the next. The environment is not a pooling
+  condition, so rows from before and after this change pool together though
+  their trials did not see the same `PATH`.
+- **B-19 A skill's files can be staged for the arm injected with it
+  (6.5.0).** By default a skill-scope A/B injects the text of the skill's
+  `SKILL.md` and nothing else (B-1). With `--stage-skill-files`, `eval ab`
+  copies the directory that skill file sits in to a temporary directory
+  outside the trial tree and opens the injection with a line in the host's
+  own form, "Base directory for this skill:" followed by the copy's path, so
+  the injected arm reaches the skill's scripts and references the way a
+  session with the skill loaded would. The files are part of the injection:
+  an arm injected with nothing gets no staged directory and cannot list one
+  from inside its trial. The trial's instruction to stay inside its own
+  directory names the staged directory as its one exception, and the copy
+  is removed when the run ends. Staging is a run condition that pools (B-8):
+  a run without the flag records none and pools with rows written before
+  6.5.0, and a run with it forms a pool of its own (D-049, D-057, D-062).
+  Residual: nothing but the write guard and the advice in the prompt keeps
+  an arm away from a directory it was not given.
+- **B-20 An A/B can compare two skill texts (6.5.0).**
+  `eval ab --baseline-skill-file <path>` injects the baseline with that
+  file's text where it otherwise gets none, so the arms differ in which text
+  each was given — the comparison that isolates an edit to a skill, where
+  text against no text measures the skill as a whole (B-1). With
+  `--stage-skill-files` each arm gets a staged directory and a
+  base-directory line of its own (B-19), the baseline's taken from the
+  directory its file sits in. Every row records a hash of the text its arm
+  was injected with. The baseline's text is a run condition that pools
+  (B-8): a two-text run's rows form a pool of their own per baseline text
+  and are never combined with a run whose baseline was given no text, and a
+  run without the flag pools as before. `eval preflight` takes the same
+  flag, and `--stage-skill-files` with it, and runs the baseline the A/B
+  will run; its record is keyed on the baseline text's hash on top of B-3's
+  conditions, so `eval ab` is refused until a preflight exists for that
+  baseline (D-057, D-062). Residual: the treatment's text hash is recorded
+  but, as before 6.5.0, is not a pooling condition, so a skill edited and
+  re-measured under an unchanged scenario version joins the earlier
+  treatment pool; and when both arms are given one text and differ only in
+  their staged files, the text hashes do not tell the arms apart.
+- **B-21 `eval compare` can skip the analyzer (6.5.0).** On a model- or
+  human-graded scenario `eval compare` computes the verdict and then starts
+  an eval-analyzer session for a qualitative reading. With `--no-analyzer`
+  it starts none and announces none; the delta, the interval and the verdict
+  print as they would have, since they come from the rows alone (B-4). On a
+  code-graded scenario, which never starts the analyzer, the flag changes
+  nothing (D-062).
+
 ### Benchmarks
 - **B-9 Snapshots keep history and gate releases.** `eval report` writes
   `latest.json`, overwritten each time, plus a date-stamped copy under
@@ -221,7 +319,11 @@ complete, provider refusal) — and `scorableResults` in `eval-stats.js` drops e
 `gradeError` row from every scored pool (`eval run`, A/B, benchmark), while
 preflight fails closed on the same flags (B-10). Every result row records
 `trialTimeoutMs`, the ceiling its trial ran under, so a pool that mixes ceilings
-can be seen from its rows.
+can be seen from its rows. From 6.5.0 a row also records the Node version, the
+scenario hash, the scenario's declared trial environment, whether skill files were
+staged, and a hash of the text its arm was injected with (B-17 to B-20). Of those,
+only staging and the baseline's text are pool conditions, and
+`scripts/lib/eval-pools.js` owns the list of fields that are.
 
 ## Decisions
 
@@ -266,3 +368,10 @@ its rationale is inline at B-10.
   two-skill-text A/B, so it is a finding at 0 sessions (B-1, B-7).
 - **D-058** — 6.4.0's round: the write guard cannot tell another run's write
   from a trial's, so one checkout runs one live eval at a time (B-7).
+- **D-059** — 6.5.0's round puts four measurements each behind an offline
+  design gate and runs them one at a time, the router scenario not among
+  them (B-3, B-15).
+- **D-062** — 6.5.0's instrument: the run lock, preflight rows, the Node
+  version and scenario hash on every row, a built trial environment a
+  scenario can declare, staged skill files, a two-text A/B, and a compare
+  that can skip the analyzer (B-8, B-15 to B-21).
