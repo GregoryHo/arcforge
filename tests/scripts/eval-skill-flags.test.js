@@ -22,6 +22,7 @@ const evalLib = require('../../scripts/lib/eval');
 jest.mock('../../scripts/lib/eval-blind-autotrigger', () => ({
   runBlindAutoTrigger: jest.fn(() => ({ skipped: true })),
 }));
+const { runBlindAutoTrigger } = require('../../scripts/lib/eval-blind-autotrigger');
 const { runEvalCommand } = require('../../scripts/cli/eval-command');
 const { runPreflight } = require('../../scripts/lib/eval-preflight');
 const { digestSkillDir, hashSkillText } = require('../../scripts/lib/eval-skill-staging');
@@ -139,6 +140,14 @@ describe('eval ab skill flags', () => {
         }),
       );
       expect(logs.join('\n')).toContain(`Baseline text: ${old}`);
+    });
+
+    it('hands the blind comparator both skill names to redact', async () => {
+      writeScenario('two-names');
+      const skill = writeSkill('demo', 'NEW');
+      const old = writeSkill('demo-old', 'OLD');
+      await run(args(['ab', 'two-names'], { 'skill-file': skill, 'baseline-skill-file': old }));
+      expect(runBlindAutoTrigger.mock.calls.at(-1)[4].skillName).toEqual(['demo', 'demo-old']);
     });
 
     it('gives the baseline no text without the flag', async () => {

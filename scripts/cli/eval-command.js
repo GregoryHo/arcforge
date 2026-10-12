@@ -472,7 +472,8 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
 
     // fr-gr-005: blind-comparator auto-trigger
     const { runBlindAutoTrigger } = require('../lib/eval-blind-autotrigger');
-    const skillName = skillFile ? skillNameFromFile(skillFile) : undefined;
+    // Both arms' names in a two-text A/B: a baseline that repeats its own is as identifying.
+    const skillName = [skillFile, skill.baselineSkillFile].filter(Boolean).map(skillNameFromFile);
     const blindResult = runBlindAutoTrigger(
       scenario,
       result.baseline,

@@ -476,7 +476,7 @@ When every assertion in a scenario is model-graded, `eval ab` also runs a
 **blind comparator** on each baseline/treatment pair and prints a preference
 count (treatment / baseline / tie / errors). It is a supplementary signal, never
 a verdict. The two outputs are shuffled into A and B, and condition labels and the
-skill name are redacted. The comparator writes a rubric of weighted criteria
+skill name are redacted; with `--baseline-skill-file`, the names of both skills are. The comparator writes a rubric of weighted criteria
 derived from the task and scores each output from 0 to 1 per criterion. The
 harness then does the arithmetic: each output's total is its weighted mean
 score, and one output wins only when its total beats the other's by more than

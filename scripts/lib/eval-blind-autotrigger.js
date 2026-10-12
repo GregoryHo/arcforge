@@ -97,7 +97,7 @@ function computePreferenceRate(preferences) {
  * @param {string} projectRoot - Project root directory
  * @param {Object} [opts] - Optional overrides
  * @param {string} [opts.runId] - Run ID for persisting results
- * @param {string} [opts.skillName] - Skill name for prompt sanitization
+ * @param {string|string[]} [opts.skillName] - Skill name, or names, for prompt sanitization
  * @returns {{
  *   skipped: boolean,
  *   skipNote?: string,

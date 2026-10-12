@@ -629,7 +629,7 @@ describe('eval command', () => {
       writeSkillScenario('ab-name');
       await runEvalCommand(args(['ab', 'ab-name']), { projectRoot: tempDir, asJson: false });
       const [, , , , opts] = runBlindAutoTrigger.mock.calls.at(-1);
-      expect(opts.skillName).toBe('demo');
+      expect(opts.skillName).toEqual(['demo']);
     });
 
     it('still injects the body when only --skill-file (or ## Target) is given', async () => {
