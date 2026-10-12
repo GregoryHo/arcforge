@@ -82,8 +82,40 @@ function baseDirectoryLine(dir) {
 }
 
 /**
+ * Refuse a symlink the copy would keep pointing outside the skill directory.
+ * The copy keeps a link as it is, so such a link would hand the arm a path the
+ * write check does not watch and the digest does not cover. The target is
+ * followed, not read as text: a relative path can leave through another link.
+ * @param {string} realRoot - The skill directory, symlinks resolved
+ * @param {string} entry - Path of an entry under it
+ */
+function refuseEscapingLink(realRoot, entry) {
+  if (!fs.lstatSync(entry).isSymbolicLink()) return;
+  const target = fs.readlinkSync(entry);
+  if (path.isAbsolute(target)) {
+    throw new Error(`Cannot stage ${entry}: its link target ${target} is an absolute path`);
+  }
+  let real;
+  try {
+    // The OS resolver: fs.realpathSync collapses `link/..` as text before following `link`.
+    real = fs.realpathSync.native(entry);
+  } catch (err) {
+    throw new Error(
+      `Cannot stage ${entry}: its link target ${target} does not resolve (${err.code})`,
+    );
+  }
+  const rel = path.relative(realRoot, real);
+  if (rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) {
+    throw new Error(
+      `Cannot stage ${entry}: its link target ${target} is outside the skill directory`,
+    );
+  }
+}
+
+/**
  * Copy the directory a skill file sits in to a fresh directory under the
- * system temp dir.
+ * system temp dir. A symlink is copied as a link, and refused unless its
+ * target is a relative path that resolves inside the directory.
  * @param {string} skillFile - Absolute path to the skill file
  * @returns {string} Absolute path of the copy
  */
@@ -94,10 +126,15 @@ function stageSkillDir(skillFile) {
   const source = path.dirname(skillFile);
   const staged = fs.mkdtempSync(path.join(os.tmpdir(), 'arcforge-eval-skill-'));
   try {
+    const realRoot = fs.realpathSync.native(source);
     fs.cpSync(source, staged, {
       recursive: true,
       verbatimSymlinks: true,
-      filter: (src) => !SKIP_NAMES.has(path.basename(src)),
+      filter: (src) => {
+        if (SKIP_NAMES.has(path.basename(src))) return false;
+        if (src !== source) refuseEscapingLink(realRoot, src);
+        return true;
+      },
     });
   } catch (err) {
     removeStagedDir(staged);

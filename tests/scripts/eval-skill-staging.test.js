@@ -428,6 +428,62 @@ describe('buildInjection', () => {
     });
   });
 
+  describe('stageSkillDir and symlinks', () => {
+    let root;
+    let dir;
+
+    beforeEach(() => {
+      root = fs.mkdtempSync(path.join(os.tmpdir(), 'test-stage-links-'));
+      dir = path.dirname(writeSkill(root, 'demo', 'BODY'));
+      fs.writeFileSync(path.join(root, 'outside.txt'), 'not the skill');
+    });
+
+    afterEach(() => {
+      fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    const stagedBy = (link) =>
+      recordingStaged(() => {
+        expect(() => stageSkillDir(path.join(dir, 'SKILL.md'))).toThrow(
+          `Cannot stage ${path.join(dir, link)}`,
+        );
+      });
+
+    it.each([
+      ['an absolute target', 'abs', () => path.join(dir, 'SKILL.md'), /is an absolute path/],
+      ['a target above the directory', 'up', () => '../../outside.txt', /outside the skill dir/],
+      ['a target that does not resolve', 'gone', () => 'references/nothing', /does not resolve/],
+    ])('refuses a link with %s, and leaves no copy behind', (_what, name, target, reason) => {
+      fs.symlinkSync(target(), path.join(dir, name));
+      const [staged] = stagedBy(name);
+      expect(() => stageSkillDir(path.join(dir, 'SKILL.md'))).toThrow(reason);
+      expect(fs.existsSync(staged)).toBe(false);
+    });
+
+    it('refuses a target that leaves the directory through another link', () => {
+      // Read as text, references/top/../outside.txt is a file inside; followed, it is not.
+      fs.writeFileSync(path.join(dir, 'references', 'outside.txt'), 'inside');
+      fs.writeFileSync(path.join(dir, '..', 'outside.txt'), 'not the skill');
+      fs.symlinkSync('..', path.join(dir, 'references', 'top'));
+      fs.symlinkSync('references/top/../outside.txt', path.join(dir, 'via'));
+      expect(fs.readFileSync(path.join(dir, 'via'), 'utf8')).toBe('not the skill');
+      expect(() => stageSkillDir(path.join(dir, 'SKILL.md'))).toThrow(
+        new RegExp(`Cannot stage ${path.join(dir, 'via')}: .* outside the skill dir`),
+      );
+    });
+
+    it('keeps a link whose target is inside the directory', () => {
+      fs.symlinkSync('references/verify.sh', path.join(dir, 'link.sh'));
+      const staged = stageSkillDir(path.join(dir, 'SKILL.md'));
+      try {
+        expect(fs.readlinkSync(path.join(staged, 'link.sh'))).toBe('references/verify.sh');
+        expect(fs.readFileSync(path.join(staged, 'link.sh'), 'utf8')).toBe('echo demo\n');
+      } finally {
+        removeStagedDir(staged);
+      }
+    });
+  });
+
   it('refuses to stage without the skill file path', () => {
     expect(() => buildInjection({ text: 'BODY', stage: true })).toThrow(/path of the skill file/);
     expect(() => stageSkillDir('relative/SKILL.md')).toThrow(/absolute path/);

@@ -321,6 +321,12 @@ front of a loaded skill, `Base directory for this skill:` followed by the
 copy's path. The trial's instruction to stay inside its own directory names
 that path as its one exception. The copy is removed when the run ends.
 
+A symlink in the directory is copied as a link, so its target has to be inside
+the directory too. `eval ab` and `eval preflight` refuse to stage a directory
+holding a link whose target is an absolute path, resolves outside the
+directory, or does not resolve, and name the link. Through such a link an arm
+would reach files the write check does not watch and the digest does not cover.
+
 The files belong to the injection. The baseline is injected with nothing, so it
 gets no copy and no line, and cannot list one from inside its trial directory.
 Do not put the same files into the trial with `## Setup` instead: both arms run
