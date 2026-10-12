@@ -44,6 +44,8 @@ const ARCHIVE_HEADER_FIELDS = [
 ];
 const ARCHIVE_PREFIX = 'archive-';
 const ARCHIVE_NAME = /-(\d{8}T\d{6}Z)(?:-(\d+))?\.md$/;
+// A name exactly as `save` writes it: the alias charset is validateAlias's.
+const SAVED_ARCHIVE_NAME = /^archive-[a-zA-Z0-9_-]+-(\d{8}T\d{6}Z)(?:-(\d+))?\.md$/;
 const DEFAULT_LIST_LIMIT = 20;
 
 /** Lines with the leading and trailing blank lines dropped, joined verbatim. */
@@ -404,6 +406,37 @@ function listArchives(project, { limit = DEFAULT_LIST_LIMIT } = {}) {
   return archives.slice(0, limit);
 }
 
+/**
+ * The project's newest archive, found from file names alone — no archive is
+ * opened, so the cost does not grow with what the archives hold (SessionStart
+ * calls this on its synchronous path). Only a name `save` writes counts:
+ * `archive-<alias>-<stamp>[-n].md`, whose every character is from a fixed set.
+ * The alias in that name may since have been removed or pointed elsewhere, so
+ * `alias` is one the index holds for this file now, or null.
+ * @param {string} project
+ * @returns {{ date: string, path: string, alias: string|null }|null} null when there is none
+ */
+function latestArchive(project) {
+  const projectDir = getProjectSessionsDir(project);
+  if (!fs.existsSync(projectDir)) return null;
+  // Real paths, the form aliases store and `save` reports.
+  const sessionsDir = fs.realpathSync(projectDir);
+  for (const date of getDateDirs(sessionsDir)) {
+    const [newest] = fs
+      .readdirSync(path.join(sessionsDir, date))
+      .map((f) => ({ f, m: f.match(SAVED_ARCHIVE_NAME) }))
+      .filter(({ m }) => m)
+      .sort((a, b) => b.m[1].localeCompare(a.m[1]) || Number(b.m[2] || 1) - Number(a.m[2] || 1));
+    if (!newest) continue;
+    const file = path.join(sessionsDir, date, newest.f);
+    const pointing = listAliases(project).find(
+      (a) => path.basename(a.sessionPath) === newest.f && canonicalPath(a.sessionPath) === file,
+    );
+    return { date, path: file, alias: pointing ? pointing.name : null };
+  }
+  return null;
+}
+
 /** A path's real path when it exists; otherwise its resolved form, which matches nothing listed. */
 function canonicalPath(p) {
   const resolved = path.resolve(p);
@@ -497,6 +530,7 @@ module.exports = {
   generateSession,
   saveArchive,
   listArchives,
+  latestArchive,
   readArchive,
   resolveSessionRef,
   formatSessionBriefing,

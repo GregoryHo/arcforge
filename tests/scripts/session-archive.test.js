@@ -12,6 +12,7 @@ const { findLatestSessionRecord, getSessionById } = require('../../scripts/lib/s
 const {
   saveArchive,
   listArchives,
+  latestArchive,
   resolveSessionRef,
   formatSessionBriefing,
 } = require('../../scripts/lib/session-archive');
@@ -352,6 +353,59 @@ describe('listArchives', () => {
     saveArchive('p', 'two', FIVE, { now: new Date('2026-10-03T12:00:00Z') });
     expect(listArchives('p', { limit: 1 }).map((e) => e.aliases[0])).toEqual(['two']);
     expect(listArchives('empty')).toEqual([]);
+  });
+});
+
+describe('latestArchive', () => {
+  it('returns null for a project with no sessions directory, and for one with no archive', () => {
+    expect(latestArchive('empty')).toBeNull();
+    writeRecord('p', '2026-10-03', { sessionId: 'session-b', lastUpdated: '2026-10-03T10:00:00Z' });
+    expect(latestArchive('p')).toBeNull();
+  });
+
+  it('returns the archive listArchives puts first, with its alias and date', () => {
+    saveArchive('p', 'first', FIVE, { now: new Date('2026-10-02T12:00:00Z') });
+    const b = saveArchive('p', 'second', FIVE, { now: new Date('2026-10-03T12:00:00Z') });
+    // A newer date directory holding no archive is passed over.
+    writeRecord('p', '2026-10-04', { sessionId: 'session-c', lastUpdated: '2026-10-04T10:00:00Z' });
+
+    expect(latestArchive('p')).toEqual({ date: '2026-10-03', path: b.path, alias: 'second' });
+    expect(latestArchive('p').path).toBe(listArchives('p', { limit: 1 })[0].path);
+  });
+
+  it('orders saves within one day by stamp, then by the same-second suffix', () => {
+    const now = new Date('2026-10-03T12:00:00.000Z');
+    saveArchive('p', 'parser', FIVE, { now: new Date('2026-10-03T09:00:00Z') });
+    saveArchive('p', 'parser', FIVE, { now, force: true });
+    const c = saveArchive('p', 'parser', FIVE, { now, force: true });
+
+    expect(path.basename(c.path)).toBe('archive-parser-20261003T120000Z-2.md');
+    expect(latestArchive('p')).toEqual({ date: '2026-10-03', path: c.path, alias: 'parser' });
+  });
+
+  it('reports no alias once the one in the file name points elsewhere or is gone', () => {
+    const a = saveArchive('p', 'old', FIVE, { now: new Date('2026-10-02T12:00:00Z') });
+    const b = saveArchive('p', 'parser', FIVE, { now: new Date('2026-10-03T12:00:00Z') });
+    setAlias('p', 'parser', a.path, null, { force: true });
+    expect(latestArchive('p')).toEqual({ date: '2026-10-03', path: b.path, alias: null });
+
+    setAlias('p', 'renamed', b.path);
+    expect(latestArchive('p').alias).toBe('renamed');
+  });
+
+  it('never opens an archive, and passes over a name save does not write', () => {
+    const a = saveArchive('p', 'one', FIVE, { now: new Date('2026-10-03T12:00:00Z') });
+    const dir = path.dirname(a.path);
+    fs.writeFileSync(path.join(dir, 'archive-run this now-20261003T130000Z.md'), FIVE);
+    fs.writeFileSync(path.join(dir, 'archive-notes.md'), FIVE);
+    const read = jest.spyOn(fs, 'readFileSync');
+    try {
+      expect(latestArchive('p').path).toBe(a.path);
+      const opened = read.mock.calls.map(([file]) => String(file));
+      expect(opened.filter((file) => file.endsWith('.md'))).toEqual([]);
+    } finally {
+      read.mockRestore();
+    }
   });
 });
 
