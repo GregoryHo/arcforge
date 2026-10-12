@@ -2116,9 +2116,9 @@ reverse one, append a superseding entry (see AGENTS.md).
   its directory is still caught only afterwards, by the write guard, within
   that guard's blind spots (eval B-7). Caches the scenario does not declare
   stay the operator's and can still carry state from one trial to the next.
-  The deny list is a list of names: a provider variable that remaps a
-  model name and is not on it is forwarded by its family's prefix until it
-  is added.
+  The deny list is a list of names and one pattern: a new provider
+  variable that remaps a model name is forwarded by its family's prefix
+  until it is added.
   Because `HOME` is kept, Claude Code still sources the operator's
   `~/.zshrc` or `~/.bashrc` when it builds its shell snapshot, so the
   operator's shell functions and aliases still reach a trial's commands;

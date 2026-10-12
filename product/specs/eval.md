@@ -276,9 +276,9 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   state stays redirected as B-7 says (D-057, D-062). Residual: this is not
   a sandbox. A trial still runs with the operator's filesystem permissions
   and `HOME`, and a cache no scenario redirected is still the operator's,
-  shared from one trial to the next. The deny list is a list of names, so a
-  provider variable that remaps a model name and is not on it is forwarded
-  by its family's prefix until it is added. Because `HOME` is kept, Claude
+  shared from one trial to the next. The deny list is a list of names and
+  one pattern, so a new provider variable that remaps a model name is
+  forwarded by its family's prefix until it is added. Because `HOME` is kept, Claude
   Code
   still sources the operator's shell startup file (`~/.zshrc` or
   `~/.bashrc`) when it builds its shell snapshot, so the operator's shell
