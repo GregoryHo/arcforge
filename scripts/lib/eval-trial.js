@@ -86,7 +86,8 @@ function resolveTrialTimeoutMs(env = process.env) {
  *   its skill text and the digest of its staged files. And the conditions both
  *   arms record: whether the run stages skill files, the hash of the text the
  *   baseline was given, if any, and the digest of the files staged for it.
- *   copies is every directory the run staged, each digested again after the trial
+ *   copies is every directory staged for this trial: each is watched for
+ *   writes while it runs and digested again after it
  * @returns {TrialResult} Trial result
  */
 function runTrial(scenario, trialNumber, totalTrials, options = {}) {
@@ -236,7 +237,9 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     console.error(`[eval-debug] cmd: ${claudeBin} ${claudeArgs.join(' ')}`);
     console.error(`[eval-debug] prompt: ${prompt.slice(0, 100)}...`);
   }
-  const writesSince = watchForWrites([projectRoot, pluginDir, ...watchRoots]);
+  const copies = skillInjection.copies || [];
+  const copyDirs = copies.map(({ dir }) => path.resolve(dir));
+  const writesSince = watchForWrites([projectRoot, pluginDir, ...watchRoots, ...copyDirs]);
   const t0 = Date.now();
   const result = execCommand(claudeBin, claudeArgs, {
     input: prompt,
@@ -326,9 +329,13 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   // A trial that changed the repository it ran from measured a different
   // environment than its arm describes, and may have changed what the next
   // trial sees. It is an instrument failure whatever it scored (eval-10).
-  if (repoWrites.changed.length > 0) {
-    const shown = repoWrites.changed.slice(0, 5).join(', ');
-    const more = repoWrites.changed.length > 5 ? ` and ${repoWrites.changed.length - 5} more` : '';
+  // A write into the trial's own staged copy is told apart below: that copy
+  // is no later trial's.
+  const inCopy = (file) => copyDirs.some((dir) => file === dir || file.startsWith(dir + path.sep));
+  const wroteRepo = repoWrites.changed.filter((file) => !inCopy(file));
+  if (wroteRepo.length > 0) {
+    const shown = wroteRepo.slice(0, 5).join(', ');
+    const more = wroteRepo.length > 5 ? ` and ${wroteRepo.length - 5} more` : '';
     return {
       ...base,
       output: parsedOutput || '',
@@ -338,15 +345,17 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     };
   }
 
-  // A write the snapshot above cannot see (it compares mtime, size and mode,
-  // not content) still changes what later trials are given, so every staged
-  // copy is digested again (B-19).
-  const copiesChanged = changedCopies(skillInjection.copies);
+  // A trial that wrote into its staged copy ran, from that write on, with
+  // other skill files than its arm records (B-19). The snapshot above compares
+  // mtime, size and mode, not content, so each copy is digested again as well.
+  const wroteCopy = repoWrites.changed.filter(inCopy);
+  const copiesChanged = wroteCopy.length > 0 ? wroteCopy.slice(0, 5) : changedCopies(copies);
   if (copiesChanged.length > 0) {
+    const more = wroteCopy.length > 5 ? ` and ${wroteCopy.length - 5} more` : '';
     return {
       ...base,
       output: parsedOutput || '',
-      error: `Trial changed the staged skill files: ${copiesChanged.join(', ')}`,
+      error: `Trial changed the staged skill files: ${copiesChanged.join(', ')}${more}`,
       errorType: 'trial_wrote_skill_files',
       infraError: true,
     };
@@ -422,17 +431,11 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
  * repository is not restored here: that is the operator's call.
  * @param {Object} row - The TrialResult the trial produced
  * @param {string} where - Which trial, for the message (e.g. 'baseline trial 2')
- * A trial that left a staged skill copy changed (trial_wrote_skill_files) ends
- * the run the same way: the copy is what every later trial is given.
- * @throws {Error} when the row is trial_wrote_repo or trial_wrote_skill_files
+ * A trial that changed its staged skill copy (trial_wrote_skill_files) does
+ * not end the run: the copy was that trial's alone and is removed with it.
+ * @throws {Error} when the row is trial_wrote_repo
  */
 function stopIfTrialWroteRepo(row, where) {
-  if (row?.errorType === 'trial_wrote_skill_files') {
-    const dirs = String(row.error || '').replace(/^Trial changed the staged skill files:\s*/, '');
-    throw new Error(
-      `${where} changed the staged skill files: ${dirs}. The run is stopped so no later trial is given the changed files; rows already recorded are kept. The copy is removed with the run.`,
-    );
-  }
   if (row?.errorType !== 'trial_wrote_repo') return;
   const paths = String(row.error || '').replace(/^Trial wrote outside its directory:\s*/, '');
   throw new Error(

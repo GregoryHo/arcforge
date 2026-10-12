@@ -349,8 +349,14 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   session with the skill loaded would. The files are part of the injection:
   an arm injected with nothing gets no staged directory and cannot list one
   from inside its trial. The trial's instruction to stay inside its own
-  directory names the staged directory as its one exception, and the copy
-  is removed when the run ends or the command exits. The skill directory is
+  directory names the staged directory as its one exception. Each trial is
+  staged a copy of its own, removed when that trial ends or the command
+  exits, so no trial is given what another wrote. Each arm is also staged
+  once before the first trial and that copy removed: a directory that
+  cannot be staged is refused before any trial runs, and the digest taken
+  there is the one every row of the arm records. A later copy with another
+  digest means the skill directory changed under the run, and the run is
+  refused from that trial on. The skill directory is
   resolved through any symlink before it is digested and copied, so a
   directory that is itself a link is staged as the directory it names. An
   entry that is neither a file nor a symlink is refused, by name, before
@@ -358,10 +364,13 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   refuses one whose target is an absolute path, resolves outside the skill
   directory, or does not resolve; the check runs on the source directory and
   again on the staged copy, where a relative target can resolve differently.
-  After every trial each staged copy is digested again; a trial that left
-  one with other content than was staged is an instrument failure
-  (`trial_wrote_skill_files`), excluded from scored pools, and stops the run
-  as `trial_wrote_repo` does (B-7).
+  A trial's copy is watched by the write guard while it runs and digested
+  again when it ends; a trial that wrote into its copy, or left it with
+  other content than was staged, is an instrument failure
+  (`trial_wrote_skill_files`), excluded from scored pools. It does not stop
+  the run: the copy was that trial's alone, and the next trial is staged a
+  fresh one. A write into the project root or the plugin still stops the
+  run as `trial_wrote_repo` (B-7), whatever the same trial did to its copy.
   Staging is a run condition that pools (B-8):
   a run without the flag records none and pools with rows written before
   6.5.0, and a run with it forms a pool of its own (D-049, D-057, D-062).
@@ -369,11 +378,14 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   an arm away from a directory it was not given. A link into `.venv` or
   `node_modules` is refused too, since those directories are left out of the
   copy and the link does not resolve there.
+  Residual: a skill that writes into its own directory on every use spoils
+  every trial of its arm. The run completes, and that arm has no row to
+  score.
   Residual: a write confined to a `.git` or `node_modules` directory inside
   the copy is not detected. The write guard skips both names and the digest
   leaves them out; `.venv` and `__pycache__` are left out of the digest too,
   but the write guard sees them.
-  Residual: a run that is killed leaves its copy behind. No signal is
+  Residual: a run that is killed leaves the running trial's copy behind. No signal is
   handled, because a trial is a synchronous child and a handler would keep
   the run from being interrupted. The copy is named
   `arcforge-eval-skill-<PID>-` under `os.tmpdir()`, and the next staging

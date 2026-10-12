@@ -9,9 +9,13 @@
  * belongs to the injection: an arm injected with nothing gets none, and cannot
  * list one from inside `<projectRoot>/.eval-trials/`.
  *
+ * A copy belongs to one trial: each trial of an injected arm is staged a copy
+ * of its own, removed when that trial ends (trialArm), so what a trial writes
+ * into its copy is never what a later trial is given.
+ *
  * One call stages one directory. A run that needs a second skill's files in an
  * arm calls stageSkillDir again for that directory and adds its own
- * base-directory line; nothing here assumes a single staged directory per run.
+ * base-directory line; nothing here assumes a single staged directory per trial.
  *
  * Zero external dependencies — Node.js standard library only.
  */
@@ -242,7 +246,7 @@ function removeStagedDir(staged) {
  * check compares each file's mtime, size and mode, so a rewrite that puts all
  * three back passes it; this reads the content. A write confined to a
  * directory the digest leaves out (SKIP_NAMES) is not seen here either.
- * @param {Array<{ dir: string, filesHash: string }>} [copies] - Every copy the run staged
+ * @param {Array<{ dir: string, filesHash: string }>} [copies] - Every copy staged for the trial
  * @returns {string[]} Paths of the copies that changed
  */
 function changedCopies(copies = []) {
@@ -292,7 +296,7 @@ function buildInjection({ text, skillFile, stage } = {}) {
 }
 
 /**
- * The staged copies of a run's injections, as changedCopies checks them.
+ * The staged copies of a trial's injections, as changedCopies checks them.
  * @param {Array<{ baseDir: string|null, filesHash: string|null }>} injections - From buildInjection
  * @returns {Array<{ dir: string, filesHash: string }>}
  */
@@ -313,34 +317,70 @@ function withInjection(scenario, { text }) {
 }
 
 /**
- * The baseline arm on its own, as `eval preflight` runs it. Nothing is staged
- * until the first trial asks for the arm, so the caller can hold this across
- * its own checks and only owes a remove() once trials may have started.
+ * One arm of a run, staged again for each of its trials (B-19). The arm is
+ * staged once here and the copy removed, so a directory that cannot be staged
+ * is refused before any trial runs, and the digest every row records is
+ * taken. A later copy with another digest means the skill directory changed
+ * under the run, and is refused: its rows would not be of one arm.
  * @param {Object} scenario - Parsed scenario
- * @param {{ text?: string, skillFile?: string, stage?: boolean }} baseline - As buildInjection
- * @returns {{ arm: () => { scenario: Object, watchRoots: string[], skillInjection: Object }, remove: () => void }}
- *   skillInjection as runTrial takes it
+ * @param {{ text?: string, skillFile?: string, stage?: boolean }} arm - As buildInjection
+ * @returns {{ textHash: string|null, filesHash: string|null, forTrial: () => { scenario: Object, skillInjection: { baseDir: string|null, copies: Array<{ dir: string, filesHash: string }> }, remove: () => void } }}
+ *   forTrial stages a copy for one trial: the scenario as that trial runs it,
+ *   the part of runTrial's skillInjection that is the trial's own, and what
+ *   removes the copy once the trial has ended
  */
-function baselineArm(scenario, baseline) {
-  let injection = null;
-  const arm = () => {
-    injection = injection || buildInjection(baseline);
+function trialArm(scenario, arm) {
+  const first = buildInjection(arm);
+  removeStagedDir(first.baseDir);
+  const { textHash, filesHash } = first;
+  const forTrial = () => {
+    const injection = buildInjection(arm);
+    if (injection.filesHash !== filesHash) {
+      removeStagedDir(injection.baseDir);
+      throw new Error(
+        `Skill files in ${path.dirname(arm.skillFile)} changed during the run: staged as ${filesHash} when it started, ${injection.filesHash} now`,
+      );
+    }
     return {
       scenario: withInjection(scenario, injection),
-      watchRoots: [injection.baseDir].filter(Boolean),
+      skillInjection: { baseDir: injection.baseDir, copies: stagedCopies([injection]) },
+      remove: () => removeStagedDir(injection.baseDir),
+    };
+  };
+  return { textHash, filesHash, forTrial };
+}
+
+/**
+ * The baseline arm on its own, as `eval preflight` runs it. Nothing is staged
+ * until the first trial asks for the arm, so the caller can hold this across
+ * its own checks.
+ * @param {Object} scenario - Parsed scenario
+ * @param {{ text?: string, skillFile?: string, stage?: boolean }} baseline - As buildInjection
+ * @returns {{ arm: () => { scenario: Object, skillInjection: Object, remove: () => void } }}
+ *   arm stages a copy for one trial; skillInjection as runTrial takes it, and
+ *   remove is owed once that trial has ended
+ */
+function baselineArm(scenario, baseline) {
+  let staging = null;
+  const arm = () => {
+    staging = staging || trialArm(scenario, baseline);
+    const { textHash, filesHash } = staging;
+    const trial = staging.forTrial();
+    return {
+      scenario: trial.scenario,
+      remove: trial.remove,
       skillInjection: {
-        baseDir: injection.baseDir,
-        textHash: injection.textHash,
-        filesHash: injection.filesHash,
+        ...trial.skillInjection,
+        textHash,
+        filesHash,
         // Without a baseline text nothing is staged, whatever was asked for.
-        staged: Boolean(injection.baseDir),
-        copies: stagedCopies([injection]),
-        baselineHash: injection.textHash,
-        baselineFilesHash: injection.filesHash,
+        staged: Boolean(filesHash),
+        baselineHash: textHash,
+        baselineFilesHash: filesHash,
       },
     };
   };
-  return { arm, remove: () => removeStagedDir(injection?.baseDir) };
+  return { arm };
 }
 
 module.exports = {
@@ -354,5 +394,6 @@ module.exports = {
   stagedCopies,
   buildInjection,
   withInjection,
+  trialArm,
   baselineArm,
 };
