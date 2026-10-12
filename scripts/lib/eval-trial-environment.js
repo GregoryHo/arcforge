@@ -65,11 +65,16 @@ const FORWARDED = {
 // eval was started from, and no family may ever widen far enough to pass them.
 const NEVER_FORWARDED = [
   'ANTHROPIC_MODEL',
+  'ANTHROPIC_SMALL_FAST_MODEL',
   'CLAUDECODE',
   'CLAUDE_CODE_ENTRYPOINT',
   'CLAUDE_CODE_SSE_PORT',
   'CLAUDE_CODE_SESSION_ID',
 ];
+
+// Dropped with them: ANTHROPIC_DEFAULT_SONNET_MODEL and its siblings remap what
+// `--model sonnet` resolves to while the row still records `sonnet`.
+const MODEL_REMAP = { prefix: 'ANTHROPIC_DEFAULT_', suffix: '_MODEL' };
 
 // The variables a scenario may point into its trial, so that an install the
 // agent performs lands in the trial directory and not in the operator's caches.
@@ -101,6 +106,7 @@ const withoutTrailingSlash = (dir) => (dir.length > 1 ? dir.replace(/\/+$/, '') 
 
 function isForwarded(name) {
   if (NEVER_FORWARDED.includes(name)) return false;
+  if (name.startsWith(MODEL_REMAP.prefix) && name.endsWith(MODEL_REMAP.suffix)) return false;
   return (
     FORWARDED.names.includes(name) ||
     FORWARDED.prefixes.some((prefix) => name.startsWith(prefix)) ||

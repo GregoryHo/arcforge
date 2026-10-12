@@ -166,14 +166,20 @@ container-credential variable needs no entry of its own.
 | Cloud provider credentials | `AWS_*`, `GOOGLE_*`, `GCLOUD_*`, `CLOUDSDK_*`, `CLOUD_ML_REGION` |
 | Network | every variable ending in `_PROXY` or `_proxy` (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY` and their lowercase forms), `SSL_CERT_*`, `NODE_EXTRA_CA_CERTS`, `CURL_CA_BUNDLE`, `REQUESTS_CA_BUNDLE`, `NODE_TLS_REJECT_UNAUTHORIZED` |
 
-Five names are dropped even though a family would match them, or so that none
-ever does: `ANTHROPIC_MODEL`, and the variables of the Claude Code session you
-started the eval from (`CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`,
-`CLAUDE_CODE_SSE_PORT`, `CLAUDE_CODE_SESSION_ID`). No other `CLAUDE_CODE_*`
-variable is forwarded either.
+These are dropped even though a family would match them, or so that none ever
+does:
 
-Everything else is dropped. A model picked through `ANTHROPIC_MODEL` does not
-reach the trial: pass `--model` so the row records it. `## Setup` runs in this
+| Dropped | Why |
+|---------|-----|
+| `ANTHROPIC_MODEL` | the row records `--model`, not your variable |
+| `ANTHROPIC_DEFAULT_*_MODEL` (`ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_DEFAULT_HAIKU_MODEL`), `ANTHROPIC_SMALL_FAST_MODEL` | they remap what `--model sonnet` resolves to while the row still records `sonnet` |
+| `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, `CLAUDE_CODE_SSE_PORT`, `CLAUDE_CODE_SESSION_ID` | they belong to the Claude Code session you started the eval from |
+
+No other `CLAUDE_CODE_*` variable is forwarded either.
+
+Everything else is dropped. A model picked through `ANTHROPIC_MODEL`, or an
+alias remapped through `ANTHROPIC_DEFAULT_*_MODEL`, does not reach the trial:
+pass `--model` so the row records it. `## Setup` runs in this
 same environment, plus `PROJECT_ROOT` and `TRIAL_DIR`, so a fixture is built
 with the tools the trial will find. `HOME` is kept because that is where `claude` finds your login,
 which has one side effect: Claude Code loads the functions and aliases of your

@@ -161,6 +161,11 @@ describe('a contained trial does not inherit the operator environment', () => {
     ['NODE_TLS_REJECT_UNAUTHORIZED', true],
     // The model is the row's --model, never the operator's variable
     ['ANTHROPIC_MODEL', false],
+    // Nor a variable that remaps what a --model alias resolves to
+    ['ANTHROPIC_DEFAULT_SONNET_MODEL', false],
+    ['ANTHROPIC_DEFAULT_OPUS_MODEL', false],
+    ['ANTHROPIC_DEFAULT_HAIKU_MODEL', false],
+    ['ANTHROPIC_SMALL_FAST_MODEL', false],
     // The session an eval was started from
     ['CLAUDECODE', false],
     ['CLAUDE_CODE_ENTRYPOINT', false],
