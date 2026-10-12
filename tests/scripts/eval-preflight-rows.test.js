@@ -19,6 +19,7 @@ const {
   loadResultPools,
   parseEvalName,
   parseScenario,
+  repoCommit,
   runTrial,
   saveTranscript,
 } = require('../../scripts/lib/eval');
@@ -189,6 +190,16 @@ describe('preflight result rows', () => {
       expect(transcript).toBe(path.join(runDir, 'transcripts', 'preflight-trial-2.txt'));
       const grading = getGradingPath(trialRow(`${NAME}-preflight`, 2), tempDir);
       expect(grading).toBe(path.join(runDir, 'grading', 'trial-2.json'));
+    });
+  });
+
+  describe('repoCommit, against real git', () => {
+    it('is the HEAD of the checkout it is asked about', () => {
+      expect(repoCommit(path.resolve(__dirname, '../..'))).toMatch(/^[0-9a-f]{40}$/);
+    });
+
+    it('is null for a directory outside any repository', () => {
+      expect(repoCommit(tempDir)).toBeNull();
     });
   });
 

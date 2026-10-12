@@ -17,6 +17,7 @@ const {
   parseScenario,
   appendResult,
   stampRow,
+  repoCommit,
   gradeTrialResult,
   cleanupTrialDir,
 } = require('./eval');
@@ -139,7 +140,7 @@ function resolveScenarioFile(name, projectRoot) {
  * @param {string} [opts.model] - Model identifier; included in cache key so
  *   per-model preflight records stay distinct (baseline pass rate is
  *   model-dependent). Pass the same value the trials were actually run with.
- * @returns {{ scenario_hash: string, scenario_name: string, model: string|null, max_turns: number|null, plugin_dir: boolean, effort: string|null, trial_timeout_ms: number, node_version: string, pass_rate: number|null, k: number, errored?: number, verdict: 'PASS'|'BLOCK', reason: string, timestamp: string }}
+ * @returns {{ scenario_hash: string, scenario_name: string, model: string|null, max_turns: number|null, plugin_dir: boolean, effort: string|null, trial_timeout_ms: number, node_version: string, repo_commit: string|null, pass_rate: number|null, k: number, errored?: number, verdict: 'PASS'|'BLOCK', reason: string, timestamp: string }}
  */
 function runPreflight(name, projectRoot, opts = {}) {
   const { runTrial, gradeResult, model, conditions = {} } = opts;
@@ -157,8 +158,10 @@ function runPreflight(name, projectRoot, opts = {}) {
     plugin_dir: Boolean(conditions.pluginDir),
     effort: conditions.effort || null,
     trial_timeout_ms: conditions.trialTimeoutMs || DEFAULT_TRIAL_TIMEOUT_MS,
-    // Recorded, not keyed on: a Node upgrade does not invalidate a record.
+    // Recorded, not keyed on: a Node upgrade or a new commit does not
+    // invalidate a record.
     node_version: process.version,
+    repo_commit: repoCommit(projectRoot),
   };
   // Write the record under the cache key and return it.
   const writeRecord = (outcome) => {
@@ -186,7 +189,7 @@ function runPreflight(name, projectRoot, opts = {}) {
   for (let t = 1; t <= PREFLIGHT_K; t++) {
     const raw = runTrial(t, PREFLIGHT_K);
     const graded = gradeResult(raw, t);
-    appendResult(stampRow({ ...graded, eval: evalName }, scenario), projectRoot);
+    appendResult(stampRow({ ...graded, eval: evalName }, scenario, projectRoot), projectRoot);
     // Recorded first, as an A/B arm does, so the row of the trial that stops
     // the run is kept.
     stopIfTrialWroteRepo(graded, `preflight trial ${t}`);

@@ -219,7 +219,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
           graded = await eval_.gradeWithHuman(graded, rl);
         }
 
-        const versioned = eval_.stampRow(graded, scenario);
+        const versioned = eval_.stampRow(graded, scenario, projectRoot);
         eval_.appendResult(versioned, projectRoot);
         console.log(formatStatus(graded));
         eval_.stopIfTrialWroteRepo(versioned, `trial ${t}`);

@@ -92,8 +92,9 @@ That record and every preflight row carry the same `scenario_hash`, the hash
 the record is filed under, and an A/B row carries it too. So you can check that
 a comparison ran on the scenario text its preflight cleared by reading the two,
 rather than inferring it from the gate having let the run through. The record
-also notes the `node_version` it ran on. That one is a note, not a key: upgrading
-Node.js does not invalidate a preflight.
+also notes the `node_version` it ran on and the `repo_commit` of the checkout.
+Those two are notes, not keys: upgrading Node.js or committing does not
+invalidate a preflight.
 
 A scenario that measures "this must not get worse" rather than "this must
 improve" opts out by declaring `skip`:
@@ -409,12 +410,15 @@ conditions, as a "Not combined" line in the terminal, `other_pools` in the
 benchmark, and `otherPools` in the dashboard. Rows written before these
 fields existed form a pool of their own, shown as "unrecorded".
 
-Two more fields are on every row as a record and are not conditions: no reader
+Three more fields are on every row as a record and are not conditions: no reader
 pools, pairs or filters by them. `scenario_hash` is the hash of the scenario
 file as the run parsed it, taken once per run, the same value a preflight
-record is filed under. `node_version` is the Node.js the engine ran on. Rows
-from before 6.5.0 lack both and stay in the pools they were in; a Node.js
-upgrade starts no new pool.
+record is filed under. `node_version` is the Node.js the engine ran on.
+`repo_commit` is the commit the checkout was on when the run started, read once
+per run, and `null` when the project is not a git repository or git is not
+installed; it names the commit, not whether the working tree was clean. Rows
+from before 6.5.0 lack all three and stay in the pools they were in; a Node.js
+upgrade or a new commit starts no new pool.
 
 Only a pool with at least one scored trial can be the measurement. A pool where
 every trial is an infra or grade error, such as quota refusals after switching
@@ -459,8 +463,8 @@ at once. `latest.json` holds the most recent report.
 A per-trial export goes to `evals/benchmarks/raw/` the same way, under the same
 file name as its aggregate. Each raw row
 carries its run conditions (`model`, `effort`, `trialTimeoutMs`, `maxTurns`,
-`pluginDir`, `isolation`) and its `scenario_hash` and `node_version`, `null`
-for a row recorded before those two existed. Its baseline-relative fields (`baseline_score_avg`,
+`pluginDir`, `isolation`) and its `scenario_hash`, `node_version` and
+`repo_commit`, `null` for a row recorded before those existed. Its baseline-relative fields (`baseline_score_avg`,
 `score_delta_vs_baseline_avg` and the rest) are computed against the baseline
 pool that ran under the same model, effort, ceiling and turn budget. That
 average leaves out the pool's infra and grade errors, which stay in the export

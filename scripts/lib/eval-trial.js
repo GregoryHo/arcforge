@@ -18,6 +18,7 @@ const {
   reservedNameError,
 } = require('./eval-scenario');
 const {
+  repoCommit,
   createTrialDir,
   runSetup,
   writeIsolationSettings,
@@ -90,6 +91,9 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   // Refused before any session: no row of such a run could be filed correctly.
   const reserved = reservedNameError(scenario.name);
   if (reserved) throw new Error(reserved);
+  // Read ahead of the first session, so a run's rows name the commit it
+  // started from (stampRow), not one a trial or the operator moved to.
+  repoCommit(projectRoot);
   // Resolved before anything else so a bad override is refused ahead of the
   // fixture Setup and the session (B-10), and recorded on every row it produces.
   const trialTimeoutMs = resolveTrialTimeoutMs();

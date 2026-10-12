@@ -1,7 +1,8 @@
 /**
  * eval-row-stamp.test.js - every result row and preflight record says which
- * scenario text and which Node.js it ran from (`scenario_hash`,
- * `node_version`), and neither is a pooling condition (B-8 unchanged).
+ * scenario text, which Node.js and which commit it ran from (`scenario_hash`,
+ * `node_version`, `repo_commit`), and none is a pooling condition (B-8
+ * unchanged).
  *
  * Doubles as the schema test for the row and the preflight record: the key
  * sets below are exact. The `claude` subprocess is stubbed; no session is
@@ -11,6 +12,9 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
+const childProcess = require('node:child_process');
+
+const realExecFileSync = childProcess.execFileSync;
 
 jest.mock('../../scripts/lib/utils', () => {
   const actual = jest.requireActual('../../scripts/lib/utils');
@@ -22,6 +26,7 @@ const {
   SCENARIOS_DIR,
   findScenario,
   loadResults,
+  repoCommit,
   runSkillEval,
   runTrial,
   stampRow,
@@ -60,6 +65,7 @@ true
 ## Version
 2
 `;
+const COMMIT = 'a1b2c3d4e5'.repeat(4);
 const DONE_STREAM = [
   JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'Done' }] } }),
   JSON.stringify({ type: 'result', result: 'Done' }),
@@ -83,6 +89,7 @@ const ROW_KEYS = [
   'output_tokens',
   'passed',
   'pluginDir',
+  'repo_commit',
   'runId',
   'scenario_hash',
   'score',
@@ -103,6 +110,7 @@ const RECORD_KEYS = [
   'pass_rate',
   'plugin_dir',
   'reason',
+  'repo_commit',
   'scenario_hash',
   'scenario_name',
   'timestamp',
@@ -110,9 +118,22 @@ const RECORD_KEYS = [
   'verdict',
 ];
 
-describe('rows and preflight records carry scenario_hash and node_version', () => {
+describe('rows and preflight records carry scenario_hash, node_version and repo_commit', () => {
   let tempDir;
   let scenarioFile;
+  let gitHead;
+  let gitSpy;
+
+  /** The plugin list answers [], a trial answers `onTrial()`. */
+  function stubExec(onTrial) {
+    mockUtils.execCommand.mockImplementation((cmd, args) => {
+      if (cmd === 'claude' && args[0] === 'plugin')
+        return { stdout: '[]', stderr: '', exitCode: 0 };
+      if (cmd === 'claude') return onTrial();
+      return { stdout: '', stderr: '', exitCode: 0 };
+    });
+  }
+  const headReads = () => gitSpy.mock.calls.filter(([cmd]) => cmd === 'git').length;
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-row-stamp-'));
@@ -120,14 +141,18 @@ describe('rows and preflight records carry scenario_hash and node_version', () =
     fs.mkdirSync(path.dirname(scenarioFile), { recursive: true });
     fs.writeFileSync(scenarioFile, SCENARIO_TEXT);
     mockUtils.execCommand.mockReset();
-    mockUtils.execCommand.mockImplementation((cmd, args) => {
-      if (cmd === 'claude' && args[0] === 'plugin')
-        return { stdout: '[]', stderr: '', exitCode: 0 };
-      return { stdout: cmd === 'claude' ? DONE_STREAM : '', stderr: '', exitCode: 0 };
+    // `git rev-parse HEAD` answers `gitHead`: a string, or an error to throw.
+    gitHead = `${COMMIT}\n`;
+    gitSpy = jest.spyOn(childProcess, 'execFileSync').mockImplementation((cmd, args, opts) => {
+      if (cmd !== 'git') return realExecFileSync(cmd, args, opts);
+      if (gitHead instanceof Error) throw gitHead;
+      return gitHead;
     });
+    stubExec(() => ({ stdout: DONE_STREAM, stderr: '', exitCode: 0 }));
   });
 
   afterEach(() => {
+    gitSpy.mockRestore();
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
@@ -135,11 +160,7 @@ describe('rows and preflight records carry scenario_hash and node_version', () =
   /** Every trial hits the ceiling: an infra error, never a score. */
   const killEveryTrial = () => {
     const error = Object.assign(new Error('ETIMEDOUT'), { code: 'ETIMEDOUT', status: 143 });
-    mockUtils.execCommand.mockImplementation((cmd, args) => {
-      if (cmd === 'claude' && args[0] === 'plugin')
-        return { stdout: '[]', stderr: '', exitCode: 0 };
-      return { stdout: '', stderr: '', exitCode: 143, error };
-    });
+    stubExec(() => ({ stdout: '', stderr: '', exitCode: 143, error }));
   };
   const runAb = (k = 2) =>
     runSkillEval(findScenario(NAME, tempDir), k, {
@@ -169,19 +190,24 @@ describe('rows and preflight records carry scenario_hash and node_version', () =
   describe('stampRow', () => {
     it('adds the version, the scenario hash and the running Node version', () => {
       const row = { eval: 'x', passed: true };
-      const stamped = stampRow(row, { version: '4', scenarioHash: 'abc' });
+      const stamped = stampRow(row, { version: '4', scenarioHash: 'abc' }, tempDir);
       expect(stamped).toEqual({
         eval: 'x',
         passed: true,
         version: '4',
         scenario_hash: 'abc',
         node_version: process.version,
+        repo_commit: COMMIT,
       });
       expect(row).toEqual({ eval: 'x', passed: true });
     });
 
     it('leaves out what the scenario does not have', () => {
-      expect(stampRow({ eval: 'x' }, {})).toEqual({ eval: 'x', node_version: process.version });
+      expect(stampRow({ eval: 'x' }, {}, tempDir)).toEqual({
+        eval: 'x',
+        node_version: process.version,
+        repo_commit: COMMIT,
+      });
     });
   });
 
@@ -204,6 +230,7 @@ describe('rows and preflight records carry scenario_hash and node_version', () =
         expect(Object.keys(row).sort()).toEqual(ROW_KEYS);
         expect(row.scenario_hash).toBe(HASH);
         expect(row.node_version).toBe(process.version);
+        expect(row.repo_commit).toBe(COMMIT);
         expect(row.version).toBe('2');
       }
     });
@@ -213,7 +240,11 @@ describe('rows and preflight records carry scenario_hash and node_version', () =
       runAb(1);
       const [row] = loadResults(`${NAME}-baseline`, tempDir);
       expect(row.infraError).toBe(true);
-      expect(row).toMatchObject({ scenario_hash: HASH, node_version: process.version });
+      expect(row).toMatchObject({
+        scenario_hash: HASH,
+        node_version: process.version,
+        repo_commit: COMMIT,
+      });
     });
 
     it('takes the hash once per run, from the scenario as parsed, not per trial', () => {
@@ -239,6 +270,7 @@ describe('rows and preflight records carry scenario_hash and node_version', () =
         expect(Object.keys(row).sort()).toEqual(ROW_KEYS);
         expect(row.scenario_hash).toBe(record.scenario_hash);
         expect(row.node_version).toBe(process.version);
+        expect(row.repo_commit).toBe(record.repo_commit);
       }
       expect(record.scenario_hash).toBe(HASH);
     });
@@ -255,6 +287,7 @@ describe('rows and preflight records carry scenario_hash and node_version', () =
         effort: null,
         trial_timeout_ms: 900000,
         node_version: process.version,
+        repo_commit: COMMIT,
         pass_rate: 1,
         k: 3,
         verdict: 'BLOCK',
@@ -269,9 +302,10 @@ describe('rows and preflight records carry scenario_hash and node_version', () =
       expect(Object.keys(record).sort()).toEqual([...RECORD_KEYS, 'errored'].sort());
       expect(record).toMatchObject({ pass_rate: null, errored: 3, verdict: 'BLOCK' });
       expect(record.node_version).toBe(process.version);
+      expect(record.repo_commit).toBe(COMMIT);
     });
 
-    it('keeps the Node version out of the record file name', () => {
+    it('keeps the Node version and the commit out of the record file name', () => {
       runPreflightTrials({ maxTurns: 10, effort: 'high' });
       expect(fs.readdirSync(path.join(tempDir, PREFLIGHT_DIR))).toEqual([
         `${HASH}-opus-t10-ehigh.json`,
@@ -279,21 +313,66 @@ describe('rows and preflight records carry scenario_hash and node_version', () =
     });
   });
 
-  describe('neither is a pooling condition', () => {
-    it('a PASS recorded under another Node version still unlocks the A/B', () => {
+  describe('the commit of the checkout', () => {
+    it('is read once per run: HEAD moving mid-run does not change later rows', () => {
+      let trials = 0;
+      stubExec(() => {
+        trials += 1;
+        gitHead = `${'9'.repeat(40)}\n`;
+        return { stdout: DONE_STREAM, stderr: '', exitCode: 0 };
+      });
+      runAb();
+      const rows = [
+        ...loadResults(`${NAME}-baseline`, tempDir),
+        ...loadResults(`${NAME}-treatment`, tempDir),
+      ];
+      expect(trials).toBe(4);
+      expect(rows.map((r) => r.repo_commit)).toEqual([COMMIT, COMMIT, COMMIT, COMMIT]);
+      expect(headReads()).toBe(1);
+    });
+
+    it('is one read for a preflight too, shared by its rows and its record', () => {
+      const record = runPreflightTrials();
+      expect(record.repo_commit).toBe(COMMIT);
+      expect(headReads()).toBe(1);
+    });
+
+    it.each([
+      ['the checkout is not a git repository', new Error('fatal: not a git repository')],
+      ['git is unavailable', Object.assign(new Error('spawnSync git ENOENT'), { code: 'ENOENT' })],
+      ['git answers something that is not a commit', 'HEAD\n'],
+    ])('is null on rows and the record when %s', (_why, answer) => {
+      gitHead = answer;
+      expect(repoCommit(tempDir)).toBeNull();
+      const record = runPreflightTrials();
+      expect(record).toHaveProperty('repo_commit', null);
+      const rows = loadResults(`${NAME}-preflight`, tempDir);
+      expect(rows).toHaveLength(3);
+      for (const row of rows) expect(row).toHaveProperty('repo_commit', null);
+    });
+  });
+
+  describe('none is a pooling condition', () => {
+    it('a PASS recorded under another Node version and commit still unlocks the A/B', () => {
       const file = path.join(tempDir, PREFLIGHT_DIR, preflightFilename(HASH, 'opus'));
       fs.mkdirSync(path.dirname(file), { recursive: true });
-      const record = { scenario_hash: HASH, verdict: 'PASS', node_version: 'v18.0.0' };
+      const record = {
+        scenario_hash: HASH,
+        verdict: 'PASS',
+        node_version: 'v18.0.0',
+        repo_commit: 'f'.repeat(40),
+      };
       fs.writeFileSync(file, JSON.stringify(record));
       expect(checkPreflightGate(NAME, tempDir, { model: 'opus' })).toBeNull();
-      // And one written before the field existed.
+      // And one written before the fields existed.
       fs.writeFileSync(file, JSON.stringify({ scenario_hash: HASH, verdict: 'PASS' }));
       expect(checkPreflightGate(NAME, tempDir, { model: 'opus' })).toBeNull();
     });
 
-    it('rows from two Node versions, or with and without the fields, stay one pool', () => {
+    it('rows from two Node versions or commits, or without the fields, stay one pool', () => {
       expect(CONDITION_FIELDS).not.toContain('node_version');
       expect(CONDITION_FIELDS).not.toContain('scenario_hash');
+      expect(CONDITION_FIELDS).not.toContain('repo_commit');
       const row = (extra) => ({
         passed: true,
         score: 1,
@@ -308,8 +387,8 @@ describe('rows and preflight records carry scenario_hash and node_version', () =
       });
       const mixed = [
         row({}), // 6.4.0 row: neither field
-        row({ node_version: 'v22.0.0', scenario_hash: 'aaaa' }),
-        row({ node_version: 'v24.13.1', scenario_hash: 'bbbb' }),
+        row({ node_version: 'v22.0.0', scenario_hash: 'aaaa', repo_commit: 'a'.repeat(40) }),
+        row({ node_version: 'v24.13.1', scenario_hash: 'bbbb', repo_commit: null }),
       ];
       const pools = splitPools(mixed);
       expect(pools.current).toHaveLength(3);
@@ -322,7 +401,7 @@ describe('rows and preflight records carry scenario_hash and node_version', () =
   });
 
   describe('the raw benchmark export', () => {
-    it('carries both fields, null for a row that predates them', () => {
+    it('carries all three fields, null for a row that predates them', () => {
       runAb(1);
       const oldRow = {
         ...loadResults(`${NAME}-baseline`, tempDir)[0],
@@ -330,16 +409,17 @@ describe('rows and preflight records carry scenario_hash and node_version', () =
       };
       delete oldRow.scenario_hash;
       delete oldRow.node_version;
+      delete oldRow.repo_commit;
       const oldDir = path.join(tempDir, RESULTS_DIR, NAME, oldRow.runId);
       fs.mkdirSync(oldDir, { recursive: true });
       fs.writeFileSync(path.join(oldDir, 'baseline.jsonl'), `${JSON.stringify(oldRow)}\n`);
 
       const raw = rawRowsForScenario(findScenario(NAME, tempDir), tempDir);
-      const stamps = raw.map((r) => [r.run_id, r.scenario_hash, r.node_version]);
+      const stamps = raw.map((r) => [r.run_id, r.scenario_hash, r.node_version, r.repo_commit]);
       expect(stamps).toEqual(
         expect.arrayContaining([
-          ['20261001-000000-old1', null, null],
-          [RUN_ID, HASH, process.version],
+          ['20261001-000000-old1', null, null, null],
+          [RUN_ID, HASH, process.version, COMMIT],
         ]),
       );
     });
