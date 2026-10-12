@@ -252,6 +252,59 @@ PR #283。
 - preflight 的列若全是 grade 或基礎設施錯誤，等於沒有量到，可重跑，整輪至多 2 次。
 - **一個 checkout 一次只跑一個 live eval**（D-058；A1 合併後由引擎的鎖執行）。四項依序，最長的 D4 放最後，中途超時不卡住其他三項；有條件的 D5 排在 D4 之後。
 
+**關卡判定之後的三次 run（D-063）**：D2、D3 判 NOT MEASURABLE，各花 0 個 session，剩下 D1、D4、D5 依序在主 checkout 執行，前一項結束才開始下一項。額度以 `wp-d/budget.md` 為準：排定 26，補跑至多 8，preflight 重跑至多 6，D5 之前最壞 40，加 D5 的 13 是 53。preflight 重跑的條件以 D-063 第 5 條為準：引擎只要有一列是 grade 或基礎設施錯誤，就寫下沒有通過率的 BLOCK，那份紀錄算沒有量到，不是天花板。D1、D4 的指令照抄各自 scenario 的 Design Notes；`arcforge` 與 `node scripts/cli.js` 是同一個入口，`PATH` 上沒有前者時用後者。
+
+D1，`eval-sessions-handover-and-resume` Version 2：
+
+```bash
+arcforge eval preflight eval-sessions-handover-and-resume \
+  --model 'opus[1m]' --effort xhigh --max-turns 30
+# only on PASS:
+arcforge eval ab eval-sessions-handover-and-resume \
+  --skill-file skills/core/sessions/SKILL.md \
+  --k 5 --model 'opus[1m]' --effort xhigh --max-turns 30
+```
+
+D4，`eval-diagramming-obsidian-layout-grid` Version 1。先在 repo 之外組出 baseline 目錄並核對兩個 digest，任何一個不符就不花 session：
+
+```bash
+BASE="${TMPDIR:-/tmp}/arcforge-d4-baseline/diagramming-obsidian"
+rm -rf "$BASE" && mkdir -p "$BASE"
+git archive HEAD:skills/core/diagramming-obsidian | tar -x -C "$BASE"
+git show 1fed56d0~1:skills/core/diagramming-obsidian/references/layout-heuristics.md \
+  > "$BASE/references/layout-heuristics.md"
+
+# exactly one line: references/layout-heuristics.md differs
+diff -rq "$BASE" skills/core/diagramming-obsidian
+
+# 0f3c574c1e448946, then 42ec93e5d9d42cec
+node -e "const {digestSkillDir}=require('./scripts/lib/eval-skill-staging');for(const d of process.argv.slice(1))console.log(digestSkillDir(d))" \
+  "$BASE" skills/core/diagramming-obsidian
+
+ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000 arcforge eval preflight eval-diagramming-obsidian-layout-grid \
+  --model 'opus[1m]' --effort xhigh \
+  --stage-skill-files --baseline-skill-file "$BASE/SKILL.md"
+# only on PASS:
+ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000 arcforge eval ab eval-diagramming-obsidian-layout-grid \
+  --model 'opus[1m]' --effort xhigh \
+  --skill-file skills/core/diagramming-obsidian/SKILL.md \
+  --stage-skill-files --baseline-skill-file "$BASE/SKILL.md"
+```
+
+D5，`eval-sessions-handover-completeness` Version 4，scenario 檔不改；D1 與 D4 結束時花掉的不超過 67 才跑，不補跑。baseline 沒有文字，所以 `--stage-skill-files` 不影響 preflight 跑的 baseline，也不改變 preflight 紀錄的鍵；兩道指令帶同一組旗標：
+
+```bash
+node scripts/cli.js eval preflight eval-sessions-handover-completeness \
+  --skill-file skills/core/sessions/SKILL.md --stage-skill-files \
+  --model 'opus[1m]' --effort xhigh
+# only on PASS:
+node scripts/cli.js eval ab eval-sessions-handover-completeness \
+  --skill-file skills/core/sessions/SKILL.md --k 5 --stage-skill-files \
+  --model 'opus[1m]' --effort xhigh
+```
+
+D1 與 D4 的補跑是同一道 `eval ab` 指令把 k 改成 `--k 1`（D4 是加上 `--k 1`，前面照樣帶 `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000`），每支至多 2 次；判定一律用 `arcforge eval compare <scenario>` 讀合併池。
+
 **稽核義務**：
 
 - 每次 run 的摘要、preflight 紀錄的複本、逐列稽核都放 `docs/plans/v6.5/wp-d/`。

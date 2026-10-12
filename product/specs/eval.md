@@ -534,3 +534,7 @@ its rationale is inline at B-10.
   environment a
   scenario can declare, staged skill files, a two-text A/B, and a compare
   that can skip the analyzer (B-8, B-15 to B-21).
+- **D-063** — 6.5.0's round, fixed after the gates: a preflight row that
+  shows the instrument failed, or that wrote into its staged copy, makes the
+  preflight a rerun and not a ceiling reading, and an A/B row that wrote
+  into its staged copy is made up by a top-up (B-3, B-19).

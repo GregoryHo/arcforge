@@ -119,7 +119,11 @@ work carries provenance a reader can check.
   declares, so that a missing dependency can be produced ([eval](eval.md)
   B-18 to B-20). It sits behind a new offline design gate, and until that
   gate passes and the A/B reads, the sentence still rests on its text alone
-  (D-059, D-062).
+  (D-059, D-062). That gate ended NOT MEASURABLE: the installs and the
+  verify the sentence asks for run `uv` inside the skill's `references/`,
+  which writes a `.venv` into the trial's staged copy, and a row that does
+  so is not scored. The sentence is a finding at 0 sessions again and ships
+  in 6.5.0 on its text (D-063).
 
 **Residual — most of this section has no harness evidence.** Three items rest
 on eval scenarios, and only in part: B-3 on
@@ -179,3 +183,7 @@ live behind the CLI per [cli](cli.md) B-8.
 - **D-062** — the engine changes those two measurements wait on: staged
   skill files, a trial environment a scenario declares, and an A/B between
   two skill texts (B-10).
+- **D-063** — the verify-exit gate ended NOT MEASURABLE again, so the
+  sentence is a finding at 0 sessions; the layout change (#185) is measured
+  as a coordinate-plan task only, its arms differing in the staged
+  `references/layout-heuristics.md` (B-10).

@@ -179,6 +179,11 @@ asserted by test (B-3).
   through `arcforge session resume`, trims the `sessions` body into its
   `references/`, and measures the `executing` to `dispatching` handoff
   (#184), each measurement behind a design gate (B-9, B-11, B-12).
+- **D-063** — the round's plan, fixed after the gates: Version 2 of the
+  present-then-stop scenario runs with a per-row instrument-failure rule,
+  the `executing` to `dispatching` handoff (#184) is not measurable and is a
+  finding at 0 sessions, and the trimmed handover-writing path is read as
+  treatment non-regression only (B-9, B-10, B-11, B-12).
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
 

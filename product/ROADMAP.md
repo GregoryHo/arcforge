@@ -2210,3 +2210,201 @@ reverse one, append a superseding entry (see AGENTS.md).
   holds each new flag to the CLI manifest. The live proofs are a second preflight refused
   while a first runs, and the design gates of D-059, which cite the
   merged engine.
+
+### D-063 — 6.5.0's round: two A/Bs and a conditional third, with the handoff and the verify-exit sentence as findings
+- Date: 2026-10-13
+- Version: 6.5.0
+- Refines: D-059
+- Status: Accepted
+- Decision: D-059's round is fixed as eight clauses, after its five design
+  gates and before any session of it is read. (1) Two of the four
+  measurements are findings at 0 sessions: the `executing` to `dispatching`
+  handoff (#184) and the `diagramming-obsidian` verify-exit sentence
+  ([obsidian](specs/obsidian.md) B-10) are NOT MEASURABLE on the merged
+  engine, so neither gets a scenario, a preflight or an A/B, and #184 stays
+  open. (2) Three runs remain, serial, in this order: D1,
+  `eval-sessions-handover-and-resume` Version 2
+  ([skill-system](specs/skill-system.md) B-11); D4,
+  `eval-diagramming-obsidian-layout-grid` Version 1 (#185), measurable only
+  as a task that hands back a coordinate plan and builds, renders and saves
+  nothing; and D5, `eval-sessions-handover-completeness` at its current
+  Version 4 with the scenario file unedited, measurable as treatment
+  non-regression only. (3) Every run is on `--model 'opus[1m]'
+  --effort xhigh`, isolated, with no `--plugin-dir`, the skill text injected
+  by `--skill-file`; each starts with one preflight at k=3 and, on a PASS,
+  goes to an A/B at the scenario's `## Trials`, which is 5 per arm in all
+  three. D1 stages no skill files and takes no baseline text, under
+  `--max-turns 30` and the scenario's own `## Environment`. D4 injects the
+  current `SKILL.md` into both arms with `--stage-skill-files` and
+  `--baseline-skill-file <materialised>/SKILL.md`, the materialised
+  directory being the current skill directory built outside the repository
+  with `references/layout-heuristics.md` alone replaced by its text at
+  `1fed56d0~1`; the baseline's directory digest is `0f3c574c1e448946` and
+  the treatment's `42ec93e5d9d42cec`, the preflight and the A/B both run
+  under `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000`, and a digest that differs
+  from these spends no session until both are registered again in an entry
+  that refines this one. D5 adds `--stage-skill-files` and no baseline text,
+  at the scenario's turn budget of 40; its preflight carries the flag too
+  and runs the same baseline under the same key, a baseline given no text
+  having nothing staged for it. (4) A preflight BLOCK at
+  ceiling is a finding: no second preflight and no A/B. An A/B's verdict is
+  the engine's, read with `eval compare` on the pooled rows of the
+  scenario's Version and never re-scored by hand. (5) A preflight that
+  measured nothing is neither a PASS nor a BLOCK and may be rerun, at most
+  twice in the whole round, 3 sessions each, an allowance all three runs
+  share. Three things count: a record the engine wrote as a BLOCK with no
+  pass rate, which it does when any one row is a grade or infrastructure
+  error; in D1, any single row whose transcript holds a standalone
+  `arcforge session resume duration-hours` call while the wrapper's log
+  holds no line for it — the scenario or its environment is fixed before the
+  rerun, and no A/B session is spent on the record that preflight wrote; and
+  in D4, any row that wrote into its staged copy
+  (`trial_wrote_skill_files`), which is one such row. A measurement still without a usable preflight when the
+  allowance is spent is recorded as not measured. (6) Top-ups are as D-057
+  wrote them, for D1 and D4 only: an A/B that ends with fewer than 5
+  scorable rows in an arm gets at most two top-ups of one trial per arm
+  (`eval ab --k 1`, the same skill file and flags, 4 sessions), its verdict
+  read from the pooled rows with no row discarded, and INSUFFICIENT_DATA —
+  recorded as not measured, never re-read as INCONCLUSIVE — if an arm is
+  still short after the second. A D4 A/B row that wrote into its staged copy
+  is unscored and is made up only this way. (7) D5 runs last, after D1 and
+  D4 have ended with at most 67 sessions spent, a condition every case below
+  meets; it has a preflight of 3, an A/B of 10 and no top-up. Its main
+  reading is the treatment's pass rate and each arm's rate on A1 to A4,
+  reported per arm from the per-assertion vectors of this round's rows. The
+  engine's delta is recorded and is never read as evidence of improvement,
+  whatever its size, and the preflight's PASS is never cited as
+  discrimination. "Treatment not regressed, A1 to A4 not discriminating" is
+  written only when every treatment row passes all seven assertions, every
+  baseline row passes A1 to A4, and the only assertions a baseline row
+  loses are the two the arms differ on by construction, the write under
+  `.handovers/` and A5. A treatment row that loses either of those two is
+  the regression this run exists to find and is reported as one; a row of
+  either arm that fails any of A1 to A4 is reported per assertion and per
+  arm as a behavioural difference, outside that sentence. (8) One checkout runs one
+  live eval at a time ([eval](specs/eval.md) B-15), so a run starts only
+  when the one before it has ended, and the operator audits every row of
+  every preflight and every A/B. The audit carries, per row: in D1, the
+  resume calls against the wrapper's log; in D4, whether the row opened the
+  staged `layout-heuristics.md`, whether a baseline row read the current
+  file from the repository, and each unscored row with the path it wrote;
+  in D5, whether the treatment read the staged handover template. The
+  budget is 26 scheduled sessions (D1 3 + 10, D4 3 + 10), at most 8 for
+  top-ups and at most 6 for preflight reruns — 40 before D5 at worst — and
+  13 for D5: 53 at worst, under D-059's cap of about 80, which stands, as
+  does its rule that an A/B which would pass the cap is not started.
+- Why: each run or finding follows from its gate's verdict. D1 is
+  MEASURABLE because an offline run of the engine's own functions showed the
+  archive that the fixture's Setup saves resolving from the trial's root: the
+  Setup and the session share one `ARCFORGE_HOME` and one project key. The
+  prompt hands the command to both arms, since a baseline that never saw the
+  skill could not otherwise read the archive and the arms would differ by
+  exposure, not behaviour. It stages nothing because both of B-11's steps
+  are in the `SKILL.md` body, which also leaves its pool differing from
+  6.4.0's in the Version alone. Its per-row rule exists because a transcript
+  keeps a command and neither its output nor its exit code: an `arcforge`
+  that does not resolve in a real session's `Bash` fails C3 as an ordinary
+  FAIL, the engine writes a PASS record on 0/3, and an A/B on that record
+  would spend 10 sessions on 0/5 against 0/5. The handoff is NOT MEASURABLE
+  because a trial runs with `--disable-slash-commands` and has no way to
+  load a skill by name, so the `dispatching` body the sentence points at
+  never reaches the treatment; `--stage-skill-files` copies the one
+  directory the injected file sits in, and `executing/` holds `SKILL.md`
+  alone; a fixture copy reaches both arms; the transcript keeps the first
+  200 characters of an Agent call, so no grader reads a dispatch card; and
+  of #184's two assertions, "no model-tier field" passes in every arm and
+  "has acceptance criteria" measures `dispatching`'s own step, not the word
+  #182 changed, which has no observable behavioural consequence. The
+  verify-exit sentence is NOT MEASURABLE for a new reason. The three engine
+  changes D-057 asked for have landed (D-062), but the sentence has the
+  agent run `uv sync` and `uv run` inside the skill's `references/`, which
+  creates a `.venv` there; that directory is now the trial's staged copy,
+  the write guard reports the write, the row is `trial_wrote_skill_files`
+  and unscored, and a scenario cannot move the environment because
+  `UV_PROJECT_ENVIRONMENT` is not a variable it may declare. A trial that
+  does what the sentence says never scores, in either arm. Separately,
+  D-062's Residual requires `uv`'s absence to be shown in a real trial, the
+  gate may spend no session, and the offline evidence points the other way.
+  D4 is MEASURABLE in one shape for the same cause: any `uv run` loses the
+  row, so the task stops where #182's edit acts, at the moment `x` and `y`
+  are chosen. The merged prompt departs from the gate's draft in one
+  sentence: it prescribes a typed plan, one `"type": "box"` per service
+  whose `id` is the service's name, and the grader reads those entries
+  alone; both arms read that sentence and it says nothing about where a box
+  goes. Its one scored assertion is 40 px between same-level shapes, a
+  number both versions of the reference state; "column pitch equals 220" is
+  not asserted, because the old text never contains 220 and a baseline would
+  fail it by construction (D-057's reasoning on the five headings). The gate
+  counts five ways an old-reference baseline passes without copying the 200
+  px grid, so a ceiling BLOCK is a live outcome, and it would answer #185:
+  the old grid's contradiction did not make an agent plan a violating
+  layout. The 1800 s ceiling is kept because raising it costs nothing while
+  a killed trial costs a session, and it is part of the preflight key, so
+  both commands carry it. D5 is MEASURABLE because the engine supports the
+  run and staging reaches the treatment alone, and it is non-regression only
+  because two of its seven assertions separate the arms by construction: the
+  committed reading is five baselines at 5/7 against five treatments at 7/7,
+  a delta of 0.29 that is exactly 2/7. The mixed grader passes a row at 6/7,
+  so the baseline falls short of a pass on those two alone and the
+  preflight's PASS follows, whatever A1 to A4 do. Staging can move one thing, the treatment downward, and that is the
+  one question the 13 sessions answer. The 67-session condition always holds
+  because the two findings return 26 of D-059's 52 scheduled sessions. No
+  A/B restart is budgeted because a staged copy is per trial since #291: a
+  write into it costs that row, not the run. Both known instrument failures
+  — D1's `PATH` and D4's staged-copy write in a preflight — draw on the
+  round's two reruns and get no allowance of their own, which is what keeps
+  the worst case at 53. This refines D-059 and reverses nothing: D-059 left
+  the gates' verdicts, each k and the allowances to this entry, a NOT
+  MEASURABLE finding at 0 sessions is an outcome it provides for, and its
+  order survives with (ii) and (iii) removed.
+- Residual: #184 stays unmeasured and open, the word shipping on its text
+  (D-049); measuring it needs a second staged skill directory for the
+  treatment, a transcript that keeps an Agent call's whole prompt, and a
+  claim rewritten as the two skills' joint behaviour. The verify-exit
+  sentence ships on its text for a second version; measuring it needs
+  `UV_PROJECT_ENVIRONMENT` declarable so the environment lands in the trial,
+  a test branch that depends on Chromium being absent, not `uv`, and
+  preferably a transcript that keeps a `Bash` exit code. Whether `uv`
+  resolves in a real trial's shell is still not established; D4 does not
+  depend on it, but a D4 row that runs `uv` is lost. D4 reads the spacing of
+  a plan once the file lands in the project, not whether an agent writes to
+  an absolute path, and not the full build, render and save pipeline, which
+  stays unmeasured; the `cd` into `references/` is in the `SKILL.md` both
+  arms share, so a lopsided count of unscored rows is reported and not read
+  as discrimination. The write guard sees a `.venv` in a staged copy and the
+  directory digest does not (eval B-19). D4's baseline directory is not in
+  the repository and is pinned by its digest alone. D5 cannot show that
+  moving the template mattered, nor that A1 to A4 discriminate: the body
+  still states the path convention and the five headings, and separating the
+  template's share would take a trimmed, unstaged arm outside D-059. If no
+  treatment row opens the staged template, D-059's Residual — the moved
+  material is not in front of the treatment — holds for this round too.
+  After `eval report`, the snapshot's reading for that scenario is the
+  staged pool, with the pre-trim pool beside it on disk. In D1, whether
+  `arcforge` resolves on a real session's `Bash` `PATH` is decided by the
+  first preflight row, the archive's `Saved:` line is the trial's own time
+  because `session save` takes no date, and C5 keeps the regex blind spots
+  D-058 recorded. Every reading stays direction only (D-059).
+- Cost accepted: 26 scheduled sessions; up to 8 for top-ups (two `--k 1`
+  top-ups, 4 sessions, for each of D1 and D4); up to 6 for two preflight
+  reruns; 13 for D5. The worst case is 40 before D5 and 53 with it, of a cap
+  of about 80, plus D5's model-grader calls, which the cap does not count —
+  D5 is the round's one model-graded scenario. Two of D-059's four
+  measurements produce no reading, and #184 stays open on a verdict. D4's
+  trials run under an 1800 s ceiling, reported as eval B-10 requires, and
+  the plan's two hours for its A/B is read as an upper bound, not an
+  estimate.
+- Verification: the five gates under `docs/plans/v6.5/wp-d/` (PR #290) —
+  `design-gate.sessions-resume.md`, `design-gate.executing-dispatching.md`,
+  `design-gate.verify-exit.md`, `design-gate.diagramming-layout.md` and
+  `design-gate.sessions-handover-writing.md` — with `budget.md` beside
+  them; `evals/scenarios/eval-sessions-handover-and-resume.md` Version 2
+  (PR #292), whose Design Notes carry the per-row rule;
+  `evals/scenarios/eval-diagramming-obsidian-layout-grid.md` Version 1
+  (PR #293), whose Design Notes carry the baseline directory's build and
+  both digests; and `evals/scenarios/eval-sessions-handover-completeness.md`
+  Version 4, unedited. The round's preflight records and A/B pools are
+  copied under `docs/plans/v6.5/wp-d/` the way D-058's were, with the
+  operator audits, and the 6.5.0 section of `evals/skill-eval-coverage.md`
+  carries the two findings' ledger text and the audit of every row. The
+  outcome is a later entry.
