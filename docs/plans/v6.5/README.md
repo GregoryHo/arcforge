@@ -10,7 +10,7 @@
 | [`wp-d/design-gate.verify-exit.md`](wp-d/design-gate.verify-exit.md) | D3 verify-exit 的第二次離線設計關卡：NOT MEASURABLE，0 個 session，記為發現 |
 | [`wp-d/design-gate.diagramming-layout.md`](wp-d/design-gate.diagramming-layout.md) | D4 `diagramming-obsidian` 版面 reference 的離線設計關卡：MEASURABLE，只限交出座標計畫的 task |
 | [`wp-d/design-gate.sessions-handover-writing.md`](wp-d/design-gate.sessions-handover-writing.md) | D5 `sessions` handover 撰寫（有條件）的離線設計關卡：MEASURABLE，只能讀成 treatment 的非回歸 |
-| [`wp-d/budget.md`](wp-d/budget.md) | 五道關卡判定之後的 session 額度：排定 26，D5 有條件 13，最壞情況 63，上限 80 |
+| [`wp-d/budget.md`](wp-d/budget.md) | 五道關卡判定之後的 session 額度：排定 26，D5 有條件 13，最壞情況 53，上限 80 |
 
 preflight 紀錄、稽核與發版後查核會隨各工作包的 PR 加進這張表。
 

@@ -1,8 +1,8 @@
 # verify-exit 設計關卡，第二次（D-059 (iii)，obsidian B-10）
 
-**判定：NOT MEASURABLE。** 6.4.0 關卡要求的三項引擎修改都已合併，但受測句子要 agent 做的事（在 skill 的 `references/` 裡執行 `uv`）會把 `.venv` 寫進 staged 複本，write guard 把它記成 `trial_wrote_repo` 並中止整個 run，scenario 沒有辦法把這個 `.venv` 移到別處。本項記為發現，花 0 個 session；PLAN 預留的 13 個 session 不動用。
+**判定：NOT MEASURABLE。** 6.4.0 關卡要求的三項引擎修改都已合併，但受測句子要 agent 做的事（在 skill 的 `references/` 裡執行 `uv`）會把 `.venv` 寫進該 trial 的 staged 複本，write guard 把那一列記成 `trial_wrote_skill_files`（`infraError`，不進池），scenario 沒有辦法把這個 `.venv` 移到別處。run 不會中止，但照句子做的 trial 一列都計不了分。本項記為發現，花 0 個 session；PLAN 預留的 13 個 session 不動用。
 
-本文件只閱讀程式，並在不啟動 session 的前提下執行引擎函式、`zsh` 與 `uv`（在 scratch 目錄的複本裡）。行號以 `main` 的 `c1d2da73` 為準。
+本文件只閱讀程式，並在不啟動 session 的前提下執行引擎函式、`zsh` 與 `uv`（在 scratch 目錄的複本裡）。行號以 `main` 的 `c1d2da73` 為準；#291（`5945d308`）把 staged 複本改成每個 trial 一份，受它影響的段落已照新引擎改寫，那些段落的行號標明取自 `5945d308`。
 
 ## 受測的句子
 
@@ -34,9 +34,9 @@ baseline 的文字是 `c5328ba4~1`（`0bcd2e87`）的 `SKILL.md:168`、`:171`：
 - `UV_CACHE_DIR`、`UV_INSTALL_DIR`、`XDG_BIN_HOME`、`PLAYWRIGHT_BROWSERS_PATH` 都能指到 `${TRIAL_DIR}` 底下（`eval-trial-environment.js:83-95`；離線確認這四行被接受），trial 目錄每個 trial 結束時移除（`eval.js:185-187`）。
 - `uv` 的專案環境不在其中。在 scratch 目錄的 `references/` 複本裡執行 `uv run --offline python -c …`（uv 0.10.11）：輸出「Creating virtual environment at: .venv」，`sys.prefix` 是 `<複本>/references/.venv`，`uv.lock` 沒變，沒有別的新檔。所以 `:29` 的 `uv sync` 與 `:165` 的 `uv run` 都會在 staged 複本裡建立 `references/.venv`。
 - write guard 會看到它。`eval-trial-guard.js:26` 跳過的名稱只有 `.git`、`node_modules`、`.eval-trials`；staged 目錄在每個 trial 的監看清單內（`eval.js:303`、`eval-trial.js:239`）。離線對一份 staged 複本寫入 `references/.venv/pyvenv.cfg`：`watchForWrites` 回報 1 個變動，`changedCopies` 回報 0 個（digest 跳過 `.venv`，`eval-skill-staging.js:29`）。eval B-19 的 Residual 寫的就是這個不對稱。
-- 被看到的後果：該列是 `trial_wrote_repo`、`infraError: true`（`eval-trial.js:329-338`），`stopIfTrialWroteRepo` 接著丟出錯誤，run 結束（`:429-441`；A/B 在 `eval.js:210`，preflight 在 `scripts/lib/eval-preflight.js:237`）。
+- 被看到的後果（`5945d308`）：寫入落在該 trial 自己的 staged 複本裡，該列是 `trial_wrote_skill_files`、`infraError: true`（`eval-trial.js:351-362`），不進池。run 繼續：`stopIfTrialWroteRepo` 只對 `trial_wrote_repo` 丟出錯誤（`:438-445`），那是寫到專案根目錄才有的列（`:334-346`）。preflight 也跑得完三個 trial，但只要有一列是 `infraError` 就判 BLOCK、`pass_rate: null`（`scripts/lib/eval-preflight.js:247-255`），`eval ab` 不放行。
 - scenario 無法把 `.venv` 移走：`UV_PROJECT_ENVIRONMENT` 不在可宣告的清單內，離線確認被拒絕（`eval-trial-environment.js:278-282`）。
-- 就算 guard 放行，staged 複本是每個 run 建一次、同一臂的所有 trial 共用（`eval.js:291-299`，`:335` 才移除）。trial 1 建好的 `.venv` 會留給 trial 2，6.4.0 事實 5 的「trial 之間不再獨立」原樣重現。
+- trial 之間的獨立性已解決（`5945d308`）：每個 trial 拿到自己的一份複本，trial 結束就移除（`eval-skill-staging.js:332-351`、`eval.js:206-216`；preflight 在 `scripts/cli/eval-command.js:291-307`）。trial 1 建的 `.venv` 不會留給 trial 2，6.4.0 事實 5 的「trial 之間不再獨立」不再成立。剩下的是上一點：建了 `.venv` 的那一列本身不計分。
 - Setup 的 30 秒上限沒變（`scripts/lib/eval-trial-env.js:99`），Setup 也拿不到 staged 目錄的路徑。
 
 **事實 6（trial 裡沒有 Obsidian）：不變。** fixture 放一個格式正確的 manual-fallback `.excalidraw.md` 即可，這一項本來就不是阻礙。
@@ -49,9 +49,9 @@ baseline 的文字是 `c5328ba4~1`（`0bcd2e87`）的 `SKILL.md:168`、`:171`：
 
 **在這台主機的 trial 裡，`uv` 與 Chromium 解析不到嗎？** Chromium 可以由 `PLAYWRIGHT_BROWSERS_PATH` 做到解析不到，這不依賴 `PATH`。`uv` 無法在離線條件下證明解析不到，手上的離線證據指向相反：只要 trial 的 shell 讀了 rc 檔，`uv` 就回來。PLAN 與 D-062 的 Residual 都規定，證明不了缺席就判 NOT MEASURABLE；真 trial 是唯一的證明，而本關卡不得花 session。
 
-**那就不靠 `uv` 缺席，只做 Chromium 缺席呢？** 這是唯一能穩定重現的缺相依套件分支，也是句子真正會被用到的地方：`uv` 在、`uv run` 建好 venv、renderer 找不到 Chromium，印出 `Chromium not installed for Playwright. Run: cd … && uv run playwright install chromium`（`render_excalidraw.py:219`），verifier 以 `VERIFY FAILED:` 非零退出。但走到這一行之前，`uv run` 已經在 staged 複本裡建了 `.venv`（事實 5）。兩臂在句子產生分歧之前就各自成為 `trial_wrote_repo`，run 在第一個 trial 中止：preflight 先寫下該列，接著在 `eval-preflight.js:237` 丟出錯誤，不寫 preflight 紀錄；`:247-255` 的 BLOCK 分支走不到。這樣的 preflight 既不是 PASS，也不是 BLOCK，`eval ab` 因為沒有 PASS 紀錄而不放行。
+**那就不靠 `uv` 缺席，只做 Chromium 缺席呢？** 這是唯一能穩定重現的缺相依套件分支，也是句子真正會被用到的地方：`uv` 在、`uv run` 建好 venv、renderer 找不到 Chromium，印出 `Chromium not installed for Playwright. Run: cd … && uv run playwright install chromium`（`render_excalidraw.py:219`），verifier 以 `VERIFY FAILED:` 非零退出。但走到這一行之前，`uv run` 已經在 staged 複本裡建了 `.venv`（事實 5）。兩臂在句子產生分歧之前，每個 trial 就各自成為 `trial_wrote_skill_files`。run 不中止，但這些列是 `infraError`，不計分：preflight 三列都出錯，走 `eval-preflight.js:247-255` 的分支判 BLOCK（`pass_rate: null`，不是天花板的 BLOCK），`eval ab` 不放行。只有寫到專案根目錄的 `trial_wrote_repo` 才會在 `:237` 丟出錯誤、不寫紀錄。
 
-**`uv` 真的缺席的話呢？** treatment 照句子「install `uv` first」裝好，再照「verify again」執行 `uv run`，同樣在 staged 複本裡建 `.venv`。把句子完整做完的 treatment 會被記成儀器錯誤並中止 run；沒做完的 treatment（只回報缺 `uv`）沒有「安裝後再 verify」可以評分。
+**`uv` 真的缺席的話呢？** treatment 照句子「install `uv` first」裝好，再照「verify again」執行 `uv run`，同樣在 staged 複本裡建 `.venv`。把句子完整做完的 treatment 會被記成儀器錯誤，那一列不計分；沒做完的 treatment（只回報缺 `uv`）沒有「安裝後再 verify」可以評分。
 
 **grader 只看決策點（vault 檔的雜湊有沒有變）可以嗎？** 雜湊是可靠的訊號，但能留下計分列的只有從頭到尾沒成功執行過 `uv` 的 trial。那些列量到的是 agent 在 `command not found` 之後有沒有重畫，不是讀了 verifier 那一行之後的決定。
 
@@ -65,15 +65,15 @@ baseline 的文字是 `c5328ba4~1`（`0bcd2e87`）的 `SKILL.md:168`、`:171`：
 
 ## 判定
 
-NOT MEASURABLE。6.4.0 關卡要求的三項修改（staged skill 檔、trial 環境宣告、兩文字 A/B）都在，事實 1、2、3、6 與對照組的問題不再成立。剩下的阻斷點是事實 5 的後半：句子要求的安裝與 verify 會在 staged 複本裡建立 `.venv`，write guard 中止 run，`## Environment` 不接受 `UV_PROJECT_ENVIRONMENT`。`uv` 的缺席另外無法在不花 session 的條件下證明。
+NOT MEASURABLE。6.4.0 關卡要求的三項修改（staged skill 檔、trial 環境宣告、兩文字 A/B）都在，事實 1、2、3、6 與對照組的問題不再成立。剩下的阻斷點是事實 5 的後半：句子要求的安裝與 verify 會在 staged 複本裡建立 `.venv`，write guard 把那一列記成 `trial_wrote_skill_files`，不計分，`## Environment` 不接受 `UV_PROJECT_ENVIRONMENT`。#291 之後複本是每個 trial 一份，run 不再中止，trial 之間也不再共用環境；但照句子做的 trial 仍然沒有一列進得了池，判定不變。`uv` 的缺席另外無法在不花 session 的條件下證明。
 
 ## 帳本用的發現文字
 
-> `diagramming-obsidian` verify-exit 句子（#267，`SKILL.md:168-173`）：6.5.0 離線設計關卡再次判定無法量測，未花 session。6.4.0 關卡列出的三項引擎修改已合併並離線確認可用：`--stage-skill-files` 給每臂一份 skill 目錄與 base-directory 行，`--baseline-skill-file` 讓 baseline 注入 #267 之前的文字，`## Environment` 能把 uv 與 playwright 的快取指進 trial。阻斷點換了一個：句子要 agent 在 skill 的 `references/` 執行 `uv sync` 與 `uv run`，uv 0.10.11 會在那個目錄建立 `.venv`，那個目錄現在是 staged 複本，write guard 看得到 `.venv`（digest 看不到），該列成為 `trial_wrote_repo` 並中止 run；`UV_PROJECT_ENVIRONMENT` 不在 scenario 可宣告的變數內。staged 複本又是同一臂所有 trial 共用，就算放行，第一個 trial 裝好的環境也會留給下一個。另外，引擎建的 `PATH` 沒有 `uv`，但這台主機以同一個 `PATH` 啟動會讀 rc 檔的 zsh，`uv` 就回到 `~/.local/bin`；缺席沒有在真 trial 裡證明。這句仍以文字出貨。
+> `diagramming-obsidian` verify-exit 句子（#267，`SKILL.md:168-173`）：6.5.0 離線設計關卡再次判定無法量測，未花 session。6.4.0 關卡列出的三項引擎修改已合併並離線確認可用：`--stage-skill-files` 給每臂一份 skill 目錄與 base-directory 行，`--baseline-skill-file` 讓 baseline 注入 #267 之前的文字，`## Environment` 能把 uv 與 playwright 的快取指進 trial。阻斷點換了一個：句子要 agent 在 skill 的 `references/` 執行 `uv sync` 與 `uv run`，uv 0.10.11 會在那個目錄建立 `.venv`，那個目錄現在是 staged 複本，write guard 看得到 `.venv`（digest 看不到），該列成為 `trial_wrote_skill_files`，是 `infraError`，不進池；`UV_PROJECT_ENVIRONMENT` 不在 scenario 可宣告的變數內。#291 之後每個 trial 有自己的複本，run 不中止，環境也不會留給下一個 trial，但照句子做的 trial 沒有一列計得了分。另外，引擎建的 `PATH` 沒有 `uv`，但這台主機以同一個 `PATH` 啟動會讀 rc 檔的 zsh，`uv` 就回到 `~/.local/bin`；缺席沒有在真 trial 裡證明。這句仍以文字出貨。
 
 ## 要怎樣的引擎修改才量得到
 
-1. **讓 venv 落在 trial 內**：把 `UV_PROJECT_ENVIRONMENT` 加進 `TRIAL_DIR_VARS`（`eval-trial-environment.js:83-95`），scenario 宣告 `UV_PROJECT_ENVIRONMENT=${TRIAL_DIR}/.venv-diagram`。這同時解決 guard 與「同臂的 trial 共用環境」兩件事。只讓 guard 在 staged 複本裡跳過 `.venv` 不夠，環境仍會從一個 trial 留到下一個。這個變數是否在 agent 的 shell 裡保持原值，要在真 trial 驗證。
+1. **讓 venv 落在 trial 內**：把 `UV_PROJECT_ENVIRONMENT` 加進 `TRIAL_DIR_VARS`（`eval-trial-environment.js:83-95`），scenario 宣告 `UV_PROJECT_ENVIRONMENT=${TRIAL_DIR}/.venv-diagram`。venv 不落在 staged 複本裡，guard 就沒有東西可報，那一列才計得了分。「同臂的 trial 共用環境」已由 #291 的每個 trial 一份複本解決，不再需要這項修改來處理。這個變數是否在 agent 的 shell 裡保持原值，要在真 trial 驗證。
 2. **不依賴 `uv` 缺席**：受測分支改成 Chromium 缺席（`PLAYWRIGHT_BROWSERS_PATH` 指到 trial 內的空目錄），`uv` 反而要確定解析得到。eval B-18 要求的「在真 trial 裡示範缺席」就不再是這項量測的前提。
 3. **transcript 保留工具輸出**，或至少保留 `Bash` 的 exit code，grader 才能把「讀了那一行之後安裝」與「沒看就安裝」分開。沒有這項仍可量（雜湊加指令序列），只是證據較弱。
 

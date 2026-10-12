@@ -1,8 +1,8 @@
 # `diagramming-obsidian` 版面 reference 設計關卡（D-059 (iv)，#185）
 
-**判定：MEASURABLE，只限「只交出座標計畫」的 task 形狀。** PLAN 描述的形狀（走 manual fallback 存檔）不可量，原因與 verify-exit 關卡相同：任何一次 `uv run` 都會把 `.venv` 寫進 staged 複本並中止 run。預算照 PLAN：preflight 3 + A/B 10，共 13 個 session。
+**判定：MEASURABLE，只限「只交出座標計畫」的 task 形狀。** PLAN 描述的形狀（走 manual fallback 存檔）不可量，原因與 verify-exit 關卡相同：任何一次 `uv run` 都會把 `.venv` 寫進該 trial 的 staged 複本，那一列就不計分。預算照 PLAN：preflight 3 + A/B 10，共 13 個 session。
 
-本文件只閱讀程式，並在不啟動 session 的前提下執行引擎函式與 `git show`。行號以 `main` 的 `c1d2da73` 為準。
+本文件只閱讀程式，並在不啟動 session 的前提下執行引擎函式與 `git show`。行號以 `main` 的 `c1d2da73` 為準；#291（`5945d308`）把 staged 複本改成每個 trial 一份，受它影響的段落已照新引擎改寫，那些段落的行號標明取自 `5945d308`。
 
 ## 受測的變更
 
@@ -22,7 +22,7 @@
 
 1. **兩臂文字相同、staged 檔案不同的 A/B 有支援。** `--baseline-skill-file` 指到另一個目錄裡的 `SKILL.md`，加 `--stage-skill-files`，baseline 的複本取自那個目錄（`scripts/cli/eval-skill-options.js:43-61`、`scripts/lib/eval-skill-staging.js:183-199`）。文字 hash 分不出兩臂，row 與 pool 靠目錄 digest：每臂記 `skillFilesHash`，兩臂都記 `baselineSkillFilesHash`，後者是 pool 條件，也在 preflight 的鍵裡（`scripts/lib/eval-trial.js:171-179`、`scripts/lib/eval-pools.js:29-39`、`scripts/lib/eval-preflight.js:98-100`）。
 2. **離線組出 baseline 目錄並算過鍵。** `git archive HEAD skills/core/diagramming-obsidian` 解開後，把 `references/layout-heuristics.md` 換成 `git show 1fed56d0~1:…` 的內容；`diff -rq` 與現行目錄只差這一個檔案。`readBaselineSkill(…, stage=true)` 回報文字 hash `51fe7cc9f5373b7e`（與現行版相同）、目錄 digest `0f3c574c1e448946`；現行目錄的 digest 是 `42ec93e5d9d42cec`。ceiling 設 1800000 時 preflight 紀錄檔名是 `<hash>-opus_1m_-exhigh-c1800000-b51fe7cc9f5373b7e-s0f3c574c1e448946.json`。digest 涵蓋路徑、可執行位元與內容，不含時間戳（`eval-skill-staging.js:53-77`）。
-3. **在 staged 的 `references/` 執行 `uv` 會中止 run，兩臂皆然。** uv 0.10.11 在該目錄建立 `.venv`（在 scratch 複本實測）；write guard 不跳過 `.venv`（`scripts/lib/eval-trial-guard.js:26`），離線對 staged 複本寫入 `references/.venv/…` 被回報為變動；該列成為 `trial_wrote_repo`，run 結束（`eval-trial.js:329-338`、`:429-441`）。`UV_PROJECT_ENVIRONMENT` 不可宣告（`scripts/lib/eval-trial-environment.js:278-282`）。細節在 `design-gate.verify-exit.md` 事實 5。
+3. **寫進 staged 複本的 trial 不計分，run 繼續；兩臂皆然（`5945d308`）。** 每個 trial 拿到自己的一份複本，trial 結束就移除（`scripts/lib/eval-skill-staging.js:332-351`、`scripts/lib/eval.js:206-216`）。uv 0.10.11 在 `references/` 建立 `.venv`（在 scratch 複本實測）；write guard 不跳過 `.venv`（`scripts/lib/eval-trial-guard.js:26`），所以寫入被回報為變動，該列成為 `trial_wrote_skill_files`、`infraError: true`，不進池（`eval-trial.js:351-362`）。只有寫到專案根目錄的 `trial_wrote_repo` 才讓 run 結束（`:334-346`、`:438-445`）。`UV_PROJECT_ENVIRONMENT` 不可宣告（`scripts/lib/eval-trial-environment.js:278-282`）。細節在 `design-gate.verify-exit.md` 事實 5。
 4. **skill 的流程處處要 `uv`。** `SKILL.md:134-135`（Phase 2 的 check 與 render）、`:165`（verify）、`:53`「Run `verify_saved_diagram.py` after every save」。現行 `SKILL.md:169` 還寫「No `uv`: install `uv` first」，兩臂的文字都有這一句。
 5. **trial 裡沒有 Obsidian。** `obsidian eval` 不可及，Phase 1 的 EA 建置（`SKILL.md:117-118`）做不了。
 6. **兩臂都拿得到的其他檔案**（staged 複本裡，內容相同）：`plan_layout.py`（只用標準函式庫；`ROW_GAP = 30`，`:57`；單欄直排）、`check_overlaps.py`（只用標準函式庫；`MIN_SHAPE_GAP = 30`，`:475`，只回報 0 到 30 px 之間的間距）、`painters-toolkit.md`（Primary 是 160–200 × 70–100，`:208`；「Primaries get 60-100px buffer between peers」，`:214`）。shim 有 `python3`（`eval-trial-environment.js:195`），不經 `uv` 也跑得動前兩支。
@@ -31,13 +31,13 @@
 
 ## 逐題回答
 
-**PLAN 的形狀（手排版面，走 manual fallback 存檔）可量嗎？** 不可量。存檔之後 skill 要求 verify（事實 4），verify 是 `uv run`，`uv run` 寫 `.venv` 進 staged 複本（事實 3）。照 skill 做的 trial 會成為 `trial_wrote_repo`，run 在那一個 trial 中止。`uv` 若解析不到，現行 `SKILL.md:169` 叫 agent 先裝，裝完同樣走到 `uv run`。這不分臂，所以不是偏差，而是整輪拿不到可計分的列。
+**PLAN 的形狀（手排版面，走 manual fallback 存檔）可量嗎？** 不可量。存檔之後 skill 要求 verify（事實 4），verify 是 `uv run`，`uv run` 寫 `.venv` 進 staged 複本（事實 3）。照 skill 做的 trial 會成為 `trial_wrote_skill_files`，那一列不計分。`uv` 若解析不到，現行 `SKILL.md:169` 叫 agent 先裝，裝完同樣走到 `uv run`。這不分臂，所以不是偏差，而是整輪拿不到可計分的列。
 
 **那什麼形狀可量？** 只交出座標計畫。#182 改的是 Phase 1 的格線，影響發生在「決定 x、y」那一刻，之後的建置、render、存檔都與這個檔案無關。使用者要求先看座標計畫、暫不建置，是平常會出現的要求，也讓 `uv` 沒有出場的理由。prompt 例：
 
 > I want an Excalidraw diagram of our ingest pipeline for the team vault, but before you build anything, give me the coordinate plan to review: write it to `layout.json` at the top of this project folder — use the full absolute path, not a relative one — as a list of `{id, label, x, y, width, height}` for every shape, plus `{id, type: "separator", y}` for any zone separator. Don't build, render or save a diagram yet. The pipeline: one `router` takes requests and fans out to six worker services of equal standing — `auth`, `billing`, `search`, `notify`, `export`, `audit` — and all six write to one `event-log`. Top zone: router. Middle zone: the six workers, side by side. Bottom zone: the event log.
 
-這段話沒有提到間距、格線、40、200 或 220。prompt 是固定文字，寫不出 trial 目錄的實際路徑，所以用「this project folder」指明位置並要求絕對路徑；原因在「殘餘風險」的第一項。六個同層元素排一列是版面本身的要求，不是提示；它們彼此之間沒有箭頭。
+這段話沒有提到間距、格線、40、200 或 220。prompt 是固定文字，寫不出 trial 目錄的實際路徑，所以用「this project folder」指明位置並要求絕對路徑；原因在「殘餘風險」的前兩項。六個同層元素排一列是版面本身的要求，不是提示；它們彼此之間沒有箭頭。
 
 **鑑別用的斷言是什麼？** `layout.json` 裡六個 worker 兩兩之間，水平間距（左右相鄰者的 `x₂ − (x₁ + width₁)`）都不小於 40。這個 40 是兩版 reference 都寫著的同層最小間距，不是新版才有的數字。不用「欄距等於 220」：那是舊文字沒看過的數字，先天決定（D-057 對五個標題的判定）。
 
@@ -62,27 +62,26 @@
 
 ## 殘餘風險（預先登記時要寫進去）
 
-- **任何寫進 staged 複本的動作都中止 run，不只 `.venv`。** 兩條路：
+- **寫進 staged 複本的 trial 不計分，不只 `.venv`。** 兩條路：
   - 相對路徑的寫入。`SKILL.md:20-27` 要 agent 先 `cd "$BASE/references"`；在那之後以相對路徑寫 `layout.json`，或執行 `python3 plan_layout.py --output coords.json`，檔案落在 staged 複本裡。這條路不需要 `uv`，是最可能發生的一條。
   - `uv run`。prompt 說了不建置，但 agent 仍可能把計畫轉成 `.excalidraw` 再以 `uv run python check_overlaps.py` 檢查，`.venv` 寫進 staged 複本。真 trial 裡 `uv` 是否解析得到沒有離線證明；`design-gate.verify-exit.md` 的離線證據指向解析得到。
 
-  兩條路的後果相同：write guard 回報變動（`eval-trial-guard.js:26`），該列是 `trial_wrote_repo`（`eval-trial.js:329-338`），run 在那一個 trial 結束（`:429-441`）。
-- **中止的 A/B 補跑修不好。** 補跑額度是 2 次 `--k 1`，每次兩臂各加一列；A/B 若在前幾個 trial 中止，缺的列多於 4 列，補不回來。task 要帶的緩解：prompt 指明 `layout.json` 寫在專案目錄，並要求絕對路徑（見上面的 prompt），agent 就算已經 `cd` 進 `references/`，輸出也落在 trial 目錄。預先登記的規則：中止之前已寫入的列留在池裡，一筆都不丟；中止的 A/B 以相同的旗標與 baseline 目錄重新啟動，整輪至多 1 次，花掉的 session 計入上限；重新啟動後再中止，就記為發現，以池裡現有的列判讀。
-- **重新啟動不能變成重抽。** agent 照 skill 的 `cd` 走、以相對路徑寫 `layout.json`，是 task 上的行為，不是暫時的儀器故障。引擎把那一列記成 `infraError`，`eval compare` 不計它；若只讀引擎的數字，等於把沒照絕對路徑寫的 trial 丟掉，一直抽到有 agent 照做為止。所以中止列要算分，不靠引擎，靠稽核：每一筆 `trial_wrote_repo` 的列逐臂列出，連同寫進 staged 複本的路徑；寫入的是 `layout.json`（或 `plan_layout.py` 的輸出）的列，在第二種讀法裡記為 `A1` FAIL，因為 `$TRIAL_DIR/layout.json` 不存在時 grader 本來就判 FAIL。判讀報兩個數字：引擎的讀法（不計中止列）與把中止列記為 FAIL 的讀法。兩種讀法的判定不同時，結果記為無法判定，不記為 IMPROVED。preflight 同理：重跑只是為了讓引擎寫得出紀錄，中止的那一列照樣列出並在第二種讀法裡記為 baseline FAIL。寫入的若是 `.venv`（`uv run`），那一列沒有 `layout.json` 可評，只列出，兩種讀法都不計。
-- **重新啟動後算哪幾列。** 重新啟動是同一組 pool 條件下再跑一次完整的 k=5，`eval compare` 會把兩次的列全部讀進去；先跑完的那一臂可能有 10 列，另一臂只有 5 到 9 列，這已經不是預先登記的 k=5 對 k=5。所以判定用的列在讀結果之前就定死：每一臂依時間戳排序，取兩次 run 合起來最先的 5 列。第一種讀法只排有計分的列；第二種讀法把記為 FAIL 的中止列也排進去，佔一個名額。這個取法只看時間，不看分數。取完之後某一臂仍不足 5 列，才動用補跑。兩次 run 的所有列都留在磁碟上並在稽核表逐列列出；`eval compare` 對合併池回報的數字照樣附上，但兩臂列數不同時不拿它當判定。
-
-- **preflight 遇到 `trial_wrote_repo`。** 該列寫入之後，preflight 在 `eval-preflight.js:237` 丟出錯誤，不寫紀錄，所以既不是 PASS，也不是 BLOCK（`design-gate.verify-exit.md`「逐題回答」）。預先登記要寫明它動用的是 preflight 出錯重跑的額度（整輪至多 2 次），不是補跑，也不是 A/B 的重新啟動。
+  兩條路的後果相同（`5945d308`，事實 3）：那一列是 `trial_wrote_skill_files`，不進池；複本是那個 trial 自己的，run 繼續，下一個 trial 拿到新的一份。損失的只有那一列。
+- **少掉的列由補跑補上。** 預先登記的補跑是 2 次 `--k 1`，每次兩臂各加一列；A/B 結束時任一臂可評分的列少於 5 筆就動用。兩次補跑之後仍不足 5 筆，照 PLAN 記為 `INSUFFICIENT_DATA` 的發現，不再加跑。不計分的列逐臂列在稽核表，連同它寫了什麼路徑。task 要帶的緩解不變：prompt 指明 `layout.json` 寫在專案目錄，並要求絕對路徑（見上面的 prompt），agent 就算已經 `cd` 進 `references/`，輸出也落在 trial 目錄。
+- **preflight 遇到 `trial_wrote_skill_files`。** preflight 跑得完三個 trial，但只要有一列是 `infraError` 就判 BLOCK、`pass_rate: null`（`eval-preflight.js:247-255`）。這不是天花板的 BLOCK，是沒有量到；它動用 preflight 出錯重跑的額度（整輪至多 2 次），不是補跑。
+- **寫到專案根目錄仍然中止 run。** staged 複本以外的寫入（例如沿著 `../../skills/` 寫回 repo）還是 `trial_wrote_repo`，run 在那一個 trial 結束（`eval-trial.js:334-346`、`:438-445`，`5945d308`）。prompt 沒有任何理由讓 agent 這樣做；發生了就照 PLAN 記為發現。
+- **skill 目錄在 run 中途被改。** 每臂在第一個 trial 之前先 stage 一次取 digest，之後每個 trial 的複本 digest 不同就拒絕（`eval-skill-staging.js:332-345`，`5945d308`）。量測期間不動 `skills/` 與 baseline 目錄。
 - **baseline 目錄不在 repo 裡。** 它由 operator 在 run 之前以 `git archive` 與 `git show` 組出來，身分靠 digest `0f3c574c1e448946` 釘住，預先登記的 decision 要寫這個值與組法。`skills/` 若在量測前再變動，兩個 digest 都要重算。另一個做法是把整個目錄提交到 `evals/fixtures/`，代價是 15 個檔案的複本；由 scenario PR 決定。
 - **沒打開 reference 的列。** 這種列量到的不是這個檔案。grader 在 audit 行印出有沒有 `Read` 到 staged 的 `layout-heuristics.md`，稽核時分開報告，不改標籤。
 - **逃逸。** `../../skills/core/diagramming-obsidian/references/layout-heuristics.md` 是現行版，baseline 若讀了它就不再是舊 reference 那一臂。transcript 的 `Read` 路徑看得出來，稽核要逐列檢查。
 
 ## 判定
 
-MEASURABLE，條件四項：(1) task 只要座標計畫，prompt 明說暫不建置、render、存檔；(2) 計分的斷言只有「六個同層元素兩兩水平間距 ≥40」，分隔線淨空不計分；(3) prompt 指明 `layout.json` 寫在專案目錄並要求絕對路徑；(4) 預先登記寫明寫進 staged 複本造成的 `trial_wrote_repo` 怎麼處理：已寫入的列留在池裡，A/B 至多重新啟動 1 次並計入上限，preflight 則動用出錯重跑的額度；中止列逐臂列出，判讀報兩種讀法（不計中止列、中止列記為 FAIL），兩者判定不同就記為無法判定；重新啟動後每一臂只取依時間排序最先的 5 列。PLAN 原本的 manual-fallback 形狀判 NOT MEASURABLE，要等 `UV_PROJECT_ENVIRONMENT` 可宣告。
+MEASURABLE，條件四項：(1) task 只要座標計畫，prompt 明說暫不建置、render、存檔；(2) 計分的斷言只有「六個同層元素兩兩水平間距 ≥40」，分隔線淨空不計分；(3) prompt 指明 `layout.json` 寫在專案目錄並要求絕對路徑；(4) 預先登記寫明寫進 staged 複本的列（`trial_wrote_skill_files`）不計分、由補跑補上，preflight 出現這種列則動用出錯重跑的額度。PLAN 原本的 manual-fallback 形狀判 NOT MEASURABLE，要等 `UV_PROJECT_ENVIRONMENT` 可宣告。
 
 ## 帳本用的發現文字
 
-> `diagramming-obsidian` 的 `references/layout-heuristics.md`（#185，#182 的 200 → 220 px）：6.5.0 離線設計關卡判定可量測，但只限 agent 交出座標計畫、不建置也不存檔的 task。完整流程不可量：skill 的 check、render、verify 都經 `uv run`，在 staged 複本裡建立 `.venv`，write guard 中止 run。A/B 是兩臂同一份 `SKILL.md`、staged 目錄只差這一個檔案，baseline 目錄的 digest 是 pool 條件與 preflight 的鍵。鑑別斷言是同層元素間距不小於 40 px，兩版 reference 都寫著這個數字，舊格線與它矛盾；不用「欄距 = 220」。舊 reference 的 baseline 有五條不照抄 200 px 的路可以通過，天花板由 preflight 判斷。skill 要 agent 先 `cd` 進 `references/`，之後的相對寫入同樣落在 staged 複本並中止 run，補跑修不好中止的 A/B，所以 prompt 要求以絕對路徑把 `layout.json` 寫在專案目錄；仍然寫進 staged 複本的列是行為，稽核時逐臂列出並另報一個把它們記為 FAIL 的讀數。
+> `diagramming-obsidian` 的 `references/layout-heuristics.md`（#185，#182 的 200 → 220 px）：6.5.0 離線設計關卡判定可量測，但只限 agent 交出座標計畫、不建置也不存檔的 task。完整流程不可量：skill 的 check、render、verify 都經 `uv run`，在該 trial 的 staged 複本裡建立 `.venv`，那一列成為 `trial_wrote_skill_files`，不計分。A/B 是兩臂同一份 `SKILL.md`、staged 目錄只差這一個檔案，baseline 目錄的 digest 是 pool 條件與 preflight 的鍵。鑑別斷言是同層元素間距不小於 40 px，兩版 reference 都寫著這個數字，舊格線與它矛盾；不用「欄距 = 220」。舊 reference 的 baseline 有五條不照抄 200 px 的路可以通過，天花板由 preflight 判斷。skill 要 agent 先 `cd` 進 `references/`，之後的相對寫入同樣落在 staged 複本，那一列不計分，所以 prompt 要求以絕對路徑把 `layout.json` 寫在專案目錄；#291 之後 staged 複本是每個 trial 一份，寫進去只損失那一列，由預先登記的補跑補上。
 
 ## Scenario 骨架
 
@@ -92,6 +91,6 @@ MEASURABLE，條件四項：(1) task 只要座標計畫，prompt 明說暫不建
 - **`## Environment`**：不宣告。這個形狀不需要任何工具，也不依賴任何工具缺席。
 - **旗標**（preflight 與 A/B 相同，前面都加 `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000`）：`--model 'opus[1m]' --effort xhigh --stage-skill-files --baseline-skill-file <baseline 目錄>/SKILL.md`。baseline 目錄是現行 skill 目錄，只把 `references/layout-heuristics.md` 換成 `1fed56d0~1` 的版本。
 - **`## Max Turns`**：不設，或設得寬（30）；設了就會進 preflight 的鍵。
-- **k**：preflight 3；`## Trials` 5，兩臂共 10。A/B 因 `trial_wrote_repo` 中止時至多重新啟動 1 次，已寫入的列留在池裡，中止列在稽核的第二種讀法裡記為 FAIL；重新啟動後，判定只用每一臂依時間排序最先的 5 列。
+- **k**：preflight 3；`## Trials` 5，兩臂共 10。寫進 staged 複本的列不計分，由 2 次 `--k 1` 的補跑補上。
 - **Grader**：code，`python3 -I`，讀 `$TRIAL_DIR/layout.json`。單一計分標籤 `A1`：檔案存在且可解析；六個 worker 都在，數值有限且寬高為正；六個的垂直範圍兩兩重疊（同一列）；依 `x` 排序後相鄰兩個的間距都 ≥40。印出但不計分：`-- C2:` 每條分隔線與最近元素的距離是否 ≥30；`-- audit:` 六個寬度、相鄰間距、欄距、有沒有 `Read` staged 的 `layout-heuristics.md`、有沒有讀 trial 樹外的路徑、有沒有 `uv` 指令。檔案不存在或不可解析記 FAIL，不是 grade error：agent 被要求交出這個檔案。
 - **鑑別用的斷言**：`A1`。baseline 失敗的方式是行為：它打開舊 reference、把 180 寬的元素放上 200 的格線。它不必知道任何只有 treatment 看得到的名稱或數字就能通過，40 寫在它自己那份檔案的表裡。treatment 通過也是行為：它得把選的寬度與格線配成 40 以上，配錯同樣失敗。
