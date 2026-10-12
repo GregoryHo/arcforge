@@ -162,15 +162,16 @@ function resolveOnPath(name, pathValue, skipDir) {
 
 /**
  * Point the shim directory at the tools a trial needs: `claude` (the session,
- * and any hook that spawns one), `node` (every arcforge hook is a node script)
- * and the npm and npx that ship beside that node.
+ * and any hook that spawns one), `node` (every arcforge hook is a node script),
+ * the npm and npx that ship beside that node, and `python3` (fixture Setup
+ * scripts call it, and pyenv or Homebrew keep it off the system directories).
  *
  * A shim directory, not the tools' own directories: `claude` installs into
  * ~/.local/bin and node into a version manager's bin, and both hold whatever
  * else the operator installed there (uv, global npm CLIs), which would come
  * along and could not be taken away without taking `claude` with it.
  * @param {string} binDir - Shim directory (created when missing)
- * @param {string} [pathValue] - The parent's PATH, searched for `claude`
+ * @param {string} [pathValue] - The parent's PATH, searched for `claude` and `python3`
  * @returns {string} binDir
  */
 function ensureToolShims(binDir, pathValue) {
@@ -181,11 +182,13 @@ function ensureToolShims(binDir, pathValue) {
     node: process.execPath,
     npm: path.join(nodeDir, 'npm'),
     npx: path.join(nodeDir, 'npx'),
+    python3: resolveOnPath('python3', pathValue, binDir),
   };
   for (const [name, target] of Object.entries(tools)) {
     const link = path.join(binDir, name);
     const current = readLink(link);
     // A missing `claude` leaves no shim: the spawn then fails, and the row says so.
+    // A missing `python3` leaves none either, and a Setup that calls it fails.
     const wanted = target && fs.existsSync(target) ? target : undefined;
     if (current === wanted) continue;
     fs.rmSync(link, { force: true });

@@ -270,9 +270,12 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   `CLAUDE_CODE_SESSION_ID`). `docs/guide/eval-system.md` holds the table.
   Everything else the operator's shell exports is dropped. `PATH`
   is built too: a shim directory under `.eval-trials/` holding links to
-  `claude`, to `node`, and to the `npm` and `npx` beside it, followed by the
-  system directories `/usr/bin`, `/bin`, `/usr/sbin` and `/sbin`. So
-  `claude` and `node` resolve, and the entries of the operator's own
+  `claude`, to `node`, to the `npm` and `npx` beside it, and to the
+  `python3` the operator's `PATH` resolves (no link when it resolves none),
+  followed by the system directories `/usr/bin`, `/bin`, `/usr/sbin` and
+  `/sbin`. So the shim set — `claude`, `node`, `npm`, `npx`, `python3` —
+  resolves, `git` and the shell utilities are found only in the system
+  directories, and the entries of the operator's own
   `PATH` do not carry over — not even the directory `claude` is installed
   in, which can hold other tools — so a tool the operator happens to have
   installed — `arcforge` included — is not something a trial can run unless

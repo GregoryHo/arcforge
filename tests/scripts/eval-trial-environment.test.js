@@ -90,6 +90,14 @@ describe('a contained trial does not inherit the operator environment', () => {
     expect(version).toBe(process.version);
   });
 
+  it('resolves the python3 of the operator PATH, wherever it is installed', () => {
+    const python3 = writeExecutable(path.join(operatorBin, 'python3'));
+    const env = build();
+    const link = path.join(projectRoot, '.eval-trials', '.bin', 'python3');
+    expect(which('python3', env)).toBe(link);
+    expect(fs.readlinkSync(link)).toBe(python3);
+  });
+
   it('builds PATH from the shim directory and the system directories only', () => {
     const entries = build().PATH.split(':');
     expect(entries).toEqual([path.join(projectRoot, '.eval-trials', '.bin'), ...SYSTEM_PATH]);
@@ -279,6 +287,19 @@ describe('the shim directory', () => {
     ensureToolShims(binDir, path.join(root, 'empty'));
     expect(fs.existsSync(path.join(binDir, 'claude'))).toBe(false);
     expect(fs.existsSync(path.join(binDir, 'node'))).toBe(true);
+  });
+
+  it('links python3 from the operator PATH, follows it, and drops it when it is gone', () => {
+    const binDir = path.join(root, 'shims');
+    const link = path.join(binDir, 'python3');
+    const pyenv = writeExecutable(path.join(root, 'pyenv', 'python3'));
+    const brew = writeExecutable(path.join(root, 'brew', 'python3'));
+    ensureToolShims(binDir, [path.dirname(pyenv), path.dirname(brew)].join(':'));
+    expect(fs.readlinkSync(link)).toBe(pyenv);
+    ensureToolShims(binDir, [binDir, path.dirname(brew)].join(':'));
+    expect(fs.readlinkSync(link)).toBe(brew);
+    ensureToolShims(binDir, path.join(root, 'empty'));
+    expect(fs.existsSync(link)).toBe(false);
   });
 
   it('survives the cleanup of a trial directory beside it', () => {

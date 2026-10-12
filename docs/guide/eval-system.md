@@ -154,8 +154,10 @@ leaves hooks on so the plugin's own hooks run.
 
 Your shell's environment does not reach a contained trial either. Its `PATH` is
 rebuilt: first `.eval-trials/.bin`, which holds links to `claude`, to the `node`
-running arcforge and to the `npm` and `npx` beside that `node`, then
-`/usr/bin:/bin:/usr/sbin:/sbin`. The session itself is started from that
+running arcforge, to the `npm` and `npx` beside that `node`, and to the
+`python3` your own `PATH` resolves (none when it resolves none), then
+`/usr/bin:/bin:/usr/sbin:/sbin`. `git` and the shell utilities are expected in
+those system directories; they are not linked. The session itself is started from that
 `claude` link by its full path, so nothing a scenario adds to the `PATH` can run
 in its place. A tool you installed anywhere else (Homebrew,
 `~/.local/bin`, a version manager) is not found, even when it shares a
@@ -404,8 +406,8 @@ intent into the trial and teaching the agent the answer.
 ## Declaring a trial's environment
 
 A contained trial starts from the rebuilt environment described under
-[Step 3](#step-3--ab): a `PATH` of `claude`, `node`, `npm`, `npx` and the system
-directories. A scenario that needs something else says so in `## Environment`,
+[Step 3](#step-3--ab): a `PATH` of `claude`, `node`, `npm`, `npx`, `python3` and
+the system directories. A scenario that needs something else says so in `## Environment`,
 one declaration per line:
 
 ```
