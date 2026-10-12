@@ -171,7 +171,7 @@ container-credential variable needs no entry of its own.
 |-------|-----------|
 | You and your terminal | `HOME`, `USER`, `LOGNAME`, `SHELL`, `TERM`, `LANG`, `LC_*`, `TZ`, `TMPDIR`, `XDG_CONFIG_HOME` |
 | Claude Code's credentials and provider | `CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`, `CLAUDE_CODE_USE_*`, `ANTHROPIC_*` |
-| Cloud provider credentials | `AWS_*`, `GOOGLE_*`, `GCLOUD_*`, `CLOUDSDK_*`, `CLOUD_ML_REGION` |
+| Cloud provider credentials | `AWS_*`, `AZURE_*`, `GOOGLE_*`, `GCLOUD_*`, `CLOUDSDK_*`, `CLOUD_ML_REGION` |
 | Network | every variable ending in `_PROXY` or `_proxy` (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY` and their lowercase forms), `SSL_CERT_*`, `NODE_EXTRA_CA_CERTS`, `CURL_CA_BUNDLE`, `REQUESTS_CA_BUNDLE`, `NODE_TLS_REJECT_UNAUTHORIZED` |
 
 These are dropped even though a family would match them, or so that none ever

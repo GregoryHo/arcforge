@@ -487,3 +487,68 @@ describe('lintScenario: ## Environment', () => {
     ]);
   });
 });
+
+// A heredoc body and a fenced block are both arbitrary text. Whichever opened
+// first decides where it ends: the other's delimiters inside it are body text.
+describe('lintScenario: a heredoc and a code fence in one scenario', () => {
+  const { parseScenario } = require('../../scripts/lib/eval-scenario');
+  let dir;
+
+  beforeEach(() => {
+    dir = makeTempDir();
+  });
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  const scenario = (setup) =>
+    [
+      '# Eval: fence-and-heredoc',
+      '',
+      '## Setup',
+      ...setup,
+      '',
+      '## Context',
+      'Some context here.',
+      '',
+      '## Grader Config',
+      'Score based on output quality.',
+      '',
+      '## Assertions',
+      '- [ ] A1: The output is valid JSON',
+      '',
+      '## Environment',
+      'PATH-=/usr/sbin',
+      '',
+    ].join('\n');
+
+  it.each([
+    ['a tilde line', '~~~'],
+    ['a backtick line', '```'],
+    ['a tilde line with an info string', '~~~text'],
+  ])('reads every section after a Setup heredoc that writes %s', (_label, fenceLine) => {
+    const setup = ["cat > notes.md <<'EOF'", fenceLine, '## Not A Section', 'EOF', 'echo done'];
+    const file = writeScenario(dir, 'heredoc-opens-fence', scenario(setup));
+
+    expect(lintScenario(file)).toEqual([]);
+    const parsed = parseScenario(file);
+    expect(parsed.setup).toBe(setup.join('\n'));
+    expect(parsed.context).toBe('Some context here.');
+    expect(parsed.graderConfig).toBe('Score based on output quality.');
+    expect(parsed.assertions).toEqual(['A1: The output is valid JSON']);
+    expect(parsed.environment).toEqual(['PATH-=/usr/sbin']);
+  });
+
+  it('closes a fence on its own delimiter, whatever heredoc line it holds', () => {
+    const setup = ['```sh', 'cat > notes.md <<EOF', '## Not A Section', '```', 'echo done'];
+    const file = writeScenario(dir, 'fence-holds-heredoc', scenario(setup));
+
+    expect(lintScenario(file)).toEqual([]);
+    const parsed = parseScenario(file);
+    expect(parsed.setup).toBe(setup.join('\n'));
+    expect(parsed.context).toBe('Some context here.');
+    expect(parsed.assertions).toEqual(['A1: The output is valid JSON']);
+    expect(parsed.environment).toEqual(['PATH-=/usr/sbin']);
+  });
+});
