@@ -86,14 +86,17 @@ function baseDirectoryLine(dir) {
  * The copy keeps a link as it is, so such a link would hand the arm a path the
  * write check does not watch and the digest does not cover. The target is
  * followed, not read as text: a relative path can leave through another link.
- * @param {string} realRoot - The skill directory, symlinks resolved
+ * @param {string} realRoot - The directory the link must stay in, symlinks resolved
  * @param {string} entry - Path of an entry under it
+ * @param {string} [named] - The path the error names, when the entry is a copy
  */
-function refuseEscapingLink(realRoot, entry) {
+function refuseEscapingLink(realRoot, entry, named) {
   if (!fs.lstatSync(entry).isSymbolicLink()) return;
   const target = fs.readlinkSync(entry);
+  const where = named ? ' once the directory is copied' : '';
+  const link = named || entry;
   if (path.isAbsolute(target)) {
-    throw new Error(`Cannot stage ${entry}: its link target ${target} is an absolute path`);
+    throw new Error(`Cannot stage ${link}: its link target ${target} is an absolute path`);
   }
   let real;
   try {
@@ -101,13 +104,13 @@ function refuseEscapingLink(realRoot, entry) {
     real = fs.realpathSync.native(entry);
   } catch (err) {
     throw new Error(
-      `Cannot stage ${entry}: its link target ${target} does not resolve (${err.code})`,
+      `Cannot stage ${link}: its link target ${target} does not resolve${where} (${err.code})`,
     );
   }
   const rel = path.relative(realRoot, real);
   if (rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) {
     throw new Error(
-      `Cannot stage ${entry}: its link target ${target} is outside the skill directory`,
+      `Cannot stage ${link}: its link target ${target} is outside the skill directory${where}`,
     );
   }
 }
@@ -115,7 +118,9 @@ function refuseEscapingLink(realRoot, entry) {
 /**
  * Copy the directory a skill file sits in to a fresh directory under the
  * system temp dir. A symlink is copied as a link, and refused unless its
- * target is a relative path that resolves inside the directory.
+ * target is a relative path that resolves inside the directory, both where the
+ * directory sits and in the copy: `../<the directory's name>/x` stays inside the
+ * first and leaves the second.
  * @param {string} skillFile - Absolute path to the skill file
  * @returns {string} Absolute path of the copy
  */
@@ -136,6 +141,10 @@ function stageSkillDir(skillFile) {
         return true;
       },
     });
+    const realStaged = fs.realpathSync.native(staged);
+    for (const entry of fs.readdirSync(staged, { recursive: true })) {
+      refuseEscapingLink(realStaged, path.join(staged, entry), path.join(source, entry));
+    }
   } catch (err) {
     removeStagedDir(staged);
     throw new Error(`Failed to stage skill files from ${source}: ${err.message}`);

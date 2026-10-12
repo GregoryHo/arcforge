@@ -472,6 +472,18 @@ describe('buildInjection', () => {
       );
     });
 
+    it('refuses a target that stays inside only by naming the directory itself', () => {
+      // Resolves in the source; in the copy, whose name differs, it is a path outside.
+      fs.mkdirSync(path.join(dir, 'sub'));
+      fs.symlinkSync('../../demo/references/verify.sh', path.join(dir, 'sub', 'link.sh'));
+      expect(fs.readFileSync(path.join(dir, 'sub', 'link.sh'), 'utf8')).toBe('echo demo\n');
+      const [staged] = stagedBy(path.join('sub', 'link.sh'));
+      expect(() => stageSkillDir(path.join(dir, 'SKILL.md'))).toThrow(
+        /once the directory is copied/,
+      );
+      expect(fs.existsSync(staged)).toBe(false);
+    });
+
     it('keeps a link whose target is inside the directory', () => {
       fs.symlinkSync('references/verify.sh', path.join(dir, 'link.sh'));
       const staged = stageSkillDir(path.join(dir, 'SKILL.md'));

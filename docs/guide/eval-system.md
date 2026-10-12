@@ -326,6 +326,10 @@ the directory too. `eval ab` and `eval preflight` refuse to stage a directory
 holding a link whose target is an absolute path, resolves outside the
 directory, or does not resolve, and name the link. Through such a link an arm
 would reach files the write check does not watch and the digest does not cover.
+The target is checked again in the copy. A link that stays inside only by naming
+the directory itself (`../my-skill/run.sh` from a subfolder of `my-skill`) is
+refused, and so is a link into a folder staging leaves out, since neither
+resolves inside the copy.
 
 The files belong to the injection. The baseline is injected with nothing, so it
 gets no copy and no line, and cannot list one from inside its trial directory.
