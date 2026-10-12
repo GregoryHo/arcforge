@@ -8,7 +8,7 @@
   2. 三項量測因為同一個引擎缺口被擱置：verify-exit 句子（D-057）、#185、#184 都需要「skill 的檔案只給 treatment、放在 trial 樹外」，verify-exit 與 #185 另外需要「兩份 skill 文字之間的 A/B」與「scenario 可宣告的 trial 環境」（`docs/plans/v6.4/wp-d/design-gate.verify-exit.md` 末節）。
   3. 6.4.0 讓 archive 回來了，但新 session 開始時沒有任何 hook 讀它（D-056 的 Residual；D-031 把這個承諾拿掉、留成 wish `session-continuity-injection`）。
 
-產品狀態的正本在 `product/`：6.5.0 的列、D-059 到 D-062、四份 spec 的 B-item（eval B-15 到 B-21、hooks B-8、skill-system B-11 與 B-12、obsidian B-10）。本文件是排程與執行方式；兩者不一致時以 decision 為準。
+產品狀態的正本在 `product/`：6.5.0 的列、D-059 到 D-062、五份 spec 的 B-item（eval B-15 到 B-21、hooks B-8、skill-system B-11 與 B-12、obsidian B-10、cli B-9）。本文件是排程與執行方式；兩者不一致時以 decision 為準。
 
 ## 已定案（維護者 2026-10-12 決定）
 
@@ -77,9 +77,9 @@ D-062（儀器），七項：
 |---|---|---|---|
 | WP-P product | D-059 到 D-062、roadmap 的 6.5.0 列（`next`）、B-item、墓碑、本文件與 `README.md` | 全部 | 本 PR |
 | WP-A 儀器 | D-062 的七項，五個 PR（A1 到 A5），見下方 | eval B-15 到 B-21 | A1 #287、A2 #284、A3 #286、A4 #281、A5 #288 |
-| WP-B session 延續 | D-061：`inject-context.js` 的一行指引 | hooks B-8 | #282 |
+| WP-B session 延續 | D-061：`inject-context.js` 的一行指引 | hooks B-8、cli B-9 | #282 |
 | WP-C `sessions` 瘦身 | D-059 第 1 點：`SKILL.md` 206 → ≤150，`references/` | skill-system B-12 | #283 |
-| WP-D 量測 | D-059 第 2 到 7 點：四道設計關卡 → 預先登記的 decision → 一輪 → 稽核 → 結果的 decision | skill-system B-11、obsidian B-10 | — |
+| WP-D 量測 | D-059 第 2 到 7 點：五道設計關卡（含有條件的 D5）→ 預先登記的 decision → 一輪 → 稽核 → 結果的 decision | skill-system B-11、obsidian B-10 | — |
 | WP-E 發版 | `releasing` skill | — | — |
 
 ### WP-A 儀器
@@ -152,12 +152,12 @@ PR #283。
 - 搬到 `references/`：handover 範本區塊（:40-58）、CLI 列表（:83-85、:102-109）、引擎拒絕規則（:87-95）、when-to-compact 表（:160-168）、what-survives 表（:172-177）。
 - 留在本體：步驟與勾選、Persist first、紅旗表（行為指示）。目標 ≤150 行。
 - D1 §4.3 仍成立（檔案都在 skill 目錄內）。不加任何關於 SessionStart 指引的句子：指引本身就寫了要跑什麼。
-- qa 對 #283 的發現（已記入 D-059 的 Residual）：handover 範本與兩張 compaction 表搬走之後，`eval-sessions-handover-completeness` 與 `eval-compacting-persist-before-compact` 的 treatment 文字不再帶有它們。這兩支不在本輪，所以瘦身後的 handover 撰寫與 compaction 路徑未量測，既有 pool 描述的是瘦身前的文字；日後重跑要加 `--stage-skill-files`（eval B-19）。`eval-compacting-persist-before-compact.md` 的設計註記寫時序表「carried over unchanged」，瘦身後已過時，等該 scenario 下次改版時更正，不在本輪。
+- qa 對 #283 的發現（已記入 D-059 的 Residual）：handover 範本與兩張 compaction 表搬走之後，`eval-sessions-handover-completeness` 與 `eval-compacting-persist-before-compact` 的 treatment 文字不再帶有它們。後者不在本輪，所以瘦身後的 compaction 路徑未量測；前者只以有條件的 D5 進入本輪：D5 有跑，handover 撰寫路徑就有一筆帶 staged 檔案、自成一池的讀數，D5 沒跑（額度不夠、關卡判定 NOT MEASURABLE 或 preflight BLOCK）則同樣未量測。兩種情況下既有 pool 描述的都是瘦身前的文字；日後重跑要加 `--stage-skill-files`（eval B-19）。`eval-compacting-persist-before-compact.md` 的設計註記寫時序表「carried over unchanged」，瘦身後已過時，等該 scenario 下次改版時更正，不在本輪。
 - 這是 skill 編輯，必須在量測輪之前合併。非回歸由 D1 承擔；D-059 的 Residual：D1 只量 B-11、只注入 `SKILL.md`，搬到 `references/` 的內容不在 treatment 面前。
 
 ### WP-D 量測
 
-設計關卡先於 session：每項先寫離線關卡文件 `docs/plans/v6.5/wp-d/design-gate.<項目>.md`（照 v6.4 的格式：受測句子、引擎事實、逐題回答、判定、帳本文字），交給獨立審查者攻擊。四個關卡都在 A3、A5 合併之後寫，因為要引用新引擎的實際行為，行號以合併後的 `main` 為準。
+設計關卡先於 session：每項先寫離線關卡文件 `docs/plans/v6.5/wp-d/design-gate.<項目>.md`（照 v6.4 的格式：受測句子、引擎事實、逐題回答、判定、帳本文字），交給獨立審查者攻擊。五個關卡（D1 到 D4，加上有條件的 D5）都在 A3、A5 合併之後寫，D5 的那份另外要等 WP-C 合併，因為要引用新引擎的實際行為，行號以合併後的 `main` 為準。
 
 **D1 `sessions` V2（B-11，真 archive）。** scenario：`eval-sessions-handover-and-resume` V1 → V2，pool 清空，V1 的讀數留在帳本。
 
@@ -189,7 +189,7 @@ PR #283。
 - 關卡要寫明：拿舊 reference 的 baseline 除了抄 200 px 之外還能做什麼。分隔線淨空 ≥30 作輔助斷言。
 - `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000`；k=5 兩臂約 2 小時。
 
-**D5 `sessions` handover 撰寫（有條件）。** `eval-sessions-handover-completeness` 的現行 Version，不改 scenario 檔，加 `--stage-skill-files`，所以自成一池（eval B-19），不與瘦身前的 pool 合併。只在 D1 到 D4 結束時花掉的 session 不超過 67 才跑；preflight 3、A/B 10、不補跑。不跑就維持 D-059 的 Residual。D5 不新增 scenario，跑或不跑都要寫進預先登記的 decision。
+**D5 `sessions` handover 撰寫（有條件）。** `eval-sessions-handover-completeness` 的現行 Version，不改 scenario 檔，加 `--stage-skill-files`，所以自成一池（eval B-19），不與瘦身前的 pool 合併。D5 與其他四項一樣有離線設計關卡（`design-gate.sessions-handover-writing.md`），與另外四份同時寫，判定 NOT MEASURABLE 就花 0 個 session。只在 D1 到 D4 結束時花掉的 session 不超過 67 才跑；preflight 3、A/B 10、不補跑。不跑就維持 D-059 的 Residual。D5 不新增 scenario，跑或不跑都要寫進預先登記的 decision。
 
 **#184、#185 的處置**：量到結果就關閉，留言附帳本連結；關卡判定 NOT MEASURABLE 就維持開啟，留言寫判定與缺的引擎能力。verify-exit 沒有 issue，結果只進帳本與結果的 decision。
 
@@ -208,7 +208,7 @@ PR #283。
 - A3 的證明：`eval-trial-isolation.test.js` 斷言 exec mock 的 env 沒有 operator 的 `PATH` 項、有 `## Environment` 宣告的項；一個真 trial 裡 `which arcforge` 是空的（D1 的 `## Environment` 加回去後才有）。
 - A5 的證明：treatment 的 prompt 有 base-directory 行且路徑在 `os.tmpdir()`，baseline 沒有；`ls ../..` 在 trial 內列不到 staged 目錄。
 - WP-B 的證明：暫時專案加一份植入的 archive，`claude --plugin-dir . -p` 的 `--debug` log 看到 SessionStart 的 `additionalContext` 含那一行；沒有 archive 的專案沒有。
-- WP-D：四份關卡文件、預先登記的 decision、每列稽核、帳本「6.5.0 量測輪」一節、結果的 decision；`eval report` 之後 freshness check 綠。
+- WP-D：五份關卡文件（含 D5）、預先登記的 decision、每列稽核、帳本「6.5.0 量測輪」一節、結果的 decision；`eval report` 之後 freshness check 綠。
 - WP-E：post-release 查核表每一項都有結果。
 
 ## 順序限制
@@ -240,7 +240,7 @@ PR #283。
 | preflight 出錯重跑（整輪至多 2 次） | 6 | 0 | 6 |
 | 最壞情況 | 18 | 56 | 74 |
 
-最壞情況 74，不超過上限約 80。D5（13 個 session）不在這張表裡：D1 到 D4 花掉的不超過 67 才跑，而且額度不夠時先放棄 D5，不動 D1 到 D4 的補跑。這張表是排程用的骨架；正式的預先登記是 `Refines: D-059` 的那條 decision，在四道關卡判定之後、讀任何結果之前寫，被判 NOT MEASURABLE 的項目在那裡記成 0。
+最壞情況 74，不超過上限約 80。D5（13 個 session）不在這張表裡：D1 到 D4 花掉的不超過 67 才跑，而且額度不夠時先放棄 D5，不動 D1 到 D4 的補跑。這張表是排程用的骨架；正式的預先登記是 `Refines: D-059` 的那條 decision，在五道關卡判定之後、讀任何結果之前寫，被判 NOT MEASURABLE 的項目在那裡記成 0。
 
 **規則**（沿用 v6.4 PLAN，收窄）：
 

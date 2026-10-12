@@ -1834,7 +1834,10 @@ reverse one, append a superseding entry (see AGENTS.md).
   `eval-sessions-handover-completeness` runs at its current Version with
   `--stage-skill-files`, a preflight of 3 and an A/B of 10 with no top-up,
   so that the trimmed handover-writing path has an A/B whose treatment sees
-  the moved template; otherwise that path stays the Residual below. It runs
+  the moved template; otherwise that path stays the Residual below. It is
+  gated like the other four: its design gate is written with theirs,
+  before any session, and a NOT MEASURABLE verdict there drops it at 0
+  sessions. It runs
   last, and it is dropped before any top-up of (i) to (iv) is. The
   round is serial — one live eval per checkout (D-058) — so a measurement
   starts only when the one before it has ended.
@@ -1868,18 +1871,25 @@ reverse one, append a superseding entry (see AGENTS.md).
   preflight record up by the file's hash (D-055); nothing here needs to edit
   it, and an edit would cost a preflight and an A/B, 13 sessions, against a
   cap the four measurements already use most of.
-- Residual: the trim's non-regression rests on (i) alone, and (i) measures
+- Residual: the trim's non-regression rests on (i), and on the conditional
+  fifth measurement where it runs. (i) measures
   B-11 only, with `SKILL.md` injected and no skill files staged, so the
   material moved into `references/` is not in front of the treatment; the
-  handover, save and compaction instructions get no A/B. If (i)'s gate ends
+  save and compaction instructions get no A/B, and the handover
+  instructions get one only where the fifth measurement runs. If (i)'s gate ends
   NOT MEASURABLE or its preflight BLOCKs, the trim ships on the skill
   structure tests. The trim moves the handover template and both compaction
   tables out of `SKILL.md`, and a skill-scope A/B injects `SKILL.md` alone,
   so from then on the treatment text of
   `eval-sessions-handover-completeness` and
-  `eval-compacting-persist-before-compact` carries neither; those two
-  scenarios are not in this round, so the trimmed handover-writing and
-  compaction paths ship unmeasured, their existing pools describe the text
+  `eval-compacting-persist-before-compact` carries neither. The second is
+  not in this round, so the trimmed compaction path ships unmeasured. The
+  first is in it only as the conditional fifth measurement: where that
+  runs, the trimmed handover-writing path has a reading with the skill's
+  files staged, in a pool of its own; where it does not — the sessions did
+  not fit, its gate ended NOT MEASURABLE, or its preflight BLOCKed — that
+  path ships unmeasured too. Either way the existing pools of both
+  scenarios describe the text
   from before the trim, and a later run of either must stage the skill's
   files ([eval](specs/eval.md) B-19) for the references to reach the
   injected arm. The second scenario's design note that the timing table is
@@ -1906,7 +1916,8 @@ reverse one, append a superseding entry (see AGENTS.md).
   a time costs wall-clock time, and (iv) is planned under a 1800 s trial
   ceiling, reported as eval B-10 requires. The instrument and hook changes
   reach users only after the round.
-- Verification: one design-gate document per measurement under
+- Verification: one design-gate document per measurement, the conditional
+  fifth included, under
   `docs/plans/v6.5/wp-d/`; the pre-registration entry; the round's preflight
   records and A/B pools, written down the way D-058's were, with the operator
   audit of every row in a 6.5.0 section of `evals/skill-eval-coverage.md`;
@@ -2183,5 +2194,5 @@ reverse one, append a superseding entry (see AGENTS.md).
   staged differently in two pools; and
   `eval compare --no-analyzer` spawning no session. `npm run check:docs`
   holds each new flag to the CLI manifest. The live proofs are a second preflight refused
-  while a first runs, and the four design gates of D-059, which cite the
+  while a first runs, and the design gates of D-059, which cite the
   merged engine.
