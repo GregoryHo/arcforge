@@ -5,12 +5,20 @@
  * snapshots the project around every trial, so a record the other run writes
  * (under `evals/preflight/`, say) reads as the trial's own write and stops the
  * run. `eval run`, `eval preflight` and `eval ab` therefore hold this lock for
- * as long as they run.
+ * as long as they run, and `eval report` while it writes its benchmark.
  *
  * Unlike `locking.js` it never waits and never expires by age: a run takes
  * minutes to hours, so a second run is refused at once, and a lock is reclaimed
  * only when the process that wrote it is gone. The lock file sits under
  * `.eval-trials/`, which the write guard skips and `.gitignore` covers.
+ *
+ * Residuals, neither prevented here:
+ * - A lock whose PID was reused by an unrelated process is refused until the
+ *   file is removed by hand.
+ * - The lock follows the eval process, not its trial. A trial is a synchronous
+ *   `claude` child, which a plain `kill <pid>` of the eval does not reach, so a
+ *   run killed mid-trial can leave that child alive; the next run finds a dead
+ *   holder and reclaims the lock while the orphan may still be writing.
  *
  * Zero external dependencies — Node.js standard library only.
  */

@@ -189,12 +189,16 @@ Nothing waits or retries: rerun once the first run is done, or run the second
 eval from another checkout of the project (a git worktree counts, since each
 has its own `.eval-trials/`). The lock never expires by age, because a run can
 take hours. A run that was killed leaves its lock behind, and the next run
-takes it over once the process it names no longer exists. The one case left to
-you is a lock whose PID now belongs to some unrelated process: the refusal
-names the file, and deleting it clears it. Two rarer refusals say the same
-thing in other words: a lock file that names no process, and a leftover
-`.eval-trials/run.lock.reclaim` from a run that died while taking over a dead
-lock. Each message names the file to remove. The remaining subcommands (`list`,
+takes it over once the process it names no longer exists. Two cases are left
+to you. One is a lock whose PID now belongs to some unrelated process: the
+refusal names the file, and deleting it clears it. The other is a run killed
+with its trial still running, which can leave the trial's `claude` process
+alive: the lock is reclaimed on the holder's death, not the trial's, so check
+`ps` for a leftover `claude` process before starting the next run. Two rarer
+refusals say the same thing in other words: a lock file that names no process,
+and a leftover `.eval-trials/run.lock.reclaim` from a run that died while
+taking over a dead lock. Each message names the file to remove. The remaining
+subcommands (`list`,
 `lint`, `compare`, `history`, `audit`, `dashboard`) write nothing the check
 covers, never take the lock, and run alongside a live eval.
 

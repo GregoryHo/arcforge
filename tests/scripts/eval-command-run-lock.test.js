@@ -1,6 +1,6 @@
 /**
- * eval-command-run-lock.test.js - `eval run`, `eval preflight` and `eval ab`
- * hold the checkout's run lock; a second live eval is refused.
+ * eval-command-run-lock.test.js - `eval run`, `eval preflight`, `eval ab` and
+ * `eval report` hold the checkout's run lock; a second live eval is refused.
  *
  * The lib's trial runners are replaced so no `claude` session is spawned.
  */
@@ -298,6 +298,35 @@ describe('eval run lock', () => {
 
       expect(result.stderr).toContain('Error: arm failed');
       expect(result.status).toBe(1);
+      expect(fs.existsSync(lockPath)).toBe(false);
+    });
+
+    it.each([
+      ['writing its benchmark exits 0', 'return generate(...a);', 0],
+      ['failing mid-write exits 1', `throw new Error('write failed');`, 1],
+    ])('eval report %s and leaves no lock file', (_label, afterHeld, status) => {
+      const result = spawnSync(
+        process.execPath,
+        [
+          '-e',
+          `const benchmarkLib = require(${JSON.stringify(path.join(libDir, 'lib/eval-benchmark'))});
+           const generate = benchmarkLib.generateBenchmark;
+           benchmarkLib.generateBenchmark = (...a) => {
+             if (!require('node:fs').existsSync(${JSON.stringify(lockPath)})) throw new Error('lock not held');
+             ${afterHeld}
+           };
+           const { runEvalCommand } = require(${JSON.stringify(path.join(libDir, 'cli/eval-command'))});
+           runEvalCommand(
+             { positional: ['report'], options: {}, flags: {} },
+             { projectRoot: ${JSON.stringify(tempDir)}, asJson: false },
+           ).catch((err) => { console.error('Error: ' + err.message); process.exit(1); });`,
+        ],
+        { encoding: 'utf8' },
+      );
+
+      expect(result.stderr).not.toContain('lock not held');
+      if (status === 1) expect(result.stderr).toContain('Error: write failed');
+      expect(result.status).toBe(status);
       expect(fs.existsSync(lockPath)).toBe(false);
     });
   });

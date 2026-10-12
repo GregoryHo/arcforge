@@ -107,6 +107,15 @@ describe('acquireRunLock', () => {
     expect(JSON.parse(fs.readFileSync(lockPath, 'utf8')).pid).toBe(process.ppid);
   });
 
+  it('treats a process it may not signal as alive, and leaves its lock in place', () => {
+    // PID 1 always exists; signalling it fails with EPERM for any user but root.
+    const init = { pid: 1, started: '2026-10-01T00:00:00.000Z', command: 'eval ab other-user' };
+    plant(init);
+
+    expect(() => acquireRunLock(root, 'eval run demo')).toThrow('PID 1,');
+    expect(JSON.parse(fs.readFileSync(lockPath, 'utf8'))).toEqual(init);
+  });
+
   it('refuses a lock file that names no process, and leaves it in place', () => {
     plant('not json');
 
