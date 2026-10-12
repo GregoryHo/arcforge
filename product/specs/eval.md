@@ -200,23 +200,34 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   worktrees do not exclude each other; and a recycled process id can make a
   dead lock read as held.
 - **B-16 Preflight writes a result row per trial, apart from every pool
-  (6.5.0).** Each preflight trial leaves a result row in its run's directory
-  under `evals/results/` — its grade, its assertion results, the conditions
-  it ran under, and any `infraError` or `gradeError` — under a label of its
-  own. No reader of pools returns that row: not `eval list`, not the verdict
+  (6.5.0).** Each preflight trial leaves a result row in its run's directory,
+  `evals/results/<scenario>/<runId>/preflight.jsonl` — its grade, its
+  assertion results, the conditions it ran under, and any `infraError` or
+  `gradeError` — under a condition label of its own, `preflight`, with its
+  transcript beside it as `preflight-trial-<n>.txt`. A preflight trial that
+  wrote to the repository has its row recorded and the preflight then
+  stops, as an A/B arm does (B-7). No reader of pools returns that row: not `eval list`, not the verdict
   `eval run` prints, not `eval compare`, not `eval report`, not the
   dashboard. So a preflight trial's grade is read from its row, not rebuilt
   from the trial's end state, and a preflight never moves an A/B verdict or
   a benchmark. The record under `evals/preflight/` stays what the `eval ab`
-  gate reads (B-2, B-3) (D-062).
-- **B-17 Every row names the Node version and the scenario hash (6.5.0).**
-  Every result row — A/B, `eval run` and preflight — and every preflight
-  record carries the Node version that ran the engine and the hash of the
-  scenario file as the run found it. Neither is a pooling condition: B-8's
-  conditions are unchanged, a pool is split neither by a Node upgrade nor by
-  a cosmetic edit to a scenario, and rows written before 6.5.0, which carry
-  neither, pool as they did. The two fields are there so a reader can see
-  that a pool mixes them, not so the engine refuses one that does (D-062).
+  gate reads (B-2, B-3). Because a row file's name ends in its condition, a
+  scenario whose name ends in `-baseline`, `-treatment` or `-preflight` is
+  refused before any session and reported by `eval lint`; no shipped
+  scenario has such a name (D-062).
+- **B-17 Every row names the Node version, the scenario hash and the
+  repository commit (6.5.0).** Every result row — A/B, `eval run` and
+  preflight, error rows included — and every preflight record carries the
+  Node version that ran the engine (`node_version`), the hash of the
+  scenario text the run's trials were built from, computed once per run
+  (`scenario_hash`), and the commit of the checkout the trials ran from
+  (`repo_commit`, null outside a git repository). The raw benchmark export
+  carries all three, null for rows written before 6.5.0. None is a pooling
+  condition: B-8's conditions are unchanged, a pool is split neither by a
+  Node upgrade, nor by a cosmetic edit to a scenario, nor by a new commit,
+  and rows written before 6.5.0, which carry none of them, pool as they
+  did. The three fields are there so a reader can see that a pool mixes
+  them, not so the engine refuses one that does (D-062).
 - **B-18 A trial's environment is built, not inherited (6.5.0).** The engine
   starts each contained trial session, and its fixture `Setup`, with an
   environment it builds from an allowlist: the identity, shell, locale and
@@ -341,7 +352,7 @@ complete, provider refusal) — and `scorableResults` in `eval-stats.js` drops e
 `gradeError` row from every scored pool (`eval run`, A/B, benchmark), while
 preflight fails closed on the same flags (B-10). Every result row records
 `trialTimeoutMs`, the ceiling its trial ran under, so a pool that mixes ceilings
-can be seen from its rows. From 6.5.0 a row also records the Node version, the
+can be seen from its rows. From 6.5.0 a row also records the Node version, the repository commit, the
 scenario hash, the scenario's declared trial environment, whether skill files were
 staged, and a hash of the text its arm was injected with (B-17 to B-20). Of those,
 only staging and the baseline's text are pool conditions, and
@@ -394,6 +405,7 @@ its rationale is inline at B-10.
   design gate and runs them one at a time, the router scenario not among
   them (B-3, B-15).
 - **D-062** — 6.5.0's instrument: the run lock, preflight rows, the Node
-  version and scenario hash on every row, a built trial environment a
+  version, scenario hash and repository commit on every row, a built trial
+  environment a
   scenario can declare, staged skill files, a two-text A/B, and a compare
   that can skip the analyzer (B-8, B-15 to B-21).

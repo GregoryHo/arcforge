@@ -2004,11 +2004,15 @@ reverse one, append a superseding entry (see AGENTS.md).
   lock under `.eval-trials/` that records the holder's process id, a second
   one in the same checkout is refused at once with the holder named, and a
   lock whose process is gone is reclaimed. (b) Preflight writes a result row
-  for each trial, under a label of its own that no A/B pool, `eval report`,
-  `eval list` or the dashboard reads. (c) Every result row and every
-  preflight record carries the Node version that ran the engine and the
-  scenario file's hash (`node_version` and `scenario_hash` in the preflight
-  record's spelling); neither is a pooling condition, so eval B-8's
+  for each trial, to `preflight.jsonl` in its run's directory under the
+  condition label `preflight`, which no A/B pool, `eval report`,
+  `eval list` or the dashboard reads; since a row file's name ends in its
+  condition, a scenario name ending in `-baseline`, `-treatment` or
+  `-preflight` is refused. (c) Every result row and every
+  preflight record carries the Node version that ran the engine, the hash
+  of the scenario text the trials were built from, and the commit of the
+  checkout they ran from (`node_version`, `scenario_hash` and
+  `repo_commit`); none is a pooling condition, so eval B-8's
   conditions do not change. (d) A trial's environment is rebuilt rather than
   inherited: a contained trial and its fixture setup get an allowlist — the
   identity, shell and locale variables, what the session authenticates and
@@ -2046,12 +2050,13 @@ reverse one, append a superseding entry (see AGENTS.md).
   (D-054, D-058). The label has to be its own because a preflight trial runs
   under the scenario's bare name, the name `eval run` writes and `eval list`
   falls back to. (c) D-054's verification recorded the Node version and
-  commit by hand. Neither field pools because neither changes the question a
-  row answers: Node runs the engine, not the model, and making it a
+  commit by hand. None of the three fields pools because none changes the
+  question a row answers: Node runs the engine, not the model, and making it a
   condition would split every pool at the next Node upgrade and orphan the
   6.3.0 and 6.4.0 pools, whose rows carry none; the scenario's `## Version`
   is already what says a meaning changed, and the hash also moves on a
-  cosmetic edit (B-8). Recorded, they let a reader see a mixed pool without
+  cosmetic edit (B-8); and the commit moves on every merge, whatever it
+  touched. Recorded, they let a reader see a mixed pool without
   the engine refusing it. (d) One 6.3.0 trial resolved `arcforge` from the
   operator's `PATH` and ran it (D-054), so what a trial can run depended on
   whose machine ran it. Rebuilding `PATH` makes that the scenario's
