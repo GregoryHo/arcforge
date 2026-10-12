@@ -33,9 +33,11 @@
 
 **PLAN 的形狀（手排版面，走 manual fallback 存檔）可量嗎？** 不可量。存檔之後 skill 要求 verify（事實 4），verify 是 `uv run`，`uv run` 寫 `.venv` 進 staged 複本（事實 3）。照 skill 做的 trial 會成為 `trial_wrote_skill_files`，那一列不計分。`uv` 若解析不到，現行 `SKILL.md:169` 叫 agent 先裝，裝完同樣走到 `uv run`。這不分臂，所以不是偏差，而是整輪拿不到可計分的列。
 
-**那什麼形狀可量？** 只交出座標計畫。#182 改的是 Phase 1 的格線，影響發生在「決定 x、y」那一刻，之後的建置、render、存檔都與這個檔案無關。使用者要求先看座標計畫、暫不建置，是平常會出現的要求，也讓 `uv` 沒有出場的理由。prompt 例：
+**那什麼形狀可量？** 只交出座標計畫。#182 改的是 Phase 1 的格線，影響發生在「決定 x、y」那一刻，之後的建置、render、存檔都與這個檔案無關。使用者要求先看座標計畫、暫不建置，是平常會出現的要求，也讓 `uv` 沒有出場的理由。prompt（合併進 `main` 的 Version 1，#293）：
 
-> I want an Excalidraw diagram of our ingest pipeline for the team vault, but before you build anything, give me the coordinate plan to review: write it to `layout.json` at the top of this project folder — use the full absolute path, not a relative one — as a list of `{id, label, x, y, width, height}` for every shape, plus `{id, type: "separator", y}` for any zone separator. Don't build, render or save a diagram yet. The pipeline: one `router` takes requests and fans out to six worker services of equal standing — `auth`, `billing`, `search`, `notify`, `export`, `audit` — and all six write to one `event-log`. Top zone: router. Middle zone: the six workers, side by side. Bottom zone: the event log.
+> I want an Excalidraw diagram of our ingest pipeline for the team vault, but before you build anything, give me the coordinate plan to review: write it to `layout.json` at the top of this project folder — use the full absolute path, not a relative one — as a JSON array of elements, each `{"id", "type", "x", "y", "width", "height"}` with `type` one of `"box"`, `"label"` or `"connector"`, plus `{"id", "type": "separator", "y"}` for any zone separator. Each service gets exactly one `"box"`, and that box's `id` is the service's name as written below. Don't build, render or save a diagram yet. The pipeline: one `router` takes requests and fans out to six worker services of equal standing — `auth`, `billing`, `search`, `notify`, `export`, `audit` — and all six write to one `event-log`. Top zone: router. Middle zone: the six workers, side by side. Bottom zone: the event log.
+
+本關卡原先的草稿只要求每個 shape 一筆 `{id, label, x, y, width, height}`，grader 得從形狀的大小與名稱猜哪一個是 worker 的方塊；#293 的五輪 Codex 審查，每一輪都找到一份讓這個猜測判錯的計畫，兩個方向都有。合併的版本改成指定 schema：每個服務恰有一個 `"type": "box"`、`id` 就是服務名稱，grader 只讀這些元素。這一句兩臂讀到的完全相同，沒有提到方塊該放在哪裡，間距 ≥40 的斷言一個字都沒變。
 
 這段話沒有提到間距、格線、40、200 或 220。prompt 是固定文字，寫不出 trial 目錄的實際路徑，所以用「this project folder」指明位置並要求絕對路徑；原因在「殘餘風險」的前兩項。六個同層元素排一列是版面本身的要求，不是提示；它們彼此之間沒有箭頭。
 
@@ -92,5 +94,5 @@ MEASURABLE，條件四項：(1) task 只要座標計畫，prompt 明說暫不建
 - **旗標**（preflight 與 A/B 相同，前面都加 `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000`）：`--model 'opus[1m]' --effort xhigh --stage-skill-files --baseline-skill-file <baseline 目錄>/SKILL.md`。baseline 目錄是現行 skill 目錄，只把 `references/layout-heuristics.md` 換成 `1fed56d0~1` 的版本。
 - **`## Max Turns`**：不設，或設得寬（30）；設了就會進 preflight 的鍵。
 - **k**：preflight 3；`## Trials` 5，兩臂共 10。寫進 staged 複本的列不計分，由 2 次 `--k 1` 的補跑補上。
-- **Grader**：code，`python3 -I`，讀 `$TRIAL_DIR/layout.json`。單一計分標籤 `A1`：檔案存在且可解析；六個 worker 都在，數值有限且寬高為正；六個的垂直範圍兩兩重疊（同一列）；依 `x` 排序後相鄰兩個的間距都 ≥40。印出但不計分：`-- C2:` 每條分隔線與最近元素的距離是否 ≥30；`-- audit:` 六個寬度、相鄰間距、欄距、有沒有 `Read` staged 的 `layout-heuristics.md`、有沒有讀 trial 樹外的路徑、有沒有 `uv` 指令。檔案不存在或不可解析記 FAIL，不是 grade error：agent 被要求交出這個檔案。
+- **Grader**：code，`python3 -I`，讀 `$TRIAL_DIR/layout.json`。單一計分標籤 `A1`：檔案存在、可解析，而且是 JSON 陣列；六個 worker 各有恰好一個 `"type": "box"` 且 `id` 等於服務名稱的元素，數值有限且寬高為正（label 與 connector 依宣告的 `type` 略過，不看大小或名稱）；六個的垂直範圍兩兩重疊（同一列）；依 `x` 排序後相鄰兩個的間距都 ≥40。印出但不計分：`-- C2:` 每條分隔線與最近元素的距離是否 ≥30；`-- audit:` 六個寬度、相鄰間距、欄距、有沒有 `Read` staged 的 `layout-heuristics.md`、有沒有讀 trial 樹外的路徑、有沒有 `uv` 指令。檔案不存在、不可解析或不符合指定的 schema 記 FAIL，不是 grade error：agent 被要求交出這個檔案。
 - **鑑別用的斷言**：`A1`。baseline 失敗的方式是行為：它打開舊 reference、把 180 寬的元素放上 200 的格線。它不必知道任何只有 treatment 看得到的名稱或數字就能通過，40 寫在它自己那份檔案的表裡。treatment 通過也是行為：它得把選的寬度與格線配成 40 以上，配錯同樣失敗。
