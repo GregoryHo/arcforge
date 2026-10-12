@@ -10,7 +10,8 @@
  */
 
 const fs = require('node:fs');
-const { parseScenario, reservedNameError } = require('./eval-scenario');
+const { parseScenario, reservedNameError, scenarioSections } = require('./eval-scenario');
+const { environmentLines, parseEnvironment } = require('./eval-trial-environment');
 
 /**
  * Required section headings (## level) that every scenario file must have.
@@ -32,49 +33,43 @@ const REQUIRED_SECTIONS = ['Context', 'Grader Config', 'Assertions'];
 const ASSERTION_ID_RE = /^(A\d+\s*[:–-]|\[tool_\w+\])/;
 
 /**
- * Parse a markdown file into lines and collect:
- *   - sections: Map<lowerName, { startLine: number }>
+ * Collect what the checks below read, from the sections the trial itself parses
+ * (a heading inside a code fence or a heredoc is not a section):
+ *   - sections: Map<lowerName, { startLine: number, lines: string[] }>
  *   - assertionLines: Array<{ text: string, line: number }>  (inside ## Assertions)
+ *   - environmentLines: Array<{ text: string, line: number }>  (inside ## Environment)
  *
  * @param {string} content - File content
- * @returns {{ sections: Map<string, { startLine: number }>, assertionLines: Array<{ text: string, line: number }> }}
+ * @returns {{ sections: Map<string, { startLine: number, lines: string[] }>, assertionLines: Array<{ text: string, line: number }>, environmentLines: Array<{ text: string, line: number }> }}
  */
 function parseScenarioStructure(content) {
-  const lines = content.split('\n');
-  const sections = new Map();
+  const sections = scenarioSections(content);
   const assertionLines = [];
-  let inAssertions = false;
+  const assertions = sections.get('assertions') || { startLine: 0, lines: [] };
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const lineNumber = i + 1; // 1-indexed
+  assertions.lines.forEach((line, offset) => {
+    // Capture assertion bullets: - [ ] ... or - [x] ... or - [tool_*] ...
+    const bulletMatch = line.match(/^-\s*\[([^\]]*)\]\s*(.*)/);
+    if (!bulletMatch) return;
+    const bracketContent = bulletMatch[1].trim();
+    const remainder = bulletMatch[2].trim();
+    // Behavioral markers like [tool_called] are prefix tokens that
+    // ASSERTION_ID_RE expects to find on the assertion text. Checkbox
+    // brackets ([ ], [x], [X]) are markdown plumbing and must be stripped.
+    const isBehavioralMarker = /^tool_\w+$/.test(bracketContent);
+    const text = isBehavioralMarker ? `[${bracketContent}] ${remainder}`.trim() : remainder;
+    assertionLines.push({ text, line: assertions.startLine + 1 + offset });
+  });
 
-    const headerMatch = line.match(/^##\s+(.+)/);
-    if (headerMatch) {
-      const name = headerMatch[1].trim();
-      const nameLower = name.toLowerCase();
-      sections.set(nameLower, { startLine: lineNumber });
-      inAssertions = nameLower === 'assertions';
-      continue;
-    }
-
-    if (inAssertions) {
-      // Capture assertion bullets: - [ ] ... or - [x] ... or - [tool_*] ...
-      const bulletMatch = line.match(/^-\s*\[([^\]]*)\]\s*(.*)/);
-      if (bulletMatch) {
-        const bracketContent = bulletMatch[1].trim();
-        const remainder = bulletMatch[2].trim();
-        // Behavioral markers like [tool_called] are prefix tokens that
-        // ASSERTION_ID_RE expects to find on the assertion text. Checkbox
-        // brackets ([ ], [x], [X]) are markdown plumbing and must be stripped.
-        const isBehavioralMarker = /^tool_\w+$/.test(bracketContent);
-        const text = isBehavioralMarker ? `[${bracketContent}] ${remainder}`.trim() : remainder;
-        assertionLines.push({ text, line: lineNumber });
-      }
-    }
-  }
-
-  return { sections, assertionLines };
+  const environment = sections.get('environment') || { startLine: 0, lines: [] };
+  return {
+    sections,
+    assertionLines,
+    environmentLines: environmentLines(environment.lines).map(({ text, offset }) => ({
+      text,
+      line: environment.startLine + 1 + offset,
+    })),
+  };
 }
 
 /**
@@ -86,13 +81,16 @@ function parseScenarioStructure(content) {
  * 2. ## Assertions section contains at least one entry.
  * 3. Each assertion entry has an ID prefix (A1:, [tool_called], etc.) and non-blank text.
  * 4. The scenario name does not end in a reserved condition suffix.
+ * 5. Each ## Environment line is a declaration the trial will accept.
  *
  * @param {string} filePath - Absolute path to scenario .md file
+ * @param {string} [projectRoot] - Project root the scenario's trials run under
+ *   (defaults to the working directory)
  * @returns {Array<{ file: string, line: number, message: string }>} Diagnostics
  */
-function lintScenario(filePath) {
+function lintScenario(filePath, projectRoot = process.cwd()) {
   const content = fs.readFileSync(filePath, 'utf8');
-  const { sections, assertionLines } = parseScenarioStructure(content);
+  const { sections, assertionLines, environmentLines: declared } = parseScenarioStructure(content);
 
   const diagnostics = [];
 
@@ -145,6 +143,16 @@ function lintScenario(filePath) {
         }
       }
     }
+  }
+
+  // Check 5: ## Environment declarations — the trial refuses what this reports
+  const declarations = declared.map((d) => d.text);
+  for (const { index, message } of parseEnvironment(declarations, projectRoot).errors) {
+    diagnostics.push({
+      file: filePath,
+      line: declared[index].line,
+      message: `## Environment line ${declared[index].line}: ${message}`,
+    });
   }
 
   return diagnostics;

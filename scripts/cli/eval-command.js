@@ -342,7 +342,7 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
       throw new Error(`scenario "${scenarioName}" not found in evals/scenarios/`);
     }
 
-    const diagnostics = lintScenario(scenarioFile);
+    const diagnostics = lintScenario(scenarioFile, projectRoot);
     if (diagnostics.length === 0) {
       console.log(`${scenarioName}: ok`);
     } else {

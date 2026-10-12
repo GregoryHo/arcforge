@@ -2714,7 +2714,7 @@ Do something.
 
       // Call[0] is plugin list, Call[1] is the actual claude trial
       const callArgs = mockUtils.execCommand.mock.calls[1];
-      expect(callArgs[0]).toBe('claude');
+      expect(path.basename(callArgs[0])).toBe('claude');
       expect(callArgs[1]).toContain('--plugin-dir');
       expect(callArgs[1]).toContain(tempDir);
       // A plugin-dir trial strips MCP servers like the isolated baseline it is
@@ -2943,7 +2943,7 @@ Do something.
 
       // Call[1] is the claude trial (call[0] is plugin list)
       const callArgs = mockUtils.execCommand.mock.calls[1];
-      expect(callArgs[0]).toBe('claude');
+      expect(path.basename(callArgs[0])).toBe('claude');
       expect(callArgs[1]).toContain('--plugin-dir');
       expect(callArgs[1]).toContain(tempDir);
     });
@@ -2987,7 +2987,7 @@ Do something.
       });
 
       const callArgs = mockUtils.execCommand.mock.calls[0];
-      expect(callArgs[0]).toBe('claude');
+      expect(path.basename(callArgs[0])).toBe('claude');
       expect(callArgs[1]).toContain('--max-turns');
       const mtIdx = callArgs[1].indexOf('--max-turns');
       expect(callArgs[1][mtIdx + 1]).toBe('20');
@@ -3219,7 +3219,7 @@ Do something.
 
       // Find the claude calls (not plugin list or grader) — they have 'claude' as first arg
       const claudeCalls = mockUtils.execCommand.mock.calls.filter(
-        (c) => c[0] === 'claude' && c[1].includes('-p'),
+        (c) => path.basename(c[0]) === 'claude' && c[1].includes('-p'),
       );
       // Should have 2 claude calls: 1 baseline + 1 treatment
       expect(claudeCalls.length).toBe(2);
@@ -3281,7 +3281,7 @@ Do something.
       runWorkflowEval(scenario, 1, { projectRoot: tempDir, model: 'sonnet', effort: 'high' });
 
       const claudeCalls = mockUtils.execCommand.mock.calls.filter(
-        (c) => c[0] === 'claude' && c[1].includes('-p'),
+        (c) => path.basename(c[0]) === 'claude' && c[1].includes('-p'),
       );
 
       // Neither baseline nor treatment should have --plugin-dir

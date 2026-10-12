@@ -137,6 +137,10 @@ an infra error (`provider_refusal`) and never scores either. Without that, the
 fixture's own files would pass some assertions and an exhausted quota would read
 as a regression.
 
+A trial whose session never started — no `claude` to run, or an environment the
+system refuses to pass on — is an infra error too (`trial_spawn_failed`). It
+never scores, and its fixture directory is removed.
+
 Every trial runs in a fresh fixture directory under `.eval-trials/`, with
 arcforge's own state redirected into it. By default the session is also
 isolated. Plugins and MCP servers are stripped, `CLAUDE.md` files and rules are
@@ -144,10 +148,51 @@ excluded, the output style is pinned to the default and hooks are disabled. Your
 user settings file (`~/.claude/settings.json`) is not read at all, so nothing
 set there reaches the trial: not your hooks, output style, `model` or effort
 level, `env`, permissions, or an `apiKeyHelper`. Credentials stored in your
-keychain still work, and environment variables from your shell are passed
-through. A `--plugin-dir` trial is contained the same way, `CLAUDE.md` excludes
-included, except that it loads the plugin under test and leaves hooks on so the
-plugin's own hooks run.
+keychain still work. A `--plugin-dir` trial is contained the same way,
+`CLAUDE.md` excludes included, except that it loads the plugin under test and
+leaves hooks on so the plugin's own hooks run.
+
+Your shell's environment does not reach a contained trial either. Its `PATH` is
+rebuilt: first `.eval-trials/.bin`, which holds links to `claude`, to the `node`
+running arcforge, to the `npm` and `npx` beside that `node`, and to the
+`python3` your own `PATH` resolves (none when it resolves none), then
+`/usr/bin:/bin:/usr/sbin:/sbin`. `git` and the shell utilities are expected in
+those system directories; they are not linked. The session itself is started from that
+`claude` link by its full path, so nothing a scenario adds to the `PATH` can run
+in its place. A tool you installed anywhere else (Homebrew,
+`~/.local/bin`, a version manager) is not found, even when it shares a
+directory with `claude`, unless the scenario declares it (see
+[Declaring a trial's environment](#declaring-a-trials-environment)). Only these
+variables are forwarded. A name ending in `*` is a family: every variable that
+starts that way is forwarded, so a provider's role, token-file or
+container-credential variable needs no entry of its own.
+
+| Group | Variables |
+|-------|-----------|
+| You and your terminal | `HOME`, `USER`, `LOGNAME`, `SHELL`, `TERM`, `LANG`, `LC_*`, `TZ`, `TMPDIR`, `XDG_CONFIG_HOME` |
+| Claude Code's credentials and provider | `CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`, `CLAUDE_CODE_USE_*`, `ANTHROPIC_*` |
+| Cloud provider credentials | `AWS_*`, `GOOGLE_*`, `GCLOUD_*`, `CLOUDSDK_*`, `CLOUD_ML_REGION` |
+| Network | every variable ending in `_PROXY` or `_proxy` (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY` and their lowercase forms), `SSL_CERT_*`, `NODE_EXTRA_CA_CERTS`, `CURL_CA_BUNDLE`, `REQUESTS_CA_BUNDLE`, `NODE_TLS_REJECT_UNAUTHORIZED` |
+
+These are dropped even though a family would match them, or so that none ever
+does:
+
+| Dropped | Why |
+|---------|-----|
+| `ANTHROPIC_MODEL` | the row records `--model`, not your variable |
+| `ANTHROPIC_DEFAULT_*_MODEL` (`ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_DEFAULT_HAIKU_MODEL`), `ANTHROPIC_SMALL_FAST_MODEL` | they remap what `--model sonnet` resolves to while the row still records `sonnet` |
+| `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, `CLAUDE_CODE_SSE_PORT`, `CLAUDE_CODE_SESSION_ID` | they belong to the Claude Code session you started the eval from |
+
+No other `CLAUDE_CODE_*` variable is forwarded either.
+
+Everything else is dropped. A model picked through `ANTHROPIC_MODEL`, or an
+alias remapped through `ANTHROPIC_DEFAULT_*_MODEL`, does not reach the trial:
+pass `--model` so the row records it. `## Setup` runs in this
+same environment, plus `PROJECT_ROOT` and `TRIAL_DIR`, so a fixture is built
+with the tools the trial will find. `HOME` is kept because that is where `claude` finds your login,
+which has one side effect: Claude Code loads the functions and aliases of your
+shell startup file (`~/.zshrc` or `~/.bashrc`) into the commands the agent runs,
+so a function or alias defined there is still visible to a trial.
 
 Both kinds of contained trial, isolated and `--plugin-dir`, run with permission
 prompts skipped (`--dangerously-skip-permissions`) inside their trial
@@ -157,7 +202,8 @@ either, and without the flag the agent would be denied every command, write
 and edit. What contains the trial instead is the write check described below
 and arcforge's redirected state. This holds for `eval run`, `eval preflight` and
 both arms of `eval ab`. A `--no-isolate` trial with no plugin dir is not
-contained: it reads your settings file and runs under your own permission mode.
+contained: it reads your settings file, runs under your own permission mode and
+keeps your shell's environment, `PATH` included.
 
 In a comparison, both arms run `claude` with the same flags apart from the
 injection itself. They share the settings sources, the turn budget, the
@@ -338,6 +384,7 @@ A scenario is one markdown file in `evals/scenarios/`. Sections the parser reads
 | `## Context` | Situation description — **sent to the agent** |
 | `## Scenario` | The task itself — **sent to the agent** |
 | `## Setup` | Shell that builds the fixture repository before each trial |
+| `## Environment` | Changes to the trial's `PATH` and cache directories, applied to every arm and to Setup — see [Declaring a trial's environment](#declaring-a-trials-environment) |
 | `## Assertions` | What counts as success |
 | `## Grader` | `code` (your own script), `model` (a model reads the transcript), or `mixed` (both) |
 | `## Grader Config` | The grader command for `code`, guidance for `model`, or a note on why neither is needed |
@@ -355,6 +402,62 @@ machinery, which means you can write freely in the other sections — including 
 intent into the trial and teaching the agent the answer.
 
 `## Context`, `## Grader Config`, and `## Assertions` are required.
+
+## Declaring a trial's environment
+
+A contained trial starts from the rebuilt environment described under
+[Step 3](#step-3--ab): a `PATH` of `claude`, `node`, `npm`, `npx`, `python3` and
+the system directories. A scenario that needs something else says so in `## Environment`,
+one declaration per line:
+
+```
+## Environment
+# arcforge is the tool under test
+PATH+=${PROJECT_ROOT}/bin
+PATH^=${TRIAL_DIR}/fakebin
+PATH-=/usr/sbin
+UV_CACHE_DIR=${TRIAL_DIR}/.cache/uv
+```
+
+| Declaration | Effect |
+|-------------|--------|
+| `PATH+=<dir>` | Append `<dir>` to the trial's `PATH` |
+| `PATH^=<dir>` | Prepend `<dir>`, so what it holds shadows everything after it for the agent, its hooks and Setup. The session's own `claude` is not looked up on the `PATH` |
+| `PATH-=<dir>` | Remove `<dir>`; a directory that is not on the `PATH` is ignored |
+| `<VAR>=<dir>` | Point a cache variable at a directory inside the trial |
+
+Declarations apply in the order written. Blank lines and lines starting with
+`#` are ignored. A `## Environment` heading inside a code fence is example text,
+not a section: neither `eval lint` nor the trial reads it. The rules, which
+`eval lint` checks and a trial refuses to start without:
+
+- **`<dir>` is one absolute directory.** It starts with `/`, `${PROJECT_ROOT}`
+  or `${TRIAL_DIR}`. Those two placeholders are the only expansion, and only at
+  the start: no `$HOME`, no `~`, no other variable. No whitespace, no `:` (one
+  directory per line), no `..` segment and no control character anywhere in the
+  line. A literal absolute path such as
+  `/opt/homebrew/bin` is allowed, and ties the scenario to hosts that have it.
+- **`PATH` is changed, never replaced.** `PATH=<dir>` is an error, and so is
+  removing `.eval-trials/.bin`, whether written with `${PROJECT_ROOT}` or as
+  its full path, so `claude` and `node` always resolve.
+- **`<VAR>` is one of** `XDG_CACHE_HOME`, `XDG_DATA_HOME`, `XDG_BIN_HOME`,
+  `UV_CACHE_DIR`, `UV_TOOL_DIR`, `UV_TOOL_BIN_DIR`, `UV_PYTHON_INSTALL_DIR`,
+  `UV_INSTALL_DIR`, `PLAYWRIGHT_BROWSERS_PATH`, `PIP_CACHE_DIR` or
+  `NPM_CONFIG_CACHE`, **and its value starts with `${TRIAL_DIR}/`**. That is
+  what keeps an install the agent performs inside the trial: the next trial
+  starts without it, and your own caches are untouched. Each may be declared
+  once. No other variable can be declared, `HOME` included.
+
+`${TRIAL_DIR}` is each trial's own directory, so `PATH^=${TRIAL_DIR}/fakebin`
+names a different directory in every trial; have `## Setup` fill it. Under
+`--no-isolate` with no plugin dir the same declarations are applied on top of
+your own environment.
+
+Both arms of a comparison and their Setup get the identical declarations: the
+arms still differ only by the injection. Every result row records them as
+written in its `environment` field (`[]` when the scenario declares none). They
+are not a pooling condition, so bump `## Version` when you add or change the
+section: the trials before the edit ran somewhere else.
 
 ## Assertions
 

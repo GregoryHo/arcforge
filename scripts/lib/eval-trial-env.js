@@ -16,6 +16,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execCommand, ensureDir, sanitizeFilename } = require('./utils');
+const { trialEnv } = require('./eval-trial-environment');
 
 /**
  * Create an isolated trial directory under the project root.
@@ -81,16 +82,17 @@ function cleanupTrialDir(trialDir) {
  * @param {string} setupCommand - Shell command to execute
  * @param {string} trialDir - Working directory for setup
  * @param {string} [projectRoot] - Project root for $PROJECT_ROOT env var
+ * @param {Object} [trialEnvironment] - The environment the trial itself runs in
+ *   (defaults to a contained trial's)
  */
-function runSetup(setupCommand, trialDir, projectRoot) {
-  const env = { ...process.env };
+function runSetup(setupCommand, trialDir, projectRoot, trialEnvironment) {
+  // Setup runs in the trial's own environment, so a fixture is built with the
+  // tools the trial will find and a setup that writes arcforge fixtures
+  // (instincts, activations, observations) via getArcforgeHome() lands under
+  // TRIAL_DIR/.arcforge — the home the trial's SessionStart hook reads. On top
+  // of that it gets PROJECT_ROOT and TRIAL_DIR to reference files explicitly.
+  const env = { ...(trialEnvironment || trialEnv(trialDir, {}, { projectRoot })) };
   if (projectRoot) env.PROJECT_ROOT = projectRoot;
-  // Redirect the arcforge data home to the trial dir so a setup that writes
-  // arcforge fixtures (instincts, activations, observations) via
-  // getArcforgeHome() lands under TRIAL_DIR/.arcforge — the same home the
-  // trial's SessionStart hook reads (it honors ARCFORGE_HOME). Also expose
-  // TRIAL_DIR so setups can reference it explicitly.
-  env.ARCFORGE_HOME = path.join(trialDir, '.arcforge');
   env.TRIAL_DIR = trialDir;
   const { exitCode, stderr } = execCommand('sh', ['-c', setupCommand], {
     cwd: trialDir,

@@ -308,7 +308,7 @@ describe('runSkillEval A/B flow', () => {
 
     const calls = [];
     mockUtils.execCommand.mockImplementation((cmd, cmdArgs, opts) => {
-      if (cmd === 'claude') {
+      if (path.basename(cmd) === 'claude') {
         calls.push(opts.input || (cmdArgs?.includes('-p') ? 'claude-call' : ''));
       }
       return { stdout: 'ok', stderr: '', exitCode: 0 };
@@ -334,7 +334,7 @@ describe('runSkillEval A/B flow', () => {
 
     const callOrder = [];
     mockUtils.execCommand.mockImplementation((cmd, _cmdArgs, opts) => {
-      if (cmd === 'claude') {
+      if (path.basename(cmd) === 'claude') {
         const hasSkill = (opts.input || '').includes('SKILL_MARKER');
         callOrder.push(hasSkill ? 'treatment' : 'baseline');
       }
@@ -390,7 +390,7 @@ describe('runSkillEval A/B flow', () => {
 
     const callOrder = [];
     mockUtils.execCommand.mockImplementation((cmd, _cmdArgs, opts) => {
-      if (cmd === 'claude') {
+      if (path.basename(cmd) === 'claude') {
         const hasSkill = (opts.input || '').includes('SKILL_MARKER');
         callOrder.push(hasSkill ? 'treatment' : 'baseline');
       }
@@ -794,7 +794,7 @@ describe('runWorkflowEval A/B flow', () => {
 
     const trialCalls = [];
     mockUtils.execCommand.mockImplementation((cmd, cmdArgs) => {
-      if (cmd === 'claude' && cmdArgs.includes('-p')) {
+      if (path.basename(cmd) === 'claude' && cmdArgs.includes('-p')) {
         trialCalls.push({ args: [...cmdArgs] });
       }
       return { stdout: 'ok', stderr: '', exitCode: 0 };
@@ -814,7 +814,7 @@ describe('runWorkflowEval A/B flow', () => {
 
     const prompts = [];
     mockUtils.execCommand.mockImplementation((cmd, cmdArgs, opts) => {
-      if (cmd === 'claude' && cmdArgs.includes('-p')) {
+      if (path.basename(cmd) === 'claude' && cmdArgs.includes('-p')) {
         prompts.push(opts.input);
       }
       return { stdout: 'ok', stderr: '', exitCode: 0 };
@@ -860,7 +860,7 @@ describe('runWorkflowEval A/B flow', () => {
 
     const trialOrder = [];
     mockUtils.execCommand.mockImplementation((cmd, cmdArgs) => {
-      if (cmd === 'claude' && cmdArgs.includes('-p')) {
+      if (path.basename(cmd) === 'claude' && cmdArgs.includes('-p')) {
         trialOrder.push(cmdArgs.includes('--strict-mcp-config') ? 'baseline' : 'treatment');
       }
       return { stdout: 'ok', stderr: '', exitCode: 0 };
@@ -882,7 +882,7 @@ describe('runWorkflowEval A/B flow', () => {
 
     const trialOrder = [];
     mockUtils.execCommand.mockImplementation((cmd, cmdArgs) => {
-      if (cmd === 'claude' && cmdArgs.includes('-p')) {
+      if (path.basename(cmd) === 'claude' && cmdArgs.includes('-p')) {
         trialOrder.push(cmdArgs.includes('--strict-mcp-config') ? 'baseline' : 'treatment');
       }
       return { stdout: 'ok', stderr: '', exitCode: 0 };

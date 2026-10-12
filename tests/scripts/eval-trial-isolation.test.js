@@ -35,14 +35,17 @@ const SCENARIO = {
 /** Stub every exec: the plugin list answers [], the trial answers `onTrial`. */
 function stubExec(onTrial = () => ({ stdout: DONE_STREAM, stderr: '', exitCode: 0 })) {
   mockUtils.execCommand.mockImplementation((cmd, args, opts) => {
-    if (cmd === 'claude' && args[0] === 'plugin') return { stdout: '[]', stderr: '', exitCode: 0 };
-    if (cmd === 'claude') return onTrial(opts);
+    if (path.basename(cmd) === 'claude' && args[0] === 'plugin')
+      return { stdout: '[]', stderr: '', exitCode: 0 };
+    if (path.basename(cmd) === 'claude') return onTrial(opts);
     return { stdout: '', stderr: '', exitCode: 0 };
   });
 }
 
 function trialArgs() {
-  return mockUtils.execCommand.mock.calls.find((c) => c[0] === 'claude' && c[1].includes('-p'))[1];
+  return mockUtils.execCommand.mock.calls.find(
+    (c) => path.basename(c[0]) === 'claude' && c[1].includes('-p'),
+  )[1];
 }
 
 describe('trial isolation keeps the operator user config out (B-7, #170)', () => {
@@ -114,6 +117,91 @@ describe('trial isolation keeps the operator user config out (B-7, #170)', () =>
     // without the flag a -p session is denied every Bash, Write and Edit.
     runTrial(SCENARIO, 1, 1, { projectRoot: tempDir });
     expect(trialArgs()).toContain('--dangerously-skip-permissions');
+  });
+});
+
+describe('the operator environment stays out of a contained trial (B-18)', () => {
+  const { runSkillEval } = require('../../scripts/lib/eval');
+  const OPERATOR_ONLY = '/operator/only/bin';
+  const SYSTEM = ['/usr/bin', '/bin', '/usr/sbin', '/sbin'];
+  let tempDir;
+  let saved;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-trial-env-'));
+    saved = { PATH: process.env.PATH, OPERATOR_ONLY_VAR: process.env.OPERATOR_ONLY_VAR };
+    process.env.PATH = [OPERATOR_ONLY, saved.PATH].join(path.delimiter);
+    process.env.OPERATOR_ONLY_VAR = 'set by the operator';
+    mockUtils.execCommand.mockReset();
+    stubExec();
+  });
+
+  afterEach(() => {
+    process.env.PATH = saved.PATH;
+    if (saved.OPERATOR_ONLY_VAR === undefined) delete process.env.OPERATOR_ONLY_VAR;
+    else process.env.OPERATOR_ONLY_VAR = saved.OPERATOR_ONLY_VAR;
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const SETUP = 'echo fixture';
+  const envs = (isWanted) =>
+    mockUtils.execCommand.mock.calls
+      .filter(isWanted)
+      .map((c) => ({ env: c[2].env, cwd: c[2].cwd }));
+  const sessionEnvs = () => envs((c) => path.basename(c[0]) === 'claude' && c[1].includes('-p'));
+  // The code grader also runs `sh -c`, on the operator's side; only Setup is wanted.
+  const setupEnvs = () => envs((c) => c[0] === 'sh' && c[1][1] === SETUP);
+  /** An env with its trial directory named, so two trials' envs can be compared. */
+  const portable = ({ env, cwd }) =>
+    Object.fromEntries(Object.entries(env).map(([k, v]) => [k, v.split(cwd).join('<TRIAL_DIR>')]));
+
+  it('spawns the session on a PATH with no operator entry', () => {
+    runTrial(SCENARIO, 1, 1, { projectRoot: tempDir });
+    const [{ env, cwd }] = sessionEnvs();
+    const shims = path.join(path.resolve(tempDir), '.eval-trials', '.bin');
+    expect(env.PATH.split(path.delimiter)).toEqual([shims, ...SYSTEM]);
+    expect(env.PATH).not.toContain(OPERATOR_ONLY);
+    expect(env).not.toHaveProperty('OPERATOR_ONLY_VAR');
+    expect(env.HOME).toBe(process.env.HOME);
+    expect(env.ARCFORGE_HOME).toBe(path.join(cwd, '.arcforge'));
+  });
+
+  it('contains a plugin-dir trial the same way', () => {
+    runTrial(SCENARIO, 1, 1, { projectRoot: tempDir, pluginDir: tempDir, isolated: false });
+    const [{ env }] = sessionEnvs();
+    expect(env.PATH).not.toContain(OPERATOR_ONLY);
+    expect(env).not.toHaveProperty('OPERATOR_ONLY_VAR');
+  });
+
+  it('runs Setup in the environment the session gets', () => {
+    runTrial({ ...SCENARIO, setup: SETUP }, 1, 1, { projectRoot: tempDir });
+    const [setup] = setupEnvs();
+    const [session] = sessionEnvs();
+    const { PROJECT_ROOT, TRIAL_DIR, ...rest } = setup.env;
+    expect(rest).toEqual(session.env);
+    expect([PROJECT_ROOT, TRIAL_DIR]).toEqual([tempDir, setup.cwd]);
+    // The session is not handed the two Setup-only names.
+    expect(session.env).not.toHaveProperty('PROJECT_ROOT');
+    expect(session.env).not.toHaveProperty('TRIAL_DIR');
+  });
+
+  it('gives both arms of a comparison the same environment', () => {
+    runSkillEval({ ...SCENARIO, setup: SETUP }, 1, {
+      projectRoot: tempDir,
+      skillInstruction: 'BODY',
+    });
+    const [baseline, treatment] = sessionEnvs().map(portable);
+    expect(treatment).toEqual(baseline);
+    const [baselineSetup, treatmentSetup] = setupEnvs().map(portable);
+    expect(treatmentSetup).toEqual(baselineSetup);
+  });
+
+  it('leaves a --no-isolate trial on the operator environment', () => {
+    runTrial(SCENARIO, 1, 1, { projectRoot: tempDir, isolated: false });
+    const [{ env, cwd }] = sessionEnvs();
+    expect(env.PATH).toBe(process.env.PATH);
+    expect(env.OPERATOR_ONLY_VAR).toBe('set by the operator');
+    expect(env.ARCFORGE_HOME).toBe(path.join(cwd, '.arcforge'));
   });
 });
 
@@ -380,7 +468,9 @@ describe('the baseline of a plugin-dir comparison watches the plugin it does not
   const baselineRow = () =>
     require('../../scripts/lib/eval').loadResults('isolation-baseline', tempDir)[0];
   const trialCalls = () =>
-    mockUtils.execCommand.mock.calls.filter((c) => c[0] === 'claude' && c[1].includes('-p'));
+    mockUtils.execCommand.mock.calls.filter(
+      (c) => path.basename(c[0]) === 'claude' && c[1].includes('-p'),
+    );
 
   it('records a baseline write into the plugin as trial_wrote_repo (workflow scope)', () => {
     expect(() =>
@@ -417,7 +507,7 @@ describe('a detected repository write stops the run', () => {
       runSkillEval(SCENARIO, 2, { projectRoot: tempDir, skillInstruction: 'BODY', runId: 'r1' }),
     ).toThrow(/baseline trial 1 wrote outside its directory: .*stray\.txt.*reset/s);
     const trials = mockUtils.execCommand.mock.calls.filter(
-      (c) => c[0] === 'claude' && c[1].includes('-p'),
+      (c) => path.basename(c[0]) === 'claude' && c[1].includes('-p'),
     );
     expect(trials).toHaveLength(1);
     // The offending row is on disk, still an infra error.

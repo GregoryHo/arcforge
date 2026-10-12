@@ -112,7 +112,7 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   (`--no-isolate`) readmits the surrounding toolkit into the trial — never the
   user's real state. From 6.5.0 the engine also builds a contained trial's
   environment variables and `PATH` rather than passing the operator's on
-  (B-18); a `--no-isolate` trial inherits the operator's environment. Isolation is not a sandbox, and that is a limit rather
+  (B-18); a `--no-isolate` trial with no plugin dir inherits the operator's environment. Isolation is not a sandbox, and that is a limit rather
   than a promise: the agent runs with the operator's filesystem permissions.
   What the runner adds is detection after the fact, within the blind spots the
   guide lists: a trial that wrote inside the repository it ran from is
@@ -270,9 +270,12 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   `CLAUDE_CODE_SESSION_ID`). `docs/guide/eval-system.md` holds the table.
   Everything else the operator's shell exports is dropped. `PATH`
   is built too: a shim directory under `.eval-trials/` holding links to
-  `claude`, to `node`, and to the `npm` and `npx` beside it, followed by the
-  system directories `/usr/bin`, `/bin`, `/usr/sbin` and `/sbin`. So
-  `claude` and `node` resolve, and the entries of the operator's own
+  `claude`, to `node`, to the `npm` and `npx` beside it, and to the
+  `python3` the operator's `PATH` resolves (no link when it resolves none),
+  followed by the system directories `/usr/bin`, `/bin`, `/usr/sbin` and
+  `/sbin`. So the shim set — `claude`, `node`, `npm`, `npx`, `python3` —
+  resolves, `git` and the shell utilities are found only in the system
+  directories, and the entries of the operator's own
   `PATH` do not carry over — not even the directory `claude` is installed
   in, which can hold other tools — so a tool the operator happens to have
   installed — `arcforge` included — is not something a trial can run unless
@@ -281,8 +284,8 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   `<projectRoot>/.eval-trials/.bin/claude`, so a directory the scenario
   prepends with `PATH^=`, or a `claude` its fixture `Setup` writes there,
   stays on the session's `PATH` and cannot run in the session's place.
-  Fixture `Setup` keeps the declared `PATH`. A `--no-isolate` trial is the
-  exception: it measures
+  Fixture `Setup` keeps the declared `PATH`. A `--no-isolate` trial with no
+  plugin dir is the exception: it measures
   the operator's own toolkit (B-7), so it inherits the operator's
   environment, with `ARCFORGE_HOME` redirected and the scenario's
   `## Environment` directives applied, and its session is the bare `claude`

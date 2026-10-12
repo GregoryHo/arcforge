@@ -15,6 +15,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { getTimestamp, sanitizeFilename } = require('./utils');
+const { environmentLines } = require('./eval-trial-environment');
 
 const EVALS_DIR = 'evals';
 const SCENARIOS_DIR = path.join(EVALS_DIR, 'scenarios');
@@ -138,21 +139,45 @@ function computeScenarioHash(contents) {
 }
 
 /**
- * Parse an eval scenario from a markdown file
- * @param {string} filePath - Path to scenario markdown file
- * @param {string} [projectRoot] - Project root for ${PROJECT_ROOT} expansion
- * @returns {EvalScenario} Parsed scenario
+ * Advance the open code fence past one line, by CommonMark's rule: a fence is
+ * up to three spaces of indentation and then three or more backticks or tildes.
+ * It closes only on a run of the same character at least as long, with nothing
+ * after it; the info string after an opening fence is ignored.
+ * @param {{ char: string, length: number }|null} fence - The open fence, if any
+ * @param {string} line - The line to read
+ * @returns {{ char: string, length: number }|null} The fence open after the line
  */
-function parseScenario(filePath, projectRoot) {
-  const content = fs.readFileSync(filePath, 'utf8');
-  const sections = {};
-  let currentSection = null;
-  const lines = content.split('\n');
+function fenceAfter(fence, line) {
+  const match = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+  if (!match) return fence;
+  const [, run, rest] = match;
+  if (fence) {
+    const closes = run[0] === fence.char && run.length >= fence.length && !rest.trim();
+    return closes ? null : fence;
+  }
+  // A backtick in the info string makes the line inline code, not a fence
+  if (run[0] === '`' && rest.includes('`')) return null;
+  return { char: run[0], length: run.length };
+}
 
-  let insideFence = false;
+/**
+ * Split a scenario file into its `## ` sections. A heading inside a code fence
+ * or a heredoc is body text, not a heading. The parser and the linter both read
+ * their sections from here, so they cannot disagree about where one starts.
+ * @param {string} content - Scenario file content
+ * @returns {Map<string, { startLine: number, lines: string[] }>} Keyed by the
+ *   lower-cased heading; startLine is the heading's 1-based line, and a repeated
+ *   heading replaces the earlier section
+ */
+function scenarioSections(content) {
+  const sections = new Map();
+  let currentSection = null;
+
+  let fence = null;
   let heredocMarker = null;
-  for (const line of lines) {
-    if (/^`{3,}/.test(line)) insideFence = !insideFence;
+  content.split('\n').forEach((line, index) => {
+    fence = fenceAfter(fence, line);
+    const insideFence = Boolean(fence);
 
     // Ignore ## headers inside heredocs (they contain arbitrary text)
     if (!insideFence && !heredocMarker) {
@@ -164,12 +189,25 @@ function parseScenario(filePath, projectRoot) {
 
     const headerMatch = !insideFence && !heredocMarker && line.match(/^##\s+(.+)/);
     if (headerMatch) {
-      currentSection = headerMatch[1].trim().toLowerCase();
-      sections[currentSection] = [];
+      currentSection = { startLine: index + 1, lines: [] };
+      sections.set(headerMatch[1].trim().toLowerCase(), currentSection);
     } else if (currentSection) {
-      sections[currentSection].push(line);
+      currentSection.lines.push(line);
     }
-  }
+  });
+  return sections;
+}
+
+/**
+ * Parse an eval scenario from a markdown file
+ * @param {string} filePath - Path to scenario markdown file
+ * @param {string} [projectRoot] - Project root for ${PROJECT_ROOT} expansion
+ * @returns {EvalScenario} Parsed scenario
+ */
+function parseScenario(filePath, projectRoot) {
+  const content = fs.readFileSync(filePath, 'utf8');
+  const sections = scenarioSections(content);
+  const sectionLines = (key) => sections.get(key)?.lines || [];
 
   const nameMatch = content.match(/^#\s+Eval:\s*(.+)/m);
   const name = nameMatch ? nameMatch[1].trim() : path.basename(filePath, '.md');
@@ -178,7 +216,7 @@ function parseScenario(filePath, projectRoot) {
   // assertions OR behavioral forms like `- [tool_called] Bash:cmd`. Strip ONLY
   // the markdown checkbox shell; leave behavioral `[tool_*]` prefixes intact so
   // downstream parseBehavioralAssertion can recognise them.
-  const assertions = (sections.assertions || [])
+  const assertions = sectionLines('assertions')
     .filter((line) => line.match(/^-\s*\[[^\]]*\]/))
     .map((line) =>
       line
@@ -187,7 +225,7 @@ function parseScenario(filePath, projectRoot) {
         .trim(),
     );
 
-  const section = (key) => (sections[key] || []).join('\n').trim();
+  const section = (key) => sectionLines(key).join('\n').trim();
   const trialsRaw = section('trials');
   const trials = trialsRaw ? parseInt(trialsRaw, 10) : undefined;
   const version = section('version');
@@ -204,6 +242,10 @@ function parseScenario(filePath, projectRoot) {
       ? pluginDirRaw.replace(/\$\{PROJECT_ROOT\}/g, projectRoot)
       : pluginDirRaw;
   }
+
+  // Environment: one declaration per line, kept as written (placeholders are
+  // expanded per trial, and the row records the declaration itself)
+  const environment = environmentLines(sectionLines('environment')).map(({ text }) => text);
 
   // Max Turns: parse as integer
   const maxTurnsRaw = section('max turns');
@@ -228,6 +270,7 @@ function parseScenario(filePath, projectRoot) {
     ...(verdictPolicy ? { verdictPolicy } : {}),
     ...(claimType ? { claimType } : {}),
     ...(pluginDir ? { pluginDir } : {}),
+    ...(environment.length > 0 ? { environment } : {}),
     ...(maxTurns && !Number.isNaN(maxTurns) ? { maxTurns } : {}),
   };
 }
@@ -272,6 +315,7 @@ module.exports = {
   computeScenarioHash,
   parseEvalName,
   resolveMaxTurns,
+  scenarioSections,
   parseScenario,
   listScenarios,
   findScenario,

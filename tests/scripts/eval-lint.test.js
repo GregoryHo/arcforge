@@ -306,3 +306,184 @@ describe('lintScenario - diagnostic format', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 });
+
+describe('lintScenario: ## Environment', () => {
+  let dir;
+
+  beforeEach(() => {
+    dir = makeTempDir();
+  });
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  const withEnvironment = (lines) =>
+    `${WELL_FORMED}\n## Environment\n${lines.join('\n')}\n\n## Design Notes\nPATH=ignored here\n`;
+  const environmentHeading = (content) => content.split('\n').indexOf('## Environment') + 1;
+
+  it('accepts valid declarations, comments and blank lines', () => {
+    const file = writeScenario(
+      dir,
+      'env-ok',
+      withEnvironment([
+        '# the tool under test',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: scenario placeholder, not a JS template
+        'PATH+=${PROJECT_ROOT}/bin',
+        '',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: scenario placeholder, not a JS template
+        'PATH^=${TRIAL_DIR}/fakebin',
+        'PATH-=/usr/sbin',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: scenario placeholder, not a JS template
+        'UV_CACHE_DIR=${TRIAL_DIR}/.cache/uv',
+      ]),
+    );
+    expect(lintScenario(file)).toEqual([]);
+  });
+
+  it('reports each bad declaration at its own line', () => {
+    const content = withEnvironment([
+      'PATH=/usr/local/bin',
+      '# fine',
+      'HOME=/tmp/elsewhere',
+      'UV_CACHE_DIR=/var/cache/uv',
+    ]);
+    const file = writeScenario(dir, 'env-bad', content);
+    const heading = environmentHeading(content);
+    const diagnostics = lintScenario(file);
+    expect(diagnostics.map((d) => d.line)).toEqual([heading + 1, heading + 3, heading + 4]);
+    expect(diagnostics[0].message).toMatch(/## Environment line \d+: PATH cannot be replaced/);
+    expect(diagnostics[1].message).toMatch(/HOME is not a variable a scenario may declare/);
+    expect(diagnostics[2].message).toMatch(/UV_CACHE_DIR must point inside the trial/);
+  });
+
+  it('reports a removal of the directory claude resolves from', () => {
+    const file = writeScenario(
+      dir,
+      'env-shim',
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: scenario placeholder, not a JS template
+      withEnvironment(['PATH-=${PROJECT_ROOT}/.eval-trials/.bin']),
+    );
+    expect(lintScenario(file).map((d) => d.message)).toEqual([
+      expect.stringMatching(/would remove the directory claude and node resolve from/),
+    ]);
+  });
+
+  it('reports that removal spelled as the literal path, given the project root', () => {
+    const shims = path.join(path.resolve(dir), '.eval-trials', '.bin');
+    const file = writeScenario(dir, 'env-shim-literal', withEnvironment([`PATH-=${shims}`]));
+    expect(lintScenario(file, dir).map((d) => d.message)).toEqual([
+      expect.stringMatching(/would remove the directory claude and node resolve from/),
+    ]);
+  });
+
+  it('reports a control character in a declaration', () => {
+    const content = withEnvironment(['PATH+=/tmp/a\x00b']);
+    const file = writeScenario(dir, 'env-nul', content);
+    expect(lintScenario(file)).toEqual([
+      {
+        file,
+        line: environmentHeading(content) + 1,
+        message: expect.stringMatching(/## Environment line \d+: contains a control character/),
+      },
+    ]);
+  });
+
+  it('ignores a fenced ## Environment example, as the trial does', () => {
+    const { parseScenario } = require('../../scripts/lib/eval-scenario');
+    const example = ['```', '## Environment', 'PATH=/usr/local/bin', 'not a declaration', '```'];
+    const file = writeScenario(
+      dir,
+      'env-example',
+      `${WELL_FORMED}\n## Design Notes\nA scenario may declare:\n\n${example.join('\n')}\n`,
+    );
+    expect(lintScenario(file)).toEqual([]);
+    expect(parseScenario(file)).not.toHaveProperty('environment');
+  });
+
+  // CommonMark's fence rule. Each example is followed by a real section, so a
+  // fence that fails to close is caught as well as one that closes too early.
+  const FENCED_EXAMPLES = [
+    ['a tilde fence', ['~~~', '## Environment', 'PATH=/usr/local/bin', '~~~']],
+    ['a tilde fence with an info string', ['~~~text', '## Environment', 'HOME=/tmp/x', '~~~']],
+    ['an indented backtick fence', ['   ```', '## Environment', 'PATH=/usr/local/bin', '   ```']],
+    [
+      'a tilde fence holding a backtick fence',
+      ['~~~', '```sh', 'echo hi', '```', '## Environment', 'PATH=/usr/local/bin', '~~~'],
+    ],
+    [
+      'a backtick fence holding a tilde fence',
+      ['```', '~~~', 'echo hi', '~~~', '## Environment', 'PATH=/usr/local/bin', '```'],
+    ],
+    [
+      'a four-backtick fence holding a three-backtick line',
+      ['````', '```', '## Environment', 'PATH=/usr/local/bin', '```', '````'],
+    ],
+  ];
+
+  it.each(FENCED_EXAMPLES)('ignores a ## Environment example inside %s', (_label, example) => {
+    const { parseScenario } = require('../../scripts/lib/eval-scenario');
+    const notes = `${WELL_FORMED}\n## Design Notes\nA scenario may declare:\n\n${example.join('\n')}\n`;
+
+    const alone = writeScenario(dir, 'env-fence-alone', notes);
+    expect(lintScenario(alone)).toEqual([]);
+    expect(parseScenario(alone)).not.toHaveProperty('environment');
+
+    const followed = writeScenario(
+      dir,
+      'env-fence-followed',
+      `${notes}\n## Environment\nPATH-=/usr/sbin\n`,
+    );
+    expect(lintScenario(followed)).toEqual([]);
+    expect(parseScenario(followed).environment).toEqual(['PATH-=/usr/sbin']);
+  });
+
+  it('does not open a fence at four spaces of indentation', () => {
+    const { parseScenario } = require('../../scripts/lib/eval-scenario');
+    const file = writeScenario(
+      dir,
+      'env-indented-code',
+      `${WELL_FORMED}\n## Design Notes\n    \`\`\`\n## Environment\nPATH-=/usr/sbin\n`,
+    );
+    expect(lintScenario(file)).toEqual([]);
+    expect(parseScenario(file).environment).toEqual(['PATH-=/usr/sbin']);
+  });
+
+  it('reads a real section after a fenced example of one', () => {
+    const { parseScenario } = require('../../scripts/lib/eval-scenario');
+    const content = [
+      WELL_FORMED,
+      '## Design Notes',
+      '```',
+      '## Environment',
+      'PATH=/usr/local/bin',
+      '```',
+      '',
+      '## Environment',
+      'PATH-=/usr/sbin',
+      'HOME=/tmp/elsewhere',
+      '',
+    ].join('\n');
+    const file = writeScenario(dir, 'env-example-then-real', content);
+    expect(lintScenario(file)).toEqual([
+      {
+        file,
+        line: content.split('\n').lastIndexOf('HOME=/tmp/elsewhere') + 1,
+        message: expect.stringMatching(/HOME is not a variable a scenario may declare/),
+      },
+    ]);
+    expect(parseScenario(file).environment).toEqual(['PATH-=/usr/sbin', 'HOME=/tmp/elsewhere']);
+  });
+
+  it('reports a fenced block, which the trial would refuse line by line', () => {
+    const file = writeScenario(
+      dir,
+      'env-fenced',
+      withEnvironment(['```', 'PATH-=/usr/sbin', '```']),
+    );
+    expect(lintScenario(file).map((d) => d.message)).toEqual([
+      expect.stringMatching(/expected PATH\+=<dir>/),
+      expect.stringMatching(/expected PATH\+=<dir>/),
+    ]);
+  });
+});

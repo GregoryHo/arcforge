@@ -73,4 +73,21 @@ function isProviderRefusal({ textResult, actions, usage } = {}) {
   return !(Array.isArray(actions) && actions.some((a) => a.type === 'tool'));
 }
 
-module.exports = { isTrialKilled, isOutputComplete, isProviderRefusal };
+/**
+ * Did the trial subprocess never start?
+ *
+ * A session that could not be spawned (no `claude` to run, an environment Node
+ * refuses to pass on) leaves an error with no exit status, no signal and no
+ * output. A process that ran and exited non-zero has a status; one the runner
+ * killed is isTrialKilled().
+ *
+ * @param {{ stdout?: string, error?: Error & { status?: number|null, signal?: string|null } }} execResult
+ * @returns {boolean}
+ */
+function isSpawnFailure(execResult) {
+  const err = execResult?.error;
+  if (!err || isTrialKilled(execResult)) return false;
+  return err.status == null && !execResult.stdout;
+}
+
+module.exports = { isTrialKilled, isOutputComplete, isProviderRefusal, isSpawnFailure };
