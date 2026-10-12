@@ -415,6 +415,16 @@ describe('latestArchive', () => {
     expect(latestArchive('p').alias).toBe('parser');
   });
 
+  it('reports no alias when the index cannot be parsed or is not an index', () => {
+    const a = saveArchive('p', 'parser', FIVE, { now: new Date('2026-10-03T12:00:00Z') });
+    const index = path.join(home, 'sessions', 'p', 'aliases.json');
+
+    for (const broken of ['{ not json', '[]', '{"aliases":null}']) {
+      fs.writeFileSync(index, broken);
+      expect(latestArchive('p')).toEqual({ date: '2026-10-03', path: a.path, alias: null });
+    }
+  });
+
   it('never opens an archive, and passes over a name save does not write', () => {
     const a = saveArchive('p', 'one', FIVE, { now: new Date('2026-10-03T12:00:00Z') });
     const dir = path.dirname(a.path);

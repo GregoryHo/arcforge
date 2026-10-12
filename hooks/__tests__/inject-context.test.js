@@ -629,9 +629,15 @@ describe('inject-context session continuity line', () => {
     );
   });
 
-  it('a broken alias index is silent', () => {
-    plantArchive();
+  it('a broken alias index costs the alias, not the line', () => {
+    const file = plantArchive();
     fs.writeFileSync(path.join(sessionsDir(), 'aliases.json'), '{ not json');
-    assert.ok(!sessionStart('startup').includes('Previous session archive'));
+
+    const out = JSON.parse(sessionStart('startup'));
+    assert.strictEqual(
+      out.hookSpecificOutput.additionalContext,
+      `Previous session archive: ${STAMPED}, saved 2026-10-03. ` +
+        `Read it: arcforge session resume ${file}`,
+    );
   });
 });
