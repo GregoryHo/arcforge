@@ -35,9 +35,9 @@
 
 **那什麼形狀可量？** 只交出座標計畫。#182 改的是 Phase 1 的格線，影響發生在「決定 x、y」那一刻，之後的建置、render、存檔都與這個檔案無關。使用者要求先看座標計畫、暫不建置，是平常會出現的要求，也讓 `uv` 沒有出場的理由。prompt 例：
 
-> I want an Excalidraw diagram of our ingest pipeline for the team vault, but before you build anything, give me the coordinate plan to review: write `layout.json`, a list of `{id, label, x, y, width, height}` for every shape, plus `{id, type: "separator", y}` for any zone separator. Don't build, render or save a diagram yet. The pipeline: one `router` takes requests and fans out to six worker services of equal standing — `auth`, `billing`, `search`, `notify`, `export`, `audit` — and all six write to one `event-log`. Top zone: router. Middle zone: the six workers, side by side. Bottom zone: the event log.
+> I want an Excalidraw diagram of our ingest pipeline for the team vault, but before you build anything, give me the coordinate plan to review: write it to `layout.json` at the top of this project folder — use the full absolute path, not a relative one — as a list of `{id, label, x, y, width, height}` for every shape, plus `{id, type: "separator", y}` for any zone separator. Don't build, render or save a diagram yet. The pipeline: one `router` takes requests and fans out to six worker services of equal standing — `auth`, `billing`, `search`, `notify`, `export`, `audit` — and all six write to one `event-log`. Top zone: router. Middle zone: the six workers, side by side. Bottom zone: the event log.
 
-這段話沒有提到間距、格線、40、200 或 220。六個同層元素排一列是版面本身的要求，不是提示；它們彼此之間沒有箭頭。
+這段話沒有提到間距、格線、40、200 或 220。prompt 是固定文字，寫不出 trial 目錄的實際路徑，所以用「this project folder」指明位置並要求絕對路徑；原因在「殘餘風險」的第一項。六個同層元素排一列是版面本身的要求，不是提示；它們彼此之間沒有箭頭。
 
 **鑑別用的斷言是什麼？** `layout.json` 裡六個 worker 兩兩之間，水平間距（左右相鄰者的 `x₂ − (x₁ + width₁)`）都不小於 40。這個 40 是兩版 reference 都寫著的同層最小間距，不是新版才有的數字。不用「欄距等於 220」：那是舊文字沒看過的數字，先天決定（D-057 對五個標題的判定）。
 
@@ -62,18 +62,24 @@
 
 ## 殘餘風險（預先登記時要寫進去）
 
-- **`.venv` 中止 run。** prompt 說了不建置，但 agent 仍可能把計畫轉成 `.excalidraw` 再以 `uv run python check_overlaps.py` 檢查。一旦發生，該列是 `trial_wrote_repo`，run 結束；依 PLAN 記為發現，preflight 的重跑額度整輪至多 2 次。真 trial 裡 `uv` 是否解析得到沒有離線證明；`design-gate.verify-exit.md` 的離線證據指向解析得到。
+- **任何寫進 staged 複本的動作都中止 run，不只 `.venv`。** 兩條路：
+  - 相對路徑的寫入。`SKILL.md:20-27` 要 agent 先 `cd "$BASE/references"`；在那之後以相對路徑寫 `layout.json`，或執行 `python3 plan_layout.py --output coords.json`，檔案落在 staged 複本裡。這條路不需要 `uv`，是最可能發生的一條。
+  - `uv run`。prompt 說了不建置，但 agent 仍可能把計畫轉成 `.excalidraw` 再以 `uv run python check_overlaps.py` 檢查，`.venv` 寫進 staged 複本。真 trial 裡 `uv` 是否解析得到沒有離線證明；`design-gate.verify-exit.md` 的離線證據指向解析得到。
+
+  兩條路的後果相同：write guard 回報變動（`eval-trial-guard.js:26`），該列是 `trial_wrote_repo`（`eval-trial.js:329-338`），run 在那一個 trial 結束（`:429-441`）。
+- **中止的 A/B 補跑修不好。** 補跑額度是 2 次 `--k 1`，每次兩臂各加一列；A/B 若在前幾個 trial 中止，缺的列多於 4 列，補不回來。task 要帶的緩解：prompt 指明 `layout.json` 寫在專案目錄，並要求絕對路徑（見上面的 prompt），agent 就算已經 `cd` 進 `references/`，輸出也落在 trial 目錄。預先登記的規則：中止之前已寫入的列留在池裡，一筆都不丟；中止的 A/B 以相同的旗標與 baseline 目錄重新啟動，整輪至多 1 次，花掉的 session 計入上限；重新啟動後再中止，就記為發現，以池裡現有的列判讀。
+- **preflight 遇到 `trial_wrote_repo`。** 該列寫入之後，preflight 在 `eval-preflight.js:237` 丟出錯誤，不寫紀錄，所以既不是 PASS，也不是 BLOCK（`design-gate.verify-exit.md`「逐題回答」）。預先登記要寫明它動用的是 preflight 出錯重跑的額度（整輪至多 2 次），不是補跑，也不是 A/B 的重新啟動。
 - **baseline 目錄不在 repo 裡。** 它由 operator 在 run 之前以 `git archive` 與 `git show` 組出來，身分靠 digest `0f3c574c1e448946` 釘住，預先登記的 decision 要寫這個值與組法。`skills/` 若在量測前再變動，兩個 digest 都要重算。另一個做法是把整個目錄提交到 `evals/fixtures/`，代價是 15 個檔案的複本；由 scenario PR 決定。
 - **沒打開 reference 的列。** 這種列量到的不是這個檔案。grader 在 audit 行印出有沒有 `Read` 到 staged 的 `layout-heuristics.md`，稽核時分開報告，不改標籤。
 - **逃逸。** `../../skills/core/diagramming-obsidian/references/layout-heuristics.md` 是現行版，baseline 若讀了它就不再是舊 reference 那一臂。transcript 的 `Read` 路徑看得出來，稽核要逐列檢查。
 
 ## 判定
 
-MEASURABLE，條件三項：(1) task 只要座標計畫，prompt 明說暫不建置、render、存檔；(2) 計分的斷言只有「六個同層元素兩兩水平間距 ≥40」，分隔線淨空不計分；(3) 預先登記寫明 `.venv` 造成的 `trial_wrote_repo` 記為發現。PLAN 原本的 manual-fallback 形狀判 NOT MEASURABLE，要等 `UV_PROJECT_ENVIRONMENT` 可宣告。
+MEASURABLE，條件四項：(1) task 只要座標計畫，prompt 明說暫不建置、render、存檔；(2) 計分的斷言只有「六個同層元素兩兩水平間距 ≥40」，分隔線淨空不計分；(3) prompt 指明 `layout.json` 寫在專案目錄並要求絕對路徑；(4) 預先登記寫明寫進 staged 複本造成的 `trial_wrote_repo` 怎麼處理：已寫入的列留在池裡，A/B 至多重新啟動 1 次並計入上限，preflight 則動用出錯重跑的額度。PLAN 原本的 manual-fallback 形狀判 NOT MEASURABLE，要等 `UV_PROJECT_ENVIRONMENT` 可宣告。
 
 ## 帳本用的發現文字
 
-> `diagramming-obsidian` 的 `references/layout-heuristics.md`（#185，#182 的 200 → 220 px）：6.5.0 離線設計關卡判定可量測，但只限 agent 交出座標計畫、不建置也不存檔的 task。完整流程不可量：skill 的 check、render、verify 都經 `uv run`，在 staged 複本裡建立 `.venv`，write guard 中止 run。A/B 是兩臂同一份 `SKILL.md`、staged 目錄只差這一個檔案，baseline 目錄的 digest 是 pool 條件與 preflight 的鍵。鑑別斷言是同層元素間距不小於 40 px，兩版 reference 都寫著這個數字，舊格線與它矛盾；不用「欄距 = 220」。舊 reference 的 baseline 有五條不照抄 200 px 的路可以通過，天花板由 preflight 判斷。
+> `diagramming-obsidian` 的 `references/layout-heuristics.md`（#185，#182 的 200 → 220 px）：6.5.0 離線設計關卡判定可量測，但只限 agent 交出座標計畫、不建置也不存檔的 task。完整流程不可量：skill 的 check、render、verify 都經 `uv run`，在 staged 複本裡建立 `.venv`，write guard 中止 run。A/B 是兩臂同一份 `SKILL.md`、staged 目錄只差這一個檔案，baseline 目錄的 digest 是 pool 條件與 preflight 的鍵。鑑別斷言是同層元素間距不小於 40 px，兩版 reference 都寫著這個數字，舊格線與它矛盾；不用「欄距 = 220」。舊 reference 的 baseline 有五條不照抄 200 px 的路可以通過，天花板由 preflight 判斷。skill 要 agent 先 `cd` 進 `references/`，之後的相對寫入同樣落在 staged 複本並中止 run，補跑修不好中止的 A/B，所以 prompt 要求以絕對路徑把 `layout.json` 寫在專案目錄。
 
 ## Scenario 骨架
 
@@ -83,6 +89,6 @@ MEASURABLE，條件三項：(1) task 只要座標計畫，prompt 明說暫不建
 - **`## Environment`**：不宣告。這個形狀不需要任何工具，也不依賴任何工具缺席。
 - **旗標**（preflight 與 A/B 相同，前面都加 `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000`）：`--model 'opus[1m]' --effort xhigh --stage-skill-files --baseline-skill-file <baseline 目錄>/SKILL.md`。baseline 目錄是現行 skill 目錄，只把 `references/layout-heuristics.md` 換成 `1fed56d0~1` 的版本。
 - **`## Max Turns`**：不設，或設得寬（30）；設了就會進 preflight 的鍵。
-- **k**：preflight 3；`## Trials` 5，兩臂共 10。
+- **k**：preflight 3；`## Trials` 5，兩臂共 10。A/B 因 `trial_wrote_repo` 中止時至多重新啟動 1 次，已寫入的列留在池裡。
 - **Grader**：code，`python3 -I`，讀 `$TRIAL_DIR/layout.json`。單一計分標籤 `A1`：檔案存在且可解析；六個 worker 都在，數值有限且寬高為正；六個的垂直範圍兩兩重疊（同一列）；依 `x` 排序後相鄰兩個的間距都 ≥40。印出但不計分：`-- C2:` 每條分隔線與最近元素的距離是否 ≥30；`-- audit:` 六個寬度、相鄰間距、欄距、有沒有 `Read` staged 的 `layout-heuristics.md`、有沒有讀 trial 樹外的路徑、有沒有 `uv` 指令。檔案不存在或不可解析記 FAIL，不是 grade error：agent 被要求交出這個檔案。
 - **鑑別用的斷言**：`A1`。baseline 失敗的方式是行為：它打開舊 reference、把 180 寬的元素放上 200 的格線。它不必知道任何只有 treatment 看得到的名稱或數字就能通過，40 寫在它自己那份檔案的表裡。treatment 通過也是行為：它得把選的寬度與格線配成 40 以上，配錯同樣失敗。

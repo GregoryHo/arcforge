@@ -20,7 +20,7 @@
 2. **注入的是一份文字；staging 複製的是那一份檔案所在的一個目錄。** `resolveSkillOptions` 只讀一個 `--skill-file`（或 `## Target`）（`scripts/cli/eval-skill-options.js:125-143`）；`runSkillEval` 對每臂呼叫一次 `buildInjection`（`eval.js:293-299`），複製的是 `dirname(skillFile)`（`scripts/lib/eval-skill-staging.js:183-199`）。`eval-skill-staging.js:12-14` 的註解說函式可以再被呼叫一次來 stage 第二個目錄，但 `eval ab` 沒有對應的旗標，`runSkillEval` 也沒有對應的選項。
 3. **`skills/core/executing/` 只有 `SKILL.md` 一個檔案**（`ls` 確認）。對它加 `--stage-skill-files`，treatment 多拿到的只有 base-directory 那一行與同一份 `SKILL.md` 的複本。staged 目錄建在 `os.tmpdir()` 底下（`eval-skill-staging.js:195`），它的上一層不是 `skills/core/`，`../dispatching/` 不存在。
 4. **fixture 放進 trial 的檔案兩臂都有。** Setup 對兩臂執行同一段指令、同一個環境（`eval-trial.js:191-200`）。
-5. **Agent 工具呼叫的內容在 transcript 裡只留前 200 個字元。** `summarizeToolInput` 只對 `Write`、`Edit`、`Read`、`Bash`、`Glob`、`Grep` 保留內容，其餘工具走 `JSON.stringify(input).slice(0, 200)`（`scripts/lib/eval-transcript.js:110-134`，截斷在 `:131-132`）。存檔的 transcript 是這份解析後的文字（`eval-trial.js:287-289`），原始 stream-json 不留。row 上的 `actions` 也從同一份文字解析（`:290`）。dispatch card 若是 Agent 工具的 `prompt`，code grader 與 model grader 都讀不到完整內容。
+5. **Agent 工具呼叫的內容在 transcript 裡只留前 200 個字元。** `summarizeToolInput` 只對 `Write`、`Edit`、`Read`、`Bash`、`Glob`、`Grep` 保留內容，其餘工具走 `JSON.stringify(input).slice(0, 200)`（`scripts/lib/eval-transcript.js:110-134`，截斷在 `:131-132`）。存檔的 transcript 是這份解析後的文字（`eval-trial.js:287-289`），原始 stream-json 不留。row 上的 `actions` 也從同一份文字解析（`:290`）。dispatch card 若是 Agent 工具的 `prompt`，code grader 與 model grader 都讀不到 card 的完整文字。subagent 做了什麼則看來留在 transcript：一份已存的 transcript 裡，`[Tool: Agent]` 那一行之後接著的是 subagent 自己的 `Read`、`Bash` 呼叫，沒有標記出自哪一個 agent（operator 本機、未提交的 `evals/results/` 下，`eval-code-review-range-fidelity/20260815-025626/transcripts/baseline-trial-1.txt:5-23`；只看了這一份）。所以一次派工可以間接評分：看派出去之後發生了哪些工具呼叫，而不是看 card 寫了什麼。
 6. **一個 trial 只有一則 user message。** `buildTrialPrompt` 把 Context 與 Task 併成一則（`eval-trial.js:530-543`），`-p` 與 `--no-session-persistence`（`:477-481`）。`executing/SKILL.md:84-86` 要求先問使用者要 attended 還是 unattended；prompt 不先指定模式，照 skill 做的 treatment 會停下來問，不會派工。
 
 ## 逐題回答
@@ -35,7 +35,7 @@
 
 (d) **Target 改成 `dispatching`，加 `--stage-skill-files`。** `references/dispatch-card.md` 只到 treatment，引擎支援。但這量的是 `dispatching` 自己的 card 紀律，沒有交接，不是 #184 的問題，也不在 D-059 的四項之內。它還會撞上事實 5。
 
-**card 讀得到嗎？** 讀不到完整內容（事實 5）。要讓 grader 看到全文，只能在 prompt 要求把 card 寫成檔案，這與 `dispatching/SKILL.md:71` 的指示相反，而且等於由 prompt 指定產出物。
+**card 讀得到嗎？** card 的文字讀不到完整內容；subagent 的動作讀得到，但沒有標記（事實 5）。間接評分救不了 #184 的斷言：兩個斷言問的都是 card 上有什麼欄位，動作序列答不出來。要讓 grader 看到全文，只能在 prompt 要求把 card 寫成檔案，這與 `dispatching/SKILL.md:71` 的指示相反，而且等於由 prompt 指定產出物。
 
 **兩個斷言能鑑別嗎？**
 
@@ -46,11 +46,11 @@
 
 ## 判定
 
-NOT MEASURABLE。交接本身（依名稱載入另一支 skill）在 trial 裡不存在（事實 1）；能把 `dispatching` 只交給 treatment 的做法要嘛引擎沒有（事實 2、3），要嘛改掉了出貨的版面，讀數歸不到這句話；card 的全文 grader 讀不到（事實 5）；#184 指定的兩個斷言，一個各臂都在天花板，另一個量的是 `dispatching`。只補其中一項仍然量不到。
+NOT MEASURABLE。交接本身（依名稱載入另一支 skill）在 trial 裡不存在（事實 1）；能把 `dispatching` 只交給 treatment 的做法要嘛引擎沒有（事實 2、3），要嘛改掉了出貨的版面，讀數歸不到這句話；card 的全文 grader 讀不到，能間接讀到的只有 subagent 未標記的動作（事實 5）；#184 指定的兩個斷言，一個各臂都在天花板，另一個量的是 `dispatching`。只補其中一項仍然量不到。事實 5 就算完全不成立，判定也不變：它立在事實 1 上，沒有載入管道就沒有交接可量，而被改掉的那個字沒有可觀察的行為後果。
 
 ## 帳本用的發現文字
 
-> `executing` → `dispatching` 交接（#184，`executing/SKILL.md:95-96`）：6.5.0 離線設計關卡判定以 `c1d2da73` 的引擎無法量測，未花 session。trial 帶 `--disable-slash-commands`，沒有依名稱載入 skill 的管道，句子指向的 `dispatching` 本體到不了 treatment；`--stage-skill-files` 只複製被注入那一份檔案所在的一個目錄，而 `executing/` 只有 `SKILL.md`。把 `dispatching` 放進 fixture 則兩臂都有，前例是 audit-runs-lint-script 的 5/5 對 5/5。transcript 對 Agent 工具的輸入只留前 200 個字元，dispatch card 的全文 grader 讀不到。#184 指定的斷言中，「沒有 model-tier 欄位」各臂都會通過，「有 acceptance criteria」量到的是 `dispatching` 第 3 步，不是被 #182 改掉的那個字。這個字以文字出貨（D-049 Residual）。#184 維持開啟。
+> `executing` → `dispatching` 交接（#184，`executing/SKILL.md:95-96`）：6.5.0 離線設計關卡判定以 `c1d2da73` 的引擎無法量測，未花 session。trial 帶 `--disable-slash-commands`，沒有依名稱載入 skill 的管道，句子指向的 `dispatching` 本體到不了 treatment；`--stage-skill-files` 只複製被注入那一份檔案所在的一個目錄，而 `executing/` 只有 `SKILL.md`。把 `dispatching` 放進 fixture 則兩臂都有，前例是 audit-runs-lint-script 的 5/5 對 5/5。transcript 對 Agent 工具的輸入只留前 200 個字元，dispatch card 的全文 grader 讀不到；subagent 的工具呼叫看來留在 transcript 但沒有標記，派工只能間接評分。#184 指定的斷言中，「沒有 model-tier 欄位」各臂都會通過，「有 acceptance criteria」量到的是 `dispatching` 第 3 步，不是被 #182 改掉的那個字。這個字以文字出貨（D-049 Residual）。#184 維持開啟。
 
 ## 要怎樣的引擎修改才量得到
 

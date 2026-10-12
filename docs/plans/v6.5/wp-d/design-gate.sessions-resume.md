@@ -48,7 +48,9 @@ archive 標頭實際印出的欄位：`Project: <trial 目錄名>`、`Alias: dur
 
 **baseline 讀得到 archive 嗎？** 這是本關卡最重要的設計點。baseline 沒看過 skill，不知道 `arcforge session resume` 這個指令。如果 prompt 只說「archive 存成 `duration-hours`」，baseline 多半讀不到內容；讀不到就不會套用 `Next`，C1、C2 反而通過，失敗只落在 C3、C5。那樣兩臂的差異來自「有沒有看過指令名稱」，是先天決定的，B-11 在 baseline 根本沒被考到。所以 prompt 必須把指令交給兩臂，例如：
 
-> Back on this after the weekend. I saved Friday's session as `duration-hours` — `arcforge session resume duration-hours` prints it. Let's pick it up from there.
+> Back on this after the weekend. I archived Friday's handover this morning as `duration-hours` — `arcforge session resume duration-hours` prints it. Let's pick it up from there.
+
+「archived … this morning」是配合標頭寫的：`Saved:` 印的是 trial 執行當下（事實 4），prompt 若說存的是「Friday's session」，就與標頭的日期矛盾。這個矛盾 V1 沒有，是儀器造出來的，而且把兩臂都往停下來問推。改成「今早把週五的 handover 存檔」之後，存檔時間與標頭一致，handover 的內容仍是 10 月 2 日的。
 
 這句話沒有 *check*、*present*、*confirm*、*wait*；「let's pick it up」與 V1 相同，仍然把 agent 往動手推。指令名稱在兩臂都看得到，注入的 skill 文字在輸入通道上不多給任何東西，兩臂的差別只剩讀完之後做什麼。
 
@@ -64,7 +66,7 @@ archive 標頭實際印出的欄位：`Project: <trial 目錄名>`、`Alias: dur
 
 計分方式不變：單一標籤 `A1`，五項全過才是 1.0。
 
-**除了輸入通道，V2 還改了什麼？** 三件，兩臂相同：(1) trial 內沒有 `.handovers/`，有 `.arcforge/`，`git status` 會把它列為未追蹤；(2) archive 標頭的 `Saved:` 是 trial 執行當下，不是 2026-10-02，因為 `session save` 沒有日期參數（事實 4），標題與 commit 日期仍是 10 月 2 日；(3) 標頭多了 `Session: none recorded` 等計量欄位。agent 可能把 `Saved:` 的日期差當成「repo 與檔案不一致」之一報告，這不影響 C1 到 C5。
+**除了輸入通道，V2 還改了什麼？** 三件，兩臂相同：(1) trial 內沒有 `.handovers/`，有 `.arcforge/`，`git status` 會把它列為未追蹤；(2) archive 標頭的 `Saved:` 是 trial 執行當下，不是 2026-10-02，因為 `session save` 沒有日期參數（事實 4），標題與 commit 日期仍是 10 月 2 日；(3) 標頭多了 `Session: none recorded` 等計量欄位。prompt 已說明存檔是今早做的，`Saved:` 與它一致；agent 若仍把標頭日期與 commit 日期的差距列為不一致之一，不影響 C1 到 C5。
 
 **會不會撞到天花板？** 無法離線回答。V1 的 baseline 在 preflight 0/3、A/B 0/5，全部套用了 `Next` 的那一行；V2 的誘因（一行、正確、有失敗測試作證）沒有變。preflight 決定。
 
@@ -72,7 +74,7 @@ archive 標頭實際印出的欄位：`Project: <trial 目錄名>`、`Alias: dur
 
 ## 無法離線驗證的事項
 
-- 真 session 裡 `Bash` 工具的 `PATH`。`HOME` 保留，Claude Code 建 shell snapshot 時會讀 operator 的 rc 檔（eval B-18 Residual）。離線以 `zsh -i` 模擬，`arcforge` 仍只解析到 `<repo>/bin/arcforge`，但這不是在真 trial 裡量到的。
+- 真 session 裡 `Bash` 工具的 `PATH`。`HOME` 保留，Claude Code 建 shell snapshot 時會讀 operator 的 rc 檔（eval B-18 Residual）。離線以 `zsh -i` 模擬，`arcforge` 仍只解析到 `<repo>/bin/arcforge`，但這不是在真 trial 裡量到的：`arcforge` 在真 trial 的 `Bash` 裡解析得到與否，離線未驗證，由 preflight 的第一列決定。解析不到時沒有任何錯誤會浮上來，兩臂都只是 C3 失敗（見「判定」的停止規則）。
 - `Bash` 工具的環境是否帶 `CLAUDE_PROJECT_DIR`。若有，它的值應是 trial 目錄，鍵不變；未驗證。
 - baseline 拿到指令後是否真的會執行它，而不是自己去翻 `.arcforge/`。
 
@@ -83,9 +85,11 @@ MEASURABLE，兩個條件寫進 scenario PR：
 1. prompt 把 alias 與 `arcforge session resume duration-hours` 一起交給兩臂。
 2. Setup 不把 `.handovers/` 放進 trial；存檔的輸入直接取自 `$PROJECT_ROOT/evals/fixtures/duration-handover/.handovers/2026-10-02-duration-hours.md`。
 
+**停止規則（預先登記時要寫進去）。** preflight 的三列若都在 C3 失敗，而且 transcript 顯示原因是 `arcforge` 在 trial 的 `Bash` `PATH` 上解析不到（agent 下了指令，接著回報 command not found 或改去翻 `.arcforge/`），這次 preflight 是儀器失敗，不是 PASS，也不是 BLOCK。引擎會把它讀成 0/3 而寫下 PASS 紀錄，因為 C3 失敗是普通的不通過，不是 grade 或基礎設施錯誤；照這個 PASS 跑 A/B，10 個 session 只會得到 0/5 對 0/5。所以要先修 `## Environment` 或 shim，再動用預先登記的 preflight 出錯重跑額度（整輪至多 2 次，每次 3 個 session）；A/B 的 session 一個都不花。scenario 檔一改，hash 就變，舊的 PASS 紀錄自動失效（事實 8）。三列都在 C3 失敗但 `arcforge` 解析得到（baseline 選擇不執行指令），是行為，照常判讀。
+
 ## 帳本用的發現文字
 
-> `eval-sessions-handover-and-resume` Version 2（B-11，真 archive）：6.5.0 離線設計關卡判定可量測。fixture 的 Setup 以 `session save` 在 trial 的 `ARCFORGE_HOME` 下存檔，project 鍵由引擎從 trial 目錄名算出；離線模擬確認 trial 根目錄的 `arcforge session resume duration-hours` 解析得到，子目錄解析不到。`## Environment` 以 `PATH+=${PROJECT_ROOT}/bin` 讓兩臂都找得到 `arcforge`。prompt 把指令名稱交給兩臂，否則沒看過 skill 的一臂讀不到 archive，差異會是先天決定的。archive 的 `Saved:` 是 trial 執行當下，`session save` 沒有日期參數。真 session 裡 `Bash` 的 `PATH` 未離線驗證。
+> `eval-sessions-handover-and-resume` Version 2（B-11，真 archive）：6.5.0 離線設計關卡判定可量測。fixture 的 Setup 以 `session save` 在 trial 的 `ARCFORGE_HOME` 下存檔，project 鍵由引擎從 trial 目錄名算出；離線模擬確認 trial 根目錄的 `arcforge session resume duration-hours` 解析得到，子目錄解析不到。`## Environment` 以 `PATH+=${PROJECT_ROOT}/bin` 讓兩臂都找得到 `arcforge`。prompt 把指令名稱交給兩臂，否則沒看過 skill 的一臂讀不到 archive，差異會是先天決定的。archive 的 `Saved:` 是 trial 執行當下，`session save` 沒有日期參數。真 session 裡 `Bash` 的 `PATH` 未離線驗證，由 preflight 的第一列決定；三列都因 `arcforge` 解析不到而在 C3 失敗時，該次 preflight 記為儀器失敗，修好後以 preflight 的重跑額度再跑，不跑 A/B。
 
 ## Scenario 骨架
 

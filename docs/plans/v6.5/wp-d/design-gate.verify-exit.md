@@ -49,7 +49,7 @@ baseline 的文字是 `c5328ba4~1`（`0bcd2e87`）的 `SKILL.md:168`、`:171`：
 
 **在這台主機的 trial 裡，`uv` 與 Chromium 解析不到嗎？** Chromium 可以由 `PLAYWRIGHT_BROWSERS_PATH` 做到解析不到，這不依賴 `PATH`。`uv` 無法在離線條件下證明解析不到，手上的離線證據指向相反：只要 trial 的 shell 讀了 rc 檔，`uv` 就回來。PLAN 與 D-062 的 Residual 都規定，證明不了缺席就判 NOT MEASURABLE；真 trial 是唯一的證明，而本關卡不得花 session。
 
-**那就不靠 `uv` 缺席，只做 Chromium 缺席呢？** 這是唯一能穩定重現的缺相依套件分支，也是句子真正會被用到的地方：`uv` 在、`uv run` 建好 venv、renderer 找不到 Chromium，印出 `Chromium not installed for Playwright. Run: cd … && uv run playwright install chromium`（`render_excalidraw.py:219`），verifier 以 `VERIFY FAILED:` 非零退出。但走到這一行之前，`uv run` 已經在 staged 複本裡建了 `.venv`（事實 5）。兩臂在句子產生分歧之前就各自成為 `trial_wrote_repo`，run 在第一個 trial 中止，preflight 沒有可計分的列（`eval-preflight.js:247-255` 判 BLOCK）。
+**那就不靠 `uv` 缺席，只做 Chromium 缺席呢？** 這是唯一能穩定重現的缺相依套件分支，也是句子真正會被用到的地方：`uv` 在、`uv run` 建好 venv、renderer 找不到 Chromium，印出 `Chromium not installed for Playwright. Run: cd … && uv run playwright install chromium`（`render_excalidraw.py:219`），verifier 以 `VERIFY FAILED:` 非零退出。但走到這一行之前，`uv run` 已經在 staged 複本裡建了 `.venv`（事實 5）。兩臂在句子產生分歧之前就各自成為 `trial_wrote_repo`，run 在第一個 trial 中止：preflight 先寫下該列，接著在 `eval-preflight.js:237` 丟出錯誤，不寫 preflight 紀錄；`:247-255` 的 BLOCK 分支走不到。這樣的 preflight 既不是 PASS，也不是 BLOCK，`eval ab` 因為沒有 PASS 紀錄而不放行。
 
 **`uv` 真的缺席的話呢？** treatment 照句子「install `uv` first」裝好，再照「verify again」執行 `uv run`，同樣在 staged 複本裡建 `.venv`。把句子完整做完的 treatment 會被記成儀器錯誤並中止 run；沒做完的 treatment（只回報缺 `uv`）沒有「安裝後再 verify」可以評分。
 

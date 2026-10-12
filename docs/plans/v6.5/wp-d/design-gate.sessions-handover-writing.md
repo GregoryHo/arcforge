@@ -28,7 +28,7 @@ D5 以 `eval-sessions-handover-completeness` 的現行 Version 4、不改 scenar
 
 **池會怎麼變？** 多一池：Version 4、`stageSkillFiles: true`、`opus[1m]`、`xhigh`、turn 上限 40。既有那一池（2026-08-15，條件未記錄）留在磁碟上，成為「others」。兩池不合併，也不該合併：既有那一池量的是瘦身前的文字，範本還在本體裡。
 
-**現行斷言還能鑑別嗎？** 依已提交的數字，本來就沒有靠行為鑑別過。baseline 五列一律 5/7、零變異，最直接的解釋是它每次都剛好輸掉先天的那兩個（`Write:re:^\S*handovers/` 與 A5），A1 到 A4 兩臂都在天花板。逐斷言向量不在已提交的匯出裡，這個解釋未經逐列確認；但 5/7 加上零變異，很難有別的組合。scenario 的 Design Notes 把鑑別主張放在 A1 到 A4，那一部分在既有讀數裡是 0。
+**現行斷言還能鑑別嗎？** 依已提交的數字，本來就沒有靠行為鑑別過。baseline 五列一律 5/7、零變異，最直接的解釋是它每次都剛好輸掉先天的那兩個（`Write:re:^\S*handovers/` 與 A5），A1 到 A4 兩臂都在天花板。逐斷言向量不在已提交的匯出裡，但 operator 本機未提交的 `evals/results/` 留有 Version 4 的列，逐列確認了這個解釋：`20260815-074644` 與 `20260815-050346` 兩次 run 共 9 筆有計分的 baseline 列，向量都是 `[1,0,1,1,1,1,0]`，輸掉的正是 `.handovers/` 的寫入與 A5；同一次 run 的 treatment 五列都是七個 1。scenario 的 Design Notes 把鑑別主張放在 A1 到 A4，那一部分在既有讀數裡是 0。
 
 **加了 staging，這一點會變嗎？** 不會往鑑別的方向變。baseline 還是什麼都沒注入，A1 到 A4 的 baseline 表現與 staging 無關。treatment 已經是 7/7，沒有上升空間。staging 能改變的只有一個方向：treatment 掉下來。
 
