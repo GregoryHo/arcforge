@@ -266,8 +266,9 @@ another name at an archive — only a file `save` wrote under this project's
 `~/.arcforge/sessions/<project>/`, so a `.handovers/` file is refused (read one
 with `resume <path>`), and so is a symlink there that leads to a file outside it. Aliases are per project and live in
 `~/.arcforge/sessions/<project>/aliases.json`. A name is letters, digits, `-`
-and `_`, at most 128 characters; anything else is refused, never rewritten, and
-no name is reserved. Replacing a name that already exists, through `save` or
+and `_`, at most 128 characters, and does not begin with `-` (the CLI would
+read it as a flag); anything else is refused, never rewritten, and no name is
+reserved. Replacing a name that already exists, through `save` or
 `alias set`, needs `--force`. `<project>` is the project directory's name, so
 two projects with the same directory name share their archives and aliases.
 Commands that change aliases at the same time take turns on

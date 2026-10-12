@@ -125,6 +125,11 @@ function validateAlias(alias) {
   if (alias.length > MAX_ALIAS_LENGTH) {
     return { valid: false, error: `Alias name cannot exceed ${MAX_ALIAS_LENGTH} characters` };
   }
+  // The CLI reads an operand that begins with `-` as a flag, so such a name
+  // could be stored but never passed to `resume` or `alias remove`.
+  if (alias.startsWith('-')) {
+    return { valid: false, error: 'Alias cannot begin with -' };
+  }
   if (!/^[a-zA-Z0-9_-]+$/.test(alias)) {
     return {
       valid: false,

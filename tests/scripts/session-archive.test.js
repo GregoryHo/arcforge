@@ -415,6 +415,17 @@ describe('latestArchive', () => {
     expect(latestArchive('p').alias).toBe('parser');
   });
 
+  it('never returns a hand-edited alias that begins with -, so the caller names the path', () => {
+    const a = saveArchive('p', 'parser', FIVE, { now: new Date('2026-10-03T12:00:00Z') });
+    const index = path.join(home, 'sessions', 'p', 'aliases.json');
+
+    fs.writeFileSync(
+      index,
+      JSON.stringify({ version: '1.0', aliases: { '-foo': { sessionPath: a.path } } }),
+    );
+    expect(latestArchive('p')).toEqual({ date: '2026-10-03', path: a.path, alias: null });
+  });
+
   it('reports no alias when the index cannot be parsed or is not an index', () => {
     const a = saveArchive('p', 'parser', FIVE, { now: new Date('2026-10-03T12:00:00Z') });
     const index = path.join(home, 'sessions', 'p', 'aliases.json');

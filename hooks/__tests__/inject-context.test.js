@@ -629,6 +629,21 @@ describe('inject-context session continuity line', () => {
     );
   });
 
+  it('an alias key that begins with - is resumed by path, not read as a flag', () => {
+    const file = plantArchive({ alias: false });
+    fs.writeFileSync(
+      path.join(sessionsDir(), 'aliases.json'),
+      JSON.stringify({ version: '1.0', aliases: { '-foo': { sessionPath: file } } }),
+    );
+
+    const out = JSON.parse(sessionStart('startup'));
+    assert.strictEqual(
+      out.hookSpecificOutput.additionalContext,
+      `Previous session archive: ${STAMPED}, saved 2026-10-03. ` +
+        `Read it: arcforge session resume ${file}`,
+    );
+  });
+
   it('a broken alias index costs the alias, not the line', () => {
     const file = plantArchive();
     fs.writeFileSync(path.join(sessionsDir(), 'aliases.json'), '{ not json');

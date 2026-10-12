@@ -77,6 +77,20 @@ describe('session-aliases', () => {
         expect(validateAlias(name).valid).toBe(false);
       }
     });
+
+    it('refuses a name that begins with -, which the CLI would read as a flag', () => {
+      const { validateAlias, setAlias } = getAliasesModule();
+      for (const name of ['-foo', '-', '--force', '-_x']) {
+        expect(validateAlias(name)).toEqual({ valid: false, error: 'Alias cannot begin with -' });
+      }
+      for (const name of ['foo-bar', '_x', 'foo-', '_-x', '9-']) {
+        expect(validateAlias(name).valid).toBe(true);
+      }
+      expect(setAlias(project, '-foo', '/tmp/archive.md')).toEqual({
+        success: false,
+        error: 'Alias cannot begin with -',
+      });
+    });
   });
 
   describe('a corrupt aliases.json', () => {
