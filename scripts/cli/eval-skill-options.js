@@ -87,7 +87,7 @@ function refuseSkillTextFlagsForWorkflow(scenario, given, cmd) {
  * @param {{ scope: string }} scenario
  * @param {string} projectRoot
  * @param {{ baselineSkillFile?: string, stage?: boolean }} given - Parsed CLI values
- * @returns {{ arm: Function, remove: Function, conditions: Object }} arm/remove as
+ * @returns {{ arm: Function, conditions: Object }} arm as
  *   baselineArm; conditions are what the preflight record is keyed on: the
  *   baseline text's hash, and the digest of its directory when it is staged
  */

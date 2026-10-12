@@ -182,14 +182,15 @@ describe('staged skill files for the injected arm (B-19)', () => {
     expect(rows[1].skillTextHash).toBe(hashSkillText('BODY'));
   });
 
-  it('stops the run when a trial writes into the staged copy', () => {
+  it('records a write into the staged copy on that trial, and does not stop the run', () => {
     onTrial = (trial) => {
       if (trial.staged) fs.writeFileSync(path.join(trial.staged, 'references', 'new.txt'), 'x');
     };
-    expect(() => run({ stageSkillFiles: true })).toThrow(
-      /treatment trial 1 wrote outside its directory: .*new\.txt/,
+    run({ stageSkillFiles: true });
+    expect(rows[1]).toEqual(
+      expect.objectContaining({ errorType: 'trial_wrote_skill_files', infraError: true }),
     );
-    expect(rows[1].errorType).toBe('trial_wrote_repo');
+    expect(rows[1].error).toMatch(/Trial changed the staged skill files: .*new\.txt/);
     expect(fs.existsSync(trials[1].staged)).toBe(false);
   });
 
@@ -204,32 +205,14 @@ describe('staged skill files for the injected arm (B-19)', () => {
       fs.rmSync(path.dirname(kept), { recursive: true });
     };
 
-    it('stops the run on a trial that left the staged copy with other content', () => {
+    it('records a trial that left the staged copy with other content', () => {
       onTrial = (trial) => trial.staged && rewriteUnseen(trial.staged);
-      expect(() => run({ stageSkillFiles: true })).toThrow(
-        /treatment trial 1 changed the staged skill files: .*arcforge-eval-skill-/,
-      );
+      run({ stageSkillFiles: true });
       expect(rows[1]).toEqual(
         expect.objectContaining({ errorType: 'trial_wrote_skill_files', infraError: true }),
       );
       expect(rows[1].error).toContain(trials[1].staged);
       expect(fs.existsSync(trials[1].staged)).toBe(false);
-    });
-
-    it('checks every staged copy after every trial, whichever arm it was staged for', () => {
-      const oldFile = writeSkill(tempDir, 'demo-old', 'OLD');
-      recordingStaged((dirs) => {
-        onTrial = (trial) => rewriteUnseen(dirs.find((dir) => dir !== trial.staged));
-        expect(() =>
-          run({
-            stageSkillFiles: true,
-            baselineSkillInstruction: 'OLD',
-            baselineSkillFile: oldFile,
-          }),
-        ).toThrow(/baseline trial 1 changed the staged skill files/);
-      });
-      expect(trials).toHaveLength(1);
-      expect(rows[0].errorType).toBe('trial_wrote_skill_files');
     });
 
     it('does not see a write confined to a directory the digest leaves out', () => {
@@ -349,40 +332,38 @@ describe('staged skill files for the injected arm (B-19)', () => {
       twoText({ stageSkillFiles: true });
       for (const { staged } of trials) expect(fs.existsSync(staged)).toBe(false);
 
-      // The first trial throws: the treatment's copy was staged but never used.
+      // The first trial throws: each arm was staged once ahead of the trials,
+      // and the baseline once more for that trial.
       onTrial = () => {
         throw new Error('spawn failed');
       };
       const made = recordingStaged(() => {
         expect(() => twoText({ stageSkillFiles: true })).toThrow('spawn failed');
       });
-      expect(made).toHaveLength(2);
+      expect(made).toHaveLength(3);
       for (const dir of made) expect(fs.existsSync(dir)).toBe(false);
     });
 
-    it('stops the run when the baseline writes into the copy staged for the treatment', () => {
-      const made = recordingStaged((dirs) => {
+    it('has no copy of the other arm on disk while a trial runs', () => {
+      recordingStaged((dirs) => {
         onTrial = (trial) => {
-          const other = dirs.find((dir) => dir !== trial.staged);
-          fs.writeFileSync(path.join(other, 'SKILL.md'), 'edited by the baseline');
+          trial.others = dirs.filter((dir) => dir !== trial.staged && fs.existsSync(dir));
         };
-        expect(() => twoText({ stageSkillFiles: true })).toThrow(
-          /baseline trial 1 wrote outside its directory: .*SKILL\.md/,
-        );
+        twoText({ stageSkillFiles: true });
       });
-      expect(made).toHaveLength(2);
-      expect(trials).toHaveLength(1);
+      expect(trials.map((trial) => trial.others)).toEqual([[], []]);
     });
   });
 
-  it('the baseline watches the staged copy too', () => {
+  it('has no staged copy on disk while a baseline given no text runs', () => {
     recordingStaged((dirs) => {
-      onTrial = () => fs.writeFileSync(path.join(dirs[0], 'SKILL.md'), 'edited by the baseline');
-      expect(() => run({ stageSkillFiles: true })).toThrow(
-        /baseline trial 1 wrote outside its directory: .*SKILL\.md/,
-      );
+      onTrial = (trial) => {
+        trial.others = dirs.filter((dir) => fs.existsSync(dir));
+      };
+      run({ stageSkillFiles: true });
     });
-    expect(trials).toHaveLength(1);
+    expect(trials[0].staged).toBeUndefined();
+    expect(trials[0].others).toEqual([]);
   });
 });
 

@@ -41,12 +41,7 @@ const {
   stopIfTrialWroteRepo,
 } = require('./eval-trial');
 const { splitPools } = require('./eval-pools');
-const {
-  buildInjection,
-  removeStagedDir,
-  stagedCopies,
-  withInjection,
-} = require('./eval-skill-staging');
+const { trialArm } = require('./eval-skill-staging');
 
 /**
  * Eval scenario parsed from a markdown file
@@ -194,8 +189,10 @@ function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts
  * @param {EvalScenario} treatScenario - Scenario for treatment trials (may differ from base)
  * @param {EvalScenario} gradeScenario - Original scenario for grading
  * @param {number} k - Trials per condition
- * @param {Object} bOpts - Baseline trial options
- * @param {Object} tOpts - Treatment trial options
+ * @param {Object} bOpts - Baseline trial options; stageTrial, when given, is
+ *   called for each trial and returns that trial's scenario, the skillInjection
+ *   fields that are its own, and a remove() for what it staged (trialArm)
+ * @param {Object} tOpts - Treatment trial options, as bOpts
  * @param {boolean} interleave - Alternate baseline/treatment trials
  * @returns {{ baseline: TrialResult[], treatment: TrialResult[], delta: number }}
  */
@@ -204,8 +201,19 @@ function runAbTrials(baseScenario, treatScenario, gradeScenario, k, bOpts, tOpts
   const treatment = [];
 
   // A trial that wrote outside its directory ends the run (stopIfTrialWroteRepo).
-  const runArm = (arm, scenario, t, opts) => {
-    const row = executeAndGradeTrial(scenario, gradeScenario, t, k, opts);
+  // An arm with staged skill files is staged a copy for each trial, removed
+  // once the trial is graded (B-19).
+  const runArm = (arm, scenario, t, { stageTrial, ...opts }) => {
+    const staged = stageTrial?.();
+    let row;
+    try {
+      row = executeAndGradeTrial(staged?.scenario || scenario, gradeScenario, t, k, {
+        ...opts,
+        skillInjection: { ...opts.skillInjection, ...staged?.skillInjection },
+      });
+    } finally {
+      staged?.remove();
+    }
     arm.push(row);
     stopIfTrialWroteRepo(row, `${opts.label} trial ${t}`);
   };
@@ -259,7 +267,8 @@ function sharedArmOptions(scenario, { maxTurns, pluginDir }) {
  * @param {string} [options.baselineSkillFile] - Absolute path that text was read from
  * @param {boolean} [options.stageSkillFiles=false] - Copy each injected arm's skill
  *   directory outside the trial tree and open its injection with the
- *   base-directory line (B-19); the copies are removed when the run ends
+ *   base-directory line (B-19); each trial gets a copy of its own, removed
+ *   when that trial ends
  * @param {boolean} [options.interleave=false] - Alternate baseline/treatment trials
  * @returns {{ baseline: TrialResult[], treatment: TrialResult[], delta: number }}
  */
@@ -288,52 +297,42 @@ function runSkillEval(scenario, k, options = {}) {
   resolveTrialTimeoutMs(); // refuse a bad ceiling before any trial spawns (B-10)
   const isolationSettings = buildIsolationSettings();
 
-  const staged = [];
-  try {
-    const inject = (text, file) => {
-      const injection = buildInjection({ text, skillFile: file, stage: stageSkillFiles });
-      staged.push(injection.baseDir);
-      return injection;
-    };
-    const baseline = inject(baselineSkillInstruction, baselineSkillFile);
-    const treatment = inject(skillInstruction, skillFile);
-    const shared = sharedArmOptions(scenario, { maxTurns });
-    // Both arms watch every staged copy: a write into one changes what the
-    // trials after it are given, whichever arm made it.
-    const watchRoots = [...shared.watchRoots, ...staged].filter(Boolean);
-    const copies = stagedCopies([baseline, treatment]);
-    const armOptions = (label, { baseDir, textHash, filesHash }) => ({
-      projectRoot,
-      label,
-      onTrialComplete,
-      isolationSettings,
-      model,
-      effort,
-      runId,
-      ...shared,
-      watchRoots,
-      skillInjection: {
-        baseDir,
-        textHash,
-        filesHash,
-        staged: stageSkillFiles,
-        copies,
-        baselineHash: baseline.textHash,
-        baselineFilesHash: baseline.filesHash,
-      },
-    });
-    return runAbTrials(
-      withInjection(scenario, baseline),
-      withInjection(scenario, treatment),
-      scenario,
-      k,
-      armOptions('baseline', baseline),
-      armOptions('treatment', treatment),
-      interleave,
-    );
-  } finally {
-    for (const dir of staged) removeStagedDir(dir);
-  }
+  // Each arm is staged once here and the copy removed: a directory that cannot
+  // be staged is refused before the first trial, not after the other arm's.
+  const stage = stageSkillFiles;
+  const baseline = trialArm(scenario, {
+    text: baselineSkillInstruction,
+    skillFile: baselineSkillFile,
+    stage,
+  });
+  const treatment = trialArm(scenario, { text: skillInstruction, skillFile, stage });
+  const armOptions = (label, { textHash, filesHash, forTrial }) => ({
+    projectRoot,
+    label,
+    onTrialComplete,
+    isolationSettings,
+    model,
+    effort,
+    runId,
+    ...sharedArmOptions(scenario, { maxTurns }),
+    stageTrial: forTrial,
+    skillInjection: {
+      textHash,
+      filesHash,
+      staged: stageSkillFiles,
+      baselineHash: baseline.textHash,
+      baselineFilesHash: baseline.filesHash,
+    },
+  });
+  return runAbTrials(
+    scenario,
+    scenario,
+    scenario,
+    k,
+    armOptions('baseline', baseline),
+    armOptions('treatment', treatment),
+    interleave,
+  );
 }
 
 /**

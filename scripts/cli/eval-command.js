@@ -289,40 +289,39 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
       pluginDir: abPluginDir,
     });
     const stubRunTrial = (t, totalK) => {
+      // Staged skill files are copied for this trial alone (B-19).
       const arm = baseline.arm();
-      return eval_.runTrial(arm.scenario, t, totalK, {
-        projectRoot,
-        model,
-        effort,
-        runId,
-        isolated: true,
-        label: PREFLIGHT_LABEL,
-        ...baselineArm,
-        watchRoots: [...baselineArm.watchRoots, ...arm.watchRoots],
-        skillInjection: arm.skillInjection,
-      });
+      try {
+        return eval_.runTrial(arm.scenario, t, totalK, {
+          projectRoot,
+          model,
+          effort,
+          runId,
+          isolated: true,
+          label: PREFLIGHT_LABEL,
+          ...baselineArm,
+          skillInjection: arm.skillInjection,
+        });
+      } finally {
+        arm.remove();
+      }
     };
     const stubGrade = (result) => gradePreflightTrial(result, scenario, projectRoot);
 
-    let outcome;
-    try {
-      outcome = runPreflight(scenarioName, projectRoot, {
-        scenario,
-        runTrial: stubRunTrial,
-        gradeResult: stubGrade,
-        model,
+    const outcome = runPreflight(scenarioName, projectRoot, {
+      scenario,
+      runTrial: stubRunTrial,
+      gradeResult: stubGrade,
+      model,
+      effort,
+      conditions: {
+        maxTurns: baselineArm.maxTurns,
+        pluginDir: abPluginDir,
         effort,
-        conditions: {
-          maxTurns: baselineArm.maxTurns,
-          pluginDir: abPluginDir,
-          effort,
-          trialTimeoutMs: eval_.resolveTrialTimeoutMs(),
-          ...baseline.conditions,
-        },
-      });
-    } finally {
-      baseline.remove();
-    }
+        trialTimeoutMs: eval_.resolveTrialTimeoutMs(),
+        ...baseline.conditions,
+      },
+    });
 
     console.log(`Verdict: ${outcome.verdict}`);
     console.log(`Reason:  ${outcome.reason}`);
