@@ -38,7 +38,7 @@
 | 子目錄執行 `cd src && arcforge session resume duration-hours` | exit 1：`no session alias "duration-hours" in project "src"` |
 | V1 的 scenario 改成 V2 草稿（Setup 換成存檔、加 `## Environment`、Version 2）後 `lintScenario` | `ok` |
 | 草稿的完整 Setup 在重建後的環境執行 | 237 ms 完成（上限 30 s，`eval-trial-env.js:99`）；`HEAD` 是 `feat-duration-hours`，`npm test` 仍在 `parses hours` 失敗 |
-| `## Environment` 再加 `PATH^=${TRIAL_DIR}/.arcforge/bin`，Setup 在那裡寫一支包裝 script：呼叫 `node <repo>/scripts/cli.js "$@"`，exit 0 時把參數附加到 `<trial>/.arcforge/arcforge-ok.log` | `parseEnvironment` 接受兩行；`command -v arcforge` 解析到包裝 script；根目錄的 `resume` 印出 archive，log 多一行 `session resume duration-hours`；`cd src` 的那一次 exit 1，log 沒有新增 |
+| `## Environment` 再加 `PATH^=${TRIAL_DIR}/.arcforge/bin`，Setup 在那裡寫一支包裝 script：呼叫 `node <repo>/scripts/cli.js "$@"`，每次呼叫都把 exit code、當時的工作目錄與參數附加一行到 `<trial>/.arcforge/arcforge-calls.log` | `parseEnvironment` 接受兩行；`command -v arcforge` 解析到包裝 script；根目錄的 `resume` 印出 archive，log 多一行 `0`、`<trial>`、`session resume duration-hours`；`cd src` 的那一次 exit 1，log 多一行 `1`、`<trial>/src`、同樣的參數 |
 | 以 trial 的 `PATH` 啟動 `zsh -i`（會讀 operator 的 rc 檔）後 `whence -a arcforge` | 只有 `<repo>/bin/arcforge`，沒有別的 `arcforge` 排在前面 |
 
 archive 標頭實際印出的欄位：`Project: <trial 目錄名>`、`Alias: duration-hours`、`Saved: <執行當下>`、`Session: none recorded`，其餘計量欄位是 `unknown`。
@@ -61,7 +61,7 @@ archive 標頭實際印出的欄位：`Project: <trial 目錄名>`、`Alias: dur
 |---|---|---|
 | C1 專案與 fixture 相同 | 含「handover 仍未追蹤」、`DIRS` 含 `.handovers` | 拿掉 `.handovers` 相關項；`.arcforge` 已在 `SKIP`（V1 `:589`），archive 不算變動 |
 | C2 沒有寫檔工具碰專案 | 不變 | 不變 |
-| C3 讀了 handover | `Read` 或 `Bash` 讀 `.handovers/` | `$TRIAL_DIR/.arcforge/arcforge-ok.log` 有一行 `session resume duration-hours`，也就是指令真的執行並 exit 0。只看 transcript 有沒有這個呼叫不夠：transcript 不留輸出與 exit code（事實 6），`command not found` 的呼叫看起來一模一樣。transcript 裡有沒有這個 `Bash` 呼叫、有沒有直接讀 `.arcforge/sessions/` 下的檔案，各印在 audit 行，不計分 |
+| C3 讀了 handover | `Read` 或 `Bash` 讀 `.handovers/` | `$TRIAL_DIR/.arcforge/arcforge-calls.log` 有一行 exit code 是 `0` 的 `session resume duration-hours`，也就是指令真的執行並成功。只看 transcript 有沒有這個呼叫不夠：transcript 不留輸出與 exit code（事實 6），`command not found` 的呼叫看起來一模一樣。transcript 裡有沒有這個 `Bash` 呼叫、有沒有直接讀 `.arcforge/sessions/` 下的檔案，各印在 audit 行，不計分 |
 | C4 跑了完整 suite | 不變 | 不變 |
 | C5 終局回覆提到 days 測試與下一步 | 不變 | 不變；6.4.0 帳本記下的三種 regex 盲點原樣帶過來 |
 
@@ -85,13 +85,13 @@ MEASURABLE，三個條件寫進 scenario PR：
 
 1. prompt 把 alias 與 `arcforge session resume duration-hours` 一起交給兩臂。
 2. Setup 不把 `.handovers/` 放進 trial；存檔的輸入直接取自 `$PROJECT_ROOT/evals/fixtures/duration-handover/.handovers/2026-10-02-duration-hours.md`。
-3. `resume` 成功與否要有 grader 讀得到的訊號：Setup 在 `.arcforge/bin/` 寫包裝 script，`## Environment` 以 `PATH^=${TRIAL_DIR}/.arcforge/bin` 把它排在最前面，C3 讀它留下的 log（離線驗證表）。`.arcforge` 已在 C1 的 `SKIP`，兩臂的 trial 目錄相同。
+3. `resume` 成功與否要有 grader 讀得到的訊號：Setup 在 `.arcforge/bin/` 寫包裝 script，`## Environment` 以 `PATH^=${TRIAL_DIR}/.arcforge/bin` 把它排在最前面，C3 讀它留下的 log（離線驗證表）。log 記的是每一次呼叫，連同 exit code 與工作目錄，所以「下了指令但失敗」與「指令根本沒有跑到包裝 script」分得開。`.arcforge` 已在 C1 的 `SKIP`，兩臂的 trial 目錄相同。
 
-**停止規則（預先登記時要寫進去）。** preflight 的三列若都是「transcript 裡有 `arcforge session resume duration-hours` 的呼叫，log 卻沒有對應的一行」，這次 preflight 是儀器失敗，不是 PASS，也不是 BLOCK：指令下了三次，一次都沒有成功，最可能的原因是 `arcforge` 在 trial 的 `Bash` `PATH` 上解析不到，或解析到別的東西。這個條件兩邊都是 grader 讀得到的（transcript 的指令全文與 trial 目錄裡的 log），不靠 agent 怎麼描述錯誤。引擎會把它讀成 0/3 而寫下 PASS 紀錄，因為 C3 失敗是普通的不通過，不是 grade 或基礎設施錯誤；照這個 PASS 跑 A/B，10 個 session 只會得到 0/5 對 0/5。所以要先修 `## Environment` 或 shim，再動用預先登記的 preflight 出錯重跑額度（整輪至多 2 次，每次 3 個 session）；A/B 的 session 一個都不花。scenario 檔一改，hash 就變，舊的 PASS 紀錄自動失效（事實 8）。只有一、兩列符合（例如 agent 先 `cd src` 再執行，exit 1），或三列都沒有下指令（baseline 選擇不執行），是行為，C3 照常記為失敗，照常判讀。
+**停止規則（預先登記時要寫進去）。** preflight 的三列若都是「transcript 裡有 `arcforge session resume duration-hours` 的呼叫，log 卻連一行都沒有」，這次 preflight 是儀器失敗，不是 PASS，也不是 BLOCK：指令下了，包裝 script 一次都沒有被執行，表示 `arcforge` 在 trial 的 `Bash` `PATH` 上解析不到，或解析到別的東西。這個條件兩邊都是 grader 讀得到的（transcript 的指令全文與 trial 目錄裡的 log），不靠 agent 怎麼描述錯誤。log 裡有一行 exit code 不是 0 的紀錄則相反：包裝 script 跑了，儀器沒有問題，失敗的是那一次呼叫。引擎會把它讀成 0/3 而寫下 PASS 紀錄，因為 C3 失敗是普通的不通過，不是 grade 或基礎設施錯誤；照這個 PASS 跑 A/B，10 個 session 只會得到 0/5 對 0/5。所以要先修 `## Environment` 或 shim，再動用預先登記的 preflight 出錯重跑額度（整輪至多 2 次，每次 3 個 session）；A/B 的 session 一個都不花。scenario 檔一改，hash 就變，舊的 PASS 紀錄自動失效（事實 8）。agent 先 `cd src` 再執行而 exit 1（log 記下 `1` 與 `<trial>/src`），就算三列都這樣，也是行為；三列都沒有下指令（baseline 選擇不執行）同樣是行為。這些列的 C3 照常記為失敗，照常判讀，不重跑。只有一、兩列的 log 是空的，則逐列稽核，不套用停止規則。
 
 ## 帳本用的發現文字
 
-> `eval-sessions-handover-and-resume` Version 2（B-11，真 archive）：6.5.0 離線設計關卡判定可量測。fixture 的 Setup 以 `session save` 在 trial 的 `ARCFORGE_HOME` 下存檔，project 鍵由引擎從 trial 目錄名算出；離線模擬確認 trial 根目錄的 `arcforge session resume duration-hours` 解析得到，子目錄解析不到。`## Environment` 以 `PATH+=${PROJECT_ROOT}/bin` 讓兩臂都找得到 `arcforge`，再以 `PATH^=${TRIAL_DIR}/.arcforge/bin` 排進一支 Setup 寫的包裝 script，`resume` exit 0 時留下一行 log，C3 讀這行 log，因為 transcript 不留 exit code。prompt 把指令名稱交給兩臂，否則沒看過 skill 的一臂讀不到 archive，差異會是先天決定的。archive 的 `Saved:` 是 trial 執行當下，`session save` 沒有日期參數。真 session 裡 `Bash` 的 `PATH` 未離線驗證，由 preflight 的第一列決定；三列都下了指令而 log 一行都沒有時，該次 preflight 記為儀器失敗，修好後以 preflight 的重跑額度再跑，不跑 A/B。
+> `eval-sessions-handover-and-resume` Version 2（B-11，真 archive）：6.5.0 離線設計關卡判定可量測。fixture 的 Setup 以 `session save` 在 trial 的 `ARCFORGE_HOME` 下存檔，project 鍵由引擎從 trial 目錄名算出；離線模擬確認 trial 根目錄的 `arcforge session resume duration-hours` 解析得到，子目錄解析不到。`## Environment` 以 `PATH+=${PROJECT_ROOT}/bin` 讓兩臂都找得到 `arcforge`，再以 `PATH^=${TRIAL_DIR}/.arcforge/bin` 排進一支 Setup 寫的包裝 script，每次呼叫留下一行 exit code、工作目錄與參數，C3 讀 exit code 為 0 的那一行，因為 transcript 不留 exit code。prompt 把指令名稱交給兩臂，否則沒看過 skill 的一臂讀不到 archive，差異會是先天決定的。archive 的 `Saved:` 是 trial 執行當下，`session save` 沒有日期參數。真 session 裡 `Bash` 的 `PATH` 未離線驗證，由 preflight 的第一列決定；三列都下了指令而 log 連一行都沒有時（包裝 script 沒有被執行；exit 1 的呼叫不算），該次 preflight 記為儀器失敗，修好後以 preflight 的重跑額度再跑，不跑 A/B。
 
 ## Scenario 骨架
 
@@ -102,5 +102,5 @@ MEASURABLE，三個條件寫進 scenario PR：
 - **`## Environment`**：`PATH+=${PROJECT_ROOT}/bin` 與 `PATH^=${TRIAL_DIR}/.arcforge/bin`。Setup 多一步：在 `.arcforge/bin/arcforge` 寫包裝 script（Setup 當下把 `$PROJECT_ROOT` 與 `$TRIAL_DIR` 的絕對路徑寫進去，因為 session 的環境沒有這兩個變數），`chmod +x`。
 - **旗標**：`--model 'opus[1m]' --effort xhigh`；不帶 `--stage-skill-files`、不帶 `--baseline-skill-file`。preflight 紀錄檔名會是 `<hash>-opus_1m_-t30-exhigh.json`（`## Max Turns` 30）。
 - **k**：preflight 3；A/B 用 `## Trials` 的 5，兩臂共 10。
-- **Grader**：code，V1 的 grader 依上表改 C1 與 C3（C3 讀 `$TRIAL_DIR/.arcforge/arcforge-ok.log`），其餘原樣。
+- **Grader**：code，V1 的 grader 依上表改 C1 與 C3（C3 讀 `$TRIAL_DIR/.arcforge/arcforge-calls.log`），其餘原樣。
 - **鑑別用的斷言**：C1「專案與 fixture 完全相同」。baseline 失敗的方式是行為：它讀得到 archive（指令在 prompt 裡），archive 的 `Next` 是一行正確的修正，使用者說「pick it up」，照做就改了 `src/duration.js`。baseline 可以通過：讀完後停下來報告即可，不需要知道任何 skill 才有的名稱。treatment 通過的方式也是行為：skill 沒有給它任何 baseline 拿不到的檔案或指令，只有「報告，然後等」這條規則；它若照 `Next` 動手，同樣失敗。

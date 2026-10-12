@@ -68,6 +68,8 @@
 
   兩條路的後果相同：write guard 回報變動（`eval-trial-guard.js:26`），該列是 `trial_wrote_repo`（`eval-trial.js:329-338`），run 在那一個 trial 結束（`:429-441`）。
 - **中止的 A/B 補跑修不好。** 補跑額度是 2 次 `--k 1`，每次兩臂各加一列；A/B 若在前幾個 trial 中止，缺的列多於 4 列，補不回來。task 要帶的緩解：prompt 指明 `layout.json` 寫在專案目錄，並要求絕對路徑（見上面的 prompt），agent 就算已經 `cd` 進 `references/`，輸出也落在 trial 目錄。預先登記的規則：中止之前已寫入的列留在池裡，一筆都不丟；中止的 A/B 以相同的旗標與 baseline 目錄重新啟動，整輪至多 1 次，花掉的 session 計入上限；重新啟動後再中止，就記為發現，以池裡現有的列判讀。
+- **重新啟動不能變成重抽。** agent 照 skill 的 `cd` 走、以相對路徑寫 `layout.json`，是 task 上的行為，不是暫時的儀器故障。引擎把那一列記成 `infraError`，`eval compare` 不計它；若只讀引擎的數字，等於把沒照絕對路徑寫的 trial 丟掉，一直抽到有 agent 照做為止。所以中止列要算分，不靠引擎，靠稽核：每一筆 `trial_wrote_repo` 的列逐臂列出，連同寫進 staged 複本的路徑；寫入的是 `layout.json`（或 `plan_layout.py` 的輸出）的列，在第二種讀法裡記為 `A1` FAIL，因為 `$TRIAL_DIR/layout.json` 不存在時 grader 本來就判 FAIL。判讀報兩個數字：引擎的讀法（不計中止列）與把中止列記為 FAIL 的讀法。兩種讀法的判定不同時，結果記為無法判定，不記為 IMPROVED。preflight 同理：重跑只是為了讓引擎寫得出紀錄，中止的那一列照樣列出並在第二種讀法裡記為 baseline FAIL。寫入的若是 `.venv`（`uv run`），那一列沒有 `layout.json` 可評，只列出，兩種讀法都不計。
+
 - **preflight 遇到 `trial_wrote_repo`。** 該列寫入之後，preflight 在 `eval-preflight.js:237` 丟出錯誤，不寫紀錄，所以既不是 PASS，也不是 BLOCK（`design-gate.verify-exit.md`「逐題回答」）。預先登記要寫明它動用的是 preflight 出錯重跑的額度（整輪至多 2 次），不是補跑，也不是 A/B 的重新啟動。
 - **baseline 目錄不在 repo 裡。** 它由 operator 在 run 之前以 `git archive` 與 `git show` 組出來，身分靠 digest `0f3c574c1e448946` 釘住，預先登記的 decision 要寫這個值與組法。`skills/` 若在量測前再變動，兩個 digest 都要重算。另一個做法是把整個目錄提交到 `evals/fixtures/`，代價是 15 個檔案的複本；由 scenario PR 決定。
 - **沒打開 reference 的列。** 這種列量到的不是這個檔案。grader 在 audit 行印出有沒有 `Read` 到 staged 的 `layout-heuristics.md`，稽核時分開報告，不改標籤。
@@ -75,11 +77,11 @@
 
 ## 判定
 
-MEASURABLE，條件四項：(1) task 只要座標計畫，prompt 明說暫不建置、render、存檔；(2) 計分的斷言只有「六個同層元素兩兩水平間距 ≥40」，分隔線淨空不計分；(3) prompt 指明 `layout.json` 寫在專案目錄並要求絕對路徑；(4) 預先登記寫明寫進 staged 複本造成的 `trial_wrote_repo` 怎麼處理：已寫入的列留在池裡，A/B 至多重新啟動 1 次並計入上限，preflight 則動用出錯重跑的額度。PLAN 原本的 manual-fallback 形狀判 NOT MEASURABLE，要等 `UV_PROJECT_ENVIRONMENT` 可宣告。
+MEASURABLE，條件四項：(1) task 只要座標計畫，prompt 明說暫不建置、render、存檔；(2) 計分的斷言只有「六個同層元素兩兩水平間距 ≥40」，分隔線淨空不計分；(3) prompt 指明 `layout.json` 寫在專案目錄並要求絕對路徑；(4) 預先登記寫明寫進 staged 複本造成的 `trial_wrote_repo` 怎麼處理：已寫入的列留在池裡，A/B 至多重新啟動 1 次並計入上限，preflight 則動用出錯重跑的額度；中止列逐臂列出，判讀報兩種讀法（不計中止列、中止列記為 FAIL），兩者判定不同就記為無法判定。PLAN 原本的 manual-fallback 形狀判 NOT MEASURABLE，要等 `UV_PROJECT_ENVIRONMENT` 可宣告。
 
 ## 帳本用的發現文字
 
-> `diagramming-obsidian` 的 `references/layout-heuristics.md`（#185，#182 的 200 → 220 px）：6.5.0 離線設計關卡判定可量測，但只限 agent 交出座標計畫、不建置也不存檔的 task。完整流程不可量：skill 的 check、render、verify 都經 `uv run`，在 staged 複本裡建立 `.venv`，write guard 中止 run。A/B 是兩臂同一份 `SKILL.md`、staged 目錄只差這一個檔案，baseline 目錄的 digest 是 pool 條件與 preflight 的鍵。鑑別斷言是同層元素間距不小於 40 px，兩版 reference 都寫著這個數字，舊格線與它矛盾；不用「欄距 = 220」。舊 reference 的 baseline 有五條不照抄 200 px 的路可以通過，天花板由 preflight 判斷。skill 要 agent 先 `cd` 進 `references/`，之後的相對寫入同樣落在 staged 複本並中止 run，補跑修不好中止的 A/B，所以 prompt 要求以絕對路徑把 `layout.json` 寫在專案目錄。
+> `diagramming-obsidian` 的 `references/layout-heuristics.md`（#185，#182 的 200 → 220 px）：6.5.0 離線設計關卡判定可量測，但只限 agent 交出座標計畫、不建置也不存檔的 task。完整流程不可量：skill 的 check、render、verify 都經 `uv run`，在 staged 複本裡建立 `.venv`，write guard 中止 run。A/B 是兩臂同一份 `SKILL.md`、staged 目錄只差這一個檔案，baseline 目錄的 digest 是 pool 條件與 preflight 的鍵。鑑別斷言是同層元素間距不小於 40 px，兩版 reference 都寫著這個數字，舊格線與它矛盾；不用「欄距 = 220」。舊 reference 的 baseline 有五條不照抄 200 px 的路可以通過，天花板由 preflight 判斷。skill 要 agent 先 `cd` 進 `references/`，之後的相對寫入同樣落在 staged 複本並中止 run，補跑修不好中止的 A/B，所以 prompt 要求以絕對路徑把 `layout.json` 寫在專案目錄；仍然寫進 staged 複本的列是行為，稽核時逐臂列出並另報一個把它們記為 FAIL 的讀數。
 
 ## Scenario 骨架
 
@@ -89,6 +91,6 @@ MEASURABLE，條件四項：(1) task 只要座標計畫，prompt 明說暫不建
 - **`## Environment`**：不宣告。這個形狀不需要任何工具，也不依賴任何工具缺席。
 - **旗標**（preflight 與 A/B 相同，前面都加 `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000`）：`--model 'opus[1m]' --effort xhigh --stage-skill-files --baseline-skill-file <baseline 目錄>/SKILL.md`。baseline 目錄是現行 skill 目錄，只把 `references/layout-heuristics.md` 換成 `1fed56d0~1` 的版本。
 - **`## Max Turns`**：不設，或設得寬（30）；設了就會進 preflight 的鍵。
-- **k**：preflight 3；`## Trials` 5，兩臂共 10。A/B 因 `trial_wrote_repo` 中止時至多重新啟動 1 次，已寫入的列留在池裡。
+- **k**：preflight 3；`## Trials` 5，兩臂共 10。A/B 因 `trial_wrote_repo` 中止時至多重新啟動 1 次，已寫入的列留在池裡，中止列在稽核的第二種讀法裡記為 FAIL。
 - **Grader**：code，`python3 -I`，讀 `$TRIAL_DIR/layout.json`。單一計分標籤 `A1`：檔案存在且可解析；六個 worker 都在，數值有限且寬高為正；六個的垂直範圍兩兩重疊（同一列）；依 `x` 排序後相鄰兩個的間距都 ≥40。印出但不計分：`-- C2:` 每條分隔線與最近元素的距離是否 ≥30；`-- audit:` 六個寬度、相鄰間距、欄距、有沒有 `Read` staged 的 `layout-heuristics.md`、有沒有讀 trial 樹外的路徑、有沒有 `uv` 指令。檔案不存在或不可解析記 FAIL，不是 grade error：agent 被要求交出這個檔案。
 - **鑑別用的斷言**：`A1`。baseline 失敗的方式是行為：它打開舊 reference、把 180 寬的元素放上 200 的格線。它不必知道任何只有 treatment 看得到的名稱或數字就能通過，40 寫在它自己那份檔案的表裡。treatment 通過也是行為：它得把選的寬度與格線配成 40 以上，配錯同樣失敗。
