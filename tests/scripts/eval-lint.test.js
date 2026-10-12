@@ -401,6 +401,54 @@ describe('lintScenario: ## Environment', () => {
     expect(parseScenario(file)).not.toHaveProperty('environment');
   });
 
+  // CommonMark's fence rule. Each example is followed by a real section, so a
+  // fence that fails to close is caught as well as one that closes too early.
+  const FENCED_EXAMPLES = [
+    ['a tilde fence', ['~~~', '## Environment', 'PATH=/usr/local/bin', '~~~']],
+    ['a tilde fence with an info string', ['~~~text', '## Environment', 'HOME=/tmp/x', '~~~']],
+    ['an indented backtick fence', ['   ```', '## Environment', 'PATH=/usr/local/bin', '   ```']],
+    [
+      'a tilde fence holding a backtick fence',
+      ['~~~', '```sh', 'echo hi', '```', '## Environment', 'PATH=/usr/local/bin', '~~~'],
+    ],
+    [
+      'a backtick fence holding a tilde fence',
+      ['```', '~~~', 'echo hi', '~~~', '## Environment', 'PATH=/usr/local/bin', '```'],
+    ],
+    [
+      'a four-backtick fence holding a three-backtick line',
+      ['````', '```', '## Environment', 'PATH=/usr/local/bin', '```', '````'],
+    ],
+  ];
+
+  it.each(FENCED_EXAMPLES)('ignores a ## Environment example inside %s', (_label, example) => {
+    const { parseScenario } = require('../../scripts/lib/eval-scenario');
+    const notes = `${WELL_FORMED}\n## Design Notes\nA scenario may declare:\n\n${example.join('\n')}\n`;
+
+    const alone = writeScenario(dir, 'env-fence-alone', notes);
+    expect(lintScenario(alone)).toEqual([]);
+    expect(parseScenario(alone)).not.toHaveProperty('environment');
+
+    const followed = writeScenario(
+      dir,
+      'env-fence-followed',
+      `${notes}\n## Environment\nPATH-=/usr/sbin\n`,
+    );
+    expect(lintScenario(followed)).toEqual([]);
+    expect(parseScenario(followed).environment).toEqual(['PATH-=/usr/sbin']);
+  });
+
+  it('does not open a fence at four spaces of indentation', () => {
+    const { parseScenario } = require('../../scripts/lib/eval-scenario');
+    const file = writeScenario(
+      dir,
+      'env-indented-code',
+      `${WELL_FORMED}\n## Design Notes\n    \`\`\`\n## Environment\nPATH-=/usr/sbin\n`,
+    );
+    expect(lintScenario(file)).toEqual([]);
+    expect(parseScenario(file).environment).toEqual(['PATH-=/usr/sbin']);
+  });
+
   it('reads a real section after a fenced example of one', () => {
     const { parseScenario } = require('../../scripts/lib/eval-scenario');
     const content = [

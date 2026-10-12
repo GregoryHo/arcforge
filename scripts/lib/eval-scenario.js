@@ -139,6 +139,28 @@ function computeScenarioHash(contents) {
 }
 
 /**
+ * Advance the open code fence past one line, by CommonMark's rule: a fence is
+ * up to three spaces of indentation and then three or more backticks or tildes.
+ * It closes only on a run of the same character at least as long, with nothing
+ * after it; the info string after an opening fence is ignored.
+ * @param {{ char: string, length: number }|null} fence - The open fence, if any
+ * @param {string} line - The line to read
+ * @returns {{ char: string, length: number }|null} The fence open after the line
+ */
+function fenceAfter(fence, line) {
+  const match = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+  if (!match) return fence;
+  const [, run, rest] = match;
+  if (fence) {
+    const closes = run[0] === fence.char && run.length >= fence.length && !rest.trim();
+    return closes ? null : fence;
+  }
+  // A backtick in the info string makes the line inline code, not a fence
+  if (run[0] === '`' && rest.includes('`')) return null;
+  return { char: run[0], length: run.length };
+}
+
+/**
  * Split a scenario file into its `## ` sections. A heading inside a code fence
  * or a heredoc is body text, not a heading. The parser and the linter both read
  * their sections from here, so they cannot disagree about where one starts.
@@ -151,10 +173,11 @@ function scenarioSections(content) {
   const sections = new Map();
   let currentSection = null;
 
-  let insideFence = false;
+  let fence = null;
   let heredocMarker = null;
   content.split('\n').forEach((line, index) => {
-    if (/^`{3,}/.test(line)) insideFence = !insideFence;
+    fence = fenceAfter(fence, line);
+    const insideFence = Boolean(fence);
 
     // Ignore ## headers inside heredocs (they contain arbitrary text)
     if (!insideFence && !heredocMarker) {
