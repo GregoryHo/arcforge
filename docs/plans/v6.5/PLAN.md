@@ -104,7 +104,7 @@ D-062（儀器），七項：
 
 **A2 preflight row、Node 版本與 hash。**
 
-- `stubGrade`（`eval-command.js:285-295`）或 `runPreflight`（`eval-preflight.js:158-164`）呼叫 `appendResult`（`eval.js:336`），標籤獨立（如 `preflight`）。`loadResults`（`eval.js:365`）、`pairArms`、`eval report`、dashboard 都要確認不把它混進 A/B pool。
+- `stubGrade`（`eval-command.js:285-295`）或 `runPreflight`（`eval-preflight.js:158-164`）呼叫 `appendResult`（`eval.js:336`），標籤獨立（如 `preflight`）。`loadResults`（`eval.js:365`）、`pairArms`、`eval report`、dashboard 都要確認不把它混進 A/B pool。寫 row 要在 `runPreflight` 的迴圈裡、`stopIfTrialWroteRepo` 之前：trial 寫進 repository 的那一筆（`errorType: trial_wrote_repo`）先記下，preflight 才停，與 A/B 的臂相同（eval B-16）；只從 `stubGrade` 寫會漏掉這一筆。測試要涵蓋「寫了 repository 的 trial 留下 row，之後 run 停止」（PR #284 的 `tests/scripts/eval-preflight-rows.test.js` 已有）。
 - preflight 的 transcript 本來就在 `evals/results/<scenario>/<runId>/transcripts/`，只有紀錄在 `evals/preflight/`。
 - `node_version` 進 `ranUnder`（`eval-preflight.js:150-155`，順便消掉 :178-190 與 :205-215 的重複）與 A/B row 的 `stamp`（`eval.js:134`）。
 - `scenario_hash` 進 `stamp`；`resolveScenarioFile` 每次 run 算一次，不是每個 trial 算一次。
@@ -142,7 +142,7 @@ PR #282。
 - 有 archive 就推一行到 `contextParts` 與 `userParts`：上一份 archive 的 alias 或檔名、Saved 日期、`arcforge session resume <alias|path>`；alias 欄是 `-` 的用路徑。沒有 archive 就什麼都不加。只在 `source` 為 `startup`／`clear` 時加。
 - `try/catch` 全包（hooks 的錯誤策略是靜默）。不受 learning 開關影響。alias 索引的失敗要另外處理，不能落進這個 `try/catch`：`loadAliases` 遇到壞掉的 JSON 會 throw，`listAliases` 不過濾無效的 alias 鍵，兩種情況都要退回路徑形式，不是整行消失，也不是印出不能用的 alias（hooks B-8）。路徑形式的路徑要寫成一個 shell word（含空白或 shell 特殊字元時加單引號），指令才能照印出來的樣子執行；路徑含控制字元就不出這一行。
 - 文件在同一個 PR：`docs/guide/hooks-system.md:66-69`、`hooks/README.md`、README 的 SessionStart 句子。hooks B-8 的重寫已在 WP-P。`.claude/rules/architecture.md` 的「minimal bootstrap」句子不動（一行符合）。
-- 測試：`hooks/__tests__/inject-context.test.js` 加四個 case（有 archive 的 `startup`、`resume` 不出現、無 archive 靜默、設了 `ARCFORGE_SPAWNED` 的 `startup` 不出現）。既有的 spawned 檢查只在 `loadPendingActions` 裡，管不到另外加在 `main()` 的 archive 載入，所以指引要有自己的檢查。另外三個 case 守住退回路徑的行為：alias 索引無法解析、alias 鍵無效（含控制字元）、alias 鍵以 `-` 開頭，三者都印出路徑形式（PR #282 已有這三個 case）。
+- 測試：`hooks/__tests__/inject-context.test.js` 加六個 case（有 archive 的 `startup`、`clear` 也出現、`resume` 不出現、`compact` 不出現、無 archive 靜默、設了 `ARCFORGE_SPAWNED` 的 `startup` 不出現），hooks B-8 的四個 source 各有一個（PR #282 已有）。既有的 spawned 檢查只在 `loadPendingActions` 裡，管不到另外加在 `main()` 的 archive 載入，所以指引要有自己的檢查。另外三個 case 守住退回路徑的行為：alias 索引無法解析、alias 鍵無效（含控制字元）、alias 鍵以 `-` 開頭，三者都印出路徑形式（PR #282 已有這三個 case）。
 
 ### WP-C `sessions` 瘦身
 
@@ -218,7 +218,7 @@ PR #283。
 3. WP-B、WP-C 可與 WP-A 平行，都是獨立 PR。
 4. WP-D 的設計關卡在 A3、A5 合併後才寫；關卡判定可量才寫 scenario PR；scenario／fixture PR 合併後才花 session。
 5. 所有 `skills/`、`evals/scenarios/`、`evals/fixtures/` 的變更都在量測輪之前合併。
-6. 量測輪在主 checkout 依序跑，順序 D1 → D2 → D3 → D4，重新產生 `evals/benchmarks/latest.json`。
+6. 量測輪在主 checkout 依序跑，順序 D1 → D2 → D3 → D4，D4 結束後花掉的 session 不超過 67、且 D5 的關卡通過時接著跑 D5，然後才重新產生 `evals/benchmarks/latest.json`。
 7. 然後 WP-E。
 
 時間估計：WP-P 到 WP-C 全部合併約 1 天（六到八個 PR 平行，Codex 審查各一到兩輪）；WP-D 的關卡與 scenario PR 約半天，量測輪依序約 6 到 9 小時牆鐘時間，D4 佔 2 到 3 小時；WP-E 約 2 小時。合計 2 到 3 天。6.4.0 從開版到發版是 1 天，這版多了四項量測與兩個新的引擎能力。

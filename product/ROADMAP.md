@@ -2014,7 +2014,8 @@ reverse one, append a superseding entry (see AGENTS.md).
   about 54 on the maintainer's machine, 1.3 ms warm and 13.6 ms cold — then
   one read of the alias index.
 - Verification: cases in `hooks/__tests__/inject-context.test.js` for an
-  archive at `startup`, for silence on `resume`, for silence with no
+  archive at `startup` and at `clear`, for silence on `resume` and on
+  `compact`, for silence with no
   archive, and for silence at `startup` in a session arcforge spawned
   itself; and, in the post-release check, a live session in a project with
   an archive whose SessionStart context carries the line, beside one without
