@@ -494,6 +494,28 @@ describe('buildInjection', () => {
         removeStagedDir(staged);
       }
     });
+
+    it('checks the copy without walking through a link to a directory', () => {
+      // Two links back to the root: a walk that follows them never comes back.
+      fs.mkdirSync(path.join(dir, 'sub'));
+      fs.symlinkSync('..', path.join(dir, 'sub', 'a'));
+      fs.symlinkSync('..', path.join(dir, 'sub', 'b'));
+      const readdir = fs.readdirSync;
+      jest.spyOn(fs, 'readdirSync').mockImplementation((target, options) => {
+        // A recursive readdir follows directory links, so the test fails here and does not hang.
+        if (options?.recursive) throw new Error(`recursive readdir of ${target}`);
+        return readdir(target, options);
+      });
+      let staged;
+      try {
+        staged = stageSkillDir(path.join(dir, 'SKILL.md'));
+        expect(fs.readlinkSync(path.join(staged, 'sub', 'a'))).toBe('..');
+        expect(fs.readlinkSync(path.join(staged, 'sub', 'b'))).toBe('..');
+      } finally {
+        fs.readdirSync.mockRestore();
+        removeStagedDir(staged);
+      }
+    });
   });
 
   it('refuses to stage without the skill file path', () => {

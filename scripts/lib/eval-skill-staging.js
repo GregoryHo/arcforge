@@ -142,9 +142,17 @@ function stageSkillDir(skillFile) {
       },
     });
     const realStaged = fs.realpathSync.native(staged);
-    for (const entry of fs.readdirSync(staged, { recursive: true })) {
-      refuseEscapingLink(realStaged, path.join(staged, entry), path.join(source, entry));
-    }
+    // Only real directories are entered: a walk that follows a link to a
+    // directory never returns from `sub/a -> ..` beside `sub/b -> ..`.
+    const check = (rel) => {
+      for (const entry of fs.readdirSync(path.join(staged, rel), { withFileTypes: true })) {
+        const childRel = path.join(rel, entry.name);
+        if (entry.isDirectory()) check(childRel);
+        else
+          refuseEscapingLink(realStaged, path.join(staged, childRel), path.join(source, childRel));
+      }
+    };
+    check('');
   } catch (err) {
     removeStagedDir(staged);
     throw new Error(`Failed to stage skill files from ${source}: ${err.message}`);
