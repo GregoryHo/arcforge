@@ -377,6 +377,56 @@ describe('lintScenario: ## Environment', () => {
     ]);
   });
 
+  it('reports a control character in a declaration', () => {
+    const content = withEnvironment(['PATH+=/tmp/a\x00b']);
+    const file = writeScenario(dir, 'env-nul', content);
+    expect(lintScenario(file)).toEqual([
+      {
+        file,
+        line: environmentHeading(content) + 1,
+        message: expect.stringMatching(/## Environment line \d+: contains a control character/),
+      },
+    ]);
+  });
+
+  it('ignores a fenced ## Environment example, as the trial does', () => {
+    const { parseScenario } = require('../../scripts/lib/eval-scenario');
+    const example = ['```', '## Environment', 'PATH=/usr/local/bin', 'not a declaration', '```'];
+    const file = writeScenario(
+      dir,
+      'env-example',
+      `${WELL_FORMED}\n## Design Notes\nA scenario may declare:\n\n${example.join('\n')}\n`,
+    );
+    expect(lintScenario(file)).toEqual([]);
+    expect(parseScenario(file)).not.toHaveProperty('environment');
+  });
+
+  it('reads a real section after a fenced example of one', () => {
+    const { parseScenario } = require('../../scripts/lib/eval-scenario');
+    const content = [
+      WELL_FORMED,
+      '## Design Notes',
+      '```',
+      '## Environment',
+      'PATH=/usr/local/bin',
+      '```',
+      '',
+      '## Environment',
+      'PATH-=/usr/sbin',
+      'HOME=/tmp/elsewhere',
+      '',
+    ].join('\n');
+    const file = writeScenario(dir, 'env-example-then-real', content);
+    expect(lintScenario(file)).toEqual([
+      {
+        file,
+        line: content.split('\n').lastIndexOf('HOME=/tmp/elsewhere') + 1,
+        message: expect.stringMatching(/HOME is not a variable a scenario may declare/),
+      },
+    ]);
+    expect(parseScenario(file).environment).toEqual(['PATH-=/usr/sbin', 'HOME=/tmp/elsewhere']);
+  });
+
   it('reports a fenced block, which the trial would refuse line by line', () => {
     const file = writeScenario(
       dir,

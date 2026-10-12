@@ -93,7 +93,7 @@ const TRIAL_DIR_VARS = new Set([
 ]);
 
 // Where the shim directory sits under the project root. A scenario may not take
-// it off PATH: `claude` is spawned by name and would no longer resolve.
+// it off PATH: the trial's hooks and Setup find `claude` and `node` by name there.
 const SHIM_DIR = path.join('.eval-trials', '.bin');
 const SHIM_REMOVAL = 'would remove the directory claude and node resolve from';
 
@@ -101,6 +101,11 @@ const PATH_OPS = { '+=': 'append', '^=': 'prepend', '-=': 'remove' };
 const PLACEHOLDER_RE = /^\$\{(PROJECT_ROOT|TRIAL_DIR)\}/;
 // biome-ignore lint/suspicious/noTemplateCurlyInString: the scenario placeholder, not a JS template
 const TRIAL_DIR_PREFIX = '${TRIAL_DIR}/';
+
+// A declaration is one printable line: a control character has no business in a
+// path, and a NUL in one makes Node refuse the whole environment at spawn.
+// biome-ignore lint/suspicious/noControlCharactersInRegex: intentional control char validation
+const CONTROL_CHAR_RE = /[\x00-\x1f\x7f]/;
 
 const withoutTrailingSlash = (dir) => (dir.length > 1 ? dir.replace(/\/+$/, '') : dir);
 
@@ -122,16 +127,28 @@ function namesShimDir(value, projectRoot) {
 }
 
 /**
+ * The `claude` a contained trial's session is spawned from: the shim itself, by
+ * its full path. Nothing a scenario puts on PATH is consulted for it.
+ * @param {string} projectRoot - Project root
+ * @returns {string} Absolute path (the file is missing when the operator has no `claude`)
+ */
+function claudeShim(projectRoot) {
+  return path.join(path.resolve(projectRoot), SHIM_DIR, 'claude');
+}
+
+/**
  * Find an executable the way a shell would, skipping one directory.
  * @param {string} name - Command name
  * @param {string} [pathValue] - PATH to search
  * @param {string} [skipDir] - Directory to ignore (the shim directory itself)
  * @returns {string|undefined} The first match, as an absolute path: a relative
- *   PATH entry is resolved against the working directory, as a shell would
+ *   PATH entry is resolved against the working directory, as a shell would, and
+ *   an empty entry (`:/usr/bin`) is the working directory itself
  */
 function resolveOnPath(name, pathValue, skipDir) {
-  for (const dir of String(pathValue || '').split(path.delimiter)) {
-    if (!dir || path.resolve(dir) === skipDir) continue;
+  if (!pathValue) return undefined;
+  for (const dir of String(pathValue).split(path.delimiter)) {
+    if (path.resolve(dir) === skipDir) continue;
     const candidate = path.resolve(dir, name);
     try {
       fs.accessSync(candidate, fs.constants.X_OK);
@@ -168,7 +185,7 @@ function ensureToolShims(binDir, pathValue) {
   for (const [name, target] of Object.entries(tools)) {
     const link = path.join(binDir, name);
     const current = readLink(link);
-    // A missing `claude` leaves no shim: the spawn then fails by name, as before.
+    // A missing `claude` leaves no shim: the spawn then fails, and the row says so.
     const wanted = target && fs.existsSync(target) ? target : undefined;
     if (current === wanted) continue;
     fs.rmSync(link, { force: true });
@@ -230,6 +247,7 @@ function pathProblem(value) {
  * @returns {{ directive?: { name: string, op: string, value: string }, error?: string }}
  */
 function parseEnvironmentLine(text, projectRoot) {
+  if (CONTROL_CHAR_RE.test(text)) return { error: 'contains a control character' };
   const match = text.match(/^([A-Za-z_][A-Za-z0-9_]*)(\+=|\^=|-=|=)(.*)$/);
   if (!match) return { error: 'expected PATH+=<dir>, PATH^=<dir>, PATH-=<dir> or <VAR>=<dir>' };
   const [, name, operator, value] = match;
@@ -292,7 +310,10 @@ function declaredEnvironment(scenario = {}, projectRoot = process.cwd()) {
   const declarations = scenario.environment || [];
   const { directives, errors } = parseEnvironment(declarations, projectRoot);
   if (errors.length > 0) {
-    const detail = errors.map((e) => `"${declarations[e.index]}": ${e.message}`).join('; ');
+    // JSON-quoted, so a control character in a refused line is shown escaped.
+    const detail = errors
+      .map((e) => `${JSON.stringify(declarations[e.index])}: ${e.message}`)
+      .join('; ');
     throw new Error(`Scenario ${scenario.name || ''} has a bad ## Environment line: ${detail}`);
   }
   return directives;
@@ -371,6 +392,7 @@ function trialEnv(trialDir, scenario = {}, opts = {}) {
 module.exports = {
   SYSTEM_PATH,
   TRIAL_DIR_VARS,
+  claudeShim,
   resolveOnPath,
   ensureToolShims,
   environmentLines,

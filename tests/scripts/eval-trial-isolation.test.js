@@ -35,14 +35,17 @@ const SCENARIO = {
 /** Stub every exec: the plugin list answers [], the trial answers `onTrial`. */
 function stubExec(onTrial = () => ({ stdout: DONE_STREAM, stderr: '', exitCode: 0 })) {
   mockUtils.execCommand.mockImplementation((cmd, args, opts) => {
-    if (cmd === 'claude' && args[0] === 'plugin') return { stdout: '[]', stderr: '', exitCode: 0 };
-    if (cmd === 'claude') return onTrial(opts);
+    if (path.basename(cmd) === 'claude' && args[0] === 'plugin')
+      return { stdout: '[]', stderr: '', exitCode: 0 };
+    if (path.basename(cmd) === 'claude') return onTrial(opts);
     return { stdout: '', stderr: '', exitCode: 0 };
   });
 }
 
 function trialArgs() {
-  return mockUtils.execCommand.mock.calls.find((c) => c[0] === 'claude' && c[1].includes('-p'))[1];
+  return mockUtils.execCommand.mock.calls.find(
+    (c) => path.basename(c[0]) === 'claude' && c[1].includes('-p'),
+  )[1];
 }
 
 describe('trial isolation keeps the operator user config out (B-7, #170)', () => {
@@ -145,7 +148,7 @@ describe('the operator environment stays out of a contained trial (B-18)', () =>
     mockUtils.execCommand.mock.calls
       .filter(isWanted)
       .map((c) => ({ env: c[2].env, cwd: c[2].cwd }));
-  const sessionEnvs = () => envs((c) => c[0] === 'claude' && c[1].includes('-p'));
+  const sessionEnvs = () => envs((c) => path.basename(c[0]) === 'claude' && c[1].includes('-p'));
   // The code grader also runs `sh -c`, on the operator's side; only Setup is wanted.
   const setupEnvs = () => envs((c) => c[0] === 'sh' && c[1][1] === SETUP);
   /** An env with its trial directory named, so two trials' envs can be compared. */
@@ -465,7 +468,9 @@ describe('the baseline of a plugin-dir comparison watches the plugin it does not
   const baselineRow = () =>
     require('../../scripts/lib/eval').loadResults('isolation-baseline', tempDir)[0];
   const trialCalls = () =>
-    mockUtils.execCommand.mock.calls.filter((c) => c[0] === 'claude' && c[1].includes('-p'));
+    mockUtils.execCommand.mock.calls.filter(
+      (c) => path.basename(c[0]) === 'claude' && c[1].includes('-p'),
+    );
 
   it('records a baseline write into the plugin as trial_wrote_repo (workflow scope)', () => {
     expect(() =>
@@ -502,7 +507,7 @@ describe('a detected repository write stops the run', () => {
       runSkillEval(SCENARIO, 2, { projectRoot: tempDir, skillInstruction: 'BODY', runId: 'r1' }),
     ).toThrow(/baseline trial 1 wrote outside its directory: .*stray\.txt.*reset/s);
     const trials = mockUtils.execCommand.mock.calls.filter(
-      (c) => c[0] === 'claude' && c[1].includes('-p'),
+      (c) => path.basename(c[0]) === 'claude' && c[1].includes('-p'),
     );
     expect(trials).toHaveLength(1);
     // The offending row is on disk, still an infra error.

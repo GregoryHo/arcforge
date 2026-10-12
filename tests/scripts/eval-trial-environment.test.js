@@ -251,6 +251,27 @@ describe('the shim directory', () => {
     expect(which('claude', { PATH: binDir })).toBe(path.join(binDir, 'claude'));
   });
 
+  it('reads an empty operator PATH entry as the working directory', () => {
+    const claude = writeExecutable(path.join(root, 'claude'));
+    const binDir = path.join(root, '.eval-trials', '.bin');
+    const cwd = process.cwd();
+    process.chdir(root);
+    try {
+      for (const pathValue of [':/usr/bin:/bin', '/usr/bin::/bin', '/usr/bin:/bin:']) {
+        expect(resolveOnPath('claude', pathValue)).toBe(claude);
+        // A real shell agrees: the empty entry is where it finds claude.
+        expect(which('claude', { PATH: pathValue })).toMatch(/claude$/);
+      }
+      ensureToolShims(binDir, ':/usr/bin:/bin');
+    } finally {
+      process.chdir(cwd);
+    }
+    expect(fs.readlinkSync(path.join(binDir, 'claude'))).toBe(claude);
+    // No PATH at all is not an empty entry: nothing is searched.
+    expect(resolveOnPath('claude', '')).toBeUndefined();
+    expect(resolveOnPath('claude', undefined)).toBeUndefined();
+  });
+
   it('leaves no claude shim when the operator has none, and drops a stale one', () => {
     const binDir = path.join(root, 'shims');
     const claude = writeExecutable(path.join(root, 'a', 'claude'));
@@ -397,6 +418,25 @@ describe('a scenario declares its own trial environment (## Environment)', () =>
     expect(directives).toEqual([]);
     expect(errors).toEqual([{ index: 0, message: expect.stringMatching(reason) }]);
     expect(() => build([line])).toThrow(/bad ## Environment line/);
+  });
+
+  it('refuses a control character anywhere in a declaration', () => {
+    for (const line of [
+      'PATH+=/tmp/a\x00b',
+      'PATH^=/tmp/a\x1bb',
+      'PATH-=/tmp/a\x7fb',
+      `UV_CACHE_DIR=\${TRIAL_DIR}/a\x00b`,
+      'PA\x00TH+=/tmp/a',
+    ]) {
+      const { directives, errors } = parseEnvironment([line]);
+      expect(directives).toEqual([]);
+      expect(errors).toEqual([{ index: 0, message: 'contains a control character' }]);
+    }
+    // The refusal shows the character escaped, never raw.
+    expect(() => build(['PATH+=/tmp/a\x00b'])).toThrow(
+      /bad ## Environment line: "PATH\+=\/tmp\/a\\u0000b": contains a control character/,
+    );
+    expect(fs.existsSync(shims())).toBe(false);
   });
 
   it('refuses to take the shim directory off PATH, however it is spelled', () => {

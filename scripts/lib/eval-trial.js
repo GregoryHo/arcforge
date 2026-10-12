@@ -25,9 +25,14 @@ const {
   writeIsolationSettings,
   buildIsolationSettings,
 } = require('./eval-trial-env');
-const { declaredEnvironment, trialEnv } = require('./eval-trial-environment');
+const { claudeShim, declaredEnvironment, trialEnv } = require('./eval-trial-environment');
 const { parseStreamJsonOutput, parseActionsFromTranscript } = require('./eval-transcript');
-const { isTrialKilled, isOutputComplete, isProviderRefusal } = require('./eval-trial-outcome');
+const {
+  isTrialKilled,
+  isOutputComplete,
+  isProviderRefusal,
+  isSpawnFailure,
+} = require('./eval-trial-outcome');
 const { watchForWrites } = require('./eval-trial-guard');
 
 // Roots already reported as too large for the write check in this process.
@@ -133,6 +138,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     scenarioMaxTurns: scenario.maxTurns,
     pluginDir,
   });
+  const contained = isolated || Boolean(pluginDir);
   // The run conditions every row records, which readers pool by (B-8). Model and
   // effort are the flag when one was passed; else Claude Code's default for a
   // contained trial (it does not read the user settings file), or whatever that
@@ -161,7 +167,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   // One environment for Setup and the session; an arm never gets its own.
   let env;
   try {
-    env = trialEnv(trialDir, scenario, { projectRoot, contained: isolated || Boolean(pluginDir) });
+    env = trialEnv(trialDir, scenario, { projectRoot, contained });
   } catch (error) {
     // No row can describe a trial that never had an environment: leave nothing behind.
     cleanupTrialDir(trialDir);
@@ -187,22 +193,28 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
 
   const claudeArgs = buildClaudeArgs({
     trialDir,
-    contained: isolated || Boolean(pluginDir),
+    contained,
     pluginDir,
     maxTurns: resolvedMaxTurns,
     model,
     effort,
   });
 
+  // A contained trial's session is the shim, by its full path: a directory the
+  // scenario prepends, or a `claude` its Setup writes there, is on the session's
+  // PATH and still cannot stand in for it. `--no-isolate` keeps the operator's
+  // own lookup.
+  const claudeBin = contained ? claudeShim(projectRoot) : 'claude';
+
   // Debug: log command for troubleshooting
   if (process.env.EVAL_DEBUG) {
     console.error(`[eval-debug] cwd: ${trialDir}`);
-    console.error(`[eval-debug] cmd: claude ${claudeArgs.join(' ')}`);
+    console.error(`[eval-debug] cmd: ${claudeBin} ${claudeArgs.join(' ')}`);
     console.error(`[eval-debug] prompt: ${prompt.slice(0, 100)}...`);
   }
   const writesSince = watchForWrites([projectRoot, pluginDir, ...watchRoots]);
   const t0 = Date.now();
-  const result = execCommand('claude', claudeArgs, {
+  const result = execCommand(claudeBin, claudeArgs, {
     input: prompt,
     cwd: trialDir,
     // 900s: same instrument-fix lineage as the 300s→600s raise below. P6's
@@ -328,6 +340,20 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
       output: parsedOutput || '',
       error: `Provider refused the trial in place of the agent's turn: ${textResult.trim().slice(0, 200)}`,
       errorType: 'provider_refusal',
+      infraError: true,
+    };
+  }
+
+  // A session that never started measured nothing, and scored it would read as
+  // the agent failing every assertion. Nothing ran in the trial directory, so
+  // nothing in it is worth keeping.
+  if (isSpawnFailure(result)) {
+    cleanupTrialDir(trialDir);
+    return {
+      ...base,
+      output: '',
+      error: `Trial session could not be started: ${result.stderr}`,
+      errorType: 'trial_spawn_failed',
       infraError: true,
     };
   }

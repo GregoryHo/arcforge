@@ -137,6 +137,10 @@ an infra error (`provider_refusal`) and never scores either. Without that, the
 fixture's own files would pass some assertions and an exhausted quota would read
 as a regression.
 
+A trial whose session never started — no `claude` to run, or an environment the
+system refuses to pass on — is an infra error too (`trial_spawn_failed`). It
+never scores, and its fixture directory is removed.
+
 Every trial runs in a fresh fixture directory under `.eval-trials/`, with
 arcforge's own state redirected into it. By default the session is also
 isolated. Plugins and MCP servers are stripped, `CLAUDE.md` files and rules are
@@ -151,7 +155,9 @@ leaves hooks on so the plugin's own hooks run.
 Your shell's environment does not reach a contained trial either. Its `PATH` is
 rebuilt: first `.eval-trials/.bin`, which holds links to `claude`, to the `node`
 running arcforge and to the `npm` and `npx` beside that `node`, then
-`/usr/bin:/bin:/usr/sbin:/sbin`. A tool you installed anywhere else (Homebrew,
+`/usr/bin:/bin:/usr/sbin:/sbin`. The session itself is started from that
+`claude` link by its full path, so nothing a scenario adds to the `PATH` can run
+in its place. A tool you installed anywhere else (Homebrew,
 `~/.local/bin`, a version manager) is not found, even when it shares a
 directory with `claude`, unless the scenario declares it (see
 [Declaring a trial's environment](#declaring-a-trials-environment)). Only these
@@ -414,18 +420,20 @@ UV_CACHE_DIR=${TRIAL_DIR}/.cache/uv
 | Declaration | Effect |
 |-------------|--------|
 | `PATH+=<dir>` | Append `<dir>` to the trial's `PATH` |
-| `PATH^=<dir>` | Prepend `<dir>`, so what it holds shadows everything after it |
+| `PATH^=<dir>` | Prepend `<dir>`, so what it holds shadows everything after it for the agent, its hooks and Setup. The session's own `claude` is not looked up on the `PATH` |
 | `PATH-=<dir>` | Remove `<dir>`; a directory that is not on the `PATH` is ignored |
 | `<VAR>=<dir>` | Point a cache variable at a directory inside the trial |
 
 Declarations apply in the order written. Blank lines and lines starting with
-`#` are ignored. The rules, which `eval lint` checks and a trial refuses to
-start without:
+`#` are ignored. A `## Environment` heading inside a code fence is example text,
+not a section: neither `eval lint` nor the trial reads it. The rules, which
+`eval lint` checks and a trial refuses to start without:
 
 - **`<dir>` is one absolute directory.** It starts with `/`, `${PROJECT_ROOT}`
   or `${TRIAL_DIR}`. Those two placeholders are the only expansion, and only at
   the start: no `$HOME`, no `~`, no other variable. No whitespace, no `:` (one
-  directory per line) and no `..` segment. A literal absolute path such as
+  directory per line), no `..` segment and no control character anywhere in the
+  line. A literal absolute path such as
   `/opt/homebrew/bin` is allowed, and ties the scenario to hosts that have it.
 - **`PATH` is changed, never replaced.** `PATH=<dir>` is an error, and so is
   removing `.eval-trials/.bin`, whether written with `${PROJECT_ROOT}` or as

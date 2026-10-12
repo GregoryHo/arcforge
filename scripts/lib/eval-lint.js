@@ -10,7 +10,7 @@
  */
 
 const fs = require('node:fs');
-const { parseScenario, reservedNameError } = require('./eval-scenario');
+const { parseScenario, reservedNameError, scenarioSections } = require('./eval-scenario');
 const { environmentLines, parseEnvironment } = require('./eval-trial-environment');
 
 /**
@@ -33,65 +33,41 @@ const REQUIRED_SECTIONS = ['Context', 'Grader Config', 'Assertions'];
 const ASSERTION_ID_RE = /^(A\d+\s*[:–-]|\[tool_\w+\])/;
 
 /**
- * Parse a markdown file into lines and collect:
- *   - sections: Map<lowerName, { startLine: number }>
+ * Collect what the checks below read, from the sections the trial itself parses
+ * (a heading inside a code fence or a heredoc is not a section):
+ *   - sections: Map<lowerName, { startLine: number, lines: string[] }>
  *   - assertionLines: Array<{ text: string, line: number }>  (inside ## Assertions)
  *   - environmentLines: Array<{ text: string, line: number }>  (inside ## Environment)
  *
  * @param {string} content - File content
- * @returns {{ sections: Map<string, { startLine: number }>, assertionLines: Array<{ text: string, line: number }>, environmentLines: Array<{ text: string, line: number }> }}
+ * @returns {{ sections: Map<string, { startLine: number, lines: string[] }>, assertionLines: Array<{ text: string, line: number }>, environmentLines: Array<{ text: string, line: number }> }}
  */
 function parseScenarioStructure(content) {
-  const lines = content.split('\n');
-  const sections = new Map();
+  const sections = scenarioSections(content);
   const assertionLines = [];
-  const environmentSection = [];
-  let environmentStart = 0;
-  let inAssertions = false;
-  let inEnvironment = false;
+  const assertions = sections.get('assertions') || { startLine: 0, lines: [] };
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const lineNumber = i + 1; // 1-indexed
+  assertions.lines.forEach((line, offset) => {
+    // Capture assertion bullets: - [ ] ... or - [x] ... or - [tool_*] ...
+    const bulletMatch = line.match(/^-\s*\[([^\]]*)\]\s*(.*)/);
+    if (!bulletMatch) return;
+    const bracketContent = bulletMatch[1].trim();
+    const remainder = bulletMatch[2].trim();
+    // Behavioral markers like [tool_called] are prefix tokens that
+    // ASSERTION_ID_RE expects to find on the assertion text. Checkbox
+    // brackets ([ ], [x], [X]) are markdown plumbing and must be stripped.
+    const isBehavioralMarker = /^tool_\w+$/.test(bracketContent);
+    const text = isBehavioralMarker ? `[${bracketContent}] ${remainder}`.trim() : remainder;
+    assertionLines.push({ text, line: assertions.startLine + 1 + offset });
+  });
 
-    const headerMatch = line.match(/^##\s+(.+)/);
-    if (headerMatch) {
-      const name = headerMatch[1].trim();
-      const nameLower = name.toLowerCase();
-      sections.set(nameLower, { startLine: lineNumber });
-      inAssertions = nameLower === 'assertions';
-      inEnvironment = nameLower === 'environment';
-      if (inEnvironment) {
-        environmentSection.length = 0; // a repeated heading replaces, as the parser does
-        environmentStart = lineNumber + 1;
-      }
-      continue;
-    }
-
-    if (inEnvironment) environmentSection.push(line);
-
-    if (inAssertions) {
-      // Capture assertion bullets: - [ ] ... or - [x] ... or - [tool_*] ...
-      const bulletMatch = line.match(/^-\s*\[([^\]]*)\]\s*(.*)/);
-      if (bulletMatch) {
-        const bracketContent = bulletMatch[1].trim();
-        const remainder = bulletMatch[2].trim();
-        // Behavioral markers like [tool_called] are prefix tokens that
-        // ASSERTION_ID_RE expects to find on the assertion text. Checkbox
-        // brackets ([ ], [x], [X]) are markdown plumbing and must be stripped.
-        const isBehavioralMarker = /^tool_\w+$/.test(bracketContent);
-        const text = isBehavioralMarker ? `[${bracketContent}] ${remainder}`.trim() : remainder;
-        assertionLines.push({ text, line: lineNumber });
-      }
-    }
-  }
-
+  const environment = sections.get('environment') || { startLine: 0, lines: [] };
   return {
     sections,
     assertionLines,
-    environmentLines: environmentLines(environmentSection).map(({ text, offset }) => ({
+    environmentLines: environmentLines(environment.lines).map(({ text, offset }) => ({
       text,
-      line: environmentStart + offset,
+      line: environment.startLine + 1 + offset,
     })),
   };
 }
@@ -169,7 +145,7 @@ function lintScenario(filePath, projectRoot = process.cwd()) {
     }
   }
 
-  // Check 4: ## Environment declarations — the trial refuses what this reports
+  // Check 5: ## Environment declarations — the trial refuses what this reports
   const declarations = declared.map((d) => d.text);
   for (const { index, message } of parseEnvironment(declarations, projectRoot).errors) {
     diagnostics.push({

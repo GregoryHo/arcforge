@@ -49,9 +49,9 @@ describe('a declared trial environment (## Environment)', () => {
     rows = [];
     mockUtils.execCommand.mockReset();
     mockUtils.execCommand.mockImplementation((cmd, args) => {
-      if (cmd === 'claude' && args[0] === 'plugin')
+      if (path.basename(cmd) === 'claude' && args[0] === 'plugin')
         return { stdout: '[]', stderr: '', exitCode: 0 };
-      if (cmd === 'claude') return { stdout: DONE_STREAM, stderr: '', exitCode: 0 };
+      if (path.basename(cmd) === 'claude') return { stdout: DONE_STREAM, stderr: '', exitCode: 0 };
       return { stdout: '', stderr: '', exitCode: 0 };
     });
   });
@@ -65,7 +65,7 @@ describe('a declared trial environment (## Environment)', () => {
     mockUtils.execCommand.mock.calls
       .filter(isWanted)
       .map((c) => ({ env: c[2].env, cwd: c[2].cwd }));
-  const sessionEnvs = () => envs((c) => c[0] === 'claude' && c[1].includes('-p'));
+  const sessionEnvs = () => envs((c) => path.basename(c[0]) === 'claude' && c[1].includes('-p'));
   const setupEnvs = () => envs((c) => c[0] === 'sh' && c[1][1] === SETUP);
   const portable = ({ env, cwd }) =>
     Object.fromEntries(Object.entries(env).map(([k, v]) => [k, v.split(cwd).join('<TRIAL_DIR>')]));
@@ -146,6 +146,77 @@ describe('a declared trial environment (## Environment)', () => {
     );
     expect(mockUtils.execCommand).not.toHaveBeenCalled();
     expect(fs.existsSync(path.join(tempDir, '.eval-trials'))).toBe(false);
+  });
+
+  it('refuses a control character in a declaration at the same point', () => {
+    const bad = { ...SCENARIO, environment: ['PATH+=/tmp/a\x00b'] };
+    expect(() => runTrial(bad, 1, 1, { projectRoot: tempDir })).toThrow(
+      /bad ## Environment line: .*contains a control character/,
+    );
+    expect(mockUtils.execCommand).not.toHaveBeenCalled();
+    expect(fs.existsSync(path.join(tempDir, '.eval-trials'))).toBe(false);
+  });
+
+  it('spawns the shim itself, whatever the scenario puts ahead of it on PATH', () => {
+    // A `claude` the scenario prepends: on the session's PATH, never the session.
+    const fake = path.join(tempDir, 'fakebin', 'claude');
+    fs.mkdirSync(path.dirname(fake));
+    fs.writeFileSync(fake, '#!/bin/sh\necho fake\n', { mode: 0o755 });
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: scenario placeholder, not a JS template
+    const shadowing = { ...SCENARIO, environment: ['PATH^=${PROJECT_ROOT}/fakebin'] };
+    const shim = path.join(path.resolve(tempDir), '.eval-trials', '.bin', 'claude');
+    const sessions = () =>
+      mockUtils.execCommand.mock.calls.filter(
+        (c) => path.basename(c[0]) === 'claude' && c[1].includes('-p'),
+      );
+
+    runTrial(shadowing, 1, 1, { projectRoot: tempDir });
+    runTrial({ ...SCENARIO, environment: [] }, 1, 1, { projectRoot: tempDir });
+    runTrial(shadowing, 1, 1, { projectRoot: tempDir, pluginDir });
+    expect(sessions().map((c) => c[0])).toEqual([shim, shim, shim]);
+    expect(sessions()[0][2].env.PATH.split(path.delimiter)[0]).toBe(path.dirname(fake));
+    // Setup still runs on the declared PATH.
+    expect(setupEnvs()[0].env.PATH.split(path.delimiter)[0]).toBe(path.dirname(fake));
+
+    // --no-isolate measures the operator's own toolkit, and keeps its lookup.
+    mockUtils.execCommand.mockClear();
+    runTrial(shadowing, 1, 1, { projectRoot: tempDir, isolated: false });
+    expect(sessions().map((c) => c[0])).toEqual(['claude']);
+  });
+
+  it('records a session that never started as an infra error, and keeps no trial directory', () => {
+    const { scorableResults } = require('../../scripts/lib/eval-stats');
+    mockUtils.execCommand.mockImplementation((cmd, args) => {
+      if (path.basename(cmd) !== 'claude' || !args.includes('-p'))
+        return { stdout: '', stderr: '', exitCode: 0 };
+      const error = Object.assign(new Error(`spawnSync ${cmd} ENOENT`), {
+        code: 'ENOENT',
+        status: null,
+        signal: null,
+      });
+      return { stdout: '', stderr: error.message, exitCode: 1, error };
+    });
+    const row = runTrial(SCENARIO, 1, 1, { projectRoot: tempDir });
+    expect(row).toMatchObject({
+      passed: false,
+      infraError: true,
+      errorType: 'trial_spawn_failed',
+      error: expect.stringMatching(/^Trial session could not be started: spawnSync .* ENOENT$/),
+      environment: ENVIRONMENT,
+    });
+    expect(scorableResults([row])).toEqual([]);
+    expect(fs.existsSync(row.trialDir)).toBe(false);
+  });
+
+  it('still scores a session that ran and exited non-zero with output', () => {
+    mockUtils.execCommand.mockImplementation((cmd, args) =>
+      path.basename(cmd) === 'claude' && args.includes('-p')
+        ? { stdout: DONE_STREAM, stderr: '', exitCode: 1, error: { status: 1, signal: null } }
+        : { stdout: '', stderr: '', exitCode: 0 },
+    );
+    const row = runTrial(SCENARIO, 1, 1, { projectRoot: tempDir });
+    expect(row.infraError).toBeUndefined();
+    expect(row.output).toContain('Done');
   });
 
   it('leaves no trial directory behind when the environment cannot be built', () => {

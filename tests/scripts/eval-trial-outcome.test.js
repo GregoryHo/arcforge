@@ -2,7 +2,9 @@ const {
   isTrialKilled,
   isOutputComplete,
   isProviderRefusal,
+  isSpawnFailure,
 } = require('../../scripts/lib/eval-trial-outcome');
+const { execCommand } = require('../../scripts/lib/utils');
 
 describe('eval-trial-outcome', () => {
   describe('isTrialKilled', () => {
@@ -106,6 +108,32 @@ describe('eval-trial-outcome', () => {
 
     it('should not flag an empty turn — that is trial_output_missing', () => {
       expect(isProviderRefusal({ textResult: '', usage: { output_tokens: 0 } })).toBe(false);
+    });
+  });
+
+  // Real subprocess results, not hand-built shapes: what Node reports is the contract.
+  describe('isSpawnFailure', () => {
+    it('should detect a command that does not exist', () => {
+      expect(isSpawnFailure(execCommand('/no/such/dir/claude', ['-p']))).toBe(true);
+    });
+
+    it('should detect an environment Node refuses to pass on (a NUL byte)', () => {
+      const result = execCommand('/bin/sh', ['-c', 'true'], { env: { PATH: '/tmp/a\x00b' } });
+      expect(result.exitCode).toBe(1);
+      expect(isSpawnFailure(result)).toBe(true);
+    });
+
+    it('should be false for a process that ran, whatever it exited with', () => {
+      expect(isSpawnFailure(execCommand('/bin/sh', ['-c', 'true']))).toBe(false);
+      expect(isSpawnFailure(execCommand('/bin/sh', ['-c', 'echo no >&2; exit 3']))).toBe(false);
+      expect(isSpawnFailure({ stdout: '', stderr: 'boom', exitCode: 1 })).toBe(false);
+      expect(isSpawnFailure(undefined)).toBe(false);
+    });
+
+    it('should be false for a trial the runner killed', () => {
+      const result = execCommand('/bin/sh', ['-c', 'sleep 5'], { timeout: 100 });
+      expect(isTrialKilled(result)).toBe(true);
+      expect(isSpawnFailure(result)).toBe(false);
     });
   });
 });
