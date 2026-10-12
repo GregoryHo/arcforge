@@ -357,6 +357,18 @@ describe('lintScenario: ## Environment', () => {
     expect(diagnostics[2].message).toMatch(/UV_CACHE_DIR must point inside the trial/);
   });
 
+  it('reports a removal of the directory claude resolves from', () => {
+    const file = writeScenario(
+      dir,
+      'env-shim',
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: scenario placeholder, not a JS template
+      withEnvironment(['PATH-=${PROJECT_ROOT}/.eval-trials/.bin']),
+    );
+    expect(lintScenario(file).map((d) => d.message)).toEqual([
+      expect.stringMatching(/would remove the directory claude and node resolve from/),
+    ]);
+  });
+
   it('reports a fenced block, which the trial would refuse line by line', () => {
     const file = writeScenario(
       dir,

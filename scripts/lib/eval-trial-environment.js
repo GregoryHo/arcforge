@@ -78,10 +78,17 @@ const TRIAL_DIR_VARS = new Set([
   'NPM_CONFIG_CACHE',
 ]);
 
+// Where the shim directory sits under the project root. A scenario may not take
+// it off PATH: `claude` is spawned by name and would no longer resolve.
+const SHIM_DIR = path.join('.eval-trials', '.bin');
+const SHIM_REMOVAL = 'would remove the directory claude and node resolve from';
+
 const PATH_OPS = { '+=': 'append', '^=': 'prepend', '-=': 'remove' };
 const PLACEHOLDER_RE = /^\$\{(PROJECT_ROOT|TRIAL_DIR)\}/;
 // biome-ignore lint/suspicious/noTemplateCurlyInString: the scenario placeholder, not a JS template
 const TRIAL_DIR_PREFIX = '${TRIAL_DIR}/';
+
+const withoutTrailingSlash = (dir) => (dir.length > 1 ? dir.replace(/\/+$/, '') : dir);
 
 const isForwarded = (name) => FORWARDED.has(name) || name.startsWith('LC_');
 
@@ -199,7 +206,11 @@ function parseEnvironmentLine(text) {
     if (operator === '=') {
       return { error: 'PATH cannot be replaced; use PATH+= (append), PATH^= (prepend) or PATH-=' };
     }
-    const problem = pathProblem(value);
+    const problem =
+      pathProblem(value) ||
+      (operator === '-=' && withoutTrailingSlash(value) === `\${PROJECT_ROOT}/${SHIM_DIR}`
+        ? SHIM_REMOVAL
+        : undefined);
     return problem
       ? { error: `PATH${operator} ${problem}` }
       : { directive: { name, op: PATH_OPS[operator], value } };
@@ -256,15 +267,15 @@ function declaredEnvironment(scenario = {}) {
   return directives;
 }
 
-const withoutTrailingSlash = (dir) => (dir.length > 1 ? dir.replace(/\/+$/, '') : dir);
-
 /**
  * Apply a scenario's directives to an environment, in declared order.
  * @param {Object} trialEnvironment - Environment to change (the caller's own copy)
  * @param {Object[]} directives - From declaredEnvironment()
  * @param {{ projectRoot: string, trialDir: string }} roots - Placeholder values
+ * @throws {Error} when a removal names the shim directory by its literal path
  */
 function applyDirectives(trialEnvironment, directives, { projectRoot, trialDir }) {
+  const shimDir = path.join(path.resolve(projectRoot), SHIM_DIR);
   const expand = (value) =>
     withoutTrailingSlash(
       value.replace(PLACEHOLDER_RE, (_m, name) =>
@@ -279,6 +290,9 @@ function applyDirectives(trialEnvironment, directives, { projectRoot, trialDir }
     if (op === 'set') {
       trialEnvironment[name] = dir;
       continue;
+    }
+    if (op === 'remove' && dir === shimDir) {
+      throw new Error(`## Environment: PATH-=${value} ${SHIM_REMOVAL}`);
     }
     entries = entries.filter((entry) => withoutTrailingSlash(entry) !== dir);
     if (op === 'append') entries.push(dir);
@@ -301,13 +315,13 @@ function applyDirectives(trialEnvironment, directives, { projectRoot, trialDir }
  * @param {string} trialDir - Trial directory
  * @param {EvalScenario} [scenario] - The scenario the trial runs; its
  *   `environment` lines are the only part read
- * @throws {Error} when a `## Environment` line is not valid
  * @param {Object} [opts]
  * @param {string} [opts.projectRoot] - Project root; the shim directory lives
  *   under its .eval-trials/ (defaults to the working directory)
  * @param {boolean} [opts.contained=true] - False for a `--no-isolate` trial
  * @param {Object} [opts.parentEnv] - Environment to build from (injectable for tests)
  * @returns {Object} Environment for the trial's subprocesses
+ * @throws {Error} when a `## Environment` line is not valid
  */
 function trialEnv(trialDir, scenario = {}, opts = {}) {
   const { projectRoot = process.cwd(), contained = true, parentEnv = process.env } = opts;
@@ -317,7 +331,7 @@ function trialEnv(trialDir, scenario = {}, opts = {}) {
     for (const name of Object.keys(parentEnv)) {
       if (isForwarded(name)) trialEnvironment[name] = parentEnv[name];
     }
-    const binDir = path.join(path.resolve(projectRoot), '.eval-trials', '.bin');
+    const binDir = path.join(path.resolve(projectRoot), SHIM_DIR);
     trialEnvironment.PATH = [ensureToolShims(binDir, parentEnv.PATH), ...SYSTEM_PATH].join(
       path.delimiter,
     );

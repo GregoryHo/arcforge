@@ -168,6 +168,20 @@ describe('the shim directory', () => {
     expect(fs.existsSync(path.join(binDir, 'node'))).toBe(true);
   });
 
+  it('survives the cleanup of a trial directory beside it', () => {
+    const { createTrialDir, cleanupTrialDir } = require('../../scripts/lib/eval-trial-env');
+    const trialDir = createTrialDir('scn', 1, root);
+    const env = trialEnv(trialDir, {}, { projectRoot: root });
+    const binDir = path.join(root, '.eval-trials', '.bin');
+    cleanupTrialDir(trialDir);
+    expect(fs.existsSync(trialDir)).toBe(false);
+    expect(fs.existsSync(path.join(binDir, 'node'))).toBe(true);
+    // A second trial of the same run finds the same directory, links untouched.
+    const before = fs.lstatSync(path.join(binDir, 'node')).mtimeMs;
+    expect(trialEnv(createTrialDir('scn', 2, root), {}, { projectRoot: root }).PATH).toBe(env.PATH);
+    expect(fs.lstatSync(path.join(binDir, 'node')).mtimeMs).toBe(before);
+  });
+
   it('never resolves claude to its own shim', () => {
     const binDir = path.join(root, 'shims');
     const claude = writeExecutable(path.join(root, 'a', 'claude'));
@@ -291,6 +305,24 @@ describe('a scenario declares its own trial environment (## Environment)', () =>
     expect(directives).toEqual([]);
     expect(errors).toEqual([{ index: 0, message: expect.stringMatching(reason) }]);
     expect(() => build([line])).toThrow(/bad ## Environment line/);
+  });
+
+  it('refuses to take the shim directory off PATH, however it is spelled', () => {
+    for (const line of [
+      `PATH-=\${PROJECT_ROOT}/.eval-trials/.bin`,
+      `PATH-=\${PROJECT_ROOT}/.eval-trials/.bin/`,
+    ]) {
+      expect(parseEnvironment([line]).errors).toEqual([
+        { index: 0, message: expect.stringMatching(/would remove the directory claude and node/) },
+      ]);
+    }
+    // A literal path only shows itself once the project root is known.
+    const literal = `PATH-=${shims()}`;
+    expect(parseEnvironment([literal]).errors).toEqual([]);
+    expect(() => build([literal])).toThrow(/would remove the directory claude and node/);
+    // Moving it is not removing it: claude and node still resolve.
+    const env = build([`PATH+=\${PROJECT_ROOT}/.eval-trials/.bin`]);
+    expect(env.PATH.split(':')).toEqual([...SYSTEM_PATH, shims()]);
   });
 
   it('refuses a cache variable declared twice, naming the second line', () => {

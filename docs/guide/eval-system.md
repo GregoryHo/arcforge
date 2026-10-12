@@ -412,8 +412,8 @@ start without:
   the start: no `$HOME`, no `~`, no other variable. No whitespace, no `:` (one
   directory per line) and no `..` segment. A literal absolute path such as
   `/opt/homebrew/bin` is allowed, and ties the scenario to hosts that have it.
-- **`PATH` is changed, never replaced.** `PATH=<dir>` is an error, so `claude`
-  and `node` always resolve.
+- **`PATH` is changed, never replaced.** `PATH=<dir>` is an error, and so is
+  removing `.eval-trials/.bin`, so `claude` and `node` always resolve.
 - **`<VAR>` is one of** `XDG_CACHE_HOME`, `XDG_DATA_HOME`, `XDG_BIN_HOME`,
   `UV_CACHE_DIR`, `UV_TOOL_DIR`, `UV_TOOL_BIN_DIR`, `UV_PYTHON_INSTALL_DIR`,
   `UV_INSTALL_DIR`, `PLAYWRIGHT_BROWSERS_PATH`, `PIP_CACHE_DIR` or
