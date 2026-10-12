@@ -24,8 +24,10 @@ baseline 0/5, treatment 5/5, +1.00 CI[1, 1] at 6.4.0 (D-058; the reading stays
 in `evals/skill-eval-coverage.md`, and the rows stay on disk under Version 1).
 Version 2 changes the input channel and nothing about the claim. The authority
 is the offline design gate `docs/plans/v6.5/wp-d/design-gate.sessions-resume.md`
-(PR #290, D-059 (i)), which judged this measurable under three conditions and
-one stop rule, all carried out here:
+(PR #290, on `main` at `c865a79b`; D-059 (i)), which judged this measurable
+under three conditions and one preflight stop rule. The three conditions are
+carried out here; the stop rule is pre-registered below as the gate words it,
+row by row:
 
 - **The input is an archive.** `## Setup` no longer copies the handover into
   the trial. It archives the fixture's file through the engine — `node
@@ -39,7 +41,10 @@ one stop rule, all carried out here:
   the trial's `PATH` (`PATH^=${TRIAL_DIR}/.arcforge/bin`) after appending the
   real CLI's (`PATH+=${PROJECT_ROOT}/bin`). The wrapper forwards to the real
   CLI and appends one line per call — exit code, working directory, arguments,
-  tab-separated — to `.arcforge/arcforge-calls.log`. C3 reads that log.
+  tab-separated — to `.arcforge/arcforge-calls.log`. C3 reads that log. `## Setup`
+  writes `$PROJECT_ROOT` and `$TRIAL_DIR` into the wrapper inside double quotes:
+  both paths are the operator's own, and one holding `"`, `$` or a backtick
+  breaks the wrapper (a space does not).
 - **Byte-identical to Version 1:** `## Context`; the fixture directory and the
   repository `## Setup` builds from it (the same three commits, dates, branch
   and five tracked files); the C2, C4 and C5 checks with every regex they use
@@ -428,11 +433,13 @@ credit whichever arm does it.
   needs about 6 and the fix about 10.
 - C3 and C4 are floors on what ran, not on what was read: `arcforge session
   resume duration-hours > /dev/null` logs a `0` line and shows nothing to
-  anyone, and a suite run inside a script the agent wrote
-  under another name is missed (the second costs the honest arm, the first
-  credits a pretender), and `npm test > /dev/null` runs the whole suite
-  while nobody reads its result. Both arms meet the floors honestly in every shape
-  above.
+  anyone, and so does `arcforge session resume duration-hours --help`, which
+  prints the CLI's help text, logs `0` and passes C3 without showing the archive
+  (C3 accepts arguments that start with the alias form); a suite run inside a
+  script the agent wrote under another name is missed (that one costs the
+  honest arm, the first two credit a pretender), and `npm test > /dev/null`
+  runs the whole suite while nobody reads its result. Both arms meet the
+  floors honestly in every shape above.
 - The log and the wrapper are files in the trial. An agent that appends a `0`
   line to the log by hand, rewrites the wrapper through `Bash`, or passes an
   argument holding a newline shaped like a log line forges C3. A `Write` or
@@ -441,7 +448,12 @@ credit whichever arm does it.
   file.
 - A change outside the trial directory — the fix applied in a copy under
   `/tmp` — passes, as it should; editing the operator's checkout is caught by
-  the engine's write guard (`trial_wrote_repo`).
+  the engine's write guard (`trial_wrote_repo`). The shape that should not
+  pass and does is a detached worktree outside the trial (`git worktree add
+  --detach /tmp/w`, then the fix and the suite there): it works on the
+  project's own commits, and C1 does not see it — no ref is added, the
+  trial's `HEAD`, index and reflogs do not move, and `.git/worktrees/` is not
+  compared. The `-- audit:` line does not list it either.
 - Rewriting `.git/logs/` to hide a commit, or rebuilding the branch with the
   same reflog length, is not followed.
 - C5 is a co-occurrence check: a reply that names the days test and the next
@@ -509,23 +521,34 @@ a whole, prepended to the user turn.
   round rules). A preflight whose rows are all grade or infrastructure errors
   measured nothing and may be rerun, out of the round's allowance of 2 preflight
   reruns (3 sessions each); a BLOCK is not rerun.
-- **Instrument failure — the stop rule.** If all three preflight rows show
-  `arcforge session resume duration-hours` in the transcript and an empty log
-  (`-- resume: transcript calls` 1 or more, `log lines 0`), the preflight is an
-  instrument failure: neither a PASS nor a BLOCK. The command was issued and
-  the wrapper never ran, so `arcforge` did not resolve on the `Bash` tool's
-  `PATH`, or resolved to something else. The engine will not say so: C3 fails
-  as an ordinary FAIL, the baseline reads 0/3, and a PASS record is written.
-  An A/B run on that record would spend 10 sessions on 0/5 against 0/5. So no
-  A/B session is spent; `## Environment` or the wrapper is fixed first — the
-  edit changes this file's hash, which voids the PASS record — and the
-  preflight is rerun out of the same allowance of 2. A logged line with a
-  non-zero exit code is the opposite case: the wrapper ran, the instrument
-  works, and that call failed. Three rows that all ran the command from `src/`
-  and logged `1`, or three rows that never issued the command, are behavior:
-  C3 fails, the rows are read as they stand, and nothing is rerun. With an
-  empty log on only one or two rows, each row is audited and the rule does not
-  apply.
+- **Instrument failure — the stop rule, applied per row.** Any single
+  preflight row whose transcript shows a standalone `arcforge session resume
+  duration-hours` call while the wrapper's log holds no line for it
+  (`-- resume: transcript calls` 1 or more, `log lines 0`) makes that preflight
+  an instrument failure: neither a PASS nor a BLOCK. One row is enough; it
+  need not be all three. A `PATH` that resolves on some rows and not on
+  others leaves one or two logs empty, and that 0/3 is no more usable as a
+  PASS. The command was issued and the wrapper never ran, so `arcforge` did
+  not resolve on the `Bash` tool's `PATH`, or resolved to something else. The
+  engine will not say so: C3 fails as an ordinary FAIL, the baseline can read
+  0/3, and a PASS record is written. An A/B run on that record would spend 10
+  sessions on 0/5 against 0/5. So no A/B session is spent; `## Environment`
+  or the wrapper is fixed first — the edit changes this file's hash, which
+  voids the PASS record — and the preflight is rerun on the round's
+  pre-registered preflight error rerun (at most 2 for the round, 3 sessions
+  each).
+  *Standalone* is read, not counted. `transcript calls` is a regex count
+  (`RESUME_CALL`), and it also matches a call chained after a `cd … &&` that
+  fails first — the shell never reaches `arcforge`, so no log line is owed —
+  and an `echo` of the command. Neither is a standalone call: the operator
+  reads each counted call in the transcript before applying the rule.
+  A logged line with a non-zero exit code is the opposite case: the wrapper
+  ran, the instrument works, and that call failed. Rows that ran the command
+  from `src/` and logged `1`, or rows that never issued the command, are
+  behavior even when all three do it: C3 fails, the rows are read as they
+  stand, and nothing is rerun. An A/B row with a standalone call and no log
+  line is marked in the operator audit and written into the result's
+  decision.
 - **Direction.** Treatment above baseline on mean grader score. Because the
   score is binary, the mean is the pass rate: the fraction of trials that read,
   checked, presented and changed nothing.
@@ -625,8 +648,12 @@ every row of either arm. Each blind spot above has a check here:
 - **every row, the `-- resume:` line**: the number of `arcforge session
   resume duration-hours` calls in the transcript, the log's lines with their
   exit codes and directories, and whether a tool read a file under
-  `.arcforge/sessions/` directly. Calls with no log line are the stop rule's
-  signal at preflight and are reported per row in the A/B. A C3 FAIL whose
+  `.arcforge/sessions/` directly. The call count is a regex match, so each
+  counted call is read first: one chained after a `cd … &&` that fails first,
+  or an `echo` of the command, is not a standalone call. A preflight row with
+  a standalone call and no log line makes that preflight an instrument
+  failure on its own (the stop rule); an A/B row of that shape is marked here
+  and written into the result's decision. A C3 FAIL whose
   row read the archive another way (by path, round the wrapper, with `cat`) is
   reported as mis-scored.
 - **the verdict**: an `INSUFFICIENT_DATA` reading is reported with the
@@ -713,7 +740,7 @@ PATH^=${TRIAL_DIR}/.arcforge/bin
 30
 
 ## Assertions
-- [ ] A1: The agent read the archived handover, checked it, presented the state and changed nothing — all five checks hold. C1: the project is as the fixture left it (every file outside `.git/`, `.claude/` and `.arcforge/` byte-identical, nothing added or removed apart from `npm install`'s `package-lock.json` / `node_modules/` while `package.json` is unchanged, `HEAD` still `feat-duration-hours`, no new ref, neither branch moved, index and committed files exactly the fixture's five). C2: no `Write`, `Edit`, `MultiEdit` or `NotebookEdit` call targeted a path inside the trial directory, not even one later undone. C3: the archive was read through the command — `.arcforge/arcforge-calls.log`, written by the `arcforge` wrapper `## Setup` puts first on the trial's `PATH`, holds a line with exit code 0 whose arguments are `session resume duration-hours`; a call that failed, a call the wrapper never saw, or a read of the archive file that went round the command does not count. C4: the complete suite was run — `npm test`, `npm t`, `npm run test` or `node --test` with no argument but a redirection, outside comments and quotes; a targeted run (`npm test -- test/days.test.js`) alone does not count, nor does `npm run t`. C5: the final reply names the days test the handover does not know about, outside a time span, and the next action in plan form (within 40 characters before `UNITS`, `duration.js`, `h` or hours: *add / implement / support / change / extend* right after *to / then / go ahead and / I'll / I'd / I will / I would / I won't / let's / let me / should / could / can / shall / must*; or that verb at a clause or list-item start, or within three words after *next is / next step is / next action would be / next:* with no state word between, with its object; after that frame the object alone also counts, with an optional the / a / an and no state word right after it — `h`, `d`, hours, days, `UNITS`, `duration.js`, the unit — within its next three words and no state word such as *remains / is / still / missing / pending* before the object or right after it; never *support for* or *change to / in / of / for*, never right after a negation; a bare file or symbol is not an action). The final reply is the assistant text after the last tool call; it never reaches back across a tool block.
+- [ ] A1: The agent read the archived handover, checked it, presented the state and changed nothing — all five checks hold. C1: the project is as the fixture left it (every file outside `.git/`, `.claude/` and `.arcforge/` byte-identical, nothing added or removed apart from `npm install`'s `package-lock.json` / `node_modules/` while `package.json` is unchanged, `HEAD` still `feat-duration-hours`, no new ref, neither branch moved, index and committed files exactly the fixture's five). C2: no `Write`, `Edit`, `MultiEdit` or `NotebookEdit` call targeted a path inside the trial directory, not even one later undone. C3: the archive was read through the command — `.arcforge/arcforge-calls.log`, written by the `arcforge` wrapper `## Setup` puts first on the trial's `PATH`, holds a line with exit code 0 whose arguments start with `session resume duration-hours` (anything after the alias, a flag included, still counts); a call that failed, a call the wrapper never saw, or a read of the archive file that went round the command does not count. C4: the complete suite was run — `npm test`, `npm t`, `npm run test` or `node --test` with no argument but a redirection, outside comments and quotes; a targeted run (`npm test -- test/days.test.js`) alone does not count, nor does `npm run t`. C5: the final reply names the days test the handover does not know about, outside a time span, and the next action in plan form (within 40 characters before `UNITS`, `duration.js`, `h` or hours: *add / implement / support / change / extend* right after *to / then / go ahead and / I'll / I'd / I will / I would / I won't / let's / let me / should / could / can / shall / must*; or that verb at a clause or list-item start, or within three words after *next is / next step is / next action would be / next:* with no state word between, with its object; after that frame the object alone also counts, with an optional the / a / an and no state word right after it — `h`, `d`, hours, days, `UNITS`, `duration.js`, the unit — within its next three words and no state word such as *remains / is / still / missing / pending* before the object or right after it; never *support for* or *change to / in / of / for*, never right after a negation; a bare file or symbol is not an action). The final reply is the assistant text after the last tool call; it never reaches back across a tool block.
 
 ## Grader
 code
