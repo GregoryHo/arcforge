@@ -43,6 +43,7 @@ describe('conditionOf', () => {
       'maxTurns',
       'pluginDir',
       'isolation',
+      'stageSkillFiles',
     ]);
     expect(conditionOf({ model: 'opus' })).toEqual({
       model: 'opus',
@@ -51,6 +52,7 @@ describe('conditionOf', () => {
       maxTurns: null,
       pluginDir: null,
       isolation: null,
+      stageSkillFiles: null,
     });
   });
 });
@@ -394,6 +396,29 @@ describe('pairArms', () => {
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('pools a run that staged skill files apart from one that did not (B-19)', () => {
+    const later = '2026-10-12T10:00:00.000Z';
+    const plain = [row({ trial: 1 }), row({ trial: 2 })];
+    // Rows written before 6.5.0 carry no staging field and pool with a plain run.
+    const { stageSkillFiles: _absent, ...before650 } = row({ trial: 3 });
+    const staged = [row({ trial: 1, stageSkillFiles: true, timestamp: later })];
+
+    const split = splitPools([...plain, before650, ...staged]);
+    expect(split.current).toEqual(staged);
+    expect(split.others).toEqual([
+      { conditions: expect.objectContaining({ stageSkillFiles: null }), rows: 3 },
+    ]);
+    expect(describeCondition(split.conditions)).toMatch(/, staged skill files yes$/);
+    expect(describeCondition(split.others[0].conditions)).not.toMatch(/staged/);
+
+    // A staged treatment never pairs with a baseline from a run that staged nothing.
+    expect(pairArms(plain, staged).error).toMatch(/no run conditions in common/);
+    const paired = pairArms([...plain, ...staged], [...plain, ...staged]);
+    expect(paired.baseline).toEqual(staged);
+    expect(paired.treatment).toEqual(staged);
+    expect(paired.unpaired.map((p) => p.rows)).toEqual([2, 2]);
   });
 
   it('refuses when the arms share no condition pair, listing every pool', () => {

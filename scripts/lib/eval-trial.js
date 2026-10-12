@@ -80,6 +80,9 @@ function resolveTrialTimeoutMs(env = process.env) {
  * @param {number} [options.maxTurns] - Max turns for Claude CLI
  * @param {string[]} [options.watchRoots] - Extra directories the write check watches;
  *   nothing is loaded from them (a comparison's baseline watches the plugin root)
+ * @param {{ baseDir?: string, textHash?: string, staged?: boolean }} [options.skillInjection] -
+ *   What this arm was injected with: its staged skill directory, the hash of its
+ *   skill text, and whether the run stages skill files (a condition both arms record)
  * @returns {TrialResult} Trial result
  */
 function runTrial(scenario, trialNumber, totalTrials, options = {}) {
@@ -94,6 +97,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     pluginDir: rawPluginDir,
     maxTurns: rawMaxTurns,
     watchRoots = [],
+    skillInjection = {},
   } = options;
   // Refused before any session: no row of such a run could be filed correctly.
   const reserved = reservedNameError(scenario.name);
@@ -154,6 +158,11 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
       pluginDir: Boolean(pluginDir),
       isolation: pluginDir ? 'plugin-dir' : isolated ? 'isolated' : 'toolkit',
       environment: scenario.environment || [],
+      // Recorded only by a run that staged skill files, so a run that did not
+      // pools with rows written before the field existed (B-19).
+      ...(skillInjection.staged ? { stageSkillFiles: true } : {}),
+      // Not a pooling condition: which text this arm was injected with.
+      ...(skillInjection.textHash ? { skillTextHash: skillInjection.textHash } : {}),
     };
   }
 
@@ -198,6 +207,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     maxTurns: resolvedMaxTurns,
     model,
     effort,
+    skillBaseDir: skillInjection.baseDir,
   });
 
   // A contained trial's session is the shim, by its full path: a directory the
@@ -414,9 +424,19 @@ function stopIfTrialWroteRepo(row, where) {
  * @param {number} [opts.maxTurns] - Resolved turn budget
  * @param {string} [opts.model] - Model flag value
  * @param {string} [opts.effort] - Effort flag value
+ * @param {string} [opts.skillBaseDir] - Staged skill directory this arm was given;
+ *   the advisory names it as the one exception (B-19)
  * @returns {string[]} argv after `claude`
  */
-function buildClaudeArgs({ trialDir, contained, pluginDir, maxTurns, model, effort }) {
+function buildClaudeArgs({
+  trialDir,
+  contained,
+  pluginDir,
+  maxTurns,
+  model,
+  effort,
+  skillBaseDir,
+}) {
   const args = [
     '-p',
     '--output-format',
@@ -432,7 +452,11 @@ function buildClaudeArgs({ trialDir, contained, pluginDir, maxTurns, model, effo
     // trials that ignore it.
     args.push(
       '--append-system-prompt',
-      `You are running in an isolated eval trial. Your working directory is ${trialDir}, and every file you need is already in it — do not read, search, or access files outside this directory.`,
+      `You are running in an isolated eval trial. Your working directory is ${trialDir}, and every file you need is already in it — do not read, search, or access files outside this directory.${
+        skillBaseDir
+          ? ` The one exception is ${skillBaseDir}, the base directory of the skill you were given: you may read and run the files in it, and must not write to it.`
+          : ''
+      }`,
     );
   }
   if (pluginDir) args.push('--plugin-dir', path.resolve(pluginDir));

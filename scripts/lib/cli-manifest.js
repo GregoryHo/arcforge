@@ -105,6 +105,7 @@ const CLI_MANIFEST = {
       '--top',
       '--port',
       '--skill-file',
+      '--stage-skill-files',
       '--interleave',
       '--json',
     ],

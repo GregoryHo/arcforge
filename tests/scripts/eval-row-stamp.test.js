@@ -228,7 +228,9 @@ describe('rows and preflight records carry scenario_hash, node_version and repo_
       ];
       expect(rows).toHaveLength(4);
       for (const row of rows) {
-        expect(Object.keys(row).sort()).toEqual(ROW_KEYS);
+        // The arm injected with a text records its hash as well (B-20).
+        const injected = row.eval.endsWith('-treatment') ? ['skillTextHash'] : [];
+        expect(Object.keys(row).sort()).toEqual([...ROW_KEYS, ...injected].sort());
         expect(row.scenario_hash).toBe(HASH);
         expect(row.node_version).toBe(process.version);
         expect(row.repo_commit).toBe(COMMIT);

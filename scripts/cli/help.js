@@ -56,6 +56,7 @@ COMMANDS:
   eval ab <name> [--skill-file path] A/B skill/workflow eval (requires prior PASS preflight)
       --plugin-dir   Plugin directory for treatment trials (workflow scope only)
       --max-turns    Max turns for both arms (overrides scenario)
+      --stage-skill-files  Skill scope: copy the skill file's directory outside the trial for the injected arm
       --interleave   Alternate baseline/treatment trials instead of running arms back-to-back
       --effort       Reasoning effort passed to spawned trials
   eval compare <name>                Compare A/B results

@@ -120,6 +120,7 @@ Runs both arms and stores every trial. Useful flags:
 | `--interleave` | Alternate the arms instead of running each in a block, so drift over the run hits both equally |
 | `--max-turns` | Turn budget per trial, overriding the scenario |
 | `--skill-file` | Skill-scope only: inject this skill body into the treatment prompt. Falls back to the scenario's `## Target` |
+| `--stage-skill-files` | Skill-scope only: also give the injected arm the skill's files. See [Staging a skill's files](#staging-a-skills-files) |
 | `--plugin-dir` | `workflow` scope only: load this plugin into the treatment arm. Refused for any other scope |
 
 Each trial's `claude -p` session is capped at 900 s; a trial killed at the cap is
@@ -294,6 +295,47 @@ workflow, so write it as a `workflow` scenario with `## Plugin Dir`. Whether a
 single skill triggers from its description is `claude plugin eval`'s question,
 not this harness's. No run ever injects a skill body while also loading the
 plugin.
+
+### Staging a skill's files
+
+By default the treatment gets the text of the skill file and nothing else. A
+skill that tells the agent to run a script from its own folder then has a
+script the agent cannot find. `--stage-skill-files` gives the injected arm the
+files as well:
+
+```bash
+arcforge eval ab <name> --skill-file path/to/SKILL.md --stage-skill-files
+```
+
+`eval ab` copies the directory the skill file sits in to a temporary directory
+outside the trial tree, leaving out any `.git`, `node_modules`, `.venv` and
+`__pycache__` folder. The injection then opens with the line a host puts in
+front of a loaded skill, `Base directory for this skill:` followed by the
+copy's path. The trial's instruction to stay inside its own directory names
+that path as its one exception. The copy is removed when the run ends.
+
+The files belong to the injection. The baseline is injected with nothing, so it
+gets no copy and no line, and cannot list one from inside its trial directory.
+Do not put the same files into the trial with `## Setup` instead: both arms run
+the same Setup, so the baseline would see them too.
+
+Both arms watch the copy for writes, the same way they watch the project. A
+trial that writes into it is recorded as `trial_wrote_repo` and stops the run,
+since every later trial would be given the changed files. A skill whose script
+installs into its own folder trips this check.
+
+Staging is a run condition. A run with the flag records `stageSkillFiles: true`
+on every row of both arms and forms a pool of its own. A run without it records
+nothing and pools with earlier rows. Each injected arm's row also records
+`skillTextHash`, a hash of the skill text it was given. That hash identifies
+the text; it does not pool.
+
+The limit is the same as for the trial directory. Nothing but the write check
+and the advice in the prompt keeps an arm away from a directory it was not
+given.
+
+One run stages one directory, the one `--skill-file` sits in. A run that needs
+a second skill's files in the injected arm is not supported yet.
 
 To run one condition on its own, without a comparison:
 
@@ -541,8 +583,9 @@ when only its prose did.
 
 A pool is narrower than a version. Every row also records the conditions it ran
 under: `model`, `effort`, the per-trial ceiling (`trialTimeoutMs`), the turn
-budget (`maxTurns`), whether a plugin was loaded (`pluginDir`), and the isolation
-mode (`isolation`: `isolated`, `plugin-dir`, or `toolkit` for `--no-isolate`). Rows under
+budget (`maxTurns`), whether a plugin was loaded (`pluginDir`), the isolation
+mode (`isolation`: `isolated`, `plugin-dir`, or `toolkit` for `--no-isolate`), and
+whether the run staged skill files (`stageSkillFiles`, recorded only when it did). Rows under
 different conditions answered different questions, so no reader combines them.
 `eval run`, `list`, `compare`, `report` and the dashboard judge the newest
 condition's pool. Each other pool is listed beside it with its row count and

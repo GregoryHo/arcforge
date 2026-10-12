@@ -390,20 +390,12 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
     const model = args.options.model;
     const effort = args.options.effort;
     // A skill-scope A/B needs its skill body; refuse before any progress line.
-    const skillFile = args.options['skill-file'] || scenario.target;
-    let skillInstruction;
-    if (scenario.scope !== 'workflow') {
-      if (!skillFile) {
-        throw new Error(
-          'eval ab for skill scope requires --skill-file <path> or ## Target in scenario',
-        );
-      }
-      const resolvedSkillFile = path.resolve(projectRoot, skillFile);
-      if (!fs.existsSync(resolvedSkillFile)) {
-        throw new Error(`skill file not found: ${skillFile}`);
-      }
-      skillInstruction = fs.readFileSync(resolvedSkillFile, 'utf8');
-    }
+    const { resolveSkillOptions } = require('./eval-skill-options');
+    const skill = resolveSkillOptions(scenario, projectRoot, {
+      skillFile: args.options['skill-file'],
+      stage: args.flags['stage-skill-files'],
+    });
+    const { skillFile } = skill;
     // Before the gate: it reads the record a running preflight is still writing.
     takeRunLock('ab');
 
@@ -471,10 +463,12 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
       console.log(
         `A/B eval (skill): ${scenario.name} (k=${k})${interleave ? ' [interleaved]' : ''}`,
       );
-      console.log(`Skill: ${skillFile}\n`);
+      console.log(`Skill: ${skillFile}${skill.stageSkillFiles ? ' (files staged)' : ''}\n`);
       result = eval_.runSkillEval(scenario, k, {
         projectRoot,
-        skillInstruction,
+        skillInstruction: skill.skillInstruction,
+        skillFile: skill.skillPath,
+        stageSkillFiles: skill.stageSkillFiles,
         interleave,
         onTrialComplete,
         model,

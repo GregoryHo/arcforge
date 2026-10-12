@@ -2,7 +2,8 @@
  * eval-pools.js - Group result rows by the conditions they ran under
  *
  * A pool is a scenario version plus its run conditions: model, effort, the
- * per-trial ceiling, the turn budget and whether a plugin dir was loaded (B-8).
+ * per-trial ceiling, the turn budget, whether a plugin dir was loaded (B-8) and
+ * whether the run staged skill files for its injected arm (B-19).
  * Rows measured under different conditions answered different questions, so a
  * reader never combines them. It judges the newest condition's pool and lists
  * the others beside it (D-021: pools measured on another instrument stay on
@@ -31,12 +32,13 @@ const CONDITION_FIELDS = [
   'maxTurns',
   'pluginDir',
   'isolation',
+  'stageSkillFiles',
 ];
 
 /**
  * The run conditions a row recorded; null for a field the row predates.
  * @param {Object} row - Result row
- * @returns {{ model: *, effort: *, trialTimeoutMs: *, maxTurns: *, pluginDir: * }}
+ * @returns {Object} One key per CONDITION_FIELDS entry
  */
 function conditionOf(row) {
   const conditions = {};
@@ -177,7 +179,7 @@ function pairArms(baselineRows, treatmentRows) {
       ...(unscoredArm ? { unscoredArm } : {}),
       error: unscoredArm
         ? `The ${unscoredArm} ${armsHave} no scored trial: every trial is an infra or grade error, an instrument failure, not a measurement, so no comparison is valid. Fix the failure and rerun eval ab.`
-        : 'The baseline and treatment arms have no run conditions in common (model, effort, ceiling, turn budget), so no comparison is valid. Rerun eval ab so both arms run under the same conditions.',
+        : 'The baseline and treatment arms have no run conditions in common (model, effort, ceiling, turn budget, staged skill files), so no comparison is valid. Rerun eval ab so both arms run under the same conditions.',
     };
   }
   return {
@@ -208,6 +210,8 @@ function describeCondition(conditions) {
     `max turns ${conditions.maxTurns === null && conditions.pluginDir !== null ? 'none' : show(conditions.maxTurns)}`,
     `plugin dir ${plugin}`,
     `isolation ${show(conditions.isolation)}`,
+    // Named only on a pool that has it: a run without it records nothing.
+    ...(conditions.stageSkillFiles ? ['staged skill files yes'] : []),
   ].join(', ');
 }
 
