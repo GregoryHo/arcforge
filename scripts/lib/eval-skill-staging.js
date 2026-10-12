@@ -98,10 +98,48 @@ function buildInjection({ text, skillFile, stage } = {}) {
   return { text: `${baseDirectoryLine(baseDir)}\n\n${text}`, textHash, baseDir };
 }
 
+/**
+ * A scenario as an injected arm runs it: the injection ahead of its context.
+ * @param {Object} scenario - Parsed scenario
+ * @param {{ text: string|null }} injection - From buildInjection
+ * @returns {Object} The scenario itself for an arm injected with nothing
+ */
+function withInjection(scenario, { text }) {
+  return text ? { ...scenario, context: `${text}\n\n${scenario.context}` } : scenario;
+}
+
+/**
+ * The baseline arm on its own, as `eval preflight` runs it. Nothing is staged
+ * until the first trial asks for the arm, so the caller can hold this across
+ * its own checks and only owes a remove() once trials may have started.
+ * @param {Object} scenario - Parsed scenario
+ * @param {{ text?: string, skillFile?: string, stage?: boolean }} baseline - As buildInjection
+ * @returns {{ arm: () => { scenario: Object, watchRoots: string[], skillInjection: Object }, remove: () => void }}
+ */
+function baselineArm(scenario, baseline) {
+  let injection = null;
+  const arm = () => {
+    injection = injection || buildInjection(baseline);
+    return {
+      scenario: withInjection(scenario, injection),
+      watchRoots: [injection.baseDir].filter(Boolean),
+      skillInjection: {
+        baseDir: injection.baseDir,
+        textHash: injection.textHash,
+        staged: Boolean(baseline.stage),
+        baselineHash: injection.textHash,
+      },
+    };
+  };
+  return { arm, remove: () => removeStagedDir(injection?.baseDir) };
+}
+
 module.exports = {
   hashSkillText,
   baseDirectoryLine,
   stageSkillDir,
   removeStagedDir,
   buildInjection,
+  withInjection,
+  baselineArm,
 };

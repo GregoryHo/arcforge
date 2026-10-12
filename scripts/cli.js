@@ -7,7 +7,7 @@
  *   loop --tasks <file> [--max-runs N] [--max-cost N]  Run autonomous loop over a task list
  *   eval list                        List eval scenarios
  *   eval run <name> [--k N] [--model <name>] [--no-isolate] [--plugin-dir <path>] [--max-turns N]
- *   eval preflight <name>            Run baseline trials to check scenario discriminability
+ *   eval preflight <name> [--baseline-skill-file <path>] [--stage-skill-files]  Run baseline trials to check scenario discriminability
  *   eval lint <name>                 Validate scenario file structure
  *   eval report [name] [--model <name>] [--since ISO] Show eval benchmark report
  *   eval ab <name> [--skill-file <path>] [--baseline-skill-file <path>] [--stage-skill-files] [--k N] [--model <name>] [--interleave] [--plugin-dir <path>] [--max-turns N]

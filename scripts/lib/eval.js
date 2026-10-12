@@ -41,7 +41,7 @@ const {
   stopIfTrialWroteRepo,
 } = require('./eval-trial');
 const { splitPools } = require('./eval-pools');
-const { buildInjection, removeStagedDir } = require('./eval-skill-staging');
+const { buildInjection, removeStagedDir, withInjection } = require('./eval-skill-staging');
 
 /**
  * Eval scenario parsed from a markdown file
@@ -290,8 +290,6 @@ function runSkillEval(scenario, k, options = {}) {
     };
     const baseline = inject(baselineSkillInstruction, baselineSkillFile);
     const treatment = inject(skillInstruction, skillFile);
-    const injected = ({ text }) =>
-      text ? { ...scenario, context: `${text}\n\n${scenario.context}` } : scenario;
     const shared = sharedArmOptions(scenario, { maxTurns });
     // Both arms watch every staged copy: a write into one changes what the
     // trials after it are given, whichever arm made it.
@@ -314,8 +312,8 @@ function runSkillEval(scenario, k, options = {}) {
       },
     });
     return runAbTrials(
-      injected(baseline),
-      injected(treatment),
+      withInjection(scenario, baseline),
+      withInjection(scenario, treatment),
       scenario,
       k,
       armOptions('baseline', baseline),

@@ -1,7 +1,7 @@
 /**
- * eval-skill-flags.test.js - `eval ab --stage-skill-files` (B-19) and
- * `--baseline-skill-file` (B-20), trial runner stubbed: what the command hands
- * the runner, and what it refuses.
+ * eval-skill-flags.test.js - `--stage-skill-files` (B-19) and
+ * `--baseline-skill-file` (B-20) on `eval ab` and `eval preflight`, trial runner
+ * stubbed: what the commands hand the runner, and what they refuse.
  */
 
 const fs = require('node:fs');
@@ -225,6 +225,126 @@ describe('eval ab skill flags', () => {
       preflight();
       await ab({ 'skill-file': skill }, { 'stage-skill-files': true });
       expect(evalLib.runSkillEval).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('eval preflight runs the baseline the A/B will run (B-20)', () => {
+    const BASE_LINE = /^Base directory for this skill: (.+)\n\nOLD\n\nA fixture\.$/;
+    let skill;
+    let old;
+    let seen;
+
+    beforeEach(() => {
+      writeScenario('gated', { extra: '' });
+      skill = writeSkill('demo', 'NEW');
+      old = writeSkill('demo-old', 'OLD');
+      fs.writeFileSync(path.join(tempDir, 'skills', 'demo-old', 'verify.sh'), 'echo old\n');
+      seen = [];
+      evalLib.runTrial.mockImplementation((scenario, _t, _k, options) => {
+        const staged = scenario.context.match(BASE_LINE)?.[1];
+        seen.push({
+          context: scenario.context,
+          options,
+          staged,
+          stagedFiles: staged ? fs.readdirSync(staged).sort() : null,
+        });
+        return { passed: false, score: 0 };
+      });
+      evalLib.gradeTrialResult.mockImplementation((r) => r);
+    });
+
+    const preflight = (options, flags) => run(args(['preflight', 'gated'], options, flags));
+    const ab = (options, flags) => run(args(['ab', 'gated'], options, flags));
+    const records = () => fs.readdirSync(path.join(tempDir, 'evals', 'preflight'));
+
+    it('injects the baseline text and keys the record on its hash', async () => {
+      await preflight({ 'baseline-skill-file': old });
+      expect(seen).toHaveLength(3);
+      for (const trial of seen) {
+        expect(trial.context).toBe('OLD\n\nA fixture.');
+        expect(trial.options.skillInjection).toEqual(
+          expect.objectContaining({
+            textHash: hashSkillText('OLD'),
+            baselineHash: hashSkillText('OLD'),
+            baseDir: null,
+            staged: false,
+          }),
+        );
+      }
+      expect(records()).toEqual([
+        expect.stringMatching(`-default-b${hashSkillText('OLD')}\\.json$`),
+      ]);
+
+      // That record unlocks the two-text A/B, and nothing else.
+      await expect(ab({ 'skill-file': skill })).rejects.toThrow(/No preflight record found/);
+      await ab({ 'skill-file': skill, 'baseline-skill-file': old });
+      expect(evalLib.runSkillEval).toHaveBeenCalledTimes(1);
+    });
+
+    it('stages the baseline files with --stage-skill-files, watched and then removed', async () => {
+      await preflight({ 'baseline-skill-file': old }, { 'stage-skill-files': true });
+      const [first] = seen;
+      expect(first.staged.startsWith(os.tmpdir())).toBe(true);
+      expect(first.staged).not.toContain('.eval-trials');
+      expect(first.stagedFiles).toEqual(['SKILL.md', 'verify.sh']);
+      // One copy for the whole preflight, watched by every trial.
+      for (const trial of seen) {
+        expect(trial.staged).toBe(first.staged);
+        expect(trial.options.watchRoots).toContain(first.staged);
+        expect(trial.options.skillInjection).toEqual(
+          expect.objectContaining({ baseDir: first.staged, staged: true }),
+        );
+      }
+      expect(fs.existsSync(first.staged)).toBe(false);
+      expect(records()).toEqual([
+        expect.stringMatching(`-default-b${hashSkillText('OLD')}-s\\.json$`),
+      ]);
+
+      await expect(ab({ 'skill-file': skill, 'baseline-skill-file': old })).rejects.toThrow(
+        /No preflight record found/,
+      );
+      await ab({ 'skill-file': skill, 'baseline-skill-file': old }, { 'stage-skill-files': true });
+      expect(evalLib.runSkillEval).toHaveBeenCalledTimes(1);
+    });
+
+    it('removes the staged copy when a trial throws', async () => {
+      evalLib.runTrial.mockImplementation((scenario) => {
+        seen.push({ staged: scenario.context.match(BASE_LINE)[1] });
+        throw new Error('spawn failed');
+      });
+      await expect(
+        preflight({ 'baseline-skill-file': old }, { 'stage-skill-files': true }),
+      ).rejects.toThrow('spawn failed');
+      expect(fs.existsSync(seen[0].staged)).toBe(false);
+    });
+
+    it('runs the plain baseline without a baseline text, staging or not', async () => {
+      await preflight({}, { 'stage-skill-files': true });
+      for (const trial of seen) {
+        expect(trial.context).toBe('A fixture.');
+        expect(trial.options.skillInjection.baseDir).toBeNull();
+        expect(trial.options.skillInjection.textHash).toBeNull();
+      }
+      expect(records()).toEqual([expect.stringMatching(/^[0-9a-f]{16}-default\.json$/)]);
+      await ab({ 'skill-file': skill }, { 'stage-skill-files': true });
+      expect(evalLib.runSkillEval).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses the flags on a workflow scenario and a baseline file that is missing', async () => {
+      writeScenario('flow', { scope: 'workflow' });
+      await expect(
+        run(
+          args(['preflight', 'flow'], {
+            model: 'opus',
+            effort: 'high',
+            'baseline-skill-file': old,
+          }),
+        ),
+      ).rejects.toThrow(/eval preflight --baseline-skill-file is refused for a workflow-scope/);
+      await expect(preflight({ 'baseline-skill-file': 'skills/gone/SKILL.md' })).rejects.toThrow(
+        'skill file not found: skills/gone/SKILL.md',
+      );
+      expect(evalLib.runTrial).not.toHaveBeenCalled();
     });
   });
 });

@@ -112,7 +112,7 @@ flags by hand.
 ```bash
 arcforge eval list
 arcforge eval lint <name>
-arcforge eval preflight <name>
+arcforge eval preflight <name> [--baseline-skill-file <path>] [--stage-skill-files]
 arcforge eval run <name> [--k N] [--model <m>]
 arcforge eval ab <name> [--skill-file <path>] [--baseline-skill-file <path>] [--stage-skill-files]
 arcforge eval compare <name> [--no-analyzer]
@@ -131,8 +131,8 @@ arcforge eval dashboard [--port N]
 | `--plugin-dir` | `run`, `ab` | Load a plugin directory into the trial session |
 | `--max-turns` | `run`, `ab` | Turn budget, overriding the scenario's own |
 | `--skill-file` | `ab` | The skill body injected into the treatment arm |
-| `--baseline-skill-file` | `ab` | Inject the baseline with this file's text, so the A/B compares two skill texts |
-| `--stage-skill-files` | `ab` | Copy the skill file's directory outside the trial for the injected arm, which is told where it is |
+| `--baseline-skill-file` | `ab`, `preflight` | Inject the baseline with this file's text, so the A/B compares two skill texts |
+| `--stage-skill-files` | `ab`, `preflight` | Copy the skill file's directory outside the trial for the injected arm, which is told where it is |
 | `--interleave` | `ab` | Alternate baseline and treatment trials instead of running each arm in a block |
 | `--no-analyzer` | `compare` | Print the verdict without spawning the analyzer session; the verdict itself does not change |
 | `--since` | `report` | Bound the report to results at or after an ISO timestamp |

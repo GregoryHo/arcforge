@@ -69,10 +69,16 @@ budget; nothing is loaded into the baseline. Like `ab`,
 scenario's `## Plugin Dir` counts on its own. With a plugin dir and no other limit, the
 budget is 10 turns.
 
+For an A/B between two skill texts, give `preflight` the same
+`--baseline-skill-file`, and `--stage-skill-files` if `ab` will get it. Preflight
+then runs the baseline that A/B will run, injected with that text and given its
+staged files. Without `--baseline-skill-file` the baseline is injected with
+nothing, so `--stage-skill-files` on its own changes nothing in preflight.
+
 Preflight results are cached per scenario **and per model**, keyed on the
-scenario's content, and per turn budget, plugin dir, `--effort` and per-trial
-ceiling (`ARCFORGE_EVAL_TRIAL_TIMEOUT_MS`). Edit the scenario, switch models, or
-change the budget, plugin dir, effort or ceiling, and you need a fresh one:
+scenario's content, and per turn budget, plugin dir, `--effort`, per-trial
+ceiling (`ARCFORGE_EVAL_TRIAL_TIMEOUT_MS`) and baseline text. Edit the scenario, switch models, or
+change the budget, plugin dir, effort, ceiling or baseline text, and you need a fresh one:
 baseline competence is not transferable between conditions, and a PASS earned under one
 does not unblock A/B runs under another. When `ab` finds no record for its own
 conditions, it stops. It names the conditions it needed and any it found
@@ -361,6 +367,12 @@ with. The baseline's text is a run condition: both arms' rows record its hash
 as `baselineSkillHash`. A two-text run's rows form a pool of their own per
 baseline text, and are never combined with a run whose baseline was given no
 text. A run without the flag records nothing and pools as before.
+
+Preflight has to measure the same baseline. Run `eval preflight` with the same
+`--baseline-skill-file`, and with `--stage-skill-files` if the A/B stages. Its
+record is keyed on the baseline text's hash, and on whether that baseline's
+files were staged, so `eval ab` is refused until a preflight exists for that
+baseline. A preflight of the no-skill baseline does not unlock a two-text A/B.
 
 The treatment's text hash is recorded but does not pool. When both arms are
 given one text and differ only in their staged files, the hashes do not tell

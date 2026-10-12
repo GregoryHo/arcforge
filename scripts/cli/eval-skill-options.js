@@ -6,6 +6,17 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 /**
+ * The name the blind comparator redacts for a skill file: its basename, or for
+ * a `SKILL.md` the skill's directory (the basename "SKILL" names nothing).
+ * @param {string} file - Skill file path
+ * @returns {string}
+ */
+function skillNameFromFile(file) {
+  const base = path.basename(file, '.md');
+  return base.toUpperCase() === 'SKILL' ? path.basename(path.dirname(file)) : base;
+}
+
+/**
  * Read a skill file named on the command line or by the scenario.
  * @param {string} file - Path as given, relative to the project root or absolute
  * @param {string} projectRoot
@@ -24,16 +35,69 @@ function readSkillFile(file, projectRoot) {
  * it adds to a run.
  * @param {string|undefined} file - The --baseline-skill-file value
  * @param {string} projectRoot
- * @returns {{ baselineSkillFile?: string, baselineSkillInstruction?: string, baselineSkillHash?: string }}
+ * @returns {{ baselineSkillGiven?: string, baselineSkillFile?: string, baselineSkillInstruction?: string, baselineSkillHash?: string }}
+ *   baselineSkillGiven is the path as given, baselineSkillFile the resolved one
  */
 function readBaselineSkill(file, projectRoot) {
   if (!file) return {};
   const { hashSkillText } = require('../lib/eval-skill-staging');
   const baseline = readSkillFile(file, projectRoot);
   return {
+    baselineSkillGiven: file,
     baselineSkillFile: baseline.path,
     baselineSkillInstruction: baseline.text,
     baselineSkillHash: hashSkillText(baseline.text),
+  };
+}
+
+/**
+ * Refuse the skill-text flags on a workflow scenario: both belong to an injected
+ * skill text, and a workflow comparison injects none.
+ * @param {{ scope: string }} scenario
+ * @param {{ baselineSkillFile?: string, stage?: boolean }} given - Parsed CLI values
+ * @param {string} cmd - Subcommand name for the message
+ */
+function refuseSkillTextFlagsForWorkflow(scenario, given, cmd) {
+  if (scenario.scope !== 'workflow') return;
+  const refused = [
+    given.stage ? '--stage-skill-files' : '',
+    given.baselineSkillFile ? '--baseline-skill-file' : '',
+  ].filter(Boolean);
+  if (refused.length === 0) return;
+  throw new Error(
+    `eval ${cmd} ${refused.join(' and ')} is refused for a workflow-scope scenario: both belong to an injected skill text, and a workflow A/B injects none (B-19, B-20).`,
+  );
+}
+
+/**
+ * The baseline `eval preflight` runs: the one the A/B will run (B-20). Given a
+ * baseline text it is injected with it, and its files are staged when staging
+ * was asked for too; without one it is injected with nothing, so staging has
+ * nothing to stage for it.
+ * @param {{ scope: string }} scenario
+ * @param {string} projectRoot
+ * @param {{ baselineSkillFile?: string, stage?: boolean }} given - Parsed CLI values
+ * @returns {{ arm: Function, remove: Function, conditions: Object }} arm/remove as
+ *   baselineArm; conditions are what the preflight record is keyed on
+ */
+function preflightBaseline(scenario, projectRoot, given) {
+  refuseSkillTextFlagsForWorkflow(scenario, given, 'preflight');
+  const { baselineArm } = require('../lib/eval-skill-staging');
+  const baseline = readBaselineSkill(given.baselineSkillFile, projectRoot);
+  const stage = Boolean(given.stage);
+  return {
+    ...baselineArm(scenario, {
+      text: baseline.baselineSkillInstruction,
+      skillFile: baseline.baselineSkillFile,
+      stage,
+    }),
+    conditions: baseline.baselineSkillHash
+      ? {
+          baselineSkillHash: baseline.baselineSkillHash,
+          baselineSkillFile: baseline.baselineSkillGiven,
+          stageSkillFiles: stage,
+        }
+      : {},
   };
 }
 
@@ -50,18 +114,8 @@ function readBaselineSkill(file, projectRoot) {
 function resolveSkillOptions(scenario, projectRoot, given) {
   const skillFile = given.skillFile || scenario.target;
   const stageSkillFiles = Boolean(given.stage);
-  if (scenario.scope === 'workflow') {
-    const refused = [
-      stageSkillFiles ? '--stage-skill-files' : '',
-      given.baselineSkillFile ? '--baseline-skill-file' : '',
-    ].filter(Boolean);
-    if (refused.length > 0) {
-      throw new Error(
-        `eval ab ${refused.join(' and ')} is refused for a workflow-scope scenario: both belong to an injected skill text, and a workflow A/B injects none (B-19, B-20).`,
-      );
-    }
-    return { skillFile, stageSkillFiles };
-  }
+  refuseSkillTextFlagsForWorkflow(scenario, given, 'ab');
+  if (scenario.scope === 'workflow') return { skillFile, stageSkillFiles };
   if (!skillFile) {
     throw new Error(
       'eval ab for skill scope requires --skill-file <path> or ## Target in scenario',
@@ -77,4 +131,10 @@ function resolveSkillOptions(scenario, projectRoot, given) {
   };
 }
 
-module.exports = { readSkillFile, readBaselineSkill, resolveSkillOptions };
+module.exports = {
+  skillNameFromFile,
+  readSkillFile,
+  readBaselineSkill,
+  resolveSkillOptions,
+  preflightBaseline,
+};

@@ -101,8 +101,19 @@ function conditionsSuffix({
 }
 
 /** Human-readable conditions, as the gate names them. */
-function describeConditions({ maxTurns, pluginDir, effort, trialTimeoutMs } = {}) {
-  return `max turns ${maxTurns ?? 'none'}, plugin dir ${pluginDir ? 'yes' : 'no'}, effort ${effort || 'default'}, ceiling ${trialTimeoutMs || DEFAULT_TRIAL_TIMEOUT_MS} ms`;
+function describeConditions({
+  maxTurns,
+  pluginDir,
+  effort,
+  trialTimeoutMs,
+  baselineSkillHash,
+  stageSkillFiles,
+} = {}) {
+  // Named only for a baseline given a text, so other records read as before.
+  const baselineText = baselineSkillHash
+    ? `, baseline text ${baselineSkillHash}${stageSkillFiles ? ' with staged files' : ''}`
+    : '';
+  return `max turns ${maxTurns ?? 'none'}, plugin dir ${pluginDir ? 'yes' : 'no'}, effort ${effort || 'default'}, ceiling ${trialTimeoutMs || DEFAULT_TRIAL_TIMEOUT_MS} ms${baselineText}`;
 }
 
 /**
@@ -183,6 +194,13 @@ function runPreflight(name, projectRoot, opts = {}) {
     plugin_dir: Boolean(conditions.pluginDir),
     effort: conditions.effort || null,
     trial_timeout_ms: conditions.trialTimeoutMs || DEFAULT_TRIAL_TIMEOUT_MS,
+    // Only a baseline given a skill text records these (B-20).
+    ...(conditions.baselineSkillHash
+      ? {
+          baseline_skill_hash: conditions.baselineSkillHash,
+          stage_skill_files: Boolean(conditions.stageSkillFiles),
+        }
+      : {}),
     // Recorded, not keyed on: a Node upgrade or a new commit does not
     // invalidate a record.
     node_version: process.version,
@@ -284,8 +302,9 @@ function gradePreflightTrial(result, scenario, projectRoot) {
  * @param {string} [opts.model] - Model identifier the A/B run will use; the
  *   gate verifies a preflight record exists for this exact model. Pass the
  *   same value `arcforge eval ab` will pass to its trials.
- * @param {{ maxTurns?: number, pluginDir?: string }} [opts.conditions] - The turn
- *   budget and plugin dir the A/B baseline will run under; the record must match.
+ * @param {{ maxTurns?: number, pluginDir?: string, baselineSkillHash?: string, stageSkillFiles?: boolean }} [opts.conditions] -
+ *   The turn budget and plugin dir the A/B baseline will run under, and the text
+ *   it will be given, if any; the record must match.
  * @returns {null|string} null if cleared to proceed; error message string if blocked
  */
 function checkPreflightGate(name, projectRoot, opts = {}) {
@@ -346,6 +365,10 @@ function missingPreflightMessage(name, projectRoot, { hash, model, conditions })
     conditions.maxTurns != null ? `--max-turns ${conditions.maxTurns}` : '',
     conditions.pluginDir ? `--plugin-dir ${conditions.pluginDir}` : '',
     conditions.effort ? `--effort ${conditions.effort}` : '',
+    conditions.baselineSkillHash
+      ? `--baseline-skill-file ${conditions.baselineSkillFile || '<path>'}`
+      : '',
+    conditions.baselineSkillHash && conditions.stageSkillFiles ? '--stage-skill-files' : '',
   ].filter(Boolean);
   // The ceiling is set by environment, not a flag, so the command carries it.
   const ceilingEnv =
@@ -358,7 +381,8 @@ function missingPreflightMessage(name, projectRoot, { hash, model, conditions })
     .filter(
       (f) =>
         f === `${prefix}.json` ||
-        (['-t', '-e', '-c'].some((s) => f.startsWith(`${prefix}${s}`)) && f.endsWith('.json')),
+        (['-t', '-e', '-c', '-b'].some((s) => f.startsWith(`${prefix}${s}`)) &&
+          f.endsWith('.json')),
     )
     .map((f) => {
       try {
@@ -368,6 +392,8 @@ function missingPreflightMessage(name, projectRoot, { hash, model, conditions })
           pluginDir: r.plugin_dir,
           effort: r.effort,
           trialTimeoutMs: r.trial_timeout_ms,
+          baselineSkillHash: r.baseline_skill_hash,
+          stageSkillFiles: r.stage_skill_files,
         });
       } catch {
         return null; // unreadable record: it cannot say what it ran under
@@ -382,7 +408,7 @@ function missingPreflightMessage(name, projectRoot, { hash, model, conditions })
     `No preflight record found for scenario "${name}" (hash: ${hash}, model: ${modelLabel}, ${describeConditions(conditions)}).\n` +
     mismatch +
     `Run: ${ceilingEnv}arcforge eval preflight ${[name, ...flags].join(' ')}\n` +
-    `Preflight is per-(scenario, model, effort, turn budget, plugin dir, ceiling) — baseline pass rate depends ` +
+    `Preflight is per-(scenario, model, effort, turn budget, plugin dir, ceiling, baseline text) — baseline pass rate depends ` +
     `on each, so a PASS under one does not unblock A/B runs under another.`
   );
 }
