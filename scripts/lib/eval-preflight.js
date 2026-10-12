@@ -356,6 +356,15 @@ function checkPreflightGate(name, projectRoot, opts = {}) {
 }
 
 /**
+ * An argument as a POSIX shell would need it typed: left alone when it is plain,
+ * single-quoted when the shell would split or expand it.
+ */
+function shellQuote(value) {
+  const text = String(value);
+  return /^[A-Za-z0-9_@%+=:,./-]+$/.test(text) ? text : `'${text.replace(/'/g, "'\\''")}'`;
+}
+
+/**
  * Explain a missing preflight record: name the conditions this run needs, any
  * conditions the same scenario and model were preflighted under instead, and
  * the exact command that produces the record the gate is looking for.
@@ -363,12 +372,12 @@ function checkPreflightGate(name, projectRoot, opts = {}) {
 function missingPreflightMessage(name, projectRoot, { hash, model, conditions }) {
   const modelLabel = model || 'default';
   const flags = [
-    model ? `--model ${model}` : '',
+    model ? `--model ${shellQuote(model)}` : '',
     conditions.maxTurns != null ? `--max-turns ${conditions.maxTurns}` : '',
-    conditions.pluginDir ? `--plugin-dir ${conditions.pluginDir}` : '',
-    conditions.effort ? `--effort ${conditions.effort}` : '',
+    conditions.pluginDir ? `--plugin-dir ${shellQuote(conditions.pluginDir)}` : '',
+    conditions.effort ? `--effort ${shellQuote(conditions.effort)}` : '',
     conditions.baselineSkillHash
-      ? `--baseline-skill-file ${conditions.baselineSkillFile || '<path>'}`
+      ? `--baseline-skill-file ${conditions.baselineSkillFile ? shellQuote(conditions.baselineSkillFile) : '<path>'}`
       : '',
     conditions.baselineSkillHash && conditions.baselineSkillFilesHash ? '--stage-skill-files' : '',
   ].filter(Boolean);

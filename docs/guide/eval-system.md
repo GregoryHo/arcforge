@@ -360,8 +360,10 @@ The limit is the same as for the trial directory. Nothing but the write check
 and the advice in the prompt keeps an arm away from a directory it was not
 given.
 
-One run stages one directory, the one `--skill-file` sits in. A run that needs
-a second skill's files in the injected arm is not supported yet.
+Each injected arm gets one staged directory, the one its skill file sits in:
+`--skill-file` for the treatment and, in a two-text A/B, `--baseline-skill-file`
+for the baseline (next section). An arm that needs a second skill's files is
+not supported yet.
 
 ### Comparing two skill texts
 
@@ -375,7 +377,8 @@ arcforge eval ab <name> --skill-file path/to/SKILL.md --baseline-skill-file path
 The baseline is injected with the `--baseline-skill-file` text where it would
 otherwise get none, so the arms differ in which text each was given. Use it when
 an edit fixes something the old wording caused: an agent with no skill at all
-was never misled by the old wording, so it cannot show the fix.
+was never misled by the old wording, so it cannot show the fix. An empty file
+is refused, by `eval ab` and by `eval preflight`: an empty text is no text.
 
 With `--stage-skill-files`, each arm gets a staged directory and a
 base-directory line of its own. The baseline's copy is taken from the directory

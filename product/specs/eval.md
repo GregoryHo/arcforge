@@ -365,7 +365,8 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   `eval ab --baseline-skill-file <path>` injects the baseline with that
   file's text where it otherwise gets none, so the arms differ in which text
   each was given — the comparison that isolates an edit to a skill, where
-  text against no text measures the skill as a whole (B-1). With
+  text against no text measures the skill as a whole (B-1). An empty file
+  is refused, since an empty text would be injected as none. With
   `--stage-skill-files` each arm gets a staged directory and a
   base-directory line of its own (B-19), the baseline's taken from the
   directory its file sits in. Every row records a hash of the text its arm

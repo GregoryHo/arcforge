@@ -170,6 +170,21 @@ describe('eval ab skill flags', () => {
       expect(evalLib.runSkillEval).not.toHaveBeenCalled();
     });
 
+    it('refuses an empty baseline skill file, which would be injected as no text', async () => {
+      writeScenario('empty');
+      const empty = writeSkill('demo-empty', '');
+      await expect(
+        run(
+          args(
+            ['ab', 'empty'],
+            { 'skill-file': writeSkill('demo', 'NEW'), 'baseline-skill-file': empty },
+            { 'stage-skill-files': true },
+          ),
+        ),
+      ).rejects.toThrow(`--baseline-skill-file ${empty} is empty`);
+      expect(evalLib.runSkillEval).not.toHaveBeenCalled();
+    });
+
     it('is refused for a workflow scenario', async () => {
       writeScenario('flow-text', { scope: 'workflow' });
       await expect(
@@ -382,6 +397,10 @@ describe('eval ab skill flags', () => {
       ).rejects.toThrow(/eval preflight --baseline-skill-file is refused for a workflow-scope/);
       await expect(preflight({ 'baseline-skill-file': 'skills/gone/SKILL.md' })).rejects.toThrow(
         'skill file not found: skills/gone/SKILL.md',
+      );
+      const empty = writeSkill('demo-empty', '');
+      await expect(preflight({ 'baseline-skill-file': empty })).rejects.toThrow(
+        `--baseline-skill-file ${empty} is empty`,
       );
       expect(evalLib.runTrial).not.toHaveBeenCalled();
     });

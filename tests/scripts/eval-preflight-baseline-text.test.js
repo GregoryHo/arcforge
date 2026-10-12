@@ -90,6 +90,21 @@ describe('preflight is keyed on the text the baseline was given (B-20)', () => {
     );
   });
 
+  test('the suggested command quotes a path a shell would split or expand', () => {
+    const spaced = gate({ baselineSkillHash: OLD, baselineSkillFile: 'old versions/SKILL.md' });
+    expect(spaced).toContain(
+      "Run: arcforge eval preflight test-scenario --baseline-skill-file 'old versions/SKILL.md'\n",
+    );
+    const quoted = gate({
+      baselineSkillHash: OLD,
+      baselineSkillFile: "it's $HOME/SKILL.md",
+      pluginDir: '/some plugin',
+    });
+    expect(quoted).toContain(
+      "--plugin-dir '/some plugin' --baseline-skill-file 'it'\\''s $HOME/SKILL.md'\n",
+    );
+  });
+
   test('a no-text PASS does not unlock a two-text A/B, and records no baseline text', () => {
     const record = preflightUnder({});
     expect(record).not.toHaveProperty('baseline_skill_hash');
