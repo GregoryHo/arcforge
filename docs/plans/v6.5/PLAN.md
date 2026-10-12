@@ -149,6 +149,7 @@ PR #283。
 - 搬到 `references/`：handover 範本區塊（:40-58）、CLI 列表（:83-85、:102-109）、引擎拒絕規則（:87-95）、when-to-compact 表（:160-168）、what-survives 表（:172-177）。
 - 留在本體：步驟與勾選、Persist first、紅旗表（行為指示）。目標 ≤150 行。
 - D1 §4.3 仍成立（檔案都在 skill 目錄內）。不加任何關於 SessionStart 指引的句子：指引本身就寫了要跑什麼。
+- qa 對 #283 的發現（已記入 D-059 的 Residual）：handover 範本與兩張 compaction 表搬走之後，`eval-sessions-handover-completeness` 與 `eval-compacting-persist-before-compact` 的 treatment 文字不再帶有它們。這兩支不在本輪，所以瘦身後的 handover 撰寫與 compaction 路徑未量測，既有 pool 描述的是瘦身前的文字；日後重跑要加 `--stage-skill-files`（eval B-19）。`eval-compacting-persist-before-compact.md` 的設計註記寫時序表「carried over unchanged」，瘦身後已過時，等該 scenario 下次改版時更正，不在本輪。
 - 這是 skill 編輯，必須在量測輪之前合併。非回歸由 D1 承擔；D-059 的 Residual：D1 只量 B-11、只注入 `SKILL.md`，搬到 `references/` 的內容不在 treatment 面前。
 
 ### WP-D 量測
@@ -191,6 +192,7 @@ PR #283。
 - 依 `releasing` skill 執行。vault ingest 放在版本 bump 之前；`obsidian` CLI 需要 Obsidian app 在執行中。benchmark 由量測輪重新產生，freshness gate 才會放行。
 - CHANGELOG 照 6.2.1 的做法：eval 引擎修補是使用者面（`eval` 是出貨的 CLI），寫在 Fixed／Added；只有 product 檔與 releasing 流程的條目開頭標 `Contributor-only:`。
 - 發版後查核寫在 `docs/plans/v6.5/post-release-6.5.0.md`：Release、網站、GitHub 來源安裝、快取 hook 跑起來、**SessionStart 指引在有 archive 的專案真的出現**、`eval compare --no-analyzer` 不花 model 呼叫。
+- 發版翻轉時改 `product/BACKLOG.md` 的 `skill-body-trim`：#283 進 main 之後是六支超過軟上限，最接近硬上限的是 `learning`（190 行）。
 - 重新發布維護者的 eli5 頁面（第 4 版）：時間軸加 6.5.0，hooks 那列加「開新 session 時會告訴你上一份 archive」。
 
 ### 驗證

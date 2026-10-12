@@ -151,9 +151,18 @@ down, never block the user, and never observe them uninvited.
   source is `startup` or `clear`, the line names the project's newest
   session archive ([cli](cli.md) B-9) — by an alias that points at it, or by
   its file when none does — with the date it was saved, and the command that
-  reads it, `arcforge session resume <alias|path>`. A `resume` or `compact`
-  start gets no such line, since that is the same session going on, and a
-  project with no archive gets none. The line is all that crosses over: the
+  reads it, `arcforge session resume <alias|path>`. The line reads
+  `Previous session archive: <alias>, saved <YYYY-MM-DD>. Read it: arcforge
+  session resume <alias>`; when no valid alias points at the newest archive,
+  its file name stands in for the alias and its absolute path is what the
+  command is given. "Newest" is the newest engine-written archive by the
+  stamp in its file name (`archive-<alias>-<YYYYMMDDTHHMMSSZ>[-n].md`); a
+  hand-named file under the sessions directory is not considered, and the
+  saved date is the UTC date of the archive's directory. A `resume` or
+  `compact` start gets no such line, since that is the same session going
+  on, a project with no archive gets none, and neither does a session
+  arcforge spawned itself — the diary enricher, a loop task — the same skip
+  `inject-context` already applies to pending actions. The line is all that crosses over: the
   archive's five sections are never injected, and nothing is read from the
   previous session's record, so reading the archive stays something the
   session does, not something done to it (D-061). The line does not wait on
@@ -162,7 +171,9 @@ down, never block the user, and never observe them uninvited.
   path: the lookup reads names only — the date directories, the archive
   file names, which carry the save stamp, and the project's alias index —
   and never opens an archive. "The project" is the sanitized directory
-  basename, so two same-named projects share one newest archive (D-037). The
+  basename, so two same-named projects share one newest archive (D-037). An
+  alias index that cannot be parsed, or one edited by hand so that its keys
+  are not valid aliases, yields the path form of the line, not the alias. The
   user sees a one-line summary of the same, plus counts of session aliases
   and of patterns promoted to global in the past week. With learning never
   enabled and no archive saved, no instinct, nudge, warning or pointer

@@ -1866,7 +1866,19 @@ reverse one, append a superseding entry (see AGENTS.md).
   material moved into `references/` is not in front of the treatment; the
   handover, save and compaction instructions get no A/B. If (i)'s gate ends
   NOT MEASURABLE or its preflight BLOCKs, the trim ships on the skill
-  structure tests. Every reading the round produces is direction only at
+  structure tests. The trim moves the handover template and both compaction
+  tables out of `SKILL.md`, and a skill-scope A/B injects `SKILL.md` alone,
+  so from then on the treatment text of
+  `eval-sessions-handover-completeness` and
+  `eval-compacting-persist-before-compact` carries neither; those two
+  scenarios are not in this round, so the trimmed handover-writing and
+  compaction paths ship unmeasured, their existing pools describe the text
+  from before the trim, and a later run of either must stage the skill's
+  files ([eval](specs/eval.md) B-19) for the references to reach the
+  injected arm. The second scenario's design note that the timing table is
+  "carried over unchanged" is stale after the trim and is corrected when
+  that scenario is next versioned, not in this round. (i) measures the
+  resume path, which the trim does not move. Every reading the round produces is direction only at
   its k, on one fixture and one model, for injected skill text, not plugin
   routing (D-024, D-044, D-058). The router's 6.4.0 reading stands as
   measured before D-062 changed the trial environment. #184 and #185 close
@@ -1933,7 +1945,11 @@ reverse one, append a superseding entry (see AGENTS.md).
   archive — an alias that points at it, or its file when none does, with the
   date it was saved — and the command that reads it,
   `arcforge session resume <alias|path>`. It adds nothing on `resume` or
-  `compact`, and nothing when the project has no archive. The line does not
+  `compact`, nothing when the project has no archive, and nothing in a
+  session arcforge spawned itself — the diary enricher, a loop task — the
+  skip `inject-context` already applies to pending actions. "Newest" is the
+  newest engine-written archive by the stamp in its file name; a hand-named
+  file under the sessions directory is not considered. The line does not
   depend on the learning opt-in, and none of the archive's five sections is
   ever injected. The lookup reads names only — the date directories, the
   archive file names, which carry the save stamp, and the project's alias
@@ -1966,8 +1982,9 @@ reverse one, append a superseding entry (see AGENTS.md).
   relevant. Whether an agent that sees the line reads the archive unasked,
   or should, is not measured. A `.handovers/` file is never named, only an
   archive. The line is Claude Code's alone: hooks do not run on Codex
-  (D-013). Whether a session arcforge spawned itself — the diary enricher,
-  a loop task — also receives the line is not settled here.
+  (D-013). An alias index that cannot be parsed, or one edited by hand so
+  that its keys are not valid aliases, yields the path form of the line,
+  not the alias.
 - Cost accepted: one more line in the model's context and the user's summary
   at every `startup` and `clear` of a project that has an archive, and a
   directory listing plus one small file read on the synchronous SessionStart
