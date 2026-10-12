@@ -326,7 +326,10 @@ function runBlindComparator(taskPrompt, baselineOutput, treatmentOutput, project
   const outputB = baselineIsA ? treatmentOutput : baselineOutput;
 
   // Sanitize task prompt: strip forbidden strings and skill name.
-  const forbidden = [...BLIND_COMPARATOR_FORBIDDEN, ...[].concat(skillName || [])];
+  // Longest first: redacting `demo` ahead of `demo-old` would leave `[redacted]-old`.
+  const forbidden = [...BLIND_COMPARATOR_FORBIDDEN, ...[].concat(skillName || [])].sort(
+    (a, b) => b.length - a.length,
+  );
 
   function sanitize(text) {
     let result = text || '';

@@ -254,6 +254,22 @@ describe('runBlindComparator — prompt sanitization', () => {
     expect(capturedInput).not.toContain('legacy-tdd');
   });
 
+  it('strips a name that extends another whole, whatever order they come in', () => {
+    let capturedInput = '';
+    mockUtils.execCommand.mockImplementationOnce((_cmd, _args, opts) => {
+      capturedInput = opts.input || '';
+      return { stdout: makeAgentResponse('A'), stderr: '', exitCode: 0 };
+    });
+
+    runBlindComparator(TASK_PROMPT, 'Output of demo-old', 'Output of demo', '/fake/root', [
+      'demo',
+      'demo-old',
+    ]);
+
+    expect(capturedInput).not.toContain('-old');
+    expect(capturedInput).not.toContain('demo');
+  });
+
   it('does not crash when skill name contains regex metacharacters', () => {
     // Regression: skill names with +, (, [, etc. previously threw
     // SyntaxError inside RegExp construction in the sanitizer loop.
