@@ -54,12 +54,14 @@ function skillNameFromFile(file) {
 
 /**
  * `eval run`, `eval preflight` and `eval ab` take the checkout's run lock just
- * before their first trial; however the subcommand ends, it is released here.
+ * before their first trial, and `eval report` before it writes a benchmark;
+ * however the subcommand ends, the lock is released here.
  */
 function runEvalCommand(args, context) {
   const { withRunLock } = require('../lib/eval-run-lock');
   return withRunLock(context.projectRoot, (take) => {
-    const takeRunLock = (cmd) => take(`arcforge eval ${cmd} ${args.positional[1]}`);
+    const takeRunLock = (cmd) =>
+      take(['arcforge eval', cmd, args.positional[1]].filter(Boolean).join(' '));
     return runEvalSubcommand(args, { ...context, takeRunLock });
   });
 }
@@ -595,6 +597,7 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
       }
     }
   } else if (subcommand === 'report') {
+    takeRunLock('report'); // its evals/benchmarks/ write would read as a live trial's own
     const benchmark = benchmark_.generateBenchmark(projectRoot, {
       since: args.options.since,
     });

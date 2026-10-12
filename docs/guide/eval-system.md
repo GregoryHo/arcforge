@@ -175,8 +175,11 @@ own records, such as the one `eval preflight` writes under `evals/preflight/`,
 would look like the first run's trial writing to the repository and stop it.
 So `eval run`, `eval preflight` and `eval ab` take a lock,
 `.eval-trials/run.lock`, just before their first trial and remove it when they
-end, whatever the outcome. While it is held, a second one of the three exits
-non-zero at once, before any Setup or session, and names the run in its way:
+end, whatever the outcome. `eval report` takes the same lock for the moment it
+runs, because the benchmark files it writes under `evals/benchmarks/` would
+stop a live run the same way. While the lock is held, a second one of the four
+exits non-zero at once, before any Setup, session or benchmark write, and
+names the run in its way:
 
 ```text
 Error: Another eval is running in this checkout: `arcforge eval preflight my-scenario` (PID 41873, started 2026-10-12T08:14:03.512Z) holds /path/to/project/.eval-trials/run.lock. One checkout runs one live eval at a time; wait for it to finish, or use a second checkout. If PID 41873 is not an eval, remove that file and rerun.
@@ -191,9 +194,9 @@ you is a lock whose PID now belongs to some unrelated process: the refusal
 names the file, and deleting it clears it. Two rarer refusals say the same
 thing in other words: a lock file that names no process, and a leftover
 `.eval-trials/run.lock.reclaim` from a run that died while taking over a dead
-lock. Each message names the file to remove. Commands that start no trial
-(`list`, `lint`, `compare`, `report`, `history`, `audit`, `dashboard`) never
-take the lock and run alongside a live eval.
+lock. Each message names the file to remove. The remaining subcommands (`list`,
+`lint`, `compare`, `history`, `audit`, `dashboard`) write nothing the check
+covers, never take the lock, and run alongside a live eval.
 
 The check has blind spots. Any folder named `.git`, `node_modules` or
 `.eval-trials` is skipped at any depth. So are the project's own

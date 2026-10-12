@@ -112,8 +112,9 @@ describe('eval run lock', () => {
       ['run', 'solo'],
       ['preflight', 'solo'],
       ['ab', 'pair'],
-    ])('eval %s refuses before any trial, naming the holder', async (subcommand, scenario) => {
-      const { message } = await run([subcommand, scenario]).catch((err) => err);
+      ['report'],
+    ])('eval %s refuses before any trial, naming the holder', async (...positional) => {
+      const { message } = await run(positional).catch((err) => err);
 
       expect(message).toContain('Another eval is running in this checkout');
       expect(message).toContain(`PID ${OTHER.pid}`);
@@ -136,7 +137,13 @@ describe('eval run lock', () => {
       await expect(run(['run', 'no-such-scenario'])).rejects.toThrow('not found');
     });
 
-    it('commands that start no trial are not locked out', async () => {
+    it('eval report writes no benchmark a live trial would be blamed for', async () => {
+      await run(['report']).catch(() => {});
+
+      expect(fs.existsSync(path.join(tempDir, evalLib.BENCHMARKS_DIR))).toBe(false);
+    });
+
+    it('commands that start no trial and write no benchmark are not locked out', async () => {
       await run(['list']);
 
       expect(logs.join('\n')).toContain('solo (agent, code');
@@ -172,6 +179,22 @@ describe('eval run lock', () => {
     await run(['ab', 'pair']);
 
     expect(during.command).toBe('arcforge eval ab pair');
+    expect(fs.existsSync(lockPath)).toBe(false);
+  });
+
+  it('eval report holds the lock while it writes the benchmark, under its own name', async () => {
+    const benchmarkLib = require('../../scripts/lib/eval-benchmark');
+    let during;
+    const generate = benchmarkLib.generateBenchmark;
+    jest.spyOn(benchmarkLib, 'generateBenchmark').mockImplementation((...a) => {
+      during = readLock();
+      return generate(...a);
+    });
+
+    await run(['report']);
+
+    expect(during.command).toBe('arcforge eval report');
+    expect(fs.existsSync(path.join(tempDir, evalLib.BENCHMARKS_DIR, 'latest.json'))).toBe(true);
     expect(fs.existsSync(lockPath)).toBe(false);
   });
 
