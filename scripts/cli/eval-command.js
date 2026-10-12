@@ -52,7 +52,21 @@ function skillNameFromFile(file) {
   return base.toUpperCase() === 'SKILL' ? path.basename(path.dirname(file)) : base;
 }
 
-async function runEvalCommand(args, { projectRoot, asJson }) {
+/**
+ * `eval run`, `eval preflight` and `eval ab` take the checkout's run lock just
+ * before their first trial, and `eval report` before it writes a benchmark;
+ * however the subcommand ends, the lock is released here.
+ */
+function runEvalCommand(args, context) {
+  const { withRunLock } = require('../lib/eval-run-lock');
+  return withRunLock(context.projectRoot, (take) => {
+    const takeRunLock = (cmd) =>
+      take(['arcforge eval', cmd, args.positional[1]].filter(Boolean).join(' '));
+    return runEvalSubcommand(args, { ...context, takeRunLock });
+  });
+}
+
+async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
   const eval_ = require('../lib/eval');
   const benchmark_ = require('../lib/eval-benchmark');
   const { generateRunId } = require('../lib/utils');
@@ -178,6 +192,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
   } else if (subcommand === 'run') {
     const scenario = requireScenario(args.positional[1], 'run');
     eval_.resolveTrialTimeoutMs(); // refuse a bad ceiling before any Setup or session (B-10)
+    takeRunLock('run');
     const k = parseK(scenario, false);
     const isolated = !args.flags['no-isolate'];
     const pluginDir = args.options['plugin-dir'];
@@ -263,6 +278,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     refusePluginDirOutsideWorkflow(scenario, args.options['plugin-dir'], 'preflight');
     requirePinnedToolkitFlags(scenario, args.options, 'preflight');
     eval_.resolveTrialTimeoutMs(); // refuse a bad ceiling before any Setup or session (B-10)
+    const runLock = takeRunLock('preflight');
     console.log(`Running preflight for "${scenarioName}"...`);
     const runId = generateRunId();
 
@@ -307,6 +323,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
     console.log(`Reason:  ${outcome.reason}`);
     console.log(`Hash:    ${outcome.scenario_hash}`);
     if (outcome.verdict === 'BLOCK') {
+      runLock.release(); // process.exit skips the finally that releases it
       process.exit(1);
     }
   } else if (subcommand === 'lint') {
@@ -387,6 +404,8 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
       }
       skillInstruction = fs.readFileSync(resolvedSkillFile, 'utf8');
     }
+    // Before the gate: it reads the record a running preflight is still writing.
+    takeRunLock('ab');
 
     // Preflight gate: require a PASS preflight for this (scenario, model)
     // before running A/B eval. Gate is keyed by both — a PASS produced
@@ -578,6 +597,7 @@ async function runEvalCommand(args, { projectRoot, asJson }) {
       }
     }
   } else if (subcommand === 'report') {
+    takeRunLock('report'); // its evals/benchmarks/ write would read as a live trial's own
     const benchmark = benchmark_.generateBenchmark(projectRoot, {
       since: args.options.since,
     });
