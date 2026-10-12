@@ -45,6 +45,7 @@ describe('conditionOf', () => {
       'isolation',
       'stageSkillFiles',
       'baselineSkillHash',
+      'baselineSkillFilesHash',
     ]);
     expect(conditionOf({ model: 'opus' })).toEqual({
       model: 'opus',
@@ -55,6 +56,7 @@ describe('conditionOf', () => {
       isolation: null,
       stageSkillFiles: null,
       baselineSkillHash: null,
+      baselineSkillFilesHash: null,
     });
   });
 });
@@ -449,6 +451,36 @@ describe('pairArms', () => {
     expect(splitPools(mixed).others).toEqual([]);
   });
 
+  it('pools one baseline text apart by the files staged for it (B-20)', () => {
+    const at = (hour) => `2026-10-12T${hour}:00:00.000Z`;
+    const staged = (files, overrides) =>
+      row({
+        stageSkillFiles: true,
+        baselineSkillHash: 'aaaaaaaaaaaaaaaa',
+        baselineSkillFilesHash: files,
+        ...overrides,
+      });
+    // Same baseline text, the staged references differ.
+    const oldFiles = [staged('1111111111111111', { timestamp: at(10) })];
+    const newFiles = [staged('2222222222222222', { timestamp: at(11) })];
+    const sameAgain = [staged('2222222222222222', { trial: 2, timestamp: at(12) })];
+
+    const split = splitPools([...oldFiles, ...newFiles, ...sameAgain]);
+    expect(split.current).toEqual([...newFiles, ...sameAgain]);
+    expect(split.others).toEqual([
+      {
+        conditions: expect.objectContaining({ baselineSkillFilesHash: '1111111111111111' }),
+        rows: 1,
+      },
+    ]);
+    expect(describeCondition(split.conditions)).toMatch(/, baseline files 2222222222222222$/);
+    expect(pairArms(oldFiles, newFiles).error).toMatch(/baseline text and files/);
+    expect(pairArms(newFiles, sameAgain).error).toBeUndefined();
+    // Each arm's own staged digest is recorded but does not split a pool.
+    const mixed = [row({ skillFilesHash: 'one' }), row({ trial: 2, skillFilesHash: 'two' })];
+    expect(splitPools(mixed).others).toEqual([]);
+  });
+
   it('compares a raw two-text treatment row with the baseline of its own run only', () => {
     const { generateRawBenchmarkData } = require('../../scripts/lib/eval-benchmark');
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'test-raw-two-text-'));
@@ -484,7 +516,9 @@ describe('pairArms', () => {
         expect.objectContaining({
           stageSkillFiles: true,
           baselineSkillHash: 'old',
+          baselineSkillFilesHash: null,
           skillTextHash: 'new',
+          skillFilesHash: null,
         }),
       );
     } finally {

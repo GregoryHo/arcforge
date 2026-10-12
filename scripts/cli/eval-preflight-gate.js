@@ -16,7 +16,7 @@
  * @param {string} [run.effort]
  * @param {string} [run.pluginDir] - The --plugin-dir option
  * @param {number} [run.maxTurns] - The --max-turns option
- * @param {{ baselineSkillHash?: string, baselineSkillGiven?: string, stageSkillFiles?: boolean }} [run.skill] -
+ * @param {{ baselineSkillHash?: string, baselineSkillGiven?: string, baselineSkillFilesHash?: string }} [run.skill] -
  *   From resolveSkillOptions
  */
 function requirePreflightPass(
@@ -41,7 +41,7 @@ function requirePreflightPass(
       trialTimeoutMs: eval_.resolveTrialTimeoutMs(),
       baselineSkillHash: skill?.baselineSkillHash,
       baselineSkillFile: skill?.baselineSkillGiven,
-      stageSkillFiles: skill?.stageSkillFiles,
+      baselineSkillFilesHash: skill?.baselineSkillFilesHash,
     },
   });
   if (gateError) throw new Error(gateError);

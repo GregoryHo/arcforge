@@ -3,8 +3,8 @@
  *
  * A pool is a scenario version plus its run conditions: model, effort, the
  * per-trial ceiling, the turn budget, whether a plugin dir was loaded (B-8),
- * whether the run staged skill files for its injected arms (B-19) and which
- * text its baseline was given, if any (B-20).
+ * whether the run staged skill files for its injected arms (B-19), and which
+ * text its baseline was given and which files were staged for it, if any (B-20).
  * Rows measured under different conditions answered different questions, so a
  * reader never combines them. It judges the newest condition's pool and lists
  * the others beside it (D-021: pools measured on another instrument stay on
@@ -35,6 +35,7 @@ const CONDITION_FIELDS = [
   'isolation',
   'stageSkillFiles',
   'baselineSkillHash',
+  'baselineSkillFilesHash',
 ];
 
 /**
@@ -181,7 +182,7 @@ function pairArms(baselineRows, treatmentRows) {
       ...(unscoredArm ? { unscoredArm } : {}),
       error: unscoredArm
         ? `The ${unscoredArm} ${armsHave} no scored trial: every trial is an infra or grade error, an instrument failure, not a measurement, so no comparison is valid. Fix the failure and rerun eval ab.`
-        : 'The baseline and treatment arms have no run conditions in common (model, effort, ceiling, turn budget, staged skill files, baseline text), so no comparison is valid. Rerun eval ab so both arms run under the same conditions.',
+        : 'The baseline and treatment arms have no run conditions in common (model, effort, ceiling, turn budget, staged skill files, baseline text and files), so no comparison is valid. Rerun eval ab so both arms run under the same conditions.',
     };
   }
   return {
@@ -215,6 +216,9 @@ function describeCondition(conditions) {
     // Named only on a pool that has them: a run without them records nothing.
     ...(conditions.stageSkillFiles ? ['staged skill files yes'] : []),
     ...(conditions.baselineSkillHash ? [`baseline text ${conditions.baselineSkillHash}`] : []),
+    ...(conditions.baselineSkillFilesHash
+      ? [`baseline files ${conditions.baselineSkillFilesHash}`]
+      : []),
   ].join(', ');
 }
 

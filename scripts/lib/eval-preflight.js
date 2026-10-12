@@ -75,9 +75,10 @@ function preflightFilename(hash, model, conditions = {}) {
  * no plugin dir, no effort) add nothing to the file name, so records written
  * before this key existed still match them.
  * A baseline given a skill text is another baseline: its record is keyed on the
- * text's hash, and on whether its skill files were staged for it (B-20).
- * @param {{ maxTurns?: number, pluginDir?: string, effort?: string, trialTimeoutMs?: number, baselineSkillHash?: string, stageSkillFiles?: boolean }} conditions
- * @returns {string} '' or e.g. '-t10-pd', '-ehigh', '-t10-pd-ehigh', '-b0123456789abcdef-s'
+ * text's hash, and on the digest of the files staged for it when they were, so
+ * the same text over other files is not unlocked (B-20).
+ * @param {{ maxTurns?: number, pluginDir?: string, effort?: string, trialTimeoutMs?: number, baselineSkillHash?: string, baselineSkillFilesHash?: string }} conditions
+ * @returns {string} '' or e.g. '-t10-pd', '-ehigh', '-b0123456789abcdef', '-b0123456789abcdef-sfedcba9876543210'
  */
 function conditionsSuffix({
   maxTurns,
@@ -85,7 +86,7 @@ function conditionsSuffix({
   effort,
   trialTimeoutMs,
   baselineSkillHash,
-  stageSkillFiles,
+  baselineSkillFilesHash,
 } = {}) {
   const budget =
     maxTurns == null && !pluginDir ? '' : `-t${maxTurns ?? 'none'}${pluginDir ? '-pd' : ''}`;
@@ -94,9 +95,9 @@ function conditionsSuffix({
   const ceiling =
     trialTimeoutMs && trialTimeoutMs !== DEFAULT_TRIAL_TIMEOUT_MS ? `-c${trialTimeoutMs}` : '';
   // Staging reaches the baseline only when it is given a text to stage for.
-  const baselineText = baselineSkillHash
-    ? `-b${String(baselineSkillHash).replace(/[^A-Za-z0-9]/g, '_')}${stageSkillFiles ? '-s' : ''}`
-    : '';
+  const key = (value) => String(value).replace(/[^A-Za-z0-9]/g, '_');
+  const staged = baselineSkillFilesHash ? `-s${key(baselineSkillFilesHash)}` : '';
+  const baselineText = baselineSkillHash ? `-b${key(baselineSkillHash)}${staged}` : '';
   return `${budget}${effortKey}${ceiling}${baselineText}`;
 }
 
@@ -107,11 +108,11 @@ function describeConditions({
   effort,
   trialTimeoutMs,
   baselineSkillHash,
-  stageSkillFiles,
+  baselineSkillFilesHash,
 } = {}) {
   // Named only for a baseline given a text, so other records read as before.
   const baselineText = baselineSkillHash
-    ? `, baseline text ${baselineSkillHash}${stageSkillFiles ? ' with staged files' : ''}`
+    ? `, baseline text ${baselineSkillHash}${baselineSkillFilesHash ? ` with staged files ${baselineSkillFilesHash}` : ''}`
     : '';
   return `max turns ${maxTurns ?? 'none'}, plugin dir ${pluginDir ? 'yes' : 'no'}, effort ${effort || 'default'}, ceiling ${trialTimeoutMs || DEFAULT_TRIAL_TIMEOUT_MS} ms${baselineText}`;
 }
@@ -198,7 +199,7 @@ function runPreflight(name, projectRoot, opts = {}) {
     ...(conditions.baselineSkillHash
       ? {
           baseline_skill_hash: conditions.baselineSkillHash,
-          stage_skill_files: Boolean(conditions.stageSkillFiles),
+          baseline_skill_files_hash: conditions.baselineSkillFilesHash || null,
         }
       : {}),
     // Recorded, not keyed on: a Node upgrade or a new commit does not
@@ -302,9 +303,10 @@ function gradePreflightTrial(result, scenario, projectRoot) {
  * @param {string} [opts.model] - Model identifier the A/B run will use; the
  *   gate verifies a preflight record exists for this exact model. Pass the
  *   same value `arcforge eval ab` will pass to its trials.
- * @param {{ maxTurns?: number, pluginDir?: string, baselineSkillHash?: string, stageSkillFiles?: boolean }} [opts.conditions] -
+ * @param {{ maxTurns?: number, pluginDir?: string, baselineSkillHash?: string, baselineSkillFilesHash?: string }} [opts.conditions] -
  *   The turn budget and plugin dir the A/B baseline will run under, and the text
- *   it will be given, if any; the record must match.
+ *   it will be given and the digest of the files staged for it, if any; the
+ *   record must match.
  * @returns {null|string} null if cleared to proceed; error message string if blocked
  */
 function checkPreflightGate(name, projectRoot, opts = {}) {
@@ -368,7 +370,7 @@ function missingPreflightMessage(name, projectRoot, { hash, model, conditions })
     conditions.baselineSkillHash
       ? `--baseline-skill-file ${conditions.baselineSkillFile || '<path>'}`
       : '',
-    conditions.baselineSkillHash && conditions.stageSkillFiles ? '--stage-skill-files' : '',
+    conditions.baselineSkillHash && conditions.baselineSkillFilesHash ? '--stage-skill-files' : '',
   ].filter(Boolean);
   // The ceiling is set by environment, not a flag, so the command carries it.
   const ceilingEnv =
@@ -393,7 +395,7 @@ function missingPreflightMessage(name, projectRoot, { hash, model, conditions })
           effort: r.effort,
           trialTimeoutMs: r.trial_timeout_ms,
           baselineSkillHash: r.baseline_skill_hash,
-          stageSkillFiles: r.stage_skill_files,
+          baselineSkillFilesHash: r.baseline_skill_files_hash,
         });
       } catch {
         return null; // unreadable record: it cannot say what it ran under
@@ -408,7 +410,7 @@ function missingPreflightMessage(name, projectRoot, { hash, model, conditions })
     `No preflight record found for scenario "${name}" (hash: ${hash}, model: ${modelLabel}, ${describeConditions(conditions)}).\n` +
     mismatch +
     `Run: ${ceilingEnv}arcforge eval preflight ${[name, ...flags].join(' ')}\n` +
-    `Preflight is per-(scenario, model, effort, turn budget, plugin dir, ceiling, baseline text) — baseline pass rate depends ` +
+    `Preflight is per-(scenario, model, effort, turn budget, plugin dir, ceiling, baseline text and staged files) — baseline pass rate depends ` +
     `on each, so a PASS under one does not unblock A/B runs under another.`
   );
 }

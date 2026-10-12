@@ -4,6 +4,7 @@
  * stubbed; no session is spawned.
  */
 
+const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
@@ -16,6 +17,7 @@ const mockUtils = require('../../scripts/lib/utils');
 const { runSkillEval } = require('../../scripts/lib/eval');
 const {
   buildInjection,
+  digestSkillDir,
   hashSkillText,
   removeStagedDir,
   stageSkillDir,
@@ -69,6 +71,7 @@ function recordingStaged(fn) {
 describe('staged skill files for the injected arm (B-19)', () => {
   let tempDir;
   let skillFile;
+  let skillDir;
   let trials;
   let rows;
   let onTrial;
@@ -76,6 +79,7 @@ describe('staged skill files for the injected arm (B-19)', () => {
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-staging-'));
     skillFile = writeSkill(tempDir, 'demo', 'BODY');
+    skillDir = path.dirname(skillFile);
     trials = [];
     rows = [];
     onTrial = () => {};
@@ -214,8 +218,59 @@ describe('staged skill files for the injected arm (B-19)', () => {
     });
 
     it('records no baseline text hash when the baseline was given none', () => {
-      run();
-      for (const row of rows) expect(row).not.toHaveProperty('baselineSkillHash');
+      run({ stageSkillFiles: true });
+      for (const row of rows) {
+        expect(row).not.toHaveProperty('baselineSkillHash');
+        expect(row).not.toHaveProperty('baselineSkillFilesHash');
+      }
+      expect(rows.map((r) => r.skillFilesHash)).toEqual([undefined, digestSkillDir(skillDir)]);
+    });
+
+    it('records each arm staged digest, and the baseline digest on both arms', () => {
+      twoText({ stageSkillFiles: true });
+      const oldDigest = digestSkillDir(path.dirname(oldFile));
+      const newDigest = digestSkillDir(skillDir);
+      expect(oldDigest).not.toBe(newDigest);
+      expect(rows.map((r) => r.skillFilesHash)).toEqual([oldDigest, newDigest]);
+      expect(rows.map((r) => r.baselineSkillFilesHash)).toEqual([oldDigest, oldDigest]);
+    });
+
+    it('records no digest when nothing is staged', () => {
+      twoText();
+      for (const row of rows) {
+        expect(row).not.toHaveProperty('skillFilesHash');
+        expect(row).not.toHaveProperty('baselineSkillFilesHash');
+      }
+    });
+
+    it('one text over other staged files is another baseline, the same files the same one', () => {
+      // Three directories with one SKILL.md text; only a references file differs.
+      const a = writeSkill(tempDir, 'same-a', 'ONE TEXT');
+      const b = writeSkill(tempDir, 'same-b', 'ONE TEXT');
+      const c = writeSkill(tempDir, 'same-c', 'ONE TEXT');
+      for (const file of [a, b, c]) {
+        const grid = file === c ? '220' : '200';
+        fs.writeFileSync(
+          path.join(path.dirname(file), 'references', 'verify.sh'),
+          `grid=${grid}\n`,
+        );
+      }
+      const baselineIdentity = (file) => {
+        rows = [];
+        run({
+          baselineSkillInstruction: 'ONE TEXT',
+          baselineSkillFile: file,
+          stageSkillFiles: true,
+        });
+        expect(rows[0].baselineSkillFilesHash).toBe(rows[1].baselineSkillFilesHash);
+        return [rows[0].baselineSkillHash, rows[0].baselineSkillFilesHash];
+      };
+      const [textA, filesA] = baselineIdentity(a);
+      const [textB, filesB] = baselineIdentity(b);
+      const [textC, filesC] = baselineIdentity(c);
+      expect([textB, textC]).toEqual([textA, textA]);
+      expect(filesB).toBe(filesA);
+      expect(filesC).not.toBe(filesA);
     });
 
     it('stages a directory of its own for each arm, taken from where its file sits', () => {
@@ -286,7 +341,9 @@ describe('buildInjection', () => {
       text: null,
       textHash: null,
       baseDir: null,
+      filesHash: null,
     });
+    expect(buildInjection({ text: 'BODY' }).filesHash).toBeNull();
   });
 
   it('hashes the skill text alone, so the hash does not move with the staged path', () => {
@@ -304,6 +361,71 @@ describe('buildInjection', () => {
       removeStagedDir(second.baseDir);
       fs.rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  describe('digestSkillDir', () => {
+    let root;
+    let dir;
+
+    beforeEach(() => {
+      root = fs.mkdtempSync(path.join(os.tmpdir(), 'test-digest-'));
+      dir = path.dirname(writeSkill(root, 'demo', 'BODY'));
+    });
+
+    afterEach(() => {
+      fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    it('is the same for the source directory and its staged copy', () => {
+      fs.writeFileSync(path.join(dir, '.hidden'), 'dotfile');
+      fs.symlinkSync('references/verify.sh', path.join(dir, 'link.sh'));
+      const staged = stageSkillDir(path.join(dir, 'SKILL.md'));
+      try {
+        expect(digestSkillDir(staged)).toBe(digestSkillDir(dir));
+        expect(digestSkillDir(dir)).toMatch(/^[0-9a-f]{16}$/);
+      } finally {
+        removeStagedDir(staged);
+      }
+    });
+
+    it('moves with a file content, name, executable bit, dotfile or symlink target', () => {
+      const digests = [digestSkillDir(dir)];
+      const changed = () => {
+        digests.push(digestSkillDir(dir));
+        expect(new Set(digests).size).toBe(digests.length);
+      };
+      fs.writeFileSync(path.join(dir, 'references', 'verify.sh'), 'echo changed\n');
+      changed();
+      fs.renameSync(
+        path.join(dir, 'references', 'verify.sh'),
+        path.join(dir, 'references', 'v.sh'),
+      );
+      changed();
+      fs.chmodSync(path.join(dir, 'references', 'v.sh'), 0o755);
+      changed();
+      fs.writeFileSync(path.join(dir, '.hidden'), 'dotfile');
+      changed();
+      fs.symlinkSync('references/v.sh', path.join(dir, 'link.sh'));
+      changed();
+      fs.rmSync(path.join(dir, 'link.sh'));
+      fs.symlinkSync('SKILL.md', path.join(dir, 'link.sh'));
+      changed();
+    });
+
+    it('ignores what staging leaves out, empty directories and timestamps', () => {
+      const before = digestSkillDir(dir);
+      fs.writeFileSync(path.join(dir, 'node_modules', 'dep', 'index.js'), 'changed');
+      fs.writeFileSync(path.join(dir, 'references', '.venv', 'pyvenv.cfg'), 'changed');
+      fs.mkdirSync(path.join(dir, 'empty'));
+      fs.utimesSync(path.join(dir, 'SKILL.md'), new Date(0), new Date(0));
+      expect(digestSkillDir(dir)).toBe(before);
+    });
+
+    it('refuses an entry that is neither a file nor a symlink', () => {
+      const fifo = path.join(dir, 'references', 'pipe');
+      execFileSync('mkfifo', [fifo]);
+      expect(() => digestSkillDir(dir)).toThrow(`Cannot digest ${fifo}: not a file or a symlink`);
+    });
   });
 
   it('refuses to stage without the skill file path', () => {

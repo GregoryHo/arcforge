@@ -80,10 +80,11 @@ function resolveTrialTimeoutMs(env = process.env) {
  * @param {number} [options.maxTurns] - Max turns for Claude CLI
  * @param {string[]} [options.watchRoots] - Extra directories the write check watches;
  *   nothing is loaded from them (a comparison's baseline watches the plugin root)
- * @param {{ baseDir?: string, textHash?: string, staged?: boolean, baselineHash?: string }} [options.skillInjection] -
- *   What this arm was injected with: its staged skill directory and the hash of
- *   its skill text. And two conditions both arms record: whether the run stages
- *   skill files, and the hash of the text the baseline was given, if any
+ * @param {{ baseDir?: string, textHash?: string, filesHash?: string, staged?: boolean, baselineHash?: string, baselineFilesHash?: string }} [options.skillInjection] -
+ *   What this arm was injected with: its staged skill directory, the hash of
+ *   its skill text and the digest of its staged files. And the conditions both
+ *   arms record: whether the run stages skill files, the hash of the text the
+ *   baseline was given, if any, and the digest of the files staged for it
  * @returns {TrialResult} Trial result
  */
 function runTrial(scenario, trialNumber, totalTrials, options = {}) {
@@ -165,8 +166,15 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
       // Which text the baseline of this run was given, on both arms' rows; a
       // run whose baseline was given none records nothing (B-20).
       ...(skillInjection.baselineHash ? { baselineSkillHash: skillInjection.baselineHash } : {}),
+      // And which files were staged for that baseline: the same text over
+      // other files is another baseline.
+      ...(skillInjection.baselineFilesHash
+        ? { baselineSkillFilesHash: skillInjection.baselineFilesHash }
+        : {}),
       // Not a pooling condition: which text this arm was injected with.
       ...(skillInjection.textHash ? { skillTextHash: skillInjection.textHash } : {}),
+      // Nor is this: the digest of the directory staged for this arm.
+      ...(skillInjection.filesHash ? { skillFilesHash: skillInjection.filesHash } : {}),
     };
   }
 

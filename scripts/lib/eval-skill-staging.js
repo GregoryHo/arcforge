@@ -34,6 +34,45 @@ function hashSkillText(text) {
 }
 
 /**
+ * Digest of a skill directory's content, as staging would copy it: what tells
+ * two staged directories apart when their skill text is the same (B-20).
+ *
+ * Covered: every file and symlink under the directory, dotfiles included, in
+ * sorted order of its relative path, each as its path, whether its owner may
+ * execute it, and its bytes. A symlink is never followed: its target path
+ * stands for it, as the copy keeps the link itself. Left out: the directories
+ * staging leaves out (SKIP_NAMES), empty directories, and timestamps. Anything
+ * else (a FIFO, a socket, a device) is refused, as the copy refuses it.
+ * @param {string} dir - Skill directory, or a staged copy of one
+ * @returns {string} First 16 hex characters of the SHA-256 digest
+ */
+function digestSkillDir(dir) {
+  const entries = [];
+  const walk = (rel) => {
+    for (const entry of fs.readdirSync(path.join(dir, rel), { withFileTypes: true })) {
+      if (SKIP_NAMES.has(entry.name)) continue;
+      const childRel = rel ? `${rel}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) walk(childRel);
+      else if (entry.isFile() || entry.isSymbolicLink()) entries.push(childRel);
+      else throw new Error(`Cannot digest ${path.join(dir, childRel)}: not a file or a symlink`);
+    }
+  };
+  walk('');
+  const hash = crypto.createHash('sha256');
+  for (const rel of entries.sort()) {
+    const full = path.join(dir, rel);
+    const stat = fs.lstatSync(full);
+    const link = stat.isSymbolicLink();
+    const body = link ? Buffer.from(fs.readlinkSync(full)) : fs.readFileSync(full);
+    const kind = link ? 'link' : stat.mode & 0o100 ? 'exec' : 'file';
+    // Length-prefixed, so no path or content can pass for another entry's.
+    hash.update(`${kind} ${Buffer.byteLength(rel)} ${rel} ${body.length}\n`);
+    hash.update(body);
+  }
+  return hash.digest('hex').slice(0, 16);
+}
+
+/**
  * The line a host opens a loaded skill with.
  * @param {string} dir - The skill's base directory
  * @returns {string}
@@ -83,19 +122,32 @@ function removeStagedDir(staged) {
  * @param {string} [arm.text] - Skill text to inject
  * @param {string} [arm.skillFile] - Absolute path the text was read from (staging needs it)
  * @param {boolean} [arm.stage] - Stage the skill file's directory for this arm
- * @returns {{ text: string|null, textHash: string|null, baseDir: string|null }}
+ * @returns {{ text: string|null, textHash: string|null, baseDir: string|null, filesHash: string|null }}
  *   text is what is prepended to the scenario context; the hash is of the skill
- *   text alone, since the base-directory line differs on every run
+ *   text alone, since the base-directory line differs on every run; filesHash
+ *   is the digest of the staged copy (digestSkillDir), null when nothing is staged
  */
 function buildInjection({ text, skillFile, stage } = {}) {
-  if (!text) return { text: null, textHash: null, baseDir: null };
+  if (!text) return { text: null, textHash: null, baseDir: null, filesHash: null };
   const textHash = hashSkillText(text);
-  if (!stage) return { text, textHash, baseDir: null };
+  if (!stage) return { text, textHash, baseDir: null, filesHash: null };
   if (!skillFile) {
     throw new Error('Staging skill files needs the path of the skill file, and none was given');
   }
   const baseDir = stageSkillDir(skillFile);
-  return { text: `${baseDirectoryLine(baseDir)}\n\n${text}`, textHash, baseDir };
+  let filesHash;
+  try {
+    filesHash = digestSkillDir(baseDir);
+  } catch (err) {
+    removeStagedDir(baseDir);
+    throw new Error(`Failed to digest staged skill files in ${baseDir}: ${err.message}`);
+  }
+  return {
+    text: `${baseDirectoryLine(baseDir)}\n\n${text}`,
+    textHash,
+    baseDir,
+    filesHash,
+  };
 }
 
 /**
@@ -126,8 +178,10 @@ function baselineArm(scenario, baseline) {
       skillInjection: {
         baseDir: injection.baseDir,
         textHash: injection.textHash,
+        filesHash: injection.filesHash,
         staged: Boolean(baseline.stage),
         baselineHash: injection.textHash,
+        baselineFilesHash: injection.filesHash,
       },
     };
   };
@@ -136,6 +190,7 @@ function baselineArm(scenario, baseline) {
 
 module.exports = {
   hashSkillText,
+  digestSkillDir,
   baseDirectoryLine,
   stageSkillDir,
   removeStagedDir,

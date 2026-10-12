@@ -95,6 +95,8 @@ const { buildInjection, removeStagedDir, withInjection } = require('./eval-skill
  * @property {boolean} [stageSkillFiles] - true when the run staged skill files (both arms record it)
  * @property {string} [skillTextHash] - Hash of the skill text this arm was injected with
  * @property {string} [baselineSkillHash] - Hash of the text the run's baseline was given (both arms record it)
+ * @property {string} [skillFilesHash] - Digest of the skill directory staged for this arm
+ * @property {string} [baselineSkillFilesHash] - Digest of the directory staged for the run's baseline (both arms record it)
  * @property {number[]} [assertionScores] - Per-assertion scores (0.0-1.0)
  * @property {string[]} [evidence] - Per-assertion evidence notes from grader
  * @property {number[][]} [blockRefs] - Per-assertion transcript block references (1-indexed)
@@ -294,7 +296,7 @@ function runSkillEval(scenario, k, options = {}) {
     // Both arms watch every staged copy: a write into one changes what the
     // trials after it are given, whichever arm made it.
     const watchRoots = [...shared.watchRoots, ...staged].filter(Boolean);
-    const armOptions = (label, { baseDir, textHash }) => ({
+    const armOptions = (label, { baseDir, textHash, filesHash }) => ({
       projectRoot,
       label,
       onTrialComplete,
@@ -307,8 +309,10 @@ function runSkillEval(scenario, k, options = {}) {
       skillInjection: {
         baseDir,
         textHash,
+        filesHash,
         staged: stageSkillFiles,
         baselineHash: baseline.textHash,
+        baselineFilesHash: baseline.filesHash,
       },
     });
     return runAbTrials(

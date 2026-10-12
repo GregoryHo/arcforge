@@ -35,14 +35,17 @@ function readSkillFile(file, projectRoot) {
  * it adds to a run.
  * @param {string|undefined} file - The --baseline-skill-file value
  * @param {string} projectRoot
- * @returns {{ baselineSkillGiven?: string, baselineSkillFile?: string, baselineSkillInstruction?: string, baselineSkillHash?: string }}
- *   baselineSkillGiven is the path as given, baselineSkillFile the resolved one
+ * @param {boolean} stage - Whether the baseline's files will be staged
+ * @returns {{ baselineSkillGiven?: string, baselineSkillFile?: string, baselineSkillInstruction?: string, baselineSkillHash?: string, baselineSkillFilesHash?: string }}
+ *   baselineSkillGiven is the path as given, baselineSkillFile the resolved one;
+ *   baselineSkillFilesHash is the digest of the directory that will be staged
  */
-function readBaselineSkill(file, projectRoot) {
+function readBaselineSkill(file, projectRoot, stage) {
   if (!file) return {};
-  const { hashSkillText } = require('../lib/eval-skill-staging');
+  const { hashSkillText, digestSkillDir } = require('../lib/eval-skill-staging');
   const baseline = readSkillFile(file, projectRoot);
   return {
+    ...(stage ? { baselineSkillFilesHash: digestSkillDir(path.dirname(baseline.path)) } : {}),
     baselineSkillGiven: file,
     baselineSkillFile: baseline.path,
     baselineSkillInstruction: baseline.text,
@@ -78,13 +81,14 @@ function refuseSkillTextFlagsForWorkflow(scenario, given, cmd) {
  * @param {string} projectRoot
  * @param {{ baselineSkillFile?: string, stage?: boolean }} given - Parsed CLI values
  * @returns {{ arm: Function, remove: Function, conditions: Object }} arm/remove as
- *   baselineArm; conditions are what the preflight record is keyed on
+ *   baselineArm; conditions are what the preflight record is keyed on: the
+ *   baseline text's hash, and the digest of its directory when it is staged
  */
 function preflightBaseline(scenario, projectRoot, given) {
   refuseSkillTextFlagsForWorkflow(scenario, given, 'preflight');
   const { baselineArm } = require('../lib/eval-skill-staging');
-  const baseline = readBaselineSkill(given.baselineSkillFile, projectRoot);
   const stage = Boolean(given.stage);
+  const baseline = readBaselineSkill(given.baselineSkillFile, projectRoot, stage);
   return {
     ...baselineArm(scenario, {
       text: baseline.baselineSkillInstruction,
@@ -95,7 +99,7 @@ function preflightBaseline(scenario, projectRoot, given) {
       ? {
           baselineSkillHash: baseline.baselineSkillHash,
           baselineSkillFile: baseline.baselineSkillGiven,
-          stageSkillFiles: stage,
+          baselineSkillFilesHash: baseline.baselineSkillFilesHash,
         }
       : {},
   };
@@ -127,7 +131,7 @@ function resolveSkillOptions(scenario, projectRoot, given) {
     skillPath: skill.path,
     skillInstruction: skill.text,
     stageSkillFiles,
-    ...readBaselineSkill(given.baselineSkillFile, projectRoot),
+    ...readBaselineSkill(given.baselineSkillFile, projectRoot, stageSkillFiles),
   };
 }
 

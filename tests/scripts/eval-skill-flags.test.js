@@ -24,7 +24,7 @@ jest.mock('../../scripts/lib/eval-blind-autotrigger', () => ({
 }));
 const { runEvalCommand } = require('../../scripts/cli/eval-command');
 const { runPreflight } = require('../../scripts/lib/eval-preflight');
-const { hashSkillText } = require('../../scripts/lib/eval-skill-staging');
+const { digestSkillDir, hashSkillText } = require('../../scripts/lib/eval-skill-staging');
 
 const SCENARIO = (name, scope, extra = '') => `# Eval: ${name}
 
@@ -296,8 +296,13 @@ describe('eval ab skill flags', () => {
         );
       }
       expect(fs.existsSync(first.staged)).toBe(false);
+      const oldDir = path.join(tempDir, 'skills', 'demo-old');
+      expect(first.options.skillInjection.filesHash).toBe(digestSkillDir(oldDir));
+      expect(first.options.skillInjection.baselineFilesHash).toBe(digestSkillDir(oldDir));
       expect(records()).toEqual([
-        expect.stringMatching(`-default-b${hashSkillText('OLD')}-s\\.json$`),
+        expect.stringMatching(
+          `-default-b${hashSkillText('OLD')}-s${digestSkillDir(oldDir)}\\.json$`,
+        ),
       ]);
 
       await expect(ab({ 'skill-file': skill, 'baseline-skill-file': old })).rejects.toThrow(
@@ -305,6 +310,31 @@ describe('eval ab skill flags', () => {
       );
       await ab({ 'skill-file': skill, 'baseline-skill-file': old }, { 'stage-skill-files': true });
       expect(evalLib.runSkillEval).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses an A/B whose staged baseline files changed since the preflight', async () => {
+      const staged = { 'stage-skill-files': true };
+      const twoText = { 'skill-file': skill, 'baseline-skill-file': old };
+      await preflight({ 'baseline-skill-file': old }, staged);
+      await ab(twoText, staged);
+      expect(evalLib.runSkillEval).toHaveBeenCalledTimes(1);
+
+      // An identical copy elsewhere is the same baseline.
+      fs.cpSync(path.join(tempDir, 'skills', 'demo-old'), path.join(tempDir, 'copy'), {
+        recursive: true,
+      });
+      await ab({ ...twoText, 'baseline-skill-file': 'copy/SKILL.md' }, staged);
+      expect(evalLib.runSkillEval).toHaveBeenCalledTimes(2);
+
+      // SKILL.md untouched, one staged script edited: no preflight covers it.
+      fs.writeFileSync(path.join(tempDir, 'skills', 'demo-old', 'verify.sh'), 'echo edited\n');
+      const { message } = await ab(twoText, staged).catch((err) => err);
+      expect(message).toContain('No preflight record found');
+      expect(message).toMatch(/recorded under: .*with staged files [0-9a-f]{16}\./);
+      expect(message).toContain(
+        `Run: arcforge eval preflight gated --baseline-skill-file ${old} --stage-skill-files`,
+      );
+      expect(evalLib.runSkillEval).toHaveBeenCalledTimes(2);
     });
 
     it('removes the staged copy when a trial throws', async () => {

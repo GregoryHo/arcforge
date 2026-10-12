@@ -20,6 +20,8 @@ const SCENARIO_CONTENT =
 describe('preflight is keyed on the text the baseline was given (B-20)', () => {
   const OLD = '0123456789abcdef';
   const OTHER = 'fedcba9876543210';
+  const FILES = '1111111111111111';
+  const OTHER_FILES = '2222222222222222';
   let tempDir;
 
   beforeEach(() => {
@@ -41,7 +43,7 @@ describe('preflight is keyed on the text the baseline was given (B-20)', () => {
     });
   const gate = (conditions) => checkPreflightGate('test-scenario', tempDir, { conditions });
 
-  test('the baseline text hash, and staging with it, are part of the file name', () => {
+  test('the baseline text hash, and its staged files digest, are part of the file name', () => {
     const hash = computeScenarioHash(SCENARIO_CONTENT);
     expect(preflightFilename(hash, 'opus', { baselineSkillHash: OLD })).toBe(
       `${hash}-opus-b${OLD}.json`,
@@ -50,17 +52,19 @@ describe('preflight is keyed on the text the baseline was given (B-20)', () => {
       preflightFilename(hash, 'opus', {
         effort: 'high',
         baselineSkillHash: OLD,
-        stageSkillFiles: true,
+        baselineSkillFilesHash: FILES,
       }),
-    ).toBe(`${hash}-opus-ehigh-b${OLD}-s.json`);
+    ).toBe(`${hash}-opus-ehigh-b${OLD}-s${FILES}.json`);
     // A baseline given no text has nothing staged for it: the plain record.
-    expect(preflightFilename(hash, 'opus', { stageSkillFiles: true })).toBe(`${hash}-opus.json`);
+    expect(preflightFilename(hash, 'opus', { baselineSkillFilesHash: FILES })).toBe(
+      `${hash}-opus.json`,
+    );
   });
 
   test('a PASS for one baseline text unlocks an A/B with that baseline (hit)', () => {
     const record = preflightUnder({ baselineSkillHash: OLD });
     expect(record.baseline_skill_hash).toBe(OLD);
-    expect(record.stage_skill_files).toBe(false);
+    expect(record.baseline_skill_files_hash).toBeNull();
     expect(gate({ baselineSkillHash: OLD })).toBeNull();
   });
 
@@ -78,9 +82,9 @@ describe('preflight is keyed on the text the baseline was given (B-20)', () => {
     const staged = gate({
       baselineSkillHash: OLD,
       baselineSkillFile: 'old/SKILL.md',
-      stageSkillFiles: true,
+      baselineSkillFilesHash: FILES,
     });
-    expect(staged).toMatch(new RegExp(`baseline text ${OLD} with staged files\\)`));
+    expect(staged).toMatch(new RegExp(`baseline text ${OLD} with staged files ${FILES}\\)`));
     expect(staged).toContain(
       'Run: arcforge eval preflight test-scenario --baseline-skill-file old/SKILL.md --stage-skill-files\n',
     );
@@ -89,9 +93,23 @@ describe('preflight is keyed on the text the baseline was given (B-20)', () => {
   test('a no-text PASS does not unlock a two-text A/B, and records no baseline text', () => {
     const record = preflightUnder({});
     expect(record).not.toHaveProperty('baseline_skill_hash');
-    expect(record).not.toHaveProperty('stage_skill_files');
+    expect(record).not.toHaveProperty('baseline_skill_files_hash');
     expect(gate({ baselineSkillHash: OLD })).toMatch(/No preflight record found/);
     // Staging alone does not reach a baseline that is given nothing.
-    expect(gate({ stageSkillFiles: true })).toBeNull();
+    expect(gate({ baselineSkillFilesHash: FILES })).toBeNull();
+  });
+
+  test('a PASS for one staged content unlocks that content only (B-20)', () => {
+    const staged = { baselineSkillHash: OLD, baselineSkillFile: 'old/SKILL.md' };
+    const record = preflightUnder({ ...staged, baselineSkillFilesHash: FILES });
+    expect(record.baseline_skill_files_hash).toBe(FILES);
+    expect(gate({ ...staged, baselineSkillFilesHash: FILES })).toBeNull();
+
+    // The same text over other files, or over none, is another baseline.
+    const other = gate({ ...staged, baselineSkillFilesHash: OTHER_FILES });
+    expect(other).toMatch(/No preflight record found/);
+    expect(other).toMatch(new RegExp(`with staged files ${OTHER_FILES}\\)`));
+    expect(other).toMatch(new RegExp(`recorded under: .*with staged files ${FILES}\\.`));
+    expect(gate(staged)).toMatch(/No preflight record found/);
   });
 });
