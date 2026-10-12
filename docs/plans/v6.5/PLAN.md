@@ -37,7 +37,7 @@ D-062（儀器），七項：
 
 | 項 | 內容 | spec |
 |---|---|---|
-| (a) | run lock：`eval run`、`eval preflight`、`eval ab`、`eval report` 在 `.eval-trials/` 底下取鎖，記 PID，每條結束路徑都釋放（含 preflight BLOCK）；第二個立刻被拒絕並指出持有者；行程已不存在的鎖會被回收 | eval B-15 |
+| (a) | run lock：`eval run`、`eval preflight`、`eval ab`、`eval report` 在 `.eval-trials/` 底下取鎖，記 PID，每條結束路徑都釋放（含 preflight BLOCK）；第二個立刻被拒絕並指出持有者；行程已不存在的鎖會被回收，回收前先取得保留檔，保留期間只移除 `pid` 與 `started` 都與先前所見相同的那把死鎖，其餘一律拒絕 | eval B-15 |
 | (b) | preflight 每個 trial 寫一筆 result row，標籤獨立，任何 pool 讀取端都不回傳它 | eval B-16 |
 | (c) | 每筆 row 與每筆 preflight 紀錄帶 Node 版本、scenario hash 與 checkout 的 commit（`node_version`、`scenario_hash`、`repo_commit`）；只記錄、不分組 | eval B-17 |
 | (d) | trial 環境重建：operator 的 `PATH` 不進 trial 與 fixture Setup，`claude`、`node` 仍解析得到；scenario 以 `## Environment` 宣告 `PATH` 增減與放進 trial 內的快取目錄；`HOME` 保留；兩臂相同，記進 row | eval B-18 |
@@ -100,7 +100,7 @@ D-062（儀器），七項：
 | A4 `eval compare --no-analyzer` | (g) | `eval-compare-skip-analyzer` | #281 |
 | A5 staged skill 目錄與兩文字 A/B | (e)、(f) | `eval-skill-files-outside-trial` | #288 |
 
-**A1 run lock。** `scripts/lib/locking.js` 不能直接用：mtime 超過 30 秒就當 stale、等 5 秒才放棄、不查 PID 是否存活。做法二選一：新 helper（約 40 行，O_EXCL 開檔、寫 PID、查存活、拿不到就立刻拒絕），或給 `locking.js` 加 `staleThreshold` 與 PID 檢查。鎖檔放 `.eval-trials/` 底下（write guard 跳過它，`.gitignore` 已含）。`eval-command.js` 的 `run`（:178）、`preflight`（:248）、`ab`（:375）三個分支都包 try/finally；`eval report` 也取同一把鎖（PR #287），因為它寫 `evals/benchmarks/`，live trial 的 write guard 會把這次寫入算在 trial 頭上。preflight 判定 BLOCK 時現在是 `process.exit(1)`（:317），`finally` 不會執行，鎖會留下來：改成設 `process.exitCode = 1` 後正常返回，或在 exit 之前明確釋放鎖；A1 的測試要涵蓋 BLOCK 之後鎖已不存在。不把 `evals/preflight/` 加進 guard 的 skip list，那會藏住真的 trial 寫入。
+**A1 run lock。** `scripts/lib/locking.js` 不能直接用：mtime 超過 30 秒就當 stale、等 5 秒才放棄、不查 PID 是否存活。做法二選一：新 helper（約 40 行，O_EXCL 開檔、寫 PID、查存活、拿不到就立刻拒絕），或給 `locking.js` 加 `staleThreshold` 與 PID 檢查。鎖檔放 `.eval-trials/` 底下（write guard 跳過它，`.gitignore` 已含）。`eval-command.js` 的 `run`（:178）、`preflight`（:248）、`ab`（:375）三個分支都包 try/finally；`eval report` 也取同一把鎖（PR #287），因為它寫 `evals/benchmarks/`，live trial 的 write guard 會把這次寫入算在 trial 頭上。preflight 判定 BLOCK 時現在是 `process.exit(1)`（:317），`finally` 不會執行，鎖會留下來：改成設 `process.exitCode = 1` 後正常返回，或在 exit 之前明確釋放鎖；A1 的測試要涵蓋 BLOCK 之後鎖已不存在。不把 `evals/preflight/` 加進 guard 的 skip list，那會藏住真的 trial 寫入。回收死鎖不能只是「查 PID、刪檔」：兩個行程同時看到同一個死 PID 時，後到的會刪掉先到的剛建立的鎖，兩個 eval 就同時在跑。做法（PR #287，`d83357f5`）：先以 O_EXCL 建立保留檔 `run.lock.reclaim`，拿不到就拒絕；在保留期間重讀鎖檔，鎖檔不存在就直接嘗試 O_EXCL 建立，存在則只有 `pid` 與 `started` 都與保留前讀到的那筆死紀錄相同、且該 PID 仍不存在時才移除，其餘（鎖在這段時間出現或換人）一律拒絕並指出持有者；最後釋放保留檔。沒有指出行程的鎖檔，或殘留的 `run.lock.reclaim`，不回收，拒絕訊息指出檔名，由 operator 手動移除。A1 的測試要以替換過的 fs 重播這兩種交錯：釋放後被第三個 run 以快速路徑取得的鎖不被移除、兩個回收者只有一個取得鎖。
 
 **A2 preflight row、Node 版本與 hash。**
 
