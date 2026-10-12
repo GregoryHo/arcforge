@@ -187,3 +187,152 @@ describe('the shim directory', () => {
     expect(resolveOnPath('claude', path.join(root, 'plain'))).toBeUndefined();
   });
 });
+
+describe('a scenario declares its own trial environment (## Environment)', () => {
+  const { parseScenario } = require('../../scripts/lib/eval-scenario');
+  const {
+    TRIAL_DIR_VARS,
+    parseEnvironment,
+    declaredEnvironment,
+  } = require('../../scripts/lib/eval-trial-environment');
+  /* biome-ignore-start lint/suspicious/noTemplateCurlyInString: scenario placeholders, not JS templates */
+  const REPO_BIN = 'PATH+=${PROJECT_ROOT}/bin';
+  const FAKE_BIN = 'PATH^=${TRIAL_DIR}/fakebin';
+  const UV_CACHE = 'UV_CACHE_DIR=${TRIAL_DIR}/.cache/uv';
+  const BROWSERS = 'PLAYWRIGHT_BROWSERS_PATH=${TRIAL_DIR}/.cache/ms-playwright';
+  /* biome-ignore-end lint/suspicious/noTemplateCurlyInString: scenario placeholders, not JS templates */
+  let root;
+  let projectRoot;
+  let trialDir;
+  let parentEnv;
+
+  beforeEach(() => {
+    root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'test-trial-declared-')));
+    projectRoot = path.join(root, 'project');
+    trialDir = path.join(projectRoot, '.eval-trials', 'scn-t1-abc');
+    fs.mkdirSync(trialDir, { recursive: true });
+    writeExecutable(path.join(projectRoot, 'bin', 'arcforge'));
+    writeExecutable(path.join(root, 'operator', 'bin', 'uv'));
+    parentEnv = {
+      PATH: [path.join(root, 'operator', 'bin'), ...SYSTEM_PATH].join(':'),
+      HOME: path.join(root, 'home'),
+    };
+  });
+
+  afterEach(() => {
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  const build = (environment, opts = {}) =>
+    trialEnv(trialDir, { name: 'scn', environment }, { projectRoot, parentEnv, ...opts });
+  const shims = () => path.join(projectRoot, '.eval-trials', '.bin');
+
+  it('puts arcforge back on PATH only for a scenario that declares the repo bin', () => {
+    expect(which('arcforge', build([]))).toBe('');
+    const env = build([REPO_BIN]);
+    expect(which('arcforge', env)).toBe(path.join(projectRoot, 'bin', 'arcforge'));
+    expect(env.PATH.split(':')).toEqual([shims(), ...SYSTEM_PATH, path.join(projectRoot, 'bin')]);
+  });
+
+  it('lets a trial-local directory shadow a tool for that trial alone', () => {
+    const fake = writeExecutable(path.join(trialDir, 'fakebin', 'uv'), '#!/bin/sh\nexit 127\n');
+    const env = build([FAKE_BIN]);
+    expect(which('uv', env)).toBe(fake);
+    expect(env.PATH.split(':')[0]).toBe(path.join(trialDir, 'fakebin'));
+    // Another trial of the same scenario gets its own directory, not this one.
+    const other = path.join(projectRoot, '.eval-trials', 'scn-t2-def');
+    const otherEnv = trialEnv(other, { environment: [FAKE_BIN] }, { projectRoot, parentEnv });
+    expect(otherEnv.PATH.split(':')[0]).toBe(path.join(other, 'fakebin'));
+  });
+
+  it('removes a directory, and ignores a removal of one that is not there', () => {
+    const env = build(['PATH-=/usr/sbin', 'PATH-=/not/on/path']);
+    expect(env.PATH.split(':')).toEqual([shims(), '/usr/bin', '/bin', '/sbin']);
+  });
+
+  it('applies PATH declarations in the order written, without duplicates', () => {
+    const env = build(['PATH+=/opt/a', 'PATH^=/opt/b', 'PATH+=/opt/b/', 'PATH-=/opt/a']);
+    expect(env.PATH.split(':')).toEqual([shims(), ...SYSTEM_PATH, '/opt/b']);
+  });
+
+  it('points cache directories inside the trial', () => {
+    const env = build([UV_CACHE, BROWSERS]);
+    expect(env.UV_CACHE_DIR).toBe(path.join(trialDir, '.cache', 'uv'));
+    expect(env.PLAYWRIGHT_BROWSERS_PATH).toBe(path.join(trialDir, '.cache', 'ms-playwright'));
+    expect(env.HOME).toBe(parentEnv.HOME);
+  });
+
+  it('applies the same declarations on top of a --no-isolate environment', () => {
+    const env = build([REPO_BIN, UV_CACHE], { contained: false });
+    expect(env.PATH).toBe([parentEnv.PATH, path.join(projectRoot, 'bin')].join(':'));
+    expect(env.UV_CACHE_DIR).toBe(path.join(trialDir, '.cache', 'uv'));
+  });
+
+  it.each([
+    ['PATH=/usr/local/bin', /PATH cannot be replaced/],
+    ['HOME=/tmp/elsewhere', /HOME is not a variable a scenario may declare/],
+    ['ANTHROPIC_MODEL=opus', /not a variable a scenario may declare/],
+    ['PATH+=bin', /must be an absolute path/],
+    ['PATH+=/a:/b', /one directory/],
+    ['PATH+=/with space', /one directory/],
+    ['PATH+=$HOME/bin', /expands only a leading/],
+    ['PATH+=~/bin', /expands only a leading/],
+    ['PATH+=/a/../b', /"\.\." segment/],
+    ['PATH+=', /has no value/],
+    ['UV_CACHE_DIR=/var/cache/uv', /must point inside the trial/],
+    [`UV_CACHE_DIR=\${PROJECT_ROOT}/cache`, /must point inside the trial/],
+    [`UV_CACHE_DIR=\${TRIAL_DIR}/`, /must point inside the trial/],
+    [`UV_CACHE_DIR=\${TRIAL_DIR}/../escape`, /"\.\." segment/],
+    [`PIP_CACHE_DIR+=\${TRIAL_DIR}/pip`, /takes "="/],
+    [`PATH+=\${TRIAL_DIR}bin`, /needs a "\/" after the placeholder/],
+    ['export PATH', /expected PATH\+=<dir>/],
+  ])('refuses %s', (line, reason) => {
+    const { directives, errors } = parseEnvironment([line]);
+    expect(directives).toEqual([]);
+    expect(errors).toEqual([{ index: 0, message: expect.stringMatching(reason) }]);
+    expect(() => build([line])).toThrow(/bad ## Environment line/);
+  });
+
+  it('refuses a cache variable declared twice, naming the second line', () => {
+    const { errors } = parseEnvironment([UV_CACHE, BROWSERS, UV_CACHE]);
+    expect(errors).toEqual([{ index: 2, message: 'UV_CACHE_DIR is declared twice' }]);
+  });
+
+  it('names every bad line in one refusal, and builds nothing', () => {
+    expect(() => declaredEnvironment({ name: 'scn', environment: ['PATH=/x', 'HOME=/y'] })).toThrow(
+      /Scenario scn has a bad ## Environment line: "PATH=\/x": .*; "HOME=\/y": /,
+    );
+    expect(() => build(['PATH=/x'])).toThrow();
+    expect(fs.existsSync(shims())).toBe(false);
+  });
+
+  it('accepts every declarable cache variable', () => {
+    const lines = [...TRIAL_DIR_VARS].map((name) => `${name}=\${TRIAL_DIR}/.cache/${name}`);
+    expect(parseEnvironment(lines).errors).toEqual([]);
+  });
+
+  it('is parsed from the scenario file as written, comments and blanks dropped', () => {
+    const file = path.join(root, 'scn.md');
+    fs.writeFileSync(
+      file,
+      [
+        '# Eval: scn',
+        '',
+        '## Scenario',
+        'Do it.',
+        '',
+        '## Environment',
+        '# arcforge is the tool under test',
+        `  ${REPO_BIN}  `,
+        '',
+        UV_CACHE,
+        '',
+        '## Setup',
+        'true',
+      ].join('\n'),
+    );
+    expect(parseScenario(file, projectRoot).environment).toEqual([REPO_BIN, UV_CACHE]);
+    fs.writeFileSync(file, '# Eval: scn\n\n## Scenario\nDo it.\n');
+    expect(parseScenario(file, projectRoot)).not.toHaveProperty('environment');
+  });
+});

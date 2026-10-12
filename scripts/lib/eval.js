@@ -53,6 +53,7 @@ const { splitPools } = require('./eval-pools');
  * @property {string} grader - 'code' | 'model' | 'human'
  * @property {string} graderConfig - Grader-specific configuration
  * @property {string} setup - Shell command to prepare trial directory (empty = use projectRoot)
+ * @property {string[]} [environment] - `## Environment` declarations as written (PATH changes and cache directories for the trial)
  * @property {string} [preflight] - Optional preflight policy ('skip' to bypass A/B preflight gate)
  * @property {string} [verdictPolicy] - Optional A/B verdict policy ('non-regression' to judge treatment pass/fail instead of delta)
  * @property {string} [claimType] - Evidence claim type ('non-regression' | 'discriminative-lift' | 'self-improvement-smoke' | 'infra')
@@ -73,6 +74,7 @@ const { splitPools } = require('./eval-pools');
  * @property {number|null} input_tokens - Input tokens used by the trial agent (null if unavailable)
  * @property {number|null} output_tokens - Output tokens used by the trial agent (null if unavailable)
  * @property {number} [trialTimeoutMs] - Per-trial ceiling (ms) the trial ran under; absent on rows written before 6.1.1
+ * @property {string[]} [environment] - The scenario's `## Environment` declarations the trial ran under ([] when none); absent on rows written before 6.5.0
  * @property {string} [transcript] - Path to transcript file
  * @property {string} [trialDir] - Isolated temp directory used for this trial
  * @property {string} [error] - Error message if failed

@@ -15,6 +15,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { getTimestamp, sanitizeFilename } = require('./utils');
+const { environmentLines } = require('./eval-trial-environment');
 
 const EVALS_DIR = 'evals';
 const SCENARIOS_DIR = path.join(EVALS_DIR, 'scenarios');
@@ -205,6 +206,10 @@ function parseScenario(filePath, projectRoot) {
       : pluginDirRaw;
   }
 
+  // Environment: one declaration per line, kept as written (placeholders are
+  // expanded per trial, and the row records the declaration itself)
+  const environment = environmentLines(sections.environment).map(({ text }) => text);
+
   // Max Turns: parse as integer
   const maxTurnsRaw = section('max turns');
   const maxTurns = maxTurnsRaw ? parseInt(maxTurnsRaw, 10) : undefined;
@@ -228,6 +233,7 @@ function parseScenario(filePath, projectRoot) {
     ...(verdictPolicy ? { verdictPolicy } : {}),
     ...(claimType ? { claimType } : {}),
     ...(pluginDir ? { pluginDir } : {}),
+    ...(environment.length > 0 ? { environment } : {}),
     ...(maxTurns && !Number.isNaN(maxTurns) ? { maxTurns } : {}),
   };
 }

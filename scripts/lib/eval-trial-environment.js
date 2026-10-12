@@ -5,7 +5,9 @@
  * rebuilt from a shim directory holding only the tools the trial itself needs
  * plus the system directories, and only an allowlist of variables is forwarded.
  * eval-trial.js builds the environment once per trial and hands the same object
- * to Setup and to the session.
+ * to Setup and to the session. A scenario's `## Environment` section is the one
+ * way to change it, and this module owns that section's grammar: the parser, the
+ * linter and the trial all read it from here.
  *
  * Zero external dependencies — Node.js standard library only.
  */
@@ -59,6 +61,27 @@ const FORWARDED = new Set([
   'NODE_EXTRA_CA_CERTS',
   'SSL_CERT_FILE',
 ]);
+
+// The variables a scenario may point into its trial, so that an install the
+// agent performs lands in the trial directory and not in the operator's caches.
+const TRIAL_DIR_VARS = new Set([
+  'XDG_CACHE_HOME',
+  'XDG_DATA_HOME',
+  'XDG_BIN_HOME',
+  'UV_CACHE_DIR',
+  'UV_TOOL_DIR',
+  'UV_TOOL_BIN_DIR',
+  'UV_PYTHON_INSTALL_DIR',
+  'UV_INSTALL_DIR',
+  'PLAYWRIGHT_BROWSERS_PATH',
+  'PIP_CACHE_DIR',
+  'NPM_CONFIG_CACHE',
+]);
+
+const PATH_OPS = { '+=': 'append', '^=': 'prepend', '-=': 'remove' };
+const PLACEHOLDER_RE = /^\$\{(PROJECT_ROOT|TRIAL_DIR)\}/;
+// biome-ignore lint/suspicious/noTemplateCurlyInString: the scenario placeholder, not a JS template
+const TRIAL_DIR_PREFIX = '${TRIAL_DIR}/';
 
 const isForwarded = (name) => FORWARDED.has(name) || name.startsWith('LC_');
 
@@ -126,6 +149,145 @@ function readLink(link) {
 }
 
 /**
+ * The declarations in a `## Environment` section: its lines, minus blanks and
+ * `#` comments.
+ * @param {string[]} [sectionLines] - The section's raw lines
+ * @returns {Array<{ text: string, offset: number }>} offset is the 0-based line
+ *   within the section
+ */
+function environmentLines(sectionLines = []) {
+  return sectionLines
+    .map((line, offset) => ({ text: line.trim(), offset }))
+    .filter(({ text }) => text && !text.startsWith('#'));
+}
+
+/**
+ * Why a declared path is not acceptable, or undefined when it is. A path is one
+ * directory, absolute once expanded: it starts with `/` or with one of the two
+ * placeholders, and never climbs with `..`.
+ * @param {string} value - The declared value, placeholders unexpanded
+ * @returns {string|undefined} Reason
+ */
+function pathProblem(value) {
+  if (!value) return 'has no value';
+  if (/[\s:]/.test(value)) return 'takes one directory, with no whitespace and no ":"';
+  const rest = value.replace(PLACEHOLDER_RE, '');
+  if (/[$~]/.test(rest)) {
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the scenario placeholders, not a JS template
+    return 'expands only a leading ${PROJECT_ROOT} or ${TRIAL_DIR}; no other variable and no "~"';
+  }
+  if (rest === value && !value.startsWith('/')) return 'must be an absolute path';
+  if (rest !== value && rest && !rest.startsWith('/')) return 'needs a "/" after the placeholder';
+  if (rest.split('/').includes('..')) return 'must not contain a ".." segment';
+  return undefined;
+}
+
+/**
+ * Parse one declaration.
+ *
+ *   PATH+=<dir>   append a directory        PATH^=<dir>   prepend one
+ *   PATH-=<dir>   remove one                <VAR>=<dir>   point a cache variable
+ *                                                         inside the trial
+ * @param {string} text - One trimmed, non-comment line
+ * @returns {{ directive?: { name: string, op: string, value: string }, error?: string }}
+ */
+function parseEnvironmentLine(text) {
+  const match = text.match(/^([A-Za-z_][A-Za-z0-9_]*)(\+=|\^=|-=|=)(.*)$/);
+  if (!match) return { error: 'expected PATH+=<dir>, PATH^=<dir>, PATH-=<dir> or <VAR>=<dir>' };
+  const [, name, operator, value] = match;
+  if (name === 'PATH') {
+    if (operator === '=') {
+      return { error: 'PATH cannot be replaced; use PATH+= (append), PATH^= (prepend) or PATH-=' };
+    }
+    const problem = pathProblem(value);
+    return problem
+      ? { error: `PATH${operator} ${problem}` }
+      : { directive: { name, op: PATH_OPS[operator], value } };
+  }
+  if (!TRIAL_DIR_VARS.has(name)) {
+    return {
+      error: `${name} is not a variable a scenario may declare (PATH, ${[...TRIAL_DIR_VARS].join(', ')})`,
+    };
+  }
+  if (operator !== '=') return { error: `${name} takes "=", not "${operator}"` };
+  const problem =
+    pathProblem(value) ||
+    (value.startsWith(TRIAL_DIR_PREFIX) && value.length > TRIAL_DIR_PREFIX.length
+      ? undefined
+      : `must point inside the trial: start it with ${TRIAL_DIR_PREFIX}`);
+  return problem ? { error: `${name} ${problem}` } : { directive: { name, op: 'set', value } };
+}
+
+/**
+ * Parse a scenario's declarations, collecting every problem.
+ * @param {string[]} [declarations] - Lines as environmentLines() returns their text
+ * @returns {{ directives: Object[], errors: Array<{ index: number, message: string }> }}
+ */
+function parseEnvironment(declarations = []) {
+  const directives = [];
+  const errors = [];
+  const set = new Set();
+  declarations.forEach((text, index) => {
+    const { directive, error } = parseEnvironmentLine(text);
+    const repeated = directive?.op === 'set' && set.has(directive.name);
+    if (error || repeated) {
+      errors.push({ index, message: error || `${directive.name} is declared twice` });
+    } else {
+      if (directive.op === 'set') set.add(directive.name);
+      directives.push(directive);
+    }
+  });
+  return { directives, errors };
+}
+
+/**
+ * A scenario's directives, or a refusal naming every bad line. Trials call this
+ * before they create anything, so a bad declaration costs no fixture.
+ * @param {EvalScenario} [scenario]
+ * @returns {Object[]} Directives, in declared order
+ */
+function declaredEnvironment(scenario = {}) {
+  const declarations = scenario.environment || [];
+  const { directives, errors } = parseEnvironment(declarations);
+  if (errors.length > 0) {
+    const detail = errors.map((e) => `"${declarations[e.index]}": ${e.message}`).join('; ');
+    throw new Error(`Scenario ${scenario.name || ''} has a bad ## Environment line: ${detail}`);
+  }
+  return directives;
+}
+
+const withoutTrailingSlash = (dir) => (dir.length > 1 ? dir.replace(/\/+$/, '') : dir);
+
+/**
+ * Apply a scenario's directives to an environment, in declared order.
+ * @param {Object} trialEnvironment - Environment to change (the caller's own copy)
+ * @param {Object[]} directives - From declaredEnvironment()
+ * @param {{ projectRoot: string, trialDir: string }} roots - Placeholder values
+ */
+function applyDirectives(trialEnvironment, directives, { projectRoot, trialDir }) {
+  const expand = (value) =>
+    withoutTrailingSlash(
+      value.replace(PLACEHOLDER_RE, (_m, name) =>
+        name === 'TRIAL_DIR' ? trialDir : path.resolve(projectRoot),
+      ),
+    );
+  let entries = String(trialEnvironment.PATH || '')
+    .split(path.delimiter)
+    .filter(Boolean);
+  for (const { name, op, value } of directives) {
+    const dir = expand(value);
+    if (op === 'set') {
+      trialEnvironment[name] = dir;
+      continue;
+    }
+    entries = entries.filter((entry) => withoutTrailingSlash(entry) !== dir);
+    if (op === 'append') entries.push(dir);
+    if (op === 'prepend') entries.unshift(dir);
+  }
+  trialEnvironment.PATH = entries.join(path.delimiter);
+}
+
+/**
  * Build the environment one trial runs in. Setup gets the same object.
  *
  * Contained (isolated or plugin-dir): the allowlist above, and a PATH of the
@@ -134,9 +296,12 @@ function readLink(link) {
  * own toolkit and its MCP servers start from the operator's PATH. Either way
  * the arcforge data home points into the trial, so the trial's SessionStart
  * hook reads the Setup-written fixture and never the real ~/.arcforge; HOME is
- * kept so `claude` still resolves its auth.
+ * kept so `claude` still resolves its auth. The scenario's `## Environment`
+ * directives are applied last, the same for every arm.
  * @param {string} trialDir - Trial directory
- * @param {EvalScenario} [_scenario] - The scenario the trial runs
+ * @param {EvalScenario} [scenario] - The scenario the trial runs; its
+ *   `environment` lines are the only part read
+ * @throws {Error} when a `## Environment` line is not valid
  * @param {Object} [opts]
  * @param {string} [opts.projectRoot] - Project root; the shim directory lives
  *   under its .eval-trials/ (defaults to the working directory)
@@ -144,8 +309,9 @@ function readLink(link) {
  * @param {Object} [opts.parentEnv] - Environment to build from (injectable for tests)
  * @returns {Object} Environment for the trial's subprocesses
  */
-function trialEnv(trialDir, _scenario = {}, opts = {}) {
+function trialEnv(trialDir, scenario = {}, opts = {}) {
   const { projectRoot = process.cwd(), contained = true, parentEnv = process.env } = opts;
+  const directives = declaredEnvironment(scenario);
   const trialEnvironment = contained ? {} : { ...parentEnv };
   if (contained) {
     for (const name of Object.keys(parentEnv)) {
@@ -157,12 +323,18 @@ function trialEnv(trialDir, _scenario = {}, opts = {}) {
     );
   }
   trialEnvironment.ARCFORGE_HOME = path.join(trialDir, '.arcforge');
+  if (directives.length > 0)
+    applyDirectives(trialEnvironment, directives, { projectRoot, trialDir });
   return trialEnvironment;
 }
 
 module.exports = {
   SYSTEM_PATH,
+  TRIAL_DIR_VARS,
   resolveOnPath,
   ensureToolShims,
+  environmentLines,
+  parseEnvironment,
+  declaredEnvironment,
   trialEnv,
 };

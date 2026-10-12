@@ -24,7 +24,7 @@ const {
   writeIsolationSettings,
   buildIsolationSettings,
 } = require('./eval-trial-env');
-const { trialEnv } = require('./eval-trial-environment');
+const { declaredEnvironment, trialEnv } = require('./eval-trial-environment');
 const { parseStreamJsonOutput, parseActionsFromTranscript } = require('./eval-transcript');
 const { isTrialKilled, isOutputComplete, isProviderRefusal } = require('./eval-trial-outcome');
 const { watchForWrites } = require('./eval-trial-guard');
@@ -98,6 +98,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   // Resolved before anything else so a bad override is refused ahead of the
   // fixture Setup and the session (B-10), and recorded on every row it produces.
   const trialTimeoutMs = resolveTrialTimeoutMs();
+  declaredEnvironment(scenario); // a bad ## Environment line is refused the same way
   const timestamp = getTimestamp();
 
   const buildInfraError = (error, errorType, extra = {}) => {
@@ -134,7 +135,9 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   // The run conditions every row records, which readers pool by (B-8). Model and
   // effort are the flag when one was passed; else Claude Code's default for a
   // contained trial (it does not read the user settings file), or whatever that
-  // file sets for one that does.
+  // file sets for one that does. The scenario's ## Environment declaration is
+  // recorded beside them as written; it is not a pooling condition, since a
+  // scenario that changes it bumps its ## Version.
   function ranWith() {
     const unset = isolated || pluginDir ? 'default' : 'user-settings';
     return {
@@ -143,6 +146,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
       maxTurns: resolvedMaxTurns ?? null,
       pluginDir: Boolean(pluginDir),
       isolation: pluginDir ? 'plugin-dir' : isolated ? 'isolated' : 'toolkit',
+      environment: scenario.environment || [],
     };
   }
 

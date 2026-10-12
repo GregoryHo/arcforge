@@ -306,3 +306,66 @@ describe('lintScenario - diagnostic format', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 });
+
+describe('lintScenario: ## Environment', () => {
+  let dir;
+
+  beforeEach(() => {
+    dir = makeTempDir();
+  });
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  const withEnvironment = (lines) =>
+    `${WELL_FORMED}\n## Environment\n${lines.join('\n')}\n\n## Design Notes\nPATH=ignored here\n`;
+  const environmentHeading = (content) => content.split('\n').indexOf('## Environment') + 1;
+
+  it('accepts valid declarations, comments and blank lines', () => {
+    const file = writeScenario(
+      dir,
+      'env-ok',
+      withEnvironment([
+        '# the tool under test',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: scenario placeholder, not a JS template
+        'PATH+=${PROJECT_ROOT}/bin',
+        '',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: scenario placeholder, not a JS template
+        'PATH^=${TRIAL_DIR}/fakebin',
+        'PATH-=/usr/sbin',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: scenario placeholder, not a JS template
+        'UV_CACHE_DIR=${TRIAL_DIR}/.cache/uv',
+      ]),
+    );
+    expect(lintScenario(file)).toEqual([]);
+  });
+
+  it('reports each bad declaration at its own line', () => {
+    const content = withEnvironment([
+      'PATH=/usr/local/bin',
+      '# fine',
+      'HOME=/tmp/elsewhere',
+      'UV_CACHE_DIR=/var/cache/uv',
+    ]);
+    const file = writeScenario(dir, 'env-bad', content);
+    const heading = environmentHeading(content);
+    const diagnostics = lintScenario(file);
+    expect(diagnostics.map((d) => d.line)).toEqual([heading + 1, heading + 3, heading + 4]);
+    expect(diagnostics[0].message).toMatch(/## Environment line \d+: PATH cannot be replaced/);
+    expect(diagnostics[1].message).toMatch(/HOME is not a variable a scenario may declare/);
+    expect(diagnostics[2].message).toMatch(/UV_CACHE_DIR must point inside the trial/);
+  });
+
+  it('reports a fenced block, which the trial would refuse line by line', () => {
+    const file = writeScenario(
+      dir,
+      'env-fenced',
+      withEnvironment(['```', 'PATH-=/usr/sbin', '```']),
+    );
+    expect(lintScenario(file).map((d) => d.message)).toEqual([
+      expect.stringMatching(/expected PATH\+=<dir>/),
+      expect.stringMatching(/expected PATH\+=<dir>/),
+    ]);
+  });
+});

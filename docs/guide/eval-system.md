@@ -153,7 +153,9 @@ rebuilt: first `.eval-trials/.bin`, which holds links to `claude`, to the `node`
 running arcforge and to the `npm` and `npx` beside that `node`, then
 `/usr/bin:/bin:/usr/sbin:/sbin`. A tool you installed anywhere else (Homebrew,
 `~/.local/bin`, a version manager) is not found, even when it shares a
-directory with `claude`. Only these variables are forwarded:
+directory with `claude`, unless the scenario declares it (see
+[Declaring a trial's environment](#declaring-a-trials-environment)). Only these
+variables are forwarded:
 
 | Group | Variables |
 |-------|-----------|
@@ -359,6 +361,7 @@ A scenario is one markdown file in `evals/scenarios/`. Sections the parser reads
 | `## Context` | Situation description — **sent to the agent** |
 | `## Scenario` | The task itself — **sent to the agent** |
 | `## Setup` | Shell that builds the fixture repository before each trial |
+| `## Environment` | Changes to the trial's `PATH` and cache directories, applied to every arm and to Setup — see [Declaring a trial's environment](#declaring-a-trials-environment) |
 | `## Assertions` | What counts as success |
 | `## Grader` | `code` (your own script), `model` (a model reads the transcript), or `mixed` (both) |
 | `## Grader Config` | The grader command for `code`, guidance for `model`, or a note on why neither is needed |
@@ -376,6 +379,58 @@ machinery, which means you can write freely in the other sections — including 
 intent into the trial and teaching the agent the answer.
 
 `## Context`, `## Grader Config`, and `## Assertions` are required.
+
+## Declaring a trial's environment
+
+A contained trial starts from the rebuilt environment described under
+[Step 3](#step-3--ab): a `PATH` of `claude`, `node`, `npm`, `npx` and the system
+directories. A scenario that needs something else says so in `## Environment`,
+one declaration per line:
+
+```
+## Environment
+# arcforge is the tool under test
+PATH+=${PROJECT_ROOT}/bin
+PATH^=${TRIAL_DIR}/fakebin
+PATH-=/usr/sbin
+UV_CACHE_DIR=${TRIAL_DIR}/.cache/uv
+```
+
+| Declaration | Effect |
+|-------------|--------|
+| `PATH+=<dir>` | Append `<dir>` to the trial's `PATH` |
+| `PATH^=<dir>` | Prepend `<dir>`, so what it holds shadows everything after it |
+| `PATH-=<dir>` | Remove `<dir>`; a directory that is not on the `PATH` is ignored |
+| `<VAR>=<dir>` | Point a cache variable at a directory inside the trial |
+
+Declarations apply in the order written. Blank lines and lines starting with
+`#` are ignored. The rules, which `eval lint` checks and a trial refuses to
+start without:
+
+- **`<dir>` is one absolute directory.** It starts with `/`, `${PROJECT_ROOT}`
+  or `${TRIAL_DIR}`. Those two placeholders are the only expansion, and only at
+  the start: no `$HOME`, no `~`, no other variable. No whitespace, no `:` (one
+  directory per line) and no `..` segment. A literal absolute path such as
+  `/opt/homebrew/bin` is allowed, and ties the scenario to hosts that have it.
+- **`PATH` is changed, never replaced.** `PATH=<dir>` is an error, so `claude`
+  and `node` always resolve.
+- **`<VAR>` is one of** `XDG_CACHE_HOME`, `XDG_DATA_HOME`, `XDG_BIN_HOME`,
+  `UV_CACHE_DIR`, `UV_TOOL_DIR`, `UV_TOOL_BIN_DIR`, `UV_PYTHON_INSTALL_DIR`,
+  `UV_INSTALL_DIR`, `PLAYWRIGHT_BROWSERS_PATH`, `PIP_CACHE_DIR` or
+  `NPM_CONFIG_CACHE`, **and its value starts with `${TRIAL_DIR}/`**. That is
+  what keeps an install the agent performs inside the trial: the next trial
+  starts without it, and your own caches are untouched. Each may be declared
+  once. No other variable can be declared, `HOME` included.
+
+`${TRIAL_DIR}` is each trial's own directory, so `PATH^=${TRIAL_DIR}/fakebin`
+names a different directory in every trial; have `## Setup` fill it. Under
+`--no-isolate` the same declarations are applied on top of your own environment.
+
+Both arms of a comparison and their Setup get the identical declarations: the
+arms still differ only by the injection. Every result row records them as
+written in its `environment` field (`[]` when the scenario declares none). They
+are not a pooling condition, so bump `## Version` when you add or change the
+section: the trials before the edit ran somewhere else.
 
 ## Assertions
 

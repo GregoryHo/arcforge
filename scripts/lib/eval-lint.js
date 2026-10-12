@@ -11,6 +11,7 @@
 
 const fs = require('node:fs');
 const { parseScenario, reservedNameError } = require('./eval-scenario');
+const { environmentLines, parseEnvironment } = require('./eval-trial-environment');
 
 /**
  * Required section headings (## level) that every scenario file must have.
@@ -35,15 +36,19 @@ const ASSERTION_ID_RE = /^(A\d+\s*[:–-]|\[tool_\w+\])/;
  * Parse a markdown file into lines and collect:
  *   - sections: Map<lowerName, { startLine: number }>
  *   - assertionLines: Array<{ text: string, line: number }>  (inside ## Assertions)
+ *   - environmentLines: Array<{ text: string, line: number }>  (inside ## Environment)
  *
  * @param {string} content - File content
- * @returns {{ sections: Map<string, { startLine: number }>, assertionLines: Array<{ text: string, line: number }> }}
+ * @returns {{ sections: Map<string, { startLine: number }>, assertionLines: Array<{ text: string, line: number }>, environmentLines: Array<{ text: string, line: number }> }}
  */
 function parseScenarioStructure(content) {
   const lines = content.split('\n');
   const sections = new Map();
   const assertionLines = [];
+  const environmentSection = [];
+  let environmentStart = 0;
   let inAssertions = false;
+  let inEnvironment = false;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -55,8 +60,15 @@ function parseScenarioStructure(content) {
       const nameLower = name.toLowerCase();
       sections.set(nameLower, { startLine: lineNumber });
       inAssertions = nameLower === 'assertions';
+      inEnvironment = nameLower === 'environment';
+      if (inEnvironment) {
+        environmentSection.length = 0; // a repeated heading replaces, as the parser does
+        environmentStart = lineNumber + 1;
+      }
       continue;
     }
+
+    if (inEnvironment) environmentSection.push(line);
 
     if (inAssertions) {
       // Capture assertion bullets: - [ ] ... or - [x] ... or - [tool_*] ...
@@ -74,7 +86,14 @@ function parseScenarioStructure(content) {
     }
   }
 
-  return { sections, assertionLines };
+  return {
+    sections,
+    assertionLines,
+    environmentLines: environmentLines(environmentSection).map(({ text, offset }) => ({
+      text,
+      line: environmentStart + offset,
+    })),
+  };
 }
 
 /**
@@ -86,13 +105,14 @@ function parseScenarioStructure(content) {
  * 2. ## Assertions section contains at least one entry.
  * 3. Each assertion entry has an ID prefix (A1:, [tool_called], etc.) and non-blank text.
  * 4. The scenario name does not end in a reserved condition suffix.
+ * 5. Each ## Environment line is a declaration the trial will accept.
  *
  * @param {string} filePath - Absolute path to scenario .md file
  * @returns {Array<{ file: string, line: number, message: string }>} Diagnostics
  */
 function lintScenario(filePath) {
   const content = fs.readFileSync(filePath, 'utf8');
-  const { sections, assertionLines } = parseScenarioStructure(content);
+  const { sections, assertionLines, environmentLines: declared } = parseScenarioStructure(content);
 
   const diagnostics = [];
 
@@ -145,6 +165,15 @@ function lintScenario(filePath) {
         }
       }
     }
+  }
+
+  // Check 4: ## Environment declarations — the trial refuses what this reports
+  for (const { index, message } of parseEnvironment(declared.map((d) => d.text)).errors) {
+    diagnostics.push({
+      file: filePath,
+      line: declared[index].line,
+      message: `## Environment line ${declared[index].line}: ${message}`,
+    });
   }
 
   return diagnostics;
