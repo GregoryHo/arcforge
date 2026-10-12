@@ -24,6 +24,7 @@ const {
   findScenario,
 } = require('./eval-scenario');
 const {
+  repoCommit,
   createTrialDir,
   cleanupTrialDir,
   runSetup,
@@ -84,6 +85,10 @@ const { splitPools } = require('./eval-pools');
  * @property {number|null} [maxTurns] - Turn budget the trial ran under (null: none)
  * @property {boolean} [pluginDir] - Whether a plugin dir was loaded into the trial
  * @property {string} [isolation] - 'isolated' | 'plugin-dir' | 'toolkit' (--no-isolate)
+ * @property {string} [version] - Scenario `## Version` the trial ran under
+ * @property {string} [scenario_hash] - Hash of the scenario file the trial ran from; absent on rows written before 6.5.0
+ * @property {string} [node_version] - Node.js version of the engine that ran the trial; absent on rows written before 6.5.0
+ * @property {string|null} [repo_commit] - Commit of the checkout the trial ran from (null: not a git repository, or git unavailable); absent on rows written before 6.5.0
  * @property {number[]} [assertionScores] - Per-assertion scores (0.0-1.0)
  * @property {string[]} [evidence] - Per-assertion evidence notes from grader
  * @property {number[][]} [blockRefs] - Per-assertion transcript block references (1-indexed)
@@ -93,6 +98,27 @@ const { splitPools } = require('./eval-pools');
 const EVALS_DIR = 'evals';
 const RESULTS_DIR = path.join(EVALS_DIR, 'results');
 const BENCHMARKS_DIR = path.join(EVALS_DIR, 'benchmarks');
+
+/**
+ * Stamp a row with what it ran from: the scenario's version and file hash, the
+ * Node.js version of the engine and the commit of the checkout. Every row
+ * carries them, infraError rows too, or a version-scoped read drops them and
+ * error_trials undercounts (B-8). The hash, Node version and commit are a
+ * record, not run conditions: no reader pools or filters by them.
+ * @param {TrialResult} row - Row from runTrial or a grader
+ * @param {EvalScenario} scenario - The scenario as parsed for this run
+ * @param {string} projectRoot - The checkout the trial ran from
+ * @returns {TrialResult} A stamped copy
+ */
+function stampRow(row, scenario, projectRoot) {
+  return {
+    ...row,
+    ...(scenario.version ? { version: scenario.version } : {}),
+    ...(scenario.scenarioHash ? { scenario_hash: scenario.scenarioHash } : {}),
+    node_version: process.version,
+    repo_commit: repoCommit(projectRoot),
+  };
+}
 
 /**
  * Execute a single trial: run → grade → append → callback → cleanup.
@@ -130,13 +156,14 @@ function executeAndGradeTrial(trialScenario, gradeScenario, trialNumber, k, opts
     maxTurns,
     watchRoots,
   });
-  // Every row carries the scenario version — infraError rows too, or a
-  // version-scoped read drops them and error_trials undercounts (B-8).
-  const stamp = (row) => (gradeScenario.version ? { ...row, version: gradeScenario.version } : row);
   try {
-    const recorded = result.infraError
-      ? stamp(result)
-      : stamp(graders.gradeTrialResult(result, gradeScenario, projectRoot, result.actions));
+    const recorded = stampRow(
+      result.infraError
+        ? result
+        : graders.gradeTrialResult(result, gradeScenario, projectRoot, result.actions),
+      gradeScenario,
+      projectRoot,
+    );
     appendResult(recorded, projectRoot);
     if (onTrialComplete) onTrialComplete(label, trialNumber, recorded);
     return recorded;
@@ -479,6 +506,8 @@ module.exports = {
   buildTrialPrompt,
   resolveTrialTimeoutMs,
   DEFAULT_TRIAL_TIMEOUT_MS,
+  stampRow,
+  repoCommit,
   executeAndGradeTrial,
   runSkillEval,
   runWorkflowEval,

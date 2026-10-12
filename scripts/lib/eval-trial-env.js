@@ -11,6 +11,7 @@
  * Zero external dependencies — Node.js standard library only.
  */
 
+const childProcess = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -160,7 +161,39 @@ function buildIsolationSettings({ forPluginDir = false } = {}) {
   }
 }
 
+/** One answer per checkout for the life of the process, which is one run. */
+const repoCommits = new Map();
+
+/**
+ * The commit the checkout at `projectRoot` is on, read once per run so every
+ * row of a run names the same commit even if HEAD moves while it runs.
+ * @param {string} projectRoot - Project root directory
+ * @returns {string|null} Full commit hash; null when the directory is not in a
+ *   git repository or git is unavailable
+ */
+function repoCommit(projectRoot) {
+  const root = path.resolve(projectRoot);
+  if (!repoCommits.has(root)) {
+    let commit = '';
+    try {
+      commit = childProcess
+        .execFileSync('git', ['rev-parse', 'HEAD'], {
+          cwd: root,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'ignore'],
+          timeout: 10000,
+        })
+        .trim();
+    } catch {
+      // Not a repository, no commit yet, or no git: the row records null.
+    }
+    repoCommits.set(root, /^[0-9a-f]{40,64}$/.test(commit) ? commit : null);
+  }
+  return repoCommits.get(root);
+}
+
 module.exports = {
+  repoCommit,
   createTrialDir,
   cleanupTrialDir,
   runSetup,

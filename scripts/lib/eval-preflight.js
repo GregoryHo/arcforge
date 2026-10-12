@@ -9,11 +9,19 @@
  * Zero external dependencies — Node.js standard library only.
  */
 
-const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { listScenarios, parseScenario } = require('./eval');
+const {
+  listScenarios,
+  parseScenario,
+  appendResult,
+  stampRow,
+  repoCommit,
+  gradeTrialResult,
+  cleanupTrialDir,
+} = require('./eval');
+const { computeScenarioHash } = require('./eval-scenario');
 const { stopIfTrialWroteRepo, DEFAULT_TRIAL_TIMEOUT_MS } = require('./eval-trial');
 
 /** Directory where preflight JSON files are stored */
@@ -26,6 +34,13 @@ const CEILING_THRESHOLD = 0.8;
 const PREFLIGHT_K = 3;
 
 /**
+ * The label preflight trials run and are recorded under. Their rows land in
+ * `<runId>/preflight.jsonl`, a file no baseline, treatment or `eval run` reader
+ * opens, so a preflight trial is on record without ever joining an A/B pool.
+ */
+const PREFLIGHT_LABEL = 'preflight';
+
+/**
  * Return true only for an explicit scenario-level `## Preflight\nskip` policy.
  * Missing/unknown values keep the existing fail-closed A/B preflight gate.
  * @param {Object|null|undefined} scenario - Parsed eval scenario
@@ -33,16 +48,6 @@ const PREFLIGHT_K = 3;
  */
 function shouldSkipPreflightGate(scenario) {
   return String(scenario?.preflight || '').toLowerCase() === 'skip';
-}
-
-/**
- * Compute a stable scenario hash from file contents.
- * Returns the first 16 hex characters of the SHA-256 digest.
- * @param {string} contents - Raw scenario file contents
- * @returns {string} 16-char lowercase hex prefix
- */
-function computeScenarioHash(contents) {
-  return crypto.createHash('sha256').update(contents).digest('hex').slice(0, 16);
 }
 
 /**
@@ -117,7 +122,8 @@ function resolveScenarioFile(name, projectRoot) {
  * Run a preflight for a named scenario.
  *
  * Executes PREFLIGHT_K baseline trials (no skill injection) and computes the
- * pass rate. Writes evals/preflight/<hash>.json with the result.
+ * pass rate. Writes evals/preflight/<hash>.json with the result, and one result
+ * row per trial to evals/results/<scenario>/<runId>/preflight.jsonl.
  *
  * Verdicts:
  *   PASS  — pass_rate < CEILING_THRESHOLD (scenario is discriminative)
@@ -134,31 +140,69 @@ function resolveScenarioFile(name, projectRoot) {
  * @param {string} [opts.model] - Model identifier; included in cache key so
  *   per-model preflight records stay distinct (baseline pass rate is
  *   model-dependent). Pass the same value the trials were actually run with.
- * @returns {{ scenario_hash: string, scenario_name: string, model: string|null, pass_rate: number|null, k: number, verdict: 'PASS'|'BLOCK', reason: string, timestamp: string }}
+ * @param {Object} [opts.scenario] - The scenario as the caller parsed it to
+ *   build the trials. Pass it so one read of the file stamps the trials, the
+ *   rows and the record; without it the scenario is resolved and parsed here.
+ * @returns {{ scenario_hash: string, scenario_name: string, model: string|null, max_turns: number|null, plugin_dir: boolean, effort: string|null, trial_timeout_ms: number, node_version: string, repo_commit: string|null, pass_rate: number|null, k: number, errored?: number, verdict: 'PASS'|'BLOCK', reason: string, timestamp: string }}
  */
 function runPreflight(name, projectRoot, opts = {}) {
   const { runTrial, gradeResult, model, conditions = {} } = opts;
 
-  const filePath = resolveScenarioFile(name, projectRoot);
-  if (!filePath) {
-    throw new Error(`Scenario "${name}" not found in evals/scenarios/`);
+  let scenario = opts.scenario;
+  if (!scenario) {
+    const filePath = resolveScenarioFile(name, projectRoot);
+    if (!filePath) {
+      throw new Error(`Scenario "${name}" not found in evals/scenarios/`);
+    }
+    scenario = parseScenario(filePath, projectRoot);
   }
-
-  const contents = fs.readFileSync(filePath, 'utf8');
-  const hash = computeScenarioHash(contents);
+  // The hash of the text the trials were built from: the record is filed
+  // under it and every row carries it (stampRow), from the one parse.
+  const hash = scenario.scenarioHash;
+  if (!hash) {
+    throw new Error(
+      `runPreflight: the scenario passed for "${name}" has no scenarioHash; pass the object parseScenario returned`,
+    );
+  }
   const cacheFile = preflightFilename(hash, model, conditions);
   const ranUnder = {
     max_turns: conditions.maxTurns ?? null,
     plugin_dir: Boolean(conditions.pluginDir),
     effort: conditions.effort || null,
     trial_timeout_ms: conditions.trialTimeoutMs || DEFAULT_TRIAL_TIMEOUT_MS,
+    // Recorded, not keyed on: a Node upgrade or a new commit does not
+    // invalidate a record.
+    node_version: process.version,
+    repo_commit: repoCommit(projectRoot),
+  };
+  // Write the record under the cache key and return it.
+  const writeRecord = (outcome) => {
+    const record = {
+      scenario_hash: hash,
+      scenario_name: name,
+      model: model || null,
+      ...ranUnder,
+      k: PREFLIGHT_K,
+      ...outcome,
+      timestamp: new Date().toISOString(),
+    };
+    const preflightDir = path.join(projectRoot, PREFLIGHT_DIR);
+    fs.mkdirSync(preflightDir, { recursive: true });
+    fs.writeFileSync(path.join(preflightDir, cacheFile), JSON.stringify(record, null, 2));
+    return record;
   };
 
+  // Rows are labelled here, whatever the injected runner called them: a
+  // preflight trial must not be able to land in another condition's file.
+  const evalName = `${scenario.name}-${PREFLIGHT_LABEL}`;
   const results = [];
   for (let t = 1; t <= PREFLIGHT_K; t++) {
     const raw = runTrial(t, PREFLIGHT_K);
-    stopIfTrialWroteRepo(raw, `preflight trial ${t}`);
     const graded = gradeResult(raw, t);
+    appendResult(stampRow({ ...graded, eval: evalName }, scenario, projectRoot), projectRoot);
+    // Recorded first, as an A/B arm does, so the row of the trial that stops
+    // the run is kept.
+    stopIfTrialWroteRepo(graded, `preflight trial ${t}`);
     results.push(graded);
   }
 
@@ -175,22 +219,7 @@ function runPreflight(name, projectRoot, opts = {}) {
       `${errored.length}/${results.length} preflight trials errored ` +
       `(infraError or gradeError) — no discriminability signal. ` +
       `Fix the trial environment or grader before re-running preflight.`;
-    const record = {
-      scenario_hash: hash,
-      scenario_name: name,
-      model: model || null,
-      ...ranUnder,
-      pass_rate: null,
-      k: PREFLIGHT_K,
-      errored: errored.length,
-      verdict,
-      reason,
-      timestamp: new Date().toISOString(),
-    };
-    const preflightDir = path.join(projectRoot, PREFLIGHT_DIR);
-    fs.mkdirSync(preflightDir, { recursive: true });
-    fs.writeFileSync(path.join(preflightDir, cacheFile), JSON.stringify(record, null, 2));
-    return record;
+    return writeRecord({ pass_rate: null, errored: errored.length, verdict, reason });
   }
 
   const passed = results.filter((r) => r.passed).length;
@@ -202,23 +231,25 @@ function runPreflight(name, projectRoot, opts = {}) {
       ? `Baseline pass rate ${(pass_rate * 100).toFixed(0)}% >= ${CEILING_THRESHOLD * 100}% ceiling — scenario is not discriminative. Redesign the scenario to be harder.`
       : `Baseline pass rate ${(pass_rate * 100).toFixed(0)}% < ${CEILING_THRESHOLD * 100}% — scenario is discriminative. Proceed with arcforge eval ab.`;
 
-  const record = {
-    scenario_hash: hash,
-    scenario_name: name,
-    model: model || null,
-    ...ranUnder,
-    pass_rate,
-    k: PREFLIGHT_K,
-    verdict,
-    reason,
-    timestamp: new Date().toISOString(),
-  };
+  return writeRecord({ pass_rate, verdict, reason });
+}
 
-  const preflightDir = path.join(projectRoot, PREFLIGHT_DIR);
-  fs.mkdirSync(preflightDir, { recursive: true });
-  fs.writeFileSync(path.join(preflightDir, cacheFile), JSON.stringify(record, null, 2));
-
-  return record;
+/**
+ * Grade one preflight trial and remove its directory. An infra error is
+ * returned as it is: there is no agent turn to grade, and grading a refusal
+ * would spawn a grader session while the account is limited.
+ * @param {Object} result - Row from runTrial
+ * @param {Object} scenario - Parsed eval scenario
+ * @param {string} projectRoot - Project root directory
+ * @returns {Object} Graded row
+ */
+function gradePreflightTrial(result, scenario, projectRoot) {
+  try {
+    if (result.infraError) return result;
+    return gradeTrialResult(result, scenario, projectRoot, result.actions);
+  } finally {
+    cleanupTrialDir(result.trialDir);
+  }
 }
 
 /**
@@ -353,9 +384,11 @@ module.exports = {
   // pattern.
   resolveScenarioFile,
   runPreflight,
+  gradePreflightTrial,
   checkPreflightGate,
   shouldSkipPreflightGate,
   PREFLIGHT_DIR,
   CEILING_THRESHOLD,
   PREFLIGHT_K,
+  PREFLIGHT_LABEL,
 };

@@ -11,6 +11,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { sanitizeFilename } = require('./utils');
 const { round2 } = require('./eval-stats');
+const { CONDITION_SUFFIX } = require('./eval-scenario');
 
 // Mirror of eval.js constants to avoid circular imports
 const GRADING_RESULTS_DIR = path.join('evals', 'results');
@@ -256,7 +257,7 @@ function getGradingPath(result, projectRoot) {
   // same scenario directory as the run JSONL. Diverging here (e.g. via an
   // ad-hoc /[^a-zA-Z0-9-]/ replacement) splits grading artifacts from
   // their run for any scenario containing characters like `_`.
-  const stripped = evalName.replace(/-(baseline|treatment)$/, '');
+  const stripped = evalName.replace(CONDITION_SUFFIX, '');
   const scenarioName = stripped ? sanitizeFilename(stripped) : '';
   const runId =
     result.runId ||

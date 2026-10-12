@@ -11,6 +11,7 @@
  * Zero external dependencies — Node.js standard library only.
  */
 
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { getTimestamp, sanitizeFilename } = require('./utils');
@@ -78,16 +79,36 @@ function compactDate(isoTimestamp) {
 }
 
 /**
+ * The condition suffixes an eval name may carry. Each names its own JSONL file
+ * in a run directory, so rows under one are never read as another's: a reader
+ * of `<name>-baseline` opens baseline.jsonl and nothing else.
+ */
+const CONDITION_SUFFIX = /-(baseline|treatment|preflight)$/;
+
+/**
+ * Why a scenario may not be called `name`, or null when it may. A name that
+ * ends in a condition suffix is reserved: `release-preflight` run on its own
+ * would be filed as the preflight condition of a scenario called `release`,
+ * away from its own directory and unseen by its own readers.
+ * @param {string} name - Scenario name
+ * @returns {string|null}
+ */
+function reservedNameError(name) {
+  const match = String(name).match(CONDITION_SUFFIX);
+  if (!match) return null;
+  return `Scenario name "${name}" ends in the reserved suffix "-${match[1]}": its results would be filed as the ${match[1]} condition of "${name.replace(CONDITION_SUFFIX, '')}". Rename the scenario (-baseline, -treatment and -preflight are reserved).`;
+}
+
+/**
  * Parse an eval name into scenario name and condition.
  * Used by appendResult, saveTranscript, and loadResults to derive storage paths.
- * @param {string} evalName - Eval name (may include -baseline or -treatment suffix)
+ * @param {string} evalName - Eval name (may include a -baseline, -treatment or -preflight suffix)
  * @returns {{ scenarioName: string, condition: string }}
  */
 function parseEvalName(evalName) {
-  const isBaseline = evalName.endsWith('-baseline');
-  const isTreatment = evalName.endsWith('-treatment');
-  const condition = isBaseline ? 'baseline' : isTreatment ? 'treatment' : 'results';
-  const scenarioName = sanitizeFilename(evalName.replace(/-(baseline|treatment)$/, ''));
+  const match = evalName.match(CONDITION_SUFFIX);
+  const condition = match ? match[1] : 'results';
+  const scenarioName = sanitizeFilename(evalName.replace(CONDITION_SUFFIX, ''));
   return { scenarioName, condition };
 }
 
@@ -104,6 +125,16 @@ function resolveMaxTurns(opts = {}) {
   if (opts.scenarioMaxTurns != null) return opts.scenarioMaxTurns;
   if (opts.pluginDir) return 10;
   return undefined;
+}
+
+/**
+ * Compute a stable scenario hash from file contents.
+ * Returns the first 16 hex characters of the SHA-256 digest.
+ * @param {string} contents - Raw scenario file contents
+ * @returns {string} 16-char lowercase hex prefix
+ */
+function computeScenarioHash(contents) {
+  return crypto.createHash('sha256').update(contents).digest('hex').slice(0, 16);
 }
 
 /**
@@ -180,6 +211,9 @@ function parseScenario(filePath, projectRoot) {
 
   return {
     name,
+    // Of the file as parsed: a run parses its scenario once, so every row of
+    // the run is stamped with the hash of the text its trials were built from.
+    scenarioHash: computeScenarioHash(content),
     scope: section('scope') || 'skill',
     scenario: section('scenario'),
     context: section('context'),
@@ -233,6 +267,9 @@ module.exports = {
   normalizeClaimType,
   inferClaimType,
   compactDate,
+  CONDITION_SUFFIX,
+  reservedNameError,
+  computeScenarioHash,
   parseEvalName,
   resolveMaxTurns,
   parseScenario,
