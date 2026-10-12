@@ -108,17 +108,19 @@ D-062（儀器），七項：
 - preflight 的 transcript 本來就在 `evals/results/<scenario>/<runId>/transcripts/`，只有紀錄在 `evals/preflight/`。
 - `node_version` 進 `ranUnder`（`eval-preflight.js:150-155`，順便消掉 :178-190 與 :205-215 的重複）與 A/B row 的 `stamp`（`eval.js:134`）。
 - `scenario_hash` 進 `stamp`；`resolveScenarioFile` 每次 run 算一次，不是每個 trial 算一次。
-- 兩個欄位都不進檔名鍵、不進 `ranWith()`。
+- `repo_commit`（trial 所在 checkout 的 commit，不在 git repository 內為 null）與上面兩個欄位走同一條路。三個欄位要出現在每一筆 result row（`eval run` 的獨立 row 與錯誤 row 都算）與每筆 preflight 紀錄，不只 A/B 的 `stamp`（eval B-17）。
+- 三個欄位都不進檔名鍵、不進 `ranWith()`。
 
 **A3 trial 環境。**
 
 - `eval-trial.js:196` 的 env 從 `{...process.env, ARCFORGE_HOME}` 改成 `trialEnv(trialDir)`：`PATH` 重建為最小集合（`claude`、`node` 必須仍解析得到，hooks 要用）加 scenario 的 `## Environment` 宣告。
 - scenario 可宣告的只有 `PATH` 增減與指到 trial 內的快取目錄（如 playwright、`uv` 的快取）；`HOME` 保留給 `~/.claude` 認證。
+- 只換 contained trial：`--no-isolate` 的 trial 繼承 operator 的環境，只有 `ARCFORGE_HOME` 仍被導向（eval B-18），不能無條件改成 `trialEnv`。
 - Setup 的 env（`eval-trial-env.js:84-92`）同步。
 - `eval-scenario.js` 加 `## Environment` 的解析與 lint。
 - 兩臂相同，記進 row 的條件欄。
 
-**A4 `eval compare --no-analyzer`**（PR #281）。`compareResults`（`eval-benchmark.js:504`）加 options，`scenario.grader !== 'code'` 的 `compareWithModel` 分支（:523-534）看旗標；`eval-command.js:512` 讀 `args.flags['no-analyzer']`（同 `no-isolate` 的樣式），:540-541 的 banner 一起擋，:667 的 usage 更新。
+**A4 `eval compare --no-analyzer`**（PR #281）。`compareResults`（`eval-benchmark.js:504`）加 options，`scenario.grader !== 'code'` 的 `compareWithModel` 分支（:523-534）看旗標；`eval-command.js:512` 讀 `args.flags['no-analyzer']`（同 `no-isolate` 的樣式），:540-541 的 banner 換成一行說明 analyzer 已略過（eval B-21：operator 才分得出這與 code-graded scenario 的差別，後者兩行都不印），:667 的 usage 更新。
 
 **A5 staged skill 目錄與兩文字 A/B。**
 
