@@ -2027,12 +2027,18 @@ reverse one, append a superseding entry (see AGENTS.md).
   checkout they ran from (`node_version`, `scenario_hash` and
   `repo_commit`); none is a pooling condition, so eval B-8's
   conditions do not change. (d) A trial's environment is rebuilt rather than
-  inherited: a contained trial and its fixture setup get an allowlist — the
-  identity, shell and locale variables, the provider, proxy and certificate
-  families the session authenticates and connects with, and the
-  redirected `ARCFORGE_HOME` — and everything else is dropped, among it the
-  session variables an eval started inside a Claude Code session would
-  pass on; `PATH` is a
+  inherited: a contained trial and its fixture setup get an allowlist —
+  variables forwarded by name (the identity, shell and locale variables,
+  `CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`, `CLOUD_ML_REGION`, the
+  certificate variables), by prefix (`LC_`, `ANTHROPIC_`,
+  `CLAUDE_CODE_USE_`, `AWS_`, `GOOGLE_`, `GCLOUD_`, `CLOUDSDK_`,
+  `SSL_CERT_`) or by suffix (`_PROXY`, `_proxy`), and the redirected
+  `ARCFORGE_HOME` — and everything else is dropped. A deny list wins over
+  the allowlist: `ANTHROPIC_MODEL` is dropped, so the row's `model` is the
+  one `--model` named, and so are the variables of the Claude Code session
+  an eval was started inside (`CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`,
+  `CLAUDE_CODE_SSE_PORT`, `CLAUDE_CODE_SESSION_ID`);
+  `docs/guide/eval-system.md` holds the table. `PATH` is a
   shim directory under `.eval-trials/` linking `claude`, `node`, `npm` and
   `npx`, followed by the system directories, so the operator's `PATH` no
   longer reaches such a trial while `claude` and `node` stay resolvable. A
@@ -2104,6 +2110,11 @@ reverse one, append a superseding entry (see AGENTS.md).
   its directory is still caught only afterwards, by the write guard, within
   that guard's blind spots (eval B-7). Caches the scenario does not declare
   stay the operator's and can still carry state from one trial to the next.
+  The deny list drops `ANTHROPIC_MODEL` and no other model variable:
+  `ANTHROPIC_DEFAULT_*_MODEL` and `ANTHROPIC_SMALL_FAST_MODEL`, which
+  change what a `--model` name resolves to, still pass by the `ANTHROPIC_`
+  prefix, so a row's `model` is the model run only where the operator has
+  set none of them.
   Because `HOME` is kept, Claude Code still sources the operator's
   `~/.zshrc` or `~/.bashrc` when it builds its shell snapshot, so the
   operator's shell functions and aliases still reach a trial's commands;
