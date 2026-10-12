@@ -99,7 +99,7 @@ D-062（儀器），七項：
 | A4 `eval compare --no-analyzer` | (g) | `eval-compare-skip-analyzer` | #281 |
 | A5 staged skill 目錄與兩文字 A/B | (e)、(f) | `eval-skill-files-outside-trial` | — |
 
-**A1 run lock。** `scripts/lib/locking.js` 不能直接用：mtime 超過 30 秒就當 stale、等 5 秒才放棄、不查 PID 是否存活。做法二選一：新 helper（約 40 行，O_EXCL 開檔、寫 PID、查存活、拿不到就立刻拒絕），或給 `locking.js` 加 `staleThreshold` 與 PID 檢查。鎖檔放 `.eval-trials/` 底下（write guard 跳過它，`.gitignore` 已含）。`eval-command.js` 的 `run`（:178）、`preflight`（:248）、`ab`（:375）三個分支都包 try/finally。不把 `evals/preflight/` 加進 guard 的 skip list，那會藏住真的 trial 寫入。
+**A1 run lock。** `scripts/lib/locking.js` 不能直接用：mtime 超過 30 秒就當 stale、等 5 秒才放棄、不查 PID 是否存活。做法二選一：新 helper（約 40 行，O_EXCL 開檔、寫 PID、查存活、拿不到就立刻拒絕），或給 `locking.js` 加 `staleThreshold` 與 PID 檢查。鎖檔放 `.eval-trials/` 底下（write guard 跳過它，`.gitignore` 已含）。`eval-command.js` 的 `run`（:178）、`preflight`（:248）、`ab`（:375）三個分支都包 try/finally。preflight 判定 BLOCK 時現在是 `process.exit(1)`（:317），`finally` 不會執行，鎖會留下來：改成設 `process.exitCode = 1` 後正常返回，或在 exit 之前明確釋放鎖；A1 的測試要涵蓋 BLOCK 之後鎖已不存在。不把 `evals/preflight/` 加進 guard 的 skip list，那會藏住真的 trial 寫入。
 
 **A2 preflight row、Node 版本與 hash。**
 
