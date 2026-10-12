@@ -13,7 +13,7 @@ directory, with a `Diagrams` folder inside it.
 ## Scenario
 The user says:
 
-> I want an Excalidraw diagram of our ingest pipeline for the team vault, but before you build anything, give me the coordinate plan to review: write it to `layout.json` at the top of this project folder — use the full absolute path, not a relative one — as a list of `{id, label, x, y, width, height}` for every shape, plus `{id, type: "separator", y}` for any zone separator. Don't build, render or save a diagram yet. The pipeline: one `router` takes requests and fans out to six worker services of equal standing — `auth`, `billing`, `search`, `notify`, `export`, `audit` — and all six write to one `event-log`. Top zone: router. Middle zone: the six workers, side by side. Bottom zone: the event log.
+> I want an Excalidraw diagram of our ingest pipeline for the team vault, but before you build anything, give me the coordinate plan to review: write it to `layout.json` at the top of this project folder — use the full absolute path, not a relative one — as a JSON array of elements, each `{"id", "type", "x", "y", "width", "height"}` with `type` one of `"box"`, `"label"` or `"connector"`, plus `{"id", "type": "separator", "y"}` for any zone separator. Each service gets exactly one `"box"`, and that box's `id` is the service's name as written below. Don't build, render or save a diagram yet. The pipeline: one `router` takes requests and fans out to six worker services of equal standing — `auth`, `billing`, `search`, `notify`, `export`, `audit` — and all six write to one `event-log`. Top zone: router. Middle zone: the six workers, side by side. Bottom zone: the event log.
 
 ## Preflight
 run
@@ -59,7 +59,14 @@ therefore yields no scored rows in either arm. #182 changed where shapes go at
 the moment `x` and `y` are decided; nothing after that moment reads this file.
 There is no Obsidian in a trial and none is needed.
 
-The prompt says nothing about spacing, a grid, 40, 200 or 220. Six workers "side
+The prompt says nothing about spacing, a grid, 40, 200 or 220. It differs from
+the gate's draft in one sentence: the gate asked for `{id, label, x, y, width,
+height}` per shape, and this prompt prescribes a `type` (`"box"`, `"label"`,
+`"connector"`) and one box per service whose `id` is the service's name. An
+untyped plan left the grader guessing which shape was a worker's box, and four
+review rounds on #293 each found a plan the guess got wrong, in both
+directions. Both arms read the same sentence, and it says nothing about where a
+box goes. Six workers "side
 by side" in one zone is a requirement of the layout, not a hint; no arrows run
 between them. The prompt is fixed text and cannot carry the trial's real path, so
 it says "at the top of this project folder" and asks for the full absolute path:
@@ -87,13 +94,13 @@ adjacent pair is at least 40 px apart horizontally (`x₂ − (x₁ + width₁)`
   numbers the agent quoted.
 - An agent that stacks the workers in a column (what `python3 plan_layout.py`
   does) fails A1 as "not in one row". That path is identical in both arms.
-- A missing or unparsable `layout.json`, or a worker without finite numeric
-  `x`/`y`/`width`/`height`, is a FAIL, not a grade error: the file is what the
-  agent was asked for.
+- A missing or unparsable `layout.json`, or one that does not follow the
+  prescribed schema, is a FAIL, not a grade error: the file is what the agent
+  was asked for.
 
 Printed, never scored:
 
-- `-- C2:` separator clearance, every separator to its nearest shape ≥ 30 px. It
+- `-- C2:` separator clearance, every separator to its nearest box ≥ 30 px. It
   is a floor that cannot discriminate — the old text asked for 200 px there,
   which is stricter than the new text, and the Zone Layout Template gives 30 px
   in both versions.
@@ -101,27 +108,14 @@ Printed, never scored:
   call names `layout-heuristics.md` and by which path, whether any tool call
   reached outside the trial tree, and whether `uv` was run.
 
-How the grader finds a worker: any object in the JSON with numeric `x`, `y`,
-`width`, `height` is a shape; a worker is the shape whose `id` or `label`
-carries the worker's name as a whole token (`auth`, `worker-auth`,
-`Auth Service`). When several shapes carry one name, a box beats what is drawn
-on or between boxes: a shape whose `type` is text or a connector, or whose name
-also carries another pipeline node (`router-auth`), gives way when another
-candidate remains. Among the rest the largest area wins — a box contains its own
-text label, so a small text node never stands in for the box, whichever of the
-two was given the bare `auth` as its `id` or `label`. An untyped connector the same rule cannot
-see by name (`auth-output`) is seen by shape: well-formed numbers with no width
-or no height make a line, and a line gives way too. A remaining candidate with a
-missing or non-numeric coordinate fails the worker outright; the grader never
-falls back to the label beside it. The audit line says which rule was used.
-
-Known limit, the same in both arms: the plan is untyped JSON, so box, label and
-connector are told apart by these rules and nothing else. A plan that gives a
-worker's text label no `width`/`height` at all, beside a sound box, fails that
-worker — the alternative lets a label stand in for a box whose own numbers are
-broken. If a row reads as a sound plan and still scores 0 on this rule, widen
-the rule, bump `## Version` and say so; do not re-score by hand. The file may be a bare list or a list
-wrapped in an object.
+How the grader finds a worker: the schema is prescribed, so it does not guess.
+The file is a JSON array; a worker is the one element with `"type": "box"` whose
+`id` is exactly the worker's name. Labels and connectors are ignored by their
+declared `type`, never by size or by name. A plan that does not follow the
+schema fails as malformed, in both arms: a top level that is not an array, a
+worker with no box or more than one, or a box whose `x`, `y`, `width`, `height`
+are not finite numbers with width and height above 0. If a row reads as a sound
+plan and still fails as malformed, report it as that; do not re-score by hand.
 
 The grader reads `layout.json` and the transcript as data and runs nothing
 (eval B-12). It runs as `python3 -I`, and the engine runs it from a fresh empty
@@ -211,7 +205,7 @@ needs no tool and depends on no tool being absent.
 mkdir -p vault/Diagrams
 
 ## Assertions
-- [ ] A1: `layout.json` at the top of the trial directory parses as JSON and holds all six workers (`auth`, `billing`, `search`, `notify`, `export`, `audit`) with finite numeric `x`, `y` and positive `width`, `height`; the six share one row (their vertical extents overlap pairwise); and, ordered by `x`, every adjacent pair is at least 40 px apart (`x₂ − (x₁ + width₁) ≥ 40`).
+- [ ] A1: `layout.json` at the top of the trial directory parses as a JSON array and holds exactly one `"type": "box"` element for each of the six workers (`id` `auth`, `billing`, `search`, `notify`, `export`, `audit`) with finite numeric `x`, `y` and positive `width`, `height`; the six share one row (their vertical extents overlap pairwise); and, ordered by `x`, every adjacent pair is at least 40 px apart (`x₂ − (x₁ + width₁) ≥ 40`).
 
 ## Grader
 code
@@ -266,10 +260,6 @@ def num(v):
 
 def fmt(v):
     return f"{v:g}"
-
-
-def tokens(v):
-    return re.findall(r"[a-z0-9]+", v.lower()) if isinstance(v, str) else []
 
 
 def audit_transcript():
@@ -339,72 +329,47 @@ try:
 except (ValueError, RecursionError) as err:
     fail(f"layout.json is not valid JSON ({type(err).__name__})")
 
-# Every object in the file, however the list is wrapped. Iterative, so a deeply
-# nested file cannot exhaust the stack.
-objects, stack = [], [data]
-while stack:
-    node = stack.pop()
-    if isinstance(node, dict):
-        objects.append(node)
-        stack.extend(node.values())
-    elif isinstance(node, list):
-        stack.extend(node)
+# The schema is prescribed: an array of elements, each with a declared type. The
+# grader reads the type and the id it was told to expect; it never guesses a
+# worker's box from a shape's size or name.
+if not isinstance(data, list):
+    fail(f"layout.json is not a JSON array of elements (top level is {type(data).__name__})")
+elements = [e for e in data if isinstance(e, dict)]
+kinds = [e.get("type") if isinstance(e.get("type"), str) else None for e in elements]
+print(
+    f"-- audit: {len(data)} entries: "
+    + ", ".join(f"{k or 'untyped'} {kinds.count(k)}" for k in sorted(set(kinds), key=str))
+)
 
-shapes, separators = [], []
-for o in objects:
-    if isinstance(o.get("type"), str) and o["type"].lower() == "separator":
-        y = num(o.get("y"))
-        if y is not None:
-            separators.append((str(o.get("id", "?")), y))
-        continue
-    x, y, w, h = (num(o.get(k)) for k in ("x", "y", "width", "height"))
-    named = tokens(o.get("id")) + tokens(o.get("label"))
-    shapes.append({"o": o, "x": x, "y": y, "w": w, "h": h, "named": named})
-print(f"-- audit: {len(objects)} objects, {len(separators)} separators")
+
+def box_of(e):
+    x, y, w, h = (num(e.get(k)) for k in ("x", "y", "width", "height"))
+    return {"x": x, "y": y, "w": w, "h": h}
 
 
 def placed(s):
     return None not in (s["x"], s["y"], s["w"], s["h"]) and s["w"] > 0 and s["h"] > 0
 
 
-# ---- the six workers ----
-NOT_A_BOX = {"text", "label", "arrow", "line", "connector", "edge"}
-OTHER_NODES = {"router", "event", "log"}
+boxes = [e for e, k in zip(elements, kinds) if k == "box"]
+separators = [
+    (str(e.get("id", "?")), num(e.get("y")))
+    for e, k in zip(elements, kinds)
+    if k == "separator" and num(e.get("y")) is not None
+]
 
-
-def is_annotation(s, name):
-    kind = s["o"].get("type")
-    if isinstance(kind, str) and kind.lower() in NOT_A_BOX:
-        return True
-    # Well-formed numbers with no width or no height: a line, not a box.
-    if None not in (s["x"], s["y"], s["w"], s["h"]) and (s["w"] <= 0 or s["h"] <= 0):
-        return True
-    return bool((OTHER_NODES | (set(WORKERS) - {name})) & set(s["named"]))
-
-
+# ---- the six workers: exactly one box each ----
 workers, problems = {}, []
 for name in WORKERS:
-    cands = [s for s in shapes if name in s["named"]]
-    if not cands:
-        problems.append(f"{name}: no shape with that id or label")
-        continue
-    # A box beats what is drawn on or between boxes: a text or connector type, and
-    # a shape naming a second pipeline node (`router-auth`), give way when another
-    # candidate remains; so does a line, a shape whose numbers are well formed with
-    # no width or no height. Every candidate left must be placed — a malformed box
-    # is a FAIL, never a reason to measure the label beside it. Then the largest
-    # area: a box contains its own label, whatever id or label either was given.
-    boxes = [s for s in cands if not is_annotation(s, name)] or cands
-    if not all(placed(s) for s in boxes):
+    mine = [box_of(e) for e in boxes if e.get("id") == name]
+    if len(mine) != 1:
+        problems.append(f'{name}: {len(mine)} elements with "type": "box" and that id, expected 1')
+    elif not placed(mine[0]):
         problems.append(f"{name}: x, y, width, height are not all finite numbers with width and height above 0")
-        continue
-    pick = max(boxes, key=lambda s: s["w"] * s["h"])
-    if len(cands) > 1:
-        rule = "only box" if len(boxes) == 1 else "largest area"
-        print(f"-- audit: {name}: {len(cands)} shapes carry the name, took {rule}")
-    workers[name] = pick
+    else:
+        workers[name] = mine[0]
 if problems:
-    fail("; ".join(problems))
+    fail("malformed plan: " + "; ".join(problems))
 
 # ---- one row ----
 row = sorted(workers.items(), key=lambda kv: kv[1]["x"])
@@ -430,7 +395,7 @@ else:
 emit("A1", a1, reason)
 
 # ---- C2: separator clearance, a floor that is printed and never scored ----
-solid = [s for s in shapes if placed(s)]
+solid = [b for b in map(box_of, boxes) if placed(b)]
 if not separators:
     print("-- C2: no separators in the plan")
 for sid, sy in separators:
@@ -439,11 +404,11 @@ for sid, sy in separators:
         top, bottom = s["y"], s["y"] + s["h"]
         dists.append(sy - bottom if bottom <= sy else top - sy if top >= sy else -min(sy - top, bottom - sy))
     if not dists:
-        print(f"-- C2: separator {sid} y={fmt(sy)}: no placed shapes to measure against")
+        print(f"-- C2: separator {sid} y={fmt(sy)}: no placed boxes to measure against")
         continue
     nearest = min(dists)
     verdict = "ok" if nearest >= MIN_SEPARATOR_CLEARANCE - EPS else "under"
-    print(f"-- C2: separator {sid} y={fmt(sy)}: nearest shape {fmt(nearest)}px ({verdict}, floor {MIN_SEPARATOR_CLEARANCE})")
+    print(f"-- C2: separator {sid} y={fmt(sy)}: nearest box {fmt(nearest)}px ({verdict}, floor {MIN_SEPARATOR_CLEARANCE})")
 
 audit_transcript()
 sys.exit(0 if a1 else 1)
