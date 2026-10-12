@@ -77,6 +77,7 @@ const ROW_KEYS = [
   'api_duration_ms',
   'duration_ms',
   'effort',
+  'environment',
   'eval',
   'grader',
   'input_tokens',
@@ -127,9 +128,9 @@ describe('rows and preflight records carry scenario_hash, node_version and repo_
   /** The plugin list answers [], a trial answers `onTrial()`. */
   function stubExec(onTrial) {
     mockUtils.execCommand.mockImplementation((cmd, args) => {
-      if (cmd === 'claude' && args[0] === 'plugin')
+      if (path.basename(cmd) === 'claude' && args[0] === 'plugin')
         return { stdout: '[]', stderr: '', exitCode: 0 };
-      if (cmd === 'claude') return onTrial();
+      if (path.basename(cmd) === 'claude') return onTrial();
       return { stdout: '', stderr: '', exitCode: 0 };
     });
   }
