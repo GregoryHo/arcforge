@@ -1,6 +1,6 @@
 # obsidian — spec
 
-> Status: shipped v6.4.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.4.0 · extended by 6.5.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -112,7 +112,14 @@ work carries provenance a reader can check.
   to the file it just wrote (#228). The sentence reached `main` after `v6.3.0`
   (#267) without harness evidence, and ships in 6.4.0 on its text alone: the
   round's design gate found it not measurable on the current engine and
-  recorded it as a finding at 0 sessions (D-055, D-057).
+  recorded it as a finding at 0 sessions (D-055, D-057). 6.5.0 schedules the
+  measurement that gate could not have: an A/B between two skill texts, the
+  `SKILL.md` from before #267 against the current one, each arm with its
+  skill files staged outside the trial and a trial environment the scenario
+  declares, so that a missing dependency can be produced ([eval](eval.md)
+  B-18 to B-20). It sits behind a new offline design gate, and until that
+  gate passes and the A/B reads, the sentence still rests on its text alone
+  (D-059, D-062).
 
 **Residual — most of this section has no harness evidence.** Three items rest
 on eval scenarios, and only in part: B-3 on
@@ -166,3 +173,9 @@ live behind the CLI per [cli](cli.md) B-8.
 - **D-057** — it cannot: an injected `SKILL.md` cannot reach the verifier,
   no trial's `PATH` or `HOME` can be overridden, and there is no A/B between
   two skill texts, so the sentence is a finding at 0 sessions (B-10).
+- **D-059** — 6.5.0 schedules the verify-exit sentence and the
+  `diagramming-obsidian` `references/` layout change (#185) as two-text
+  A/Bs, each behind an offline design gate (B-10).
+- **D-062** — the engine changes those two measurements wait on: staged
+  skill files, a trial environment a scenario declares, and an A/B between
+  two skill texts (B-10).

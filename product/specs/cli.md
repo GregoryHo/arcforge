@@ -1,6 +1,6 @@
 # cli — spec
 
-> Status: shipped v6.4.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.4.0 · extended by 6.5.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -88,10 +88,13 @@ underneath without breaking anything written against it.
   the project's archives. `alias set` points a name at an archive in the
   project's alias index, `alias remove` drops a name, and `alias list` prints
   the index. A name is letters, digits, `-` and `_`, at most 128 characters,
-  and anything else is refused rather than rewritten; no name is reserved,
+  and may not begin with a hyphen, which the CLI would read as a flag
+  (6.5.0);
+  anything else is refused rather than rewritten; no name is reserved,
   because a name only ever fills an operand. Overwriting a name that already
   exists, through `alias set` or `save`, needs `--force`. The group sits in
-  the one manifest (B-4) and under the exit-code API (B-5) (D-055, D-056).
+  the one manifest (B-4) and under the exit-code API (B-5) (D-055, D-056,
+  D-061).
   Residual: the header lags the session it describes. The tracker stamps its record at
   the Stop hook, after a turn ends, so a `save` made during a turn reads
   counts that leave that turn out; below the diary threshold the record
@@ -171,6 +174,9 @@ directory basename, so two same-named projects share both (D-037, D-056).
 - **D-055** — 6.4.0 is a minor because it adds a command group (B-9).
 - **D-056** — that group is `arcforge session`, an engine-written metrics
   header plus the handover's five sections, aliased per project (B-9).
+- **D-061** — 6.5.0's SessionStart line names an alias inside a command, so
+  an alias may not begin with a hyphen: `alias set` and `save` refuse one
+  (B-9).
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
 

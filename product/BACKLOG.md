@@ -97,31 +97,16 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 - ~~**redesign-maintaining-obsidian-audit-runs-lint-script**~~ — graduated into 6.3.0 (D-049).
 - ~~**redesign-maintaining-obsidian-link-rebuilds-index**~~ — graduated into 6.3.0 (D-049).
 - ~~**redesign-speccing-supersede-not-overwrite**~~ — graduated into 6.3.0 (D-049).
-- **eval-compare-skip-analyzer** — `eval compare` on a model- or
-  human-graded scenario always spawns the eval-analyzer session; a flag to
-  skip it would let a verdict be read without spending a model call.
-- **eval-skill-files-outside-trial** — in a skill-scope A/B, give only the
-  treatment arm a host-style "Base directory for this skill" line with that
-  skill's files staged outside the trial tree the baseline can list, so
-  behavior that depends on a skill's shipped scripts or references can be
-  measured without placing them in the baseline's fixture · needs: D-049.
+- ~~**eval-compare-skip-analyzer**~~ — graduated into 6.5.0 (D-062).
+- ~~**eval-skill-files-outside-trial**~~ — graduated into 6.5.0 (D-062).
 - **executing-discriminating-claim** — `executing`'s verify-decides-done
   claim formalizes what baselines already do (26 of 37 mark a real-work task
   in progress first); name a claim of the skill the baseline fails before
   designing another scenario for it · needs: D-054.
-- **preflight-result-rows** — preflight writes no result rows, only
-  transcripts and its record, so a preflight trial's grade has to be rebuilt
-  from its end state by hand · needs: D-054.
-- **eval-record-node-and-hash** — preflight records carry no Node version and
-  A/B rows carry neither the Node version nor the scenario hash, though the
-  router scenario says its records carry the Node version; record both
-  · needs: D-054.
-- **eval-trial-path** — the operator's `PATH` reaches trials, since the engine
-  spawns them with the operator's environment; one 6.3.0 trial resolved
-  `arcforge` and ran it. Narrower than **eval-trial-sandbox** · needs: D-054.
-- **eval-concurrent-run-guard** — refuse or lock a second live eval in the
-  same checkout, since the write guard aborts a trial for another run's write
-  under `evals/preflight/` · needs: D-058.
+- ~~**preflight-result-rows**~~ — graduated into 6.5.0 (D-062).
+- ~~**eval-record-node-and-hash**~~ — graduated into 6.5.0 (D-062).
+- ~~**eval-trial-path**~~ — graduated into 6.5.0 (D-062).
+- ~~**eval-concurrent-run-guard**~~ — graduated into 6.5.0 (D-062).
 
 ## CLI
 
@@ -135,9 +120,7 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 - **secrets-guard-staged-scan** — scan the content a `git commit` stages, not
   only the command string, measuring what reading the index costs on the
   synchronous hook path first · needs: D-029.
-- **session-continuity-injection** — have SessionStart carry over where the last
-  session left off from the durable session record, the promise hooks B-8 made
-  and no hook kept · needs: D-031.
+- ~~**session-continuity-injection**~~ — graduated into 6.5.0 (D-061).
 
 ## Obsidian
 
@@ -153,10 +136,11 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 ## Skill system
 
 - **skill-body-trim** — seven SKILL.md bodies sit over the 150-line soft cap:
-  `sessions` 206, `learning` 190, `diagramming-obsidian` 181, `evaluating` 171,
-  `speccing` 168, `dispatching` 158, `code-review` 155 (body lines, as
-  `test_line_budget` counts them; it only warns). The p6 remedy is to move
-  reference material into each skill's `references/`, never to cut behavioral
-  instructions. The risk is the 250-line hard cap, which fails the build —
-  `sessions` is 44 lines from it. A skill edit, so it needs eval evidence and
-  cannot ride a no-skills patch (D-019).
+  `sessions` 206 (taken by 6.5.0, D-059), `learning` 190,
+  `diagramming-obsidian` 181, `evaluating` 171, `speccing` 168, `dispatching`
+  158, `code-review` 155 (body lines, as `test_line_budget` counts them; it
+  only warns). The six besides `sessions` stay wished for. The p6 remedy is
+  to move reference material into each skill's `references/`, never to cut
+  behavioral instructions. The risk is the 250-line hard cap, which fails the
+  build — `sessions` is 44 lines from it until 6.5.0's trim lands. A skill
+  edit, so it needs eval evidence and cannot ride a no-skills patch (D-019).
