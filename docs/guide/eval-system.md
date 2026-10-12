@@ -38,7 +38,12 @@ without a passing preflight on record.
 arcforge eval lint eval-tdd-test-first-gate
 ```
 
-Structural only: required sections present, assertions shaped correctly. It says
+Structural only: required sections present, assertions shaped correctly, and a
+name the result store can file. A scenario name may not end in `-baseline`,
+`-treatment` or `-preflight`: those suffixes name the conditions a scenario's
+results are stored under, so `release-preflight` would be filed as the preflight
+of a scenario called `release`. `lint` reports such a name, and `run`, `ab` and
+`preflight` refuse it before any trial starts. It says
 nothing about whether the scenario is any good. Output is `<name>: ok` or a list
 of file-and-line diagnostics.
 

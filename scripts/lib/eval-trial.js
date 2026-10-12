@@ -11,7 +11,12 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { execCommand, ensureDir, getTimestamp, CLAUDE_MAX_BUFFER } = require('./utils');
-const { compactDate, parseEvalName, resolveMaxTurns } = require('./eval-scenario');
+const {
+  compactDate,
+  parseEvalName,
+  resolveMaxTurns,
+  reservedNameError,
+} = require('./eval-scenario');
 const {
   createTrialDir,
   runSetup,
@@ -82,6 +87,9 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     maxTurns: rawMaxTurns,
     watchRoots = [],
   } = options;
+  // Refused before any session: no row of such a run could be filed correctly.
+  const reserved = reservedNameError(scenario.name);
+  if (reserved) throw new Error(reserved);
   // Resolved before anything else so a bad override is refused ahead of the
   // fixture Setup and the session (B-10), and recorded on every row it produces.
   const trialTimeoutMs = resolveTrialTimeoutMs();

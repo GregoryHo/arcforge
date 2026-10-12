@@ -86,6 +86,20 @@ function compactDate(isoTimestamp) {
 const CONDITION_SUFFIX = /-(baseline|treatment|preflight)$/;
 
 /**
+ * Why a scenario may not be called `name`, or null when it may. A name that
+ * ends in a condition suffix is reserved: `release-preflight` run on its own
+ * would be filed as the preflight condition of a scenario called `release`,
+ * away from its own directory and unseen by its own readers.
+ * @param {string} name - Scenario name
+ * @returns {string|null}
+ */
+function reservedNameError(name) {
+  const match = String(name).match(CONDITION_SUFFIX);
+  if (!match) return null;
+  return `Scenario name "${name}" ends in the reserved suffix "-${match[1]}": its results would be filed as the ${match[1]} condition of "${name.replace(CONDITION_SUFFIX, '')}". Rename the scenario (-baseline, -treatment and -preflight are reserved).`;
+}
+
+/**
  * Parse an eval name into scenario name and condition.
  * Used by appendResult, saveTranscript, and loadResults to derive storage paths.
  * @param {string} evalName - Eval name (may include a -baseline, -treatment or -preflight suffix)
@@ -254,6 +268,7 @@ module.exports = {
   inferClaimType,
   compactDate,
   CONDITION_SUFFIX,
+  reservedNameError,
   computeScenarioHash,
   parseEvalName,
   resolveMaxTurns,

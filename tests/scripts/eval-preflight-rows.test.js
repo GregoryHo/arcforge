@@ -19,6 +19,7 @@ const {
   loadResultPools,
   parseEvalName,
   parseScenario,
+  runTrial,
   saveTranscript,
 } = require('../../scripts/lib/eval');
 const { pairArms } = require('../../scripts/lib/eval-pools');
@@ -188,6 +189,22 @@ describe('preflight result rows', () => {
       expect(transcript).toBe(path.join(runDir, 'transcripts', 'preflight-trial-2.txt'));
       const grading = getGradingPath(trialRow(`${NAME}-preflight`, 2), tempDir);
       expect(grading).toBe(path.join(runDir, 'grading', 'trial-2.json'));
+    });
+  });
+
+  describe('a scenario may not be named like a condition', () => {
+    // `eval run release-preflight` would be filed as release/<runId>/preflight.jsonl.
+    it.each([
+      'preflight',
+      'baseline',
+      'treatment',
+    ])('runTrial refuses a name ending in -%s before any session or row', (suffix) => {
+      const scenario = { name: `release-${suffix}`, scenario: 'Do it.', grader: 'code' };
+      expect(() => runTrial(scenario, 1, 1, { projectRoot: tempDir })).toThrow(
+        `Scenario name "release-${suffix}" ends in the reserved suffix "-${suffix}"`,
+      );
+      expect(fs.existsSync(path.join(tempDir, RESULTS_DIR))).toBe(false);
+      expect(fs.existsSync(path.join(tempDir, '.eval-trials'))).toBe(false);
     });
   });
 

@@ -10,6 +10,7 @@
  */
 
 const fs = require('node:fs');
+const { parseScenario, reservedNameError } = require('./eval-scenario');
 
 /**
  * Required section headings (## level) that every scenario file must have.
@@ -84,6 +85,7 @@ function parseScenarioStructure(content) {
  * 1. All REQUIRED_SECTIONS are present.
  * 2. ## Assertions section contains at least one entry.
  * 3. Each assertion entry has an ID prefix (A1:, [tool_called], etc.) and non-blank text.
+ * 4. The scenario name does not end in a reserved condition suffix.
  *
  * @param {string} filePath - Absolute path to scenario .md file
  * @returns {Array<{ file: string, line: number, message: string }>} Diagnostics
@@ -93,6 +95,13 @@ function lintScenario(filePath) {
   const { sections, assertionLines } = parseScenarioStructure(content);
 
   const diagnostics = [];
+
+  // Check 4: the name is not one the result store reads as a condition
+  const reserved = reservedNameError(parseScenario(filePath).name);
+  if (reserved) {
+    const nameLine = content.split('\n').findIndex((l) => /^#\s+Eval:/.test(l));
+    diagnostics.push({ file: filePath, line: nameLine + 1 || 1, message: reserved });
+  }
 
   // Check 1: Required sections present
   for (const required of REQUIRED_SECTIONS) {

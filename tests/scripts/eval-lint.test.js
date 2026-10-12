@@ -177,6 +177,39 @@ model
 
 // ── lintScenario: missing sections ───────────────────────────────────────────
 
+describe('lintScenario - reserved name suffix', () => {
+  test.each(['baseline', 'treatment', 'preflight'])('flags a name ending in -%s', (suffix) => {
+    const dir = makeTempDir();
+    const content = WELL_FORMED.replace('# Eval: my-eval', `# Eval: release-${suffix}`);
+    const diagnostics = lintScenario(writeScenario(dir, 'release', content));
+
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0].line).toBe(1);
+    expect(diagnostics[0].message).toContain(`ends in the reserved suffix "-${suffix}"`);
+    expect(diagnostics[0].message).toContain(`the ${suffix} condition of "release"`);
+
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('flags a file whose name supplies the scenario name', () => {
+    const dir = makeTempDir();
+    const content = WELL_FORMED.replace('# Eval: my-eval\n', '');
+    const diagnostics = lintScenario(writeScenario(dir, 'release-preflight', content));
+
+    expect(diagnostics.map((d) => d.line)).toEqual([1]);
+    expect(diagnostics[0].message).toContain('"release-preflight"');
+
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('accepts the suffix words anywhere but the end', () => {
+    const dir = makeTempDir();
+    const content = WELL_FORMED.replace('# Eval: my-eval', '# Eval: preflight-baseline-check');
+    expect(lintScenario(writeScenario(dir, 'ok', content))).toHaveLength(0);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+});
+
 describe('lintScenario - missing ## Assertions section', () => {
   test('returns diagnostic naming the missing section', () => {
     const dir = makeTempDir();
