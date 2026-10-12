@@ -8,6 +8,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
+const { spawnSync } = require('node:child_process');
 
 jest.mock('../../scripts/lib/eval', () => {
   const actual = jest.requireActual('../../scripts/lib/eval');
@@ -226,6 +227,79 @@ describe('eval run lock', () => {
 
     expect(evalLib.runSkillEval).not.toHaveBeenCalled();
     expect(fs.existsSync(lockPath)).toBe(false);
+  });
+
+  // The tests above replace process.exit with a throw, which runs the finally
+  // a real exit skips. These run the command in a child that really exits.
+  describe('in a real process, with process.exit unmocked', () => {
+    const libDir = path.resolve(__dirname, '../../scripts');
+    // Runs `eval <argv>` against tempDir with the trial runner replaced, then
+    // exits the way scripts/cli.js does.
+    const child = (runTrialBody, positional) =>
+      spawnSync(
+        process.execPath,
+        [
+          '-e',
+          `const evalLib = require(${JSON.stringify(path.join(libDir, 'lib/eval'))});
+           evalLib.runTrial = (_s, t) => { ${runTrialBody} };
+           const { runEvalCommand } = require(${JSON.stringify(path.join(libDir, 'cli/eval-command'))});
+           const lock = ${JSON.stringify(lockPath)};
+           runEvalCommand(
+             { positional: ${JSON.stringify(positional)}, options: { k: '1' }, flags: {} },
+             { projectRoot: ${JSON.stringify(tempDir)}, asJson: false },
+           ).catch((err) => { console.error('Error: ' + err.message); process.exit(1); });`,
+        ],
+        { encoding: 'utf8' },
+      );
+    const HELD = `if (!require('node:fs').existsSync(lock)) throw new Error('lock not held');`;
+
+    it('a preflight BLOCK exits 1 and leaves no lock file', () => {
+      const result = child(
+        `${HELD} return { eval: 'solo', trial: t, k: 3, passed: false, score: 0, grader: 'code',
+           timestamp: '2026-10-12T00:00:00.000Z', infraError: true, errorType: 'setup_failed' };`,
+        ['preflight', 'solo'],
+      );
+
+      expect(result.stdout).toContain('Verdict: BLOCK');
+      expect(result.stderr).not.toContain('lock not held');
+      expect(result.status).toBe(1);
+      expect(fs.existsSync(lockPath)).toBe(false);
+    });
+
+    it.each([
+      ['run', 'solo'],
+      ['preflight', 'solo'],
+    ])('eval %s failing mid-run exits 1 and leaves no lock file', (subcommand, scenario) => {
+      const result = child(`${HELD} throw new Error('spawn failed');`, [subcommand, scenario]);
+
+      expect(result.stderr).toContain('Error: spawn failed');
+      expect(result.status).toBe(1);
+      expect(fs.existsSync(lockPath)).toBe(false);
+    });
+
+    it('eval ab failing mid-run exits 1 and leaves no lock file', () => {
+      const result = spawnSync(
+        process.execPath,
+        [
+          '-e',
+          `const evalLib = require(${JSON.stringify(path.join(libDir, 'lib/eval'))});
+           evalLib.runSkillEval = () => {
+             if (!require('node:fs').existsSync(${JSON.stringify(lockPath)})) throw new Error('lock not held');
+             throw new Error('arm failed');
+           };
+           const { runEvalCommand } = require(${JSON.stringify(path.join(libDir, 'cli/eval-command'))});
+           runEvalCommand(
+             { positional: ['ab', 'pair'], options: {}, flags: {} },
+             { projectRoot: ${JSON.stringify(tempDir)}, asJson: false },
+           ).catch((err) => { console.error('Error: ' + err.message); process.exit(1); });`,
+        ],
+        { encoding: 'utf8' },
+      );
+
+      expect(result.stderr).toContain('Error: arm failed');
+      expect(result.status).toBe(1);
+      expect(fs.existsSync(lockPath)).toBe(false);
+    });
   });
 
   it('an invocation refused before the lock creates no .eval-trials directory', async () => {

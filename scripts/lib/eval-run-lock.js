@@ -143,9 +143,10 @@ function holdRunLock(lockPath) {
 
 /**
  * Run `fn`, handing it a function that takes the run lock when the run is
- * about to start; the lock, if taken, is released however `fn` ends.
+ * about to start; the lock, if taken, is released however `fn` ends. `take`
+ * returns the handle, for a caller that must release before `process.exit()`.
  * @param {string} projectRoot - Project root the eval runs from
- * @param {(take: (command: string) => void) => *} fn - May be async
+ * @param {(take: (command: string) => { release: () => void }) => *} fn - May be async
  * @returns {Promise<*>} What `fn` returned
  */
 async function withRunLock(projectRoot, fn) {
@@ -153,6 +154,7 @@ async function withRunLock(projectRoot, fn) {
   try {
     return await fn((command) => {
       lock = acquireRunLock(projectRoot, command);
+      return lock;
     });
   } finally {
     lock?.release();

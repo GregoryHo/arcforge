@@ -212,6 +212,20 @@ describe('acquireRunLock', () => {
     }
   }, 60000);
 
+  it('a holder that calls process.exit without releasing leaves no lock file', () => {
+    const modulePath = require.resolve('../../scripts/lib/eval-run-lock');
+    const result = spawnSync(process.execPath, [
+      '-e',
+      `require(${JSON.stringify(modulePath)}).acquireRunLock(process.argv[1], 'eval preflight demo');
+       if (!require('node:fs').existsSync(${JSON.stringify(lockPath)})) process.exit(7);
+       process.exit(1);`,
+      root,
+    ]);
+
+    expect(result.status).toBe(1);
+    expect(fs.existsSync(lockPath)).toBe(false);
+  });
+
   it('rejects an empty project root', () => {
     expect(() => acquireRunLock('', 'eval run demo')).toThrow('projectRoot must be a non-empty');
   });

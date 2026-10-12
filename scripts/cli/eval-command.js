@@ -278,7 +278,7 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
     refusePluginDirOutsideWorkflow(scenario, args.options['plugin-dir'], 'preflight');
     requirePinnedToolkitFlags(scenario, args.options, 'preflight');
     eval_.resolveTrialTimeoutMs(); // refuse a bad ceiling before any Setup or session (B-10)
-    takeRunLock('preflight');
+    const runLock = takeRunLock('preflight');
     console.log(`Running preflight for "${scenarioName}"...`);
     const runId = generateRunId();
 
@@ -330,6 +330,7 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
     console.log(`Reason:  ${outcome.reason}`);
     console.log(`Hash:    ${outcome.scenario_hash}`);
     if (outcome.verdict === 'BLOCK') {
+      runLock.release(); // process.exit skips the finally that releases it
       process.exit(1);
     }
   } else if (subcommand === 'lint') {
