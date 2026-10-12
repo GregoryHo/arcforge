@@ -245,9 +245,12 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   `CLAUDE_CODE_USE_`, `AWS_`, `GOOGLE_`, `GCLOUD_`, `CLOUDSDK_`,
   `SSL_CERT_`) or by suffix (`_PROXY`, `_proxy`), and `ARCFORGE_HOME` is
   set, redirected as B-7 says. A deny list wins over all three:
-  `ANTHROPIC_MODEL` is dropped, so that the model a trial runs is the one
-  `--model` names and the row's `model` records, and so are the variables
-  of the Claude Code session an eval was started from (`CLAUDECODE`,
+  `ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_*_MODEL` and
+  `ANTHROPIC_SMALL_FAST_MODEL` are dropped — the variables that choose the
+  model or change what a `--model` name resolves to — so that the model a
+  trial runs is the one `--model` names and the row's `model` records, and
+  so are the variables of the Claude Code session an eval was started from
+  (`CLAUDECODE`,
   `CLAUDE_CODE_ENTRYPOINT`, `CLAUDE_CODE_SSE_PORT`,
   `CLAUDE_CODE_SESSION_ID`). `docs/guide/eval-system.md` holds the table.
   Everything else the operator's shell exports is dropped. `PATH`
@@ -273,12 +276,10 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   state stays redirected as B-7 says (D-057, D-062). Residual: this is not
   a sandbox. A trial still runs with the operator's filesystem permissions
   and `HOME`, and a cache no scenario redirected is still the operator's,
-  shared from one trial to the next. The deny list names `ANTHROPIC_MODEL`
-  alone among the model variables: `ANTHROPIC_DEFAULT_*_MODEL` and
-  `ANTHROPIC_SMALL_FAST_MODEL`, which change what a `--model` name resolves
-  to, still pass by the `ANTHROPIC_` prefix, so a row's `model` is the name
-  asked for and is the model run only where the operator has set none of
-  them. Because `HOME` is kept, Claude Code
+  shared from one trial to the next. The deny list is a list of names, so a
+  provider variable that remaps a model name and is not on it is forwarded
+  by its family's prefix until it is added. Because `HOME` is kept, Claude
+  Code
   still sources the operator's shell startup file (`~/.zshrc` or
   `~/.bashrc`) when it builds its shell snapshot, so the operator's shell
   functions and aliases still reach the commands a trial runs; the built

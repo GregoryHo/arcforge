@@ -2038,7 +2038,9 @@ reverse one, append a superseding entry (see AGENTS.md).
   `CLAUDE_CODE_USE_`, `AWS_`, `GOOGLE_`, `GCLOUD_`, `CLOUDSDK_`,
   `SSL_CERT_`) or by suffix (`_PROXY`, `_proxy`), and the redirected
   `ARCFORGE_HOME` — and everything else is dropped. A deny list wins over
-  the allowlist: `ANTHROPIC_MODEL` is dropped, so the row's `model` is the
+  the allowlist: `ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_*_MODEL` and
+  `ANTHROPIC_SMALL_FAST_MODEL` are dropped — whatever chooses the model or
+  changes what a `--model` name resolves to — so the row's `model` is the
   one `--model` named, and so are the variables of the Claude Code session
   an eval was started inside (`CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`,
   `CLAUDE_CODE_SSE_PORT`, `CLAUDE_CODE_SESSION_ID`);
@@ -2114,11 +2116,9 @@ reverse one, append a superseding entry (see AGENTS.md).
   its directory is still caught only afterwards, by the write guard, within
   that guard's blind spots (eval B-7). Caches the scenario does not declare
   stay the operator's and can still carry state from one trial to the next.
-  The deny list drops `ANTHROPIC_MODEL` and no other model variable:
-  `ANTHROPIC_DEFAULT_*_MODEL` and `ANTHROPIC_SMALL_FAST_MODEL`, which
-  change what a `--model` name resolves to, still pass by the `ANTHROPIC_`
-  prefix, so a row's `model` is the model run only where the operator has
-  set none of them.
+  The deny list is a list of names: a provider variable that remaps a
+  model name and is not on it is forwarded by its family's prefix until it
+  is added.
   Because `HOME` is kept, Claude Code still sources the operator's
   `~/.zshrc` or `~/.bashrc` when it builds its shell snapshot, so the
   operator's shell functions and aliases still reach a trial's commands;
