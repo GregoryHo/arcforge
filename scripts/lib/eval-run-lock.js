@@ -76,18 +76,19 @@ function createExclusive(filePath, content) {
 
 /**
  * Throw when the lock belongs to a live process, or cannot say whose it is.
- * Returns when it is absent or its process is gone.
  * @param {string} lockPath
+ * @returns {{ pid: number, started: string, command: string }|null} The holder
+ *   whose process is gone, or null when there is no lock file
  */
 function refuseIfHeld(lockPath) {
   const holder = readHolder(lockPath);
   if (!holder) {
-    if (!fs.existsSync(lockPath)) return;
+    if (!fs.existsSync(lockPath)) return null;
     throw new Error(
       `Another eval may be running in this checkout: ${lockPath} exists but names no process (a run may be starting). If no eval is running, remove that file and rerun.`,
     );
   }
-  if (!isProcessAlive(holder.pid)) return;
+  if (!isProcessAlive(holder.pid)) return holder;
   throw new Error(
     `Another eval is running in this checkout: \`${holder.command}\` (PID ${holder.pid}, started ${holder.started}) holds ${lockPath}. One checkout runs one live eval at a time; wait for it to finish, or use a second checkout. If PID ${holder.pid} is not an eval, remove that file and rerun.`,
   );
@@ -110,20 +111,30 @@ function acquireRunLock(projectRoot, command) {
   const record = JSON.stringify({ pid: process.pid, started: new Date().toISOString(), command });
 
   if (createExclusive(lockPath, record)) return holdRunLock(lockPath);
-  refuseIfHeld(lockPath);
+  const dead = refuseIfHeld(lockPath);
 
-  // The holder is gone. Only the run that creates the reservation may remove
-  // its lock: two runs each removing "the stale lock" would otherwise remove
-  // one another's fresh one and both believe they hold it.
+  // No live holder. Only the run that creates the reservation may remove a
+  // lock, and only the dead one it saw before reserving: a lock that appeared
+  // or changed since then is another run's, taken while this one looked away.
   const claimPath = `${lockPath}.reclaim`;
   const lostRace = `Failed to take eval run lock ${lockPath}: another eval was taking it over at the same moment. Rerun once it finishes.`;
   if (!createExclusive(claimPath, record)) {
     throw new Error(`${lostRace} If no eval is running, remove ${claimPath}.`);
   }
   try {
-    refuseIfHeld(lockPath); // again: a run may have taken it over since the first look
-    fs.rmSync(lockPath, { force: true });
-    if (!createExclusive(lockPath, record)) throw new Error(lostRace);
+    const current = refuseIfHeld(lockPath);
+    if (current) {
+      if (current.pid !== dead?.pid || current.started !== dead.started) {
+        throw new Error(
+          `${lostRace} The lock now names \`${current.command}\` (PID ${current.pid}, started ${current.started}).`,
+        );
+      }
+      fs.rmSync(lockPath, { force: true });
+    }
+    if (!createExclusive(lockPath, record)) {
+      refuseIfHeld(lockPath); // name the run that created it first
+      throw new Error(lostRace);
+    }
   } finally {
     fs.rmSync(claimPath, { force: true });
   }

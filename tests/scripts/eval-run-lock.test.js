@@ -170,6 +170,56 @@ describe('acquireRunLock', () => {
     expect(fs.existsSync(`${lockPath}.reclaim`)).toBe(false);
   });
 
+  it('leaves a lock a third run created after the holder it lost to released', () => {
+    const third = { pid: process.ppid, started: 'c', command: 'eval ab third' };
+    plant({ pid: process.ppid, started: 'b', command: 'eval ab holder' });
+    // The holder releases after this run's create fails and before its first look.
+    const read = fs.readFileSync;
+    let reads = 0;
+    jest.spyOn(fs, 'readFileSync').mockImplementation((file, ...rest) => {
+      if (file === lockPath && reads++ === 0) fs.rmSync(lockPath);
+      return read(file, ...rest);
+    });
+    // The third run creates its lock just after this run's look under the reservation.
+    const exists = fs.existsSync;
+    let looks = 0;
+    jest.spyOn(fs, 'existsSync').mockImplementation((file) => {
+      const found = exists(file);
+      if (file === lockPath && ++looks === 2) plant(third);
+      return found;
+    });
+
+    let message;
+    try {
+      acquireRunLock(root, 'eval run demo');
+    } catch (err) {
+      message = err.message;
+    }
+
+    jest.restoreAllMocks();
+    expect(looks).toBe(2);
+    expect(message).toContain('eval ab third');
+    expect(JSON.parse(fs.readFileSync(lockPath, 'utf8'))).toEqual(third);
+    expect(fs.existsSync(`${lockPath}.reclaim`)).toBe(false);
+  });
+
+  it('leaves a dead lock that is not the one it saw before its reservation', () => {
+    const pid = deadPid();
+    const other = { pid, started: 'later', command: 'eval ab crashed again' };
+    plant({ pid, started: 'earlier', command: 'eval ab crashed' });
+    const write = fs.writeFileSync;
+    jest.spyOn(fs, 'writeFileSync').mockImplementation((file, ...rest) => {
+      if (file === `${lockPath}.reclaim`) write(lockPath, JSON.stringify(other));
+      return write(file, ...rest);
+    });
+
+    expect(() => acquireRunLock(root, 'eval run demo')).toThrow('eval ab crashed again');
+
+    jest.restoreAllMocks();
+    expect(JSON.parse(fs.readFileSync(lockPath, 'utf8'))).toEqual(other);
+    expect(fs.existsSync(`${lockPath}.reclaim`)).toBe(false);
+  });
+
   it('lets exactly one of many concurrent runs take over a dead lock, every round', async () => {
     const modulePath = require.resolve('../../scripts/lib/eval-run-lock');
     // Each contender waits for the shared start instant, tries once, reports,
