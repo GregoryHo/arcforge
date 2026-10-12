@@ -108,9 +108,11 @@ function parseScenarioStructure(content) {
  * 5. Each ## Environment line is a declaration the trial will accept.
  *
  * @param {string} filePath - Absolute path to scenario .md file
+ * @param {string} [projectRoot] - Project root the scenario's trials run under
+ *   (defaults to the working directory)
  * @returns {Array<{ file: string, line: number, message: string }>} Diagnostics
  */
-function lintScenario(filePath) {
+function lintScenario(filePath, projectRoot = process.cwd()) {
   const content = fs.readFileSync(filePath, 'utf8');
   const { sections, assertionLines, environmentLines: declared } = parseScenarioStructure(content);
 
@@ -168,7 +170,8 @@ function lintScenario(filePath) {
   }
 
   // Check 4: ## Environment declarations — the trial refuses what this reports
-  for (const { index, message } of parseEnvironment(declared.map((d) => d.text)).errors) {
+  const declarations = declared.map((d) => d.text);
+  for (const { index, message } of parseEnvironment(declarations, projectRoot).errors) {
     diagnostics.push({
       file: filePath,
       line: declared[index].line,

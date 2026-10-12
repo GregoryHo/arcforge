@@ -369,6 +369,14 @@ describe('lintScenario: ## Environment', () => {
     ]);
   });
 
+  it('reports that removal spelled as the literal path, given the project root', () => {
+    const shims = path.join(path.resolve(dir), '.eval-trials', '.bin');
+    const file = writeScenario(dir, 'env-shim-literal', withEnvironment([`PATH-=${shims}`]));
+    expect(lintScenario(file, dir).map((d) => d.message)).toEqual([
+      expect.stringMatching(/would remove the directory claude and node resolve from/),
+    ]);
+  });
+
   it('reports a fenced block, which the trial would refuse line by line', () => {
     const file = writeScenario(
       dir,

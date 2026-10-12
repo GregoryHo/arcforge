@@ -1,5 +1,5 @@
 /**
- * eval-trial-environment.test.js - The environment a trial runs in (B-7).
+ * eval-trial-environment.test.js - The environment a trial runs in (B-18).
  *
  * Nothing here is mocked: the lookups run in a real shell under the environment
  * the helper built, against a stand-in operator PATH. No `claude` is spawned.
@@ -111,6 +111,76 @@ describe('a contained trial does not inherit the operator environment', () => {
     }
   });
 
+  // The allowlist is families, so a provider's or a proxy's next variable is
+  // forwarded without a new name here.
+  it.each([
+    // Claude Code's own credentials and provider routing
+    ['CLAUDE_CONFIG_DIR', true],
+    ['CLAUDE_CODE_OAUTH_TOKEN', true],
+    ['CLAUDE_CODE_USE_BEDROCK', true],
+    ['CLAUDE_CODE_USE_VERTEX', true],
+    ['CLAUDE_CODE_USE_FOUNDRY', true],
+    ['ANTHROPIC_API_KEY', true],
+    ['ANTHROPIC_AUTH_TOKEN', true],
+    ['ANTHROPIC_BASE_URL', true],
+    ['ANTHROPIC_CUSTOM_HEADERS', true],
+    ['ANTHROPIC_BEDROCK_BASE_URL', true],
+    ['ANTHROPIC_VERTEX_PROJECT_ID', true],
+    ['ANTHROPIC_VERTEX_BASE_URL', true],
+    // AWS credential discovery, every provider the SDK can pick
+    ['AWS_PROFILE', true],
+    ['AWS_REGION', true],
+    ['AWS_ACCESS_KEY_ID', true],
+    ['AWS_BEARER_TOKEN_BEDROCK', true],
+    ['AWS_ROLE_ARN', true],
+    ['AWS_WEB_IDENTITY_TOKEN_FILE', true],
+    ['AWS_CONTAINER_CREDENTIALS_FULL_URI', true],
+    ['AWS_CONTAINER_CREDENTIALS_RELATIVE_URI', true],
+    ['AWS_CONFIG_FILE', true],
+    ['AWS_SHARED_CREDENTIALS_FILE', true],
+    // Google Cloud
+    ['GOOGLE_APPLICATION_CREDENTIALS', true],
+    ['GOOGLE_CLOUD_PROJECT', true],
+    ['GCLOUD_PROJECT', true],
+    ['CLOUDSDK_CONFIG', true],
+    ['CLOUD_ML_REGION', true],
+    // Proxies and certificates
+    ['HTTP_PROXY', true],
+    ['HTTPS_PROXY', true],
+    ['ALL_PROXY', true],
+    ['NO_PROXY', true],
+    ['http_proxy', true],
+    ['https_proxy', true],
+    ['all_proxy', true],
+    ['no_proxy', true],
+    ['SSL_CERT_FILE', true],
+    ['SSL_CERT_DIR', true],
+    ['NODE_EXTRA_CA_CERTS', true],
+    ['CURL_CA_BUNDLE', true],
+    ['REQUESTS_CA_BUNDLE', true],
+    ['NODE_TLS_REJECT_UNAUTHORIZED', true],
+    // The model is the row's --model, never the operator's variable
+    ['ANTHROPIC_MODEL', false],
+    // The session an eval was started from
+    ['CLAUDECODE', false],
+    ['CLAUDE_CODE_ENTRYPOINT', false],
+    ['CLAUDE_CODE_SSE_PORT', false],
+    ['CLAUDE_CODE_SESSION_ID', false],
+    ['CLAUDE_CODE_MAX_OUTPUT_TOKENS', false],
+    ['CLAUDE_CODE_SUBAGENT_MODEL', false],
+    ['CLAUDE_PROJECT_DIR', false],
+    // Near misses of a family
+    ['AWS', false],
+    ['PROXY', false],
+    ['MY_PROXY_HOST', false],
+    ['GITHUB_TOKEN', false],
+    ['OPENAI_API_KEY', false],
+    ['EDITOR', false],
+  ])('%s forwarded: %s', (name, forwarded) => {
+    parentEnv[name] = 'operator-value';
+    expect(Object.hasOwn(build(), name)).toBe(forwarded);
+  });
+
   it('points the arcforge data home into the trial and leaves HOME alone', () => {
     const env = build();
     expect(env.ARCFORGE_HOME).toBe(path.join(trialDir, '.arcforge'));
@@ -157,6 +227,23 @@ describe('the shim directory', () => {
     expect(fs.readlinkSync(path.join(binDir, 'claude'))).toBe(first);
     ensureToolShims(binDir, path.dirname(second));
     expect(fs.readlinkSync(path.join(binDir, 'claude'))).toBe(second);
+  });
+
+  it('links an absolute target when the operator PATH entry is relative', () => {
+    const claude = writeExecutable(path.join(root, 'tools', 'claude'));
+    const binDir = path.join(root, '.eval-trials', '.bin');
+    const relativePath = ['tools', ...SYSTEM_PATH].join(':');
+    const cwd = process.cwd();
+    process.chdir(root);
+    try {
+      expect(resolveOnPath('claude', relativePath)).toBe(claude);
+      ensureToolShims(binDir, relativePath);
+    } finally {
+      process.chdir(cwd);
+    }
+    expect(fs.readlinkSync(path.join(binDir, 'claude'))).toBe(claude);
+    // The link is followed from the shim directory, wherever the run started.
+    expect(which('claude', { PATH: binDir })).toBe(path.join(binDir, 'claude'));
   });
 
   it('leaves no claude shim when the operator has none, and drops a stale one', () => {
@@ -316,10 +403,20 @@ describe('a scenario declares its own trial environment (## Environment)', () =>
         { index: 0, message: expect.stringMatching(/would remove the directory claude and node/) },
       ]);
     }
-    // A literal path only shows itself once the project root is known.
-    const literal = `PATH-=${shims()}`;
-    expect(parseEnvironment([literal]).errors).toEqual([]);
-    expect(() => build([literal])).toThrow(/would remove the directory claude and node/);
+    // The literal path is the same directory, and is refused at the same point.
+    for (const literal of [`PATH-=${shims()}`, `PATH-=${shims()}/`]) {
+      expect(parseEnvironment([literal], projectRoot).errors).toEqual([
+        { index: 0, message: expect.stringMatching(/would remove the directory claude and node/) },
+      ]);
+      expect(() =>
+        declaredEnvironment({ name: 'scn', environment: [literal] }, projectRoot),
+      ).toThrow(/bad ## Environment line: .*would remove the directory claude and node/);
+      expect(() => build([literal])).toThrow(/would remove the directory claude and node/);
+    }
+    // Another project's shim directory is only a directory that is not on PATH.
+    expect(parseEnvironment(['PATH-=/elsewhere/.eval-trials/.bin'], projectRoot).errors).toEqual(
+      [],
+    );
     // Moving it is not removing it: claude and node still resolve.
     const env = build([`PATH+=\${PROJECT_ROOT}/.eval-trials/.bin`]);
     expect(env.PATH.split(':')).toEqual([...SYSTEM_PATH, shims()]);

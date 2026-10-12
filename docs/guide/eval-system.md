@@ -155,18 +155,27 @@ running arcforge and to the `npm` and `npx` beside that `node`, then
 `~/.local/bin`, a version manager) is not found, even when it shares a
 directory with `claude`, unless the scenario declares it (see
 [Declaring a trial's environment](#declaring-a-trials-environment)). Only these
-variables are forwarded:
+variables are forwarded. A name ending in `*` is a family: every variable that
+starts that way is forwarded, so a provider's role, token-file or
+container-credential variable needs no entry of its own.
 
 | Group | Variables |
 |-------|-----------|
 | You and your terminal | `HOME`, `USER`, `LOGNAME`, `SHELL`, `TERM`, `LANG`, `LC_*`, `TZ`, `TMPDIR`, `XDG_CONFIG_HOME` |
-| Claude Code's credentials and provider | `CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_CUSTOM_HEADERS`, `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`, `ANTHROPIC_VERTEX_PROJECT_ID`, `CLOUD_ML_REGION`, `GOOGLE_APPLICATION_CREDENTIALS`, `AWS_PROFILE`, `AWS_REGION`, `AWS_DEFAULT_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `AWS_BEARER_TOKEN_BEDROCK` |
-| Network | `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` and their lowercase forms, `NODE_EXTRA_CA_CERTS`, `SSL_CERT_FILE` |
+| Claude Code's credentials and provider | `CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`, `CLAUDE_CODE_USE_*`, `ANTHROPIC_*` |
+| Cloud provider credentials | `AWS_*`, `GOOGLE_*`, `GCLOUD_*`, `CLOUDSDK_*`, `CLOUD_ML_REGION` |
+| Network | every variable ending in `_PROXY` or `_proxy` (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY` and their lowercase forms), `SSL_CERT_*`, `NODE_EXTRA_CA_CERTS`, `CURL_CA_BUNDLE`, `REQUESTS_CA_BUNDLE`, `NODE_TLS_REJECT_UNAUTHORIZED` |
 
-Everything else is dropped, a model picked through `ANTHROPIC_MODEL` included:
-pass `--model` so the row records it. `## Setup` runs in this same environment,
-plus `PROJECT_ROOT` and `TRIAL_DIR`, so a fixture is built with the tools the
-trial will find. `HOME` is kept because that is where `claude` finds your login,
+Five names are dropped even though a family would match them, or so that none
+ever does: `ANTHROPIC_MODEL`, and the variables of the Claude Code session you
+started the eval from (`CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`,
+`CLAUDE_CODE_SSE_PORT`, `CLAUDE_CODE_SESSION_ID`). No other `CLAUDE_CODE_*`
+variable is forwarded either.
+
+Everything else is dropped. A model picked through `ANTHROPIC_MODEL` does not
+reach the trial: pass `--model` so the row records it. `## Setup` runs in this
+same environment, plus `PROJECT_ROOT` and `TRIAL_DIR`, so a fixture is built
+with the tools the trial will find. `HOME` is kept because that is where `claude` finds your login,
 which has one side effect: Claude Code loads the functions and aliases of your
 shell startup file (`~/.zshrc` or `~/.bashrc`) into the commands the agent runs,
 so a function or alias defined there is still visible to a trial.
@@ -413,7 +422,8 @@ start without:
   directory per line) and no `..` segment. A literal absolute path such as
   `/opt/homebrew/bin` is allowed, and ties the scenario to hosts that have it.
 - **`PATH` is changed, never replaced.** `PATH=<dir>` is an error, and so is
-  removing `.eval-trials/.bin`, so `claude` and `node` always resolve.
+  removing `.eval-trials/.bin`, whether written with `${PROJECT_ROOT}` or as
+  its full path, so `claude` and `node` always resolve.
 - **`<VAR>` is one of** `XDG_CACHE_HOME`, `XDG_DATA_HOME`, `XDG_BIN_HOME`,
   `UV_CACHE_DIR`, `UV_TOOL_DIR`, `UV_TOOL_BIN_DIR`, `UV_PYTHON_INSTALL_DIR`,
   `UV_INSTALL_DIR`, `PLAYWRIGHT_BROWSERS_PATH`, `PIP_CACHE_DIR` or

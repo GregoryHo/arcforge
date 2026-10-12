@@ -23,44 +23,53 @@ const SYSTEM_PATH = ['/usr/bin', '/bin', '/usr/sbin', '/sbin'];
 // who and where the user is (HOME and XDG_CONFIG_HOME are where `claude` and git
 // find their config and credentials, USER is the keychain account), how `claude`
 // authenticates and which provider it talks to, and how the network is reached.
-// Model and effort variables are left out on purpose: a row records the flag.
-const FORWARDED = new Set([
-  'HOME',
-  'USER',
-  'LOGNAME',
-  'SHELL',
-  'TERM',
-  'LANG',
-  'TZ',
-  'TMPDIR',
-  'XDG_CONFIG_HOME',
-  'CLAUDE_CONFIG_DIR',
-  'CLAUDE_CODE_OAUTH_TOKEN',
-  'ANTHROPIC_API_KEY',
-  'ANTHROPIC_AUTH_TOKEN',
-  'ANTHROPIC_BASE_URL',
-  'ANTHROPIC_CUSTOM_HEADERS',
-  'CLAUDE_CODE_USE_BEDROCK',
-  'CLAUDE_CODE_USE_VERTEX',
-  'ANTHROPIC_VERTEX_PROJECT_ID',
-  'CLOUD_ML_REGION',
-  'GOOGLE_APPLICATION_CREDENTIALS',
-  'AWS_PROFILE',
-  'AWS_REGION',
-  'AWS_DEFAULT_REGION',
-  'AWS_ACCESS_KEY_ID',
-  'AWS_SECRET_ACCESS_KEY',
-  'AWS_SESSION_TOKEN',
-  'AWS_BEARER_TOKEN_BEDROCK',
-  'HTTP_PROXY',
-  'HTTPS_PROXY',
-  'NO_PROXY',
-  'http_proxy',
-  'https_proxy',
-  'no_proxy',
-  'NODE_EXTRA_CA_CERTS',
-  'SSL_CERT_FILE',
-]);
+// The last two are families, matched by prefix or suffix: a cloud SDK picks its
+// credential provider from whichever of its variables are set (a role, a token
+// file, a container endpoint), and a list of names always misses one.
+const FORWARDED = {
+  names: [
+    'HOME',
+    'USER',
+    'LOGNAME',
+    'SHELL',
+    'TERM',
+    'LANG',
+    'TZ',
+    'TMPDIR',
+    'XDG_CONFIG_HOME',
+    'CLAUDE_CONFIG_DIR',
+    'CLAUDE_CODE_OAUTH_TOKEN',
+    'CLOUD_ML_REGION',
+    'NODE_EXTRA_CA_CERTS',
+    'CURL_CA_BUNDLE',
+    'REQUESTS_CA_BUNDLE',
+    'NODE_TLS_REJECT_UNAUTHORIZED',
+  ],
+  // ANTHROPIC_ covers ANTHROPIC_VERTEX_* and ANTHROPIC_BEDROCK_* as well.
+  prefixes: [
+    'LC_',
+    'ANTHROPIC_',
+    'CLAUDE_CODE_USE_',
+    'AWS_',
+    'GOOGLE_',
+    'GCLOUD_',
+    'CLOUDSDK_',
+    'SSL_CERT_',
+  ],
+  // HTTP_PROXY, HTTPS_PROXY, ALL_PROXY, NO_PROXY and their lowercase forms.
+  suffixes: ['_PROXY', '_proxy'],
+};
+
+// Dropped whatever the families above say. The model is left out on purpose: a
+// row records the --model flag. The rest belong to the Claude Code session an
+// eval was started from, and no family may ever widen far enough to pass them.
+const NEVER_FORWARDED = [
+  'ANTHROPIC_MODEL',
+  'CLAUDECODE',
+  'CLAUDE_CODE_ENTRYPOINT',
+  'CLAUDE_CODE_SSE_PORT',
+  'CLAUDE_CODE_SESSION_ID',
+];
 
 // The variables a scenario may point into its trial, so that an install the
 // agent performs lands in the trial directory and not in the operator's caches.
@@ -90,19 +99,34 @@ const TRIAL_DIR_PREFIX = '${TRIAL_DIR}/';
 
 const withoutTrailingSlash = (dir) => (dir.length > 1 ? dir.replace(/\/+$/, '') : dir);
 
-const isForwarded = (name) => FORWARDED.has(name) || name.startsWith('LC_');
+function isForwarded(name) {
+  if (NEVER_FORWARDED.includes(name)) return false;
+  return (
+    FORWARDED.names.includes(name) ||
+    FORWARDED.prefixes.some((prefix) => name.startsWith(prefix)) ||
+    FORWARDED.suffixes.some((suffix) => name.endsWith(suffix))
+  );
+}
+
+// True when a PATH-= value names the shim directory, by placeholder or literally.
+function namesShimDir(value, projectRoot) {
+  const root = path.resolve(projectRoot);
+  const dir = withoutTrailingSlash(value.replace(/^\$\{PROJECT_ROOT\}/, root));
+  return dir === path.join(root, SHIM_DIR);
+}
 
 /**
  * Find an executable the way a shell would, skipping one directory.
  * @param {string} name - Command name
  * @param {string} [pathValue] - PATH to search
  * @param {string} [skipDir] - Directory to ignore (the shim directory itself)
- * @returns {string|undefined} The first match, as the PATH entry spells it
+ * @returns {string|undefined} The first match, as an absolute path: a relative
+ *   PATH entry is resolved against the working directory, as a shell would
  */
 function resolveOnPath(name, pathValue, skipDir) {
   for (const dir of String(pathValue || '').split(path.delimiter)) {
     if (!dir || path.resolve(dir) === skipDir) continue;
-    const candidate = path.join(dir, name);
+    const candidate = path.resolve(dir, name);
     try {
       fs.accessSync(candidate, fs.constants.X_OK);
       if (fs.statSync(candidate).isFile()) return candidate;
@@ -196,9 +220,10 @@ function pathProblem(value) {
  *   PATH-=<dir>   remove one                <VAR>=<dir>   point a cache variable
  *                                                         inside the trial
  * @param {string} text - One trimmed, non-comment line
+ * @param {string} projectRoot - Project root, whose shim directory stays on PATH
  * @returns {{ directive?: { name: string, op: string, value: string }, error?: string }}
  */
-function parseEnvironmentLine(text) {
+function parseEnvironmentLine(text, projectRoot) {
   const match = text.match(/^([A-Za-z_][A-Za-z0-9_]*)(\+=|\^=|-=|=)(.*)$/);
   if (!match) return { error: 'expected PATH+=<dir>, PATH^=<dir>, PATH-=<dir> or <VAR>=<dir>' };
   const [, name, operator, value] = match;
@@ -208,9 +233,7 @@ function parseEnvironmentLine(text) {
     }
     const problem =
       pathProblem(value) ||
-      (operator === '-=' && withoutTrailingSlash(value) === `\${PROJECT_ROOT}/${SHIM_DIR}`
-        ? SHIM_REMOVAL
-        : undefined);
+      (operator === '-=' && namesShimDir(value, projectRoot) ? SHIM_REMOVAL : undefined);
     return problem
       ? { error: `PATH${operator} ${problem}` }
       : { directive: { name, op: PATH_OPS[operator], value } };
@@ -232,14 +255,15 @@ function parseEnvironmentLine(text) {
 /**
  * Parse a scenario's declarations, collecting every problem.
  * @param {string[]} [declarations] - Lines as environmentLines() returns their text
+ * @param {string} [projectRoot] - Project root (defaults to the working directory)
  * @returns {{ directives: Object[], errors: Array<{ index: number, message: string }> }}
  */
-function parseEnvironment(declarations = []) {
+function parseEnvironment(declarations = [], projectRoot = process.cwd()) {
   const directives = [];
   const errors = [];
   const set = new Set();
   declarations.forEach((text, index) => {
-    const { directive, error } = parseEnvironmentLine(text);
+    const { directive, error } = parseEnvironmentLine(text, projectRoot);
     const repeated = directive?.op === 'set' && set.has(directive.name);
     if (error || repeated) {
       errors.push({ index, message: error || `${directive.name} is declared twice` });
@@ -255,11 +279,12 @@ function parseEnvironment(declarations = []) {
  * A scenario's directives, or a refusal naming every bad line. Trials call this
  * before they create anything, so a bad declaration costs no fixture.
  * @param {EvalScenario} [scenario]
+ * @param {string} [projectRoot] - Project root (defaults to the working directory)
  * @returns {Object[]} Directives, in declared order
  */
-function declaredEnvironment(scenario = {}) {
+function declaredEnvironment(scenario = {}, projectRoot = process.cwd()) {
   const declarations = scenario.environment || [];
-  const { directives, errors } = parseEnvironment(declarations);
+  const { directives, errors } = parseEnvironment(declarations, projectRoot);
   if (errors.length > 0) {
     const detail = errors.map((e) => `"${declarations[e.index]}": ${e.message}`).join('; ');
     throw new Error(`Scenario ${scenario.name || ''} has a bad ## Environment line: ${detail}`);
@@ -272,10 +297,8 @@ function declaredEnvironment(scenario = {}) {
  * @param {Object} trialEnvironment - Environment to change (the caller's own copy)
  * @param {Object[]} directives - From declaredEnvironment()
  * @param {{ projectRoot: string, trialDir: string }} roots - Placeholder values
- * @throws {Error} when a removal names the shim directory by its literal path
  */
 function applyDirectives(trialEnvironment, directives, { projectRoot, trialDir }) {
-  const shimDir = path.join(path.resolve(projectRoot), SHIM_DIR);
   const expand = (value) =>
     withoutTrailingSlash(
       value.replace(PLACEHOLDER_RE, (_m, name) =>
@@ -290,9 +313,6 @@ function applyDirectives(trialEnvironment, directives, { projectRoot, trialDir }
     if (op === 'set') {
       trialEnvironment[name] = dir;
       continue;
-    }
-    if (op === 'remove' && dir === shimDir) {
-      throw new Error(`## Environment: PATH-=${value} ${SHIM_REMOVAL}`);
     }
     entries = entries.filter((entry) => withoutTrailingSlash(entry) !== dir);
     if (op === 'append') entries.push(dir);
@@ -325,7 +345,7 @@ function applyDirectives(trialEnvironment, directives, { projectRoot, trialDir }
  */
 function trialEnv(trialDir, scenario = {}, opts = {}) {
   const { projectRoot = process.cwd(), contained = true, parentEnv = process.env } = opts;
-  const directives = declaredEnvironment(scenario);
+  const directives = declaredEnvironment(scenario, projectRoot);
   const trialEnvironment = contained ? {} : { ...parentEnv };
   if (contained) {
     for (const name of Object.keys(parentEnv)) {

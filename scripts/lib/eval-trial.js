@@ -20,6 +20,7 @@ const {
 const {
   repoCommit,
   createTrialDir,
+  cleanupTrialDir,
   runSetup,
   writeIsolationSettings,
   buildIsolationSettings,
@@ -98,7 +99,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   // Resolved before anything else so a bad override is refused ahead of the
   // fixture Setup and the session (B-10), and recorded on every row it produces.
   const trialTimeoutMs = resolveTrialTimeoutMs();
-  declaredEnvironment(scenario); // a bad ## Environment line is refused the same way
+  declaredEnvironment(scenario, projectRoot); // a bad ## Environment line is refused the same way
   const timestamp = getTimestamp();
 
   const buildInfraError = (error, errorType, extra = {}) => {
@@ -158,10 +159,14 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   // Always run in trial dir for workspace safety
   const trialDir = createTrialDir(scenario.name, trialNumber, projectRoot);
   // One environment for Setup and the session; an arm never gets its own.
-  const env = trialEnv(trialDir, scenario, {
-    projectRoot,
-    contained: isolated || Boolean(pluginDir),
-  });
+  let env;
+  try {
+    env = trialEnv(trialDir, scenario, { projectRoot, contained: isolated || Boolean(pluginDir) });
+  } catch (error) {
+    // No row can describe a trial that never had an environment: leave nothing behind.
+    cleanupTrialDir(trialDir);
+    throw error;
+  }
   try {
     if (scenario.setup) runSetup(scenario.setup, trialDir, projectRoot, env);
   } catch (error) {

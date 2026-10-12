@@ -1,6 +1,6 @@
 /**
  * eval-trial-declared-env.test.js - A scenario's `## Environment` reaches both
- * arms and Setup alike, and every row records it (B-7). The `claude` subprocess
+ * arms and Setup alike, and every row records it (B-18). The `claude` subprocess
  * is stubbed; no session is spawned.
  */
 
@@ -136,5 +136,24 @@ describe('a declared trial environment (## Environment)', () => {
     );
     expect(mockUtils.execCommand).not.toHaveBeenCalled();
     expect(fs.existsSync(path.join(tempDir, '.eval-trials'))).toBe(false);
+  });
+
+  it('refuses the shim directory removed by its literal path at the same point', () => {
+    const shims = path.join(path.resolve(tempDir), '.eval-trials', '.bin');
+    const bad = { ...SCENARIO, environment: [`PATH-=${shims}`] };
+    expect(() => runTrial(bad, 1, 1, { projectRoot: tempDir })).toThrow(
+      /bad ## Environment line: .*would remove the directory claude and node resolve from/,
+    );
+    expect(mockUtils.execCommand).not.toHaveBeenCalled();
+    expect(fs.existsSync(path.join(tempDir, '.eval-trials'))).toBe(false);
+  });
+
+  it('leaves no trial directory behind when the environment cannot be built', () => {
+    // A file where the shim directory belongs: nothing can be linked into it.
+    fs.mkdirSync(path.join(tempDir, '.eval-trials'));
+    fs.writeFileSync(path.join(tempDir, '.eval-trials', '.bin'), 'in the way');
+    expect(() => runTrial(SCENARIO, 1, 1, { projectRoot: tempDir })).toThrow();
+    expect(fs.readdirSync(path.join(tempDir, '.eval-trials'))).toEqual(['.bin']);
+    expect(mockUtils.execCommand).not.toHaveBeenCalled();
   });
 });

@@ -117,7 +117,7 @@ describe('trial isolation keeps the operator user config out (B-7, #170)', () =>
   });
 });
 
-describe('the operator environment stays out of a contained trial (B-7)', () => {
+describe('the operator environment stays out of a contained trial (B-18)', () => {
   const { runSkillEval } = require('../../scripts/lib/eval');
   const OPERATOR_ONLY = '/operator/only/bin';
   const SYSTEM = ['/usr/bin', '/bin', '/usr/sbin', '/sbin'];
