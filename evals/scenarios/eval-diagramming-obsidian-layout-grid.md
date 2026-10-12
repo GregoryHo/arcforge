@@ -107,9 +107,10 @@ carries the worker's name as a whole token (`auth`, `worker-auth`,
 `Auth Service`). When several shapes carry one name, a box beats what is drawn
 on or between boxes: a shape whose `type` is text or a connector, or whose name
 also carries another pipeline node (`router-auth`), gives way when another
-candidate remains. Among the rest an exact `id` wins, then the largest area — a
-box contains its own text label, so a small text node labelled `auth` never
-stands in for the `Auth Service` box. The audit line says which rule was used. The file may be a bare list or a list
+candidate remains. Among the rest the largest area wins — a box contains its own
+text label, so a small text node never stands in for the box, whichever of the
+two was given the bare `auth` as its `id` or `label`. The audit line says which
+rule was used. The file may be a bare list or a list
 wrapped in an object.
 
 The grader reads `layout.json` and the transcript as data and runs nothing
@@ -376,16 +377,13 @@ for name in WORKERS:
         continue
     # A box beats what is drawn on or between boxes: a text or connector type, and
     # a shape naming a second pipeline node (`router-auth`), give way when another
-    # candidate remains. Then an exact id, then the largest area — a box contains
-    # its own label, so a small text node never stands in for it.
+    # candidate remains. Then the largest area: a box contains its own label, so a
+    # small text node never stands in for it, whatever id or label it was given.
     boxes = [s for s in cands if not is_annotation(s, name)] or cands
-    exact_id = [s for s in boxes if tokens(s["o"].get("id")) == [name]]
     if len(cands) == 1:
         pick, rule = cands[0], "only match"
     elif len(boxes) == 1:
         pick, rule = boxes[0], "only box"
-    elif len(exact_id) == 1:
-        pick, rule = exact_id[0], "exact id"
     else:
         sized = [s for s in boxes if placed(s)]
         pick = max(sized, key=lambda s: s["w"] * s["h"]) if sized else boxes[0]
