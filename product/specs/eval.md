@@ -218,12 +218,27 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   neither, pool as they did. The two fields are there so a reader can see
   that a pool mixes them, not so the engine refuses one that does (D-062).
 - **B-18 A trial's environment is built, not inherited (6.5.0).** The engine
-  starts each trial session, and each fixture `Setup`, with a `PATH` it
-  builds: `claude` and `node` resolve, and the entries of the operator's own
-  `PATH` do not carry over, so a tool the operator happens to have
+  starts each contained trial session, and its fixture `Setup`, with an
+  environment it builds from an allowlist: the identity, shell, locale and
+  temporary-directory variables (`HOME`, `USER`, `LOGNAME`, `SHELL`, `TERM`,
+  `LANG`, `LC_*`, `TZ`, `TMPDIR`, `XDG_CONFIG_HOME`), the variables the
+  session authenticates and reaches its provider with, the proxy and
+  certificate variables, and `ARCFORGE_HOME`, redirected as B-7 says.
+  Everything else the operator's shell exports is dropped, among it
+  `ANTHROPIC_MODEL` and every `CLAUDE_CODE_*` session variable an eval
+  started from inside a Claude Code session would otherwise pass on. `PATH`
+  is built too: a shim directory under `.eval-trials/` holding links to
+  `claude`, to `node`, and to the `npm` and `npx` beside it, followed by the
+  system directories `/usr/bin`, `/bin`, `/usr/sbin` and `/sbin`. So
+  `claude` and `node` resolve, and the entries of the operator's own
+  `PATH` do not carry over — not even the directory `claude` is installed
+  in, which can hold other tools — so a tool the operator happens to have
   installed — `arcforge` included — is not something a trial can run unless
-  the scenario says so. A scenario says so in an `## Environment` section,
-  which may add `PATH` entries, remove them, and point cache directories — a
+  the scenario says so. A `--no-isolate` trial is the exception: it measures
+  the operator's own toolkit (B-7), so it inherits the operator's
+  environment, with `ARCFORGE_HOME` alone redirected. A scenario makes its
+  statement in an `## Environment` section, which adds to the built `PATH`:
+  it may add `PATH` entries, remove them, and point cache directories — a
   package manager's, a browser download's — at a place inside the trial
   directory. Nothing else can be declared, and `HOME` is never overridden,
   because the session authenticates from `~/.claude`. The declaration
@@ -232,7 +247,11 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   state stays redirected as B-7 says (D-057, D-062). Residual: this is not
   a sandbox. A trial still runs with the operator's filesystem permissions
   and `HOME`, and a cache no scenario redirected is still the operator's,
-  shared from one trial to the next. The environment is not a pooling
+  shared from one trial to the next. Because `HOME` is kept, Claude Code
+  still sources the operator's shell startup file (`~/.zshrc` or
+  `~/.bashrc`) when it builds its shell snapshot, so the operator's shell
+  functions and aliases still reach the commands a trial runs; the built
+  environment does not change that. The environment is not a pooling
   condition, so rows from before and after this change pool together though
   their trials did not see the same `PATH`.
 - **B-19 A skill's files can be staged for the arm injected with it
@@ -274,7 +293,10 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
 - **B-21 `eval compare` can skip the analyzer (6.5.0).** On a model- or
   human-graded scenario `eval compare` computes the verdict and then starts
   an eval-analyzer session for a qualitative reading. With `--no-analyzer`
-  it starts none and announces none; the delta, the interval and the verdict
+  it starts no analyzer session and prints one line saying the analyzer was
+  skipped where the analyzer's banner would have been, so an operator can
+  tell a skipped analyzer from a code-graded scenario, which prints
+  neither; the delta, the interval and the verdict
   print as they would have, since they come from the rows alone (B-4). On a
   code-graded scenario, which never starts the analyzer, the flag changes
   nothing (D-062).

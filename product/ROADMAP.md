@@ -1993,8 +1993,16 @@ reverse one, append a superseding entry (see AGENTS.md).
   scenario file's hash (`node_version` and `scenario_hash` in the preflight
   record's spelling); neither is a pooling condition, so eval B-8's
   conditions do not change. (d) A trial's environment is rebuilt rather than
-  inherited: the operator's `PATH` no longer reaches a trial or its fixture
-  setup, `claude` and `node` stay resolvable, and a scenario may declare, in
+  inherited: a contained trial and its fixture setup get an allowlist — the
+  identity, shell and locale variables, what the session authenticates and
+  reaches its provider with, the proxy and certificate variables, and the
+  redirected `ARCFORGE_HOME` — and everything else is dropped, among it
+  `ANTHROPIC_MODEL` and every `CLAUDE_CODE_*` session variable; `PATH` is a
+  shim directory under `.eval-trials/` linking `claude`, `node`, `npm` and
+  `npx`, followed by the system directories, so the operator's `PATH` no
+  longer reaches such a trial while `claude` and `node` stay resolvable. A
+  `--no-isolate` trial inherits the operator's environment, with
+  `ARCFORGE_HOME` alone redirected. A scenario may declare, in
   an `## Environment` section, `PATH` entries to add or remove and cache
   directories to place inside the trial; `HOME` is kept, since the session
   authenticates from `~/.claude`. The declaration applies to both arms alike
@@ -2054,6 +2062,10 @@ reverse one, append a superseding entry (see AGENTS.md).
   its directory is still caught only afterwards, by the write guard, within
   that guard's blind spots (eval B-7). Caches the scenario does not declare
   stay the operator's and can still carry state from one trial to the next.
+  Because `HOME` is kept, Claude Code still sources the operator's
+  `~/.zshrc` or `~/.bashrc` when it builds its shell snapshot, so the
+  operator's shell functions and aliases still reach a trial's commands;
+  the rebuilt environment does not fix that.
   The lock covers the three commands that run trials: `eval report`, an
   edit, or any other write in the checkout during a live run still reads to
   the write guard as the trial's. It is per checkout, so two worktrees are
