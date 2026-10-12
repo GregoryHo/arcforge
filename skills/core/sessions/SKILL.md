@@ -35,33 +35,11 @@ verified when a run says so and not before.
 
 ### Step 2 — Write the file
 
-Write `.handovers/<YYYY-MM-DD>-<slug>.md`, every slot filled:
-
-```markdown
-# <what this work is> — <YYYY-MM-DD>
-
-## Where it stands
-<branch, and the one-line state of the work>
-<the command that was run and its exact result>
-
-## Done
-- <what works> — verified by <command and its result>
-
-## Unfinished
-- <what is not done> — <written but untested | blocked by X | not started>
-
-## Decisions
-- <what was decided> — because <reason>; rejected <alternative>
-
-## Next
-1. <the next action, as a command to run or a named file to change>
-```
-
-A slot with nothing in it gets the word `none`. Deleting the heading instead reads
-as an omission, and the reader cannot tell which one it was.
-
-The file is an ordinary project file: commit it when the handoff is to someone
-else, ignore it when it is to yourself tomorrow.
+Open `references/handover-template.md` and write `.handovers/<YYYY-MM-DD>-<slug>.md`
+from it: five sections in this order — `Where it stands`, `Done`, `Unfinished`,
+`Decisions`, `Next` — every slot filled, the word `none` in a slot with nothing in
+it, never a deleted heading. The file is an ordinary project file: commit it when
+the handoff is to someone else, ignore it when it is to yourself tomorrow.
 
 - [ ] Done when the file exists at that path, no slot holds a placeholder, and the user has been told the path and the next action.
 
@@ -69,7 +47,10 @@ else, ignore it when it is to yourself tomorrow.
 
 When the user asks to save, archive or name this session, or wants it reachable by
 name from another session, the archive is a second home for the handover — the
-same five sections, read later through `arcforge session resume`.
+same five sections, read later through `arcforge session resume`. Earlier archives
+are found with `arcforge session list` and named with
+`arcforge session alias set <name> <archive-path>`, `alias remove <name>` and
+`alias list`; their flags and output are in `references/session-cli.md`.
 
 ### Step 1 — Write the handover file first
 
@@ -80,33 +61,16 @@ archives the file you give it.
 
 ### Step 2 — Archive it
 
-```bash
-arcforge session save <alias> --from .handovers/<YYYY-MM-DD>-<slug>.md
-```
-
-The archive is an engine-written metrics header — duration, tool calls, user
-messages, files modified — followed by the five sections verbatim. It holds none
-of the user's message text. Each save writes a new `archive-<alias>-<UTC stamp>.md`;
-no archive is ever overwritten. The engine refuses, exits non-zero and writes
-nothing when a section is missing, empty, out of order or extra; when the alias is
-not letters, digits, `-` and `_` (at most 128); or with `alias "<name>" already
-exists — pass --force to overwrite it`. Fix the file or pick another name.
-`--force` only when the user has said to: it moves only that alias to the new
-archive; the old archive stays on disk and keeps any other aliases it had.
+Run `arcforge session save <alias> --from .handovers/<YYYY-MM-DD>-<slug>.md`. The
+engine refuses, exits non-zero and writes nothing when the sections or the alias
+are not what it accepts, or the alias is taken: fix the file or pick another name
+(`references/session-cli.md` lists each refusal and what the archive holds).
+`--force` only when the user has said to: it moves that alias off the archive it named.
 
 If `arcforge` reports `command not found`, the CLI is not on this host's PATH:
 the handover file stands on its own, so tell the user the archive was not made.
 
 - [ ] Done when the command exited 0 and the user has been told the alias and the archive path it printed.
-
-### Finding and naming archives
-
-`arcforge session list` prints this project's archives, newest first: date,
-aliases, title, path. `--limit N` caps it, `--json` is for parsing.
-
-`arcforge session alias set <name> <archive-path>` gives an existing archive
-another name (`--force` to repoint a name in use), `alias remove <name>` drops a
-name and keeps the archive, and `alias list` shows every name with its archive.
 
 ## Resuming from a handover
 
@@ -115,8 +79,7 @@ name and keeps the archive, and `alias list` shows every name with its archive.
 Read the newest file in `.handovers/`, or the one the user named, end to end. For
 a named archive, run `arcforge session resume <alias|path>`: it prints the same
 five sections, and they are read and checked exactly like a handover file. An
-archive in v5's format (`Summary`, `What Worked`, ...) fails with `the v5 session
-archive format ... is not supported`; there is no converter, so report that
+archive in v5's format is refused (`references/session-cli.md`): report that
 rather than rebuilding the five sections from it. Either one describes the repo
 as it was when the writer stopped, so check the claims that decide what happens
 next: the branch, whether the Next action already landed, and whether the suite
@@ -157,42 +120,23 @@ decision costs more than a cramped context window does.
 
 ### When to compact
 
-| Situation | Compact? | Why |
-|---|---|---|
-| Exploration finished, findings written to a file | Yes | The reading is bulky; the file is the distilled result |
-| Task list written, execution about to start | Yes | The list is the state; the discussion that produced it is not |
-| A long debugging detour just ended | Yes | Failed hypotheses and traces pollute unrelated work |
-| An approach was abandoned | Yes | Dead-end reasoning costs context and invites relitigating it |
-| Mid-edit, changes partially applied | No | Paths, names, and half-applied intent live only in context |
-| A decision was made and written nowhere | No | Persist it — then this row becomes a Yes |
-| Tests just failed, diagnosis still in context | No | You would re-derive it from zero |
-
-### What survives
-
-| Survives compaction | Lost |
-|---|---|
-| Files on disk, the task list among them | The conversation transcript |
-| Git state: commits, branches, working tree | Tool calls and their output |
-| Project instructions and skills (re-loaded) | Contents of files you read but did not act on |
-| The focus line passed to the compaction | Preferences the user stated in conversation |
-
-Anything in the right column that matters must be moved to the left column before
-compacting — that is what Persist first does. Afterwards, re-read what the next
-phase needs; a file read once is not still in context.
+Open `references/compaction.md` before deciding: one table answers compact-or-not
+by situation, the other lists what survives a compaction and what is lost. After
+compacting, re-read what the next phase needs; a file read once is not still in context.
 
 ### The compaction indicator
 
 At tool-count thresholds a hook emits one line naming the count and the phase it
 observed (`mostly reads`, `active implementation`, `mixed work`). It reports a
 boundary, it does not decide one, and it fires on a counter that knows nothing
-about whether your decisions are on disk yet. Read it as a prompt to run the table
-above. During active implementation the answer is usually "not yet".
+about whether your decisions are on disk yet. Read it as a prompt to run the
+when-to-compact table. During active implementation the answer is usually "not yet".
 
 ## Red flags
 
 | About to | Instead |
 |---|---|
-| Compact because the indicator fired | Answer the table — the indicator observes, it does not decide |
+| Compact because the indicator fired | Answer the when-to-compact table — the indicator observes, it does not decide |
 | Compact while holding a decision that exists nowhere else | Write it down first |
 | Compact mid-edit to free up room | Finish or commit the edit first |
 | Issue a bare compaction with no focus line | Name the next action in the instruction |
