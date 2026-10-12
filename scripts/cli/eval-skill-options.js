@@ -42,7 +42,7 @@ function readSkillFile(file, projectRoot) {
  */
 function readBaselineSkill(file, projectRoot, stage) {
   if (!file) return {};
-  const { hashSkillText, digestSkillDir } = require('../lib/eval-skill-staging');
+  const { hashSkillText, digestSkillDir, skillDirOf } = require('../lib/eval-skill-staging');
   const baseline = readSkillFile(file, projectRoot);
   // An empty text is injected as no text, so its rows would pool with a baseline
   // given none while the preflight was keyed on the empty file's hash.
@@ -52,7 +52,7 @@ function readBaselineSkill(file, projectRoot, stage) {
     );
   }
   return {
-    ...(stage ? { baselineSkillFilesHash: digestSkillDir(path.dirname(baseline.path)) } : {}),
+    ...(stage ? { baselineSkillFilesHash: digestSkillDir(skillDirOf(baseline.path)) } : {}),
     baselineSkillGiven: file,
     baselineSkillFile: baseline.path,
     baselineSkillInstruction: baseline.text,

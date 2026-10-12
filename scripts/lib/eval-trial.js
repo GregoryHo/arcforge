@@ -34,6 +34,7 @@ const {
   isSpawnFailure,
 } = require('./eval-trial-outcome');
 const { watchForWrites } = require('./eval-trial-guard');
+const { changedCopies } = require('./eval-skill-staging');
 
 // Roots already reported as too large for the write check in this process.
 const warnedTooLarge = new Set();
@@ -80,11 +81,12 @@ function resolveTrialTimeoutMs(env = process.env) {
  * @param {number} [options.maxTurns] - Max turns for Claude CLI
  * @param {string[]} [options.watchRoots] - Extra directories the write check watches;
  *   nothing is loaded from them (a comparison's baseline watches the plugin root)
- * @param {{ baseDir?: string, textHash?: string, filesHash?: string, staged?: boolean, baselineHash?: string, baselineFilesHash?: string }} [options.skillInjection] -
+ * @param {{ baseDir?: string, textHash?: string, filesHash?: string, staged?: boolean, copies?: Array<{ dir: string, filesHash: string }>, baselineHash?: string, baselineFilesHash?: string }} [options.skillInjection] -
  *   What this arm was injected with: its staged skill directory, the hash of
  *   its skill text and the digest of its staged files. And the conditions both
  *   arms record: whether the run stages skill files, the hash of the text the
- *   baseline was given, if any, and the digest of the files staged for it
+ *   baseline was given, if any, and the digest of the files staged for it.
+ *   copies is every directory the run staged, each digested again after the trial
  * @returns {TrialResult} Trial result
  */
 function runTrial(scenario, trialNumber, totalTrials, options = {}) {
@@ -336,6 +338,20 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     };
   }
 
+  // A write the snapshot above cannot see (it compares mtime, size and mode,
+  // not content) still changes what later trials are given, so every staged
+  // copy is digested again (B-19).
+  const copiesChanged = changedCopies(skillInjection.copies);
+  if (copiesChanged.length > 0) {
+    return {
+      ...base,
+      output: parsedOutput || '',
+      error: `Trial changed the staged skill files: ${copiesChanged.join(', ')}`,
+      errorType: 'trial_wrote_skill_files',
+      infraError: true,
+    };
+  }
+
   // A trial the runner killed before the agent finished its turn is an
   // instrument failure, not behaviour: its half transcript otherwise grades as
   // if the agent had chosen to stop there (P4 defect A — four of five two-axis
@@ -406,9 +422,17 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
  * repository is not restored here: that is the operator's call.
  * @param {Object} row - The TrialResult the trial produced
  * @param {string} where - Which trial, for the message (e.g. 'baseline trial 2')
- * @throws {Error} when the row is trial_wrote_repo
+ * A trial that left a staged skill copy changed (trial_wrote_skill_files) ends
+ * the run the same way: the copy is what every later trial is given.
+ * @throws {Error} when the row is trial_wrote_repo or trial_wrote_skill_files
  */
 function stopIfTrialWroteRepo(row, where) {
+  if (row?.errorType === 'trial_wrote_skill_files') {
+    const dirs = String(row.error || '').replace(/^Trial changed the staged skill files:\s*/, '');
+    throw new Error(
+      `${where} changed the staged skill files: ${dirs}. The run is stopped so no later trial is given the changed files; rows already recorded are kept. The copy is removed with the run.`,
+    );
+  }
   if (row?.errorType !== 'trial_wrote_repo') return;
   const paths = String(row.error || '').replace(/^Trial wrote outside its directory:\s*/, '');
   throw new Error(

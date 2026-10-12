@@ -20,6 +20,10 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { isProcessAlive } = require('./eval-run-lock');
+
+/** What a staged copy is named: this, the PID of the run that staged it, a random suffix. */
+const STAGED_PREFIX = 'arcforge-eval-skill-';
 
 /** Never part of a skill's own files: version control and installed dependencies. */
 const SKIP_NAMES = new Set(['.git', 'node_modules', '.venv', '__pycache__']);
@@ -73,6 +77,17 @@ function digestSkillDir(dir) {
 }
 
 /**
+ * The directory a skill file sits in, links resolved: the one path that is
+ * both digested and copied, so a directory reached through a link
+ * (`linked-skill -> real-skill`) is staged as the directory it names.
+ * @param {string} skillFile - Absolute path to the skill file
+ * @returns {string}
+ */
+function skillDirOf(skillFile) {
+  return fs.realpathSync.native(path.dirname(skillFile));
+}
+
+/**
  * The line a host opens a loaded skill with.
  * @param {string} dir - The skill's base directory
  * @returns {string}
@@ -81,6 +96,8 @@ function baseDirectoryLine(dir) {
   return `Base directory for this skill: ${dir}`;
 }
 
+const COPIED = ' once the directory is copied';
+
 /**
  * Refuse a symlink the copy would keep pointing outside the skill directory.
  * The copy keeps a link as it is, so such a link would hand the arm a path the
@@ -88,13 +105,12 @@ function baseDirectoryLine(dir) {
  * followed, not read as text: a relative path can leave through another link.
  * @param {string} realRoot - The directory the link must stay in, symlinks resolved
  * @param {string} entry - Path of an entry under it
- * @param {string} [named] - The path the error names, when the entry is a copy
+ * @param {string} link - The path the error names: the entry as the operator gave it
+ * @param {string} [where] - Appended to the reason when the entry is a copy
  */
-function refuseEscapingLink(realRoot, entry, named) {
+function refuseEscapingLink(realRoot, entry, link, where = '') {
   if (!fs.lstatSync(entry).isSymbolicLink()) return;
   const target = fs.readlinkSync(entry);
-  const where = named ? ' once the directory is copied' : '';
-  const link = named || entry;
   if (path.isAbsolute(target)) {
     throw new Error(`Cannot stage ${link}: its link target ${target} is an absolute path`);
   }
@@ -115,6 +131,46 @@ function refuseEscapingLink(realRoot, entry, named) {
   }
 }
 
+/** Copies this process staged and has not removed yet. */
+const live = new Set();
+let removesOnExit = false;
+
+/**
+ * Remove a copy when the process exits, however it gets there. No signal is
+ * handled: a trial is a synchronous child, so a SIGINT or SIGTERM listener
+ * would not run until the whole run had finished, and the run could no longer
+ * be interrupted. A killed run's copy is left for removeAbandonedCopies.
+ * @param {string} staged - Path of a copy just made
+ */
+function removeOnExit(staged) {
+  live.add(staged);
+  if (removesOnExit) return;
+  removesOnExit = true;
+  // `process.exit()` skips a caller's finally block; this does not.
+  process.once('exit', () => {
+    for (const dir of [...live]) removeStagedDir(dir);
+  });
+}
+
+/**
+ * Remove the copies of runs that were killed before they could: those under
+ * the system temp dir named for a process that is gone. As with the run lock,
+ * a PID reused by a live process keeps its copy until removed by hand.
+ */
+function removeAbandonedCopies() {
+  const owner = new RegExp(`^${STAGED_PREFIX}(\\d+)-`);
+  for (const name of fs.readdirSync(os.tmpdir())) {
+    const pid = Number(name.match(owner)?.[1]);
+    if (!pid || isProcessAlive(pid)) continue;
+    try {
+      fs.rmSync(path.join(os.tmpdir(), name), { recursive: true, force: true });
+    } catch {
+      // Another user's leftover in a shared temp dir: not this run's to remove,
+      // and no reason to refuse this run.
+    }
+  }
+}
+
 /**
  * Copy the directory a skill file sits in to a fresh directory under the
  * system temp dir. A symlink is copied as a link, and refused unless its
@@ -129,15 +185,24 @@ function stageSkillDir(skillFile) {
     throw new Error(`stageSkillDir: skillFile must be an absolute path, got ${skillFile}`);
   }
   const source = path.dirname(skillFile);
-  const staged = fs.mkdtempSync(path.join(os.tmpdir(), 'arcforge-eval-skill-'));
+  let staged;
   try {
-    const realRoot = fs.realpathSync.native(source);
-    fs.cpSync(source, staged, {
+    const realRoot = skillDirOf(skillFile);
+    // Ahead of the copy: the digest names an entry that cannot be staged (a
+    // FIFO, a socket), where cpSync fails without naming it.
+    digestSkillDir(realRoot);
+    removeAbandonedCopies();
+    staged = fs.mkdtempSync(path.join(os.tmpdir(), `${STAGED_PREFIX}${process.pid}-`));
+    removeOnExit(staged);
+    // From the resolved directory: with verbatimSymlinks a source that is itself
+    // a link would be copied as that link, over the directory just made.
+    fs.cpSync(realRoot, staged, {
       recursive: true,
       verbatimSymlinks: true,
       filter: (src) => {
+        if (src === realRoot) return true;
         if (SKIP_NAMES.has(path.basename(src))) return false;
-        if (src !== source) refuseEscapingLink(realRoot, src);
+        refuseEscapingLink(realRoot, src, path.join(source, path.relative(realRoot, src)));
         return true;
       },
     });
@@ -148,8 +213,10 @@ function stageSkillDir(skillFile) {
       for (const entry of fs.readdirSync(path.join(staged, rel), { withFileTypes: true })) {
         const childRel = path.join(rel, entry.name);
         if (entry.isDirectory()) check(childRel);
-        else
-          refuseEscapingLink(realStaged, path.join(staged, childRel), path.join(source, childRel));
+        else {
+          const named = path.join(source, childRel);
+          refuseEscapingLink(realStaged, path.join(staged, childRel), named, COPIED);
+        }
       }
     };
     check('');
@@ -165,8 +232,28 @@ function stageSkillDir(skillFile) {
  * @param {string|null|undefined} staged - Path stageSkillDir returned
  */
 function removeStagedDir(staged) {
-  if (!staged || !path.basename(staged).startsWith('arcforge-eval-skill-')) return;
+  if (!staged || !path.basename(staged).startsWith(STAGED_PREFIX)) return;
   fs.rmSync(staged, { recursive: true, force: true });
+  live.delete(staged);
+}
+
+/**
+ * The staged copies a trial left with other content than was staged. The write
+ * check compares each file's mtime, size and mode, so a rewrite that puts all
+ * three back passes it; this reads the content. A write confined to a
+ * directory the digest leaves out (SKIP_NAMES) is not seen here either.
+ * @param {Array<{ dir: string, filesHash: string }>} [copies] - Every copy the run staged
+ * @returns {string[]} Paths of the copies that changed
+ */
+function changedCopies(copies = []) {
+  const changed = ({ dir, filesHash }) => {
+    try {
+      return digestSkillDir(dir) !== filesHash;
+    } catch {
+      return true; // gone, or holding what cannot be digested: not what was staged
+    }
+  };
+  return copies.filter(changed).map(({ dir }) => dir);
 }
 
 /**
@@ -205,6 +292,17 @@ function buildInjection({ text, skillFile, stage } = {}) {
 }
 
 /**
+ * The staged copies of a run's injections, as changedCopies checks them.
+ * @param {Array<{ baseDir: string|null, filesHash: string|null }>} injections - From buildInjection
+ * @returns {Array<{ dir: string, filesHash: string }>}
+ */
+function stagedCopies(injections) {
+  return injections
+    .filter(({ baseDir }) => baseDir)
+    .map(({ baseDir, filesHash }) => ({ dir: baseDir, filesHash }));
+}
+
+/**
  * A scenario as an injected arm runs it: the injection ahead of its context.
  * @param {Object} scenario - Parsed scenario
  * @param {{ text: string|null }} injection - From buildInjection
@@ -221,6 +319,7 @@ function withInjection(scenario, { text }) {
  * @param {Object} scenario - Parsed scenario
  * @param {{ text?: string, skillFile?: string, stage?: boolean }} baseline - As buildInjection
  * @returns {{ arm: () => { scenario: Object, watchRoots: string[], skillInjection: Object }, remove: () => void }}
+ *   skillInjection as runTrial takes it
  */
 function baselineArm(scenario, baseline) {
   let injection = null;
@@ -233,7 +332,9 @@ function baselineArm(scenario, baseline) {
         baseDir: injection.baseDir,
         textHash: injection.textHash,
         filesHash: injection.filesHash,
-        staged: Boolean(baseline.stage),
+        // Without a baseline text nothing is staged, whatever was asked for.
+        staged: Boolean(injection.baseDir),
+        copies: stagedCopies([injection]),
         baselineHash: injection.textHash,
         baselineFilesHash: injection.filesHash,
       },
@@ -246,8 +347,11 @@ module.exports = {
   hashSkillText,
   digestSkillDir,
   baseDirectoryLine,
+  skillDirOf,
   stageSkillDir,
   removeStagedDir,
+  changedCopies,
+  stagedCopies,
   buildInjection,
   withInjection,
   baselineArm,

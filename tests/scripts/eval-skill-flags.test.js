@@ -318,6 +318,10 @@ describe('eval ab skill flags', () => {
         expect(trial.options.skillInjection).toEqual(
           expect.objectContaining({ baseDir: first.staged, staged: true }),
         );
+        // What each trial is checked against once it ends.
+        expect(trial.options.skillInjection.copies).toEqual([
+          { dir: first.staged, filesHash: trial.options.skillInjection.filesHash },
+        ]);
       }
       expect(fs.existsSync(first.staged)).toBe(false);
       const oldDir = path.join(tempDir, 'skills', 'demo-old');
@@ -378,6 +382,9 @@ describe('eval ab skill flags', () => {
         expect(trial.context).toBe('A fixture.');
         expect(trial.options.skillInjection.baseDir).toBeNull();
         expect(trial.options.skillInjection.textHash).toBeNull();
+        // Nothing was staged, so its rows record no staging.
+        expect(trial.options.skillInjection.staged).toBe(false);
+        expect(trial.options.skillInjection.copies).toEqual([]);
       }
       expect(records()).toEqual([expect.stringMatching(/^[0-9a-f]{16}-default\.json$/)]);
       await ab({ 'skill-file': skill }, { 'stage-skill-files': true });

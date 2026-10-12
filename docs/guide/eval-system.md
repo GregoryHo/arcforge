@@ -73,7 +73,8 @@ For an A/B between two skill texts, give `preflight` the same
 `--baseline-skill-file`, and `--stage-skill-files` if `ab` will get it. Preflight
 then runs the baseline that A/B will run, injected with that text and given its
 staged files. Without `--baseline-skill-file` the baseline is injected with
-nothing, so `--stage-skill-files` on its own changes nothing in preflight.
+nothing, so `--stage-skill-files` on its own changes nothing in preflight:
+nothing is staged, and its rows record no staging.
 
 Preflight results are cached per scenario **and per model**, keyed on the
 scenario's content, and per turn budget, plugin dir, `--effort`, per-trial
@@ -319,7 +320,15 @@ outside the trial tree, leaving out any `.git`, `node_modules`, `.venv` and
 `__pycache__` folder. The injection then opens with the line a host puts in
 front of a loaded skill, `Base directory for this skill:` followed by the
 copy's path. The trial's instruction to stay inside its own directory names
-that path as its one exception. The copy is removed when the run ends.
+that path as its one exception. A skill directory that is itself a symlink
+(`linked-skill -> real-skill`) is staged as the directory it points to.
+
+The copy is removed when the run ends, and when the command exits early. A run
+that is killed (Ctrl-C, `kill`) cannot remove it. The copy is named
+`arcforge-eval-skill-<PID>-<random>` under the system temp directory, and the
+next command that stages skill files removes every such directory whose
+process is gone. Until then it stays where it is, so that name is what to look
+for after a killed run.
 
 A symlink in the directory is copied as a link, so its target has to be inside
 the directory too. `eval ab` and `eval preflight` refuse to stage a directory
@@ -339,7 +348,18 @@ the same Setup, so the baseline would see them too.
 Both arms watch the copy for writes, the same way they watch the project. A
 trial that writes into it is recorded as `trial_wrote_repo` and stops the run,
 since every later trial would be given the changed files. A skill whose script
-installs into its own folder trips this check.
+writes into its own folder trips this check.
+
+The write check compares each file's modification time, size and permissions,
+not its content. So after every trial each staged copy is also digested again
+and compared with the digest taken when it was staged. A trial that left a
+copy with other content is recorded as an infra error
+(`trial_wrote_skill_files`) naming the copy, never scores, and stops the run
+like `trial_wrote_repo`. Neither check sees a write that stays inside a `.git`
+or `node_modules` folder in the copy: the write check skips both names and the
+digest leaves them out. A script that only installs into `node_modules` there
+goes unnoticed. A write into `.venv` or `__pycache__` is caught by the write
+check.
 
 Staging is a run condition. A run with the flag records `stageSkillFiles: true`
 on every row of both arms and forms a pool of its own. A run without it records
@@ -354,7 +374,7 @@ its bytes. A symlink is not followed; its target path stands for it. Empty
 directories and timestamps are left out, and so are the folders staging leaves
 out. Two directories with the same files give the same digest wherever they
 sit. A directory holding anything else, such as a named pipe or a socket, is
-refused.
+refused before anything is copied, and the refusal names the entry.
 
 The limit is the same as for the trial directory. Nothing but the write check
 and the advice in the prompt keeps an arm away from a directory it was not

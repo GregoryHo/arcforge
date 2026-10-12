@@ -4,7 +4,7 @@
  * stubbed; no session is spawned.
  */
 
-const { execFileSync } = require('node:child_process');
+const { execFileSync, spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
@@ -20,6 +20,7 @@ const {
   digestSkillDir,
   hashSkillText,
   removeStagedDir,
+  skillDirOf,
   stageSkillDir,
 } = require('../../scripts/lib/eval-skill-staging');
 
@@ -190,6 +191,56 @@ describe('staged skill files for the injected arm (B-19)', () => {
     );
     expect(rows[1].errorType).toBe('trial_wrote_repo');
     expect(fs.existsSync(trials[1].staged)).toBe(false);
+  });
+
+  describe('a write the write check does not see', () => {
+    // The write check compares mtime, size and mode: all three are put back here.
+    const rewriteUnseen = (copy) => {
+      const file = path.join(copy, 'references', 'verify.sh');
+      const kept = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'test-kept-')), 'verify.sh');
+      execFileSync('cp', ['-p', file, kept]);
+      fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('echo', 'ECHO'));
+      execFileSync('touch', ['-r', kept, file]);
+      fs.rmSync(path.dirname(kept), { recursive: true });
+    };
+
+    it('stops the run on a trial that left the staged copy with other content', () => {
+      onTrial = (trial) => trial.staged && rewriteUnseen(trial.staged);
+      expect(() => run({ stageSkillFiles: true })).toThrow(
+        /treatment trial 1 changed the staged skill files: .*arcforge-eval-skill-/,
+      );
+      expect(rows[1]).toEqual(
+        expect.objectContaining({ errorType: 'trial_wrote_skill_files', infraError: true }),
+      );
+      expect(rows[1].error).toContain(trials[1].staged);
+      expect(fs.existsSync(trials[1].staged)).toBe(false);
+    });
+
+    it('checks every staged copy after every trial, whichever arm it was staged for', () => {
+      const oldFile = writeSkill(tempDir, 'demo-old', 'OLD');
+      recordingStaged((dirs) => {
+        onTrial = (trial) => rewriteUnseen(dirs.find((dir) => dir !== trial.staged));
+        expect(() =>
+          run({
+            stageSkillFiles: true,
+            baselineSkillInstruction: 'OLD',
+            baselineSkillFile: oldFile,
+          }),
+        ).toThrow(/baseline trial 1 changed the staged skill files/);
+      });
+      expect(trials).toHaveLength(1);
+      expect(rows[0].errorType).toBe('trial_wrote_skill_files');
+    });
+
+    it('does not see a write confined to a directory the digest leaves out', () => {
+      onTrial = (trial) => {
+        if (!trial.staged) return;
+        fs.mkdirSync(path.join(trial.staged, 'node_modules', 'dep'), { recursive: true });
+        fs.writeFileSync(path.join(trial.staged, 'node_modules', 'dep', 'index.js'), 'x');
+      };
+      run({ stageSkillFiles: true });
+      expect(rows.map((r) => r.errorType)).toEqual([undefined, undefined]);
+    });
   });
 
   describe('with a baseline text (B-20)', () => {
@@ -495,6 +546,46 @@ describe('buildInjection', () => {
       }
     });
 
+    it('stages a skill whose own directory is reached through a link', () => {
+      fs.symlinkSync('demo', path.join(path.dirname(dir), 'alias'));
+      const staged = stageSkillDir(path.join(path.dirname(dir), 'alias', 'SKILL.md'));
+      try {
+        expect(fs.lstatSync(staged).isDirectory()).toBe(true);
+        expect(fs.readFileSync(path.join(staged, 'SKILL.md'), 'utf8')).toBe('BODY');
+        expect(digestSkillDir(staged)).toBe(digestSkillDir(dir));
+      } finally {
+        removeStagedDir(staged);
+      }
+    });
+
+    it('resolves a linked skill directory to the one that is digested and copied', () => {
+      fs.symlinkSync('demo', path.join(path.dirname(dir), 'alias'));
+      const viaLink = path.join(path.dirname(dir), 'alias', 'SKILL.md');
+      expect(skillDirOf(viaLink)).toBe(fs.realpathSync.native(dir));
+      expect(buildInjection({ text: 'BODY', skillFile: viaLink }).filesHash).toBeNull();
+      const { baseDir, filesHash } = buildInjection({
+        text: 'BODY',
+        skillFile: viaLink,
+        stage: true,
+      });
+      try {
+        expect(filesHash).toBe(digestSkillDir(skillDirOf(viaLink)));
+      } finally {
+        removeStagedDir(baseDir);
+      }
+    });
+
+    it('names an entry that is neither a file nor a symlink before anything is copied', () => {
+      const fifo = path.join(fs.realpathSync.native(dir), 'references', 'pipe');
+      execFileSync('mkfifo', [fifo]);
+      const made = recordingStaged(() => {
+        expect(() => stageSkillDir(path.join(dir, 'SKILL.md'))).toThrow(
+          `Cannot digest ${fifo}: not a file or a symlink`,
+        );
+      });
+      expect(made).toEqual([]);
+    });
+
     it('checks the copy without walking through a link to a directory', () => {
       // Two links back to the root: a walk that follows them never comes back.
       fs.mkdirSync(path.join(dir, 'sub'));
@@ -528,5 +619,70 @@ describe('buildInjection', () => {
     removeStagedDir(other);
     expect(fs.existsSync(other)).toBe(true);
     fs.rmSync(other, { recursive: true, force: true });
+  });
+});
+
+describe('a staged copy outlives no run (B-19)', () => {
+  const STAGING = path.join(__dirname, '../../scripts/lib/eval-skill-staging');
+  let root;
+  let skillFile;
+
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'test-stage-exit-'));
+    skillFile = writeSkill(root, 'demo', 'BODY');
+  });
+
+  afterEach(() => {
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  /** Stage in a child process, which then runs `then`; resolves once it is gone. */
+  const stageInChild = (then, onStaged = () => {}) =>
+    new Promise((resolve, reject) => {
+      const script = `const staged = require(process.argv[1]).stageSkillDir(process.argv[2]);
+        console.log(staged); ${then}`;
+      const child = spawn(process.execPath, ['-e', script, STAGING, skillFile]);
+      let staged = '';
+      child.stdout.on('data', (chunk) => {
+        staged += chunk;
+        if (staged.endsWith('\n')) onStaged(child);
+      });
+      child.on('error', reject);
+      child.on('exit', (code, signal) => resolve({ staged: staged.trim(), code, signal }));
+    });
+
+  it('names the copy after the process that staged it', () => {
+    const staged = stageSkillDir(skillFile);
+    try {
+      expect(path.basename(staged)).toMatch(new RegExp(`^arcforge-eval-skill-${process.pid}-`));
+    } finally {
+      removeStagedDir(staged);
+    }
+  });
+
+  it('removes the copy when the process exits without reaching its cleanup', async () => {
+    const { staged, code } = await stageInChild('process.exit(3);');
+    expect(code).toBe(3);
+    expect(path.basename(staged)).toMatch(/^arcforge-eval-skill-/);
+    expect(fs.existsSync(staged)).toBe(false);
+  });
+
+  it('removes the copy of a killed run at the next staging, and leaves a live run its own', async () => {
+    const { staged, signal } = await stageInChild('setInterval(() => {}, 1000);', (child) =>
+      child.kill('SIGTERM'),
+    );
+    // No handler stands between the signal and the process: a run stays killable.
+    expect(signal).toBe('SIGTERM');
+    expect(fs.existsSync(staged)).toBe(true);
+
+    const mine = stageSkillDir(skillFile);
+    try {
+      expect(fs.existsSync(staged)).toBe(false);
+      const second = stageSkillDir(skillFile);
+      expect(fs.existsSync(mine)).toBe(true);
+      removeStagedDir(second);
+    } finally {
+      removeStagedDir(mine);
+    }
   });
 });

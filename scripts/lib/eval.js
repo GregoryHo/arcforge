@@ -41,7 +41,12 @@ const {
   stopIfTrialWroteRepo,
 } = require('./eval-trial');
 const { splitPools } = require('./eval-pools');
-const { buildInjection, removeStagedDir, withInjection } = require('./eval-skill-staging');
+const {
+  buildInjection,
+  removeStagedDir,
+  stagedCopies,
+  withInjection,
+} = require('./eval-skill-staging');
 
 /**
  * Eval scenario parsed from a markdown file
@@ -296,6 +301,7 @@ function runSkillEval(scenario, k, options = {}) {
     // Both arms watch every staged copy: a write into one changes what the
     // trials after it are given, whichever arm made it.
     const watchRoots = [...shared.watchRoots, ...staged].filter(Boolean);
+    const copies = stagedCopies([baseline, treatment]);
     const armOptions = (label, { baseDir, textHash, filesHash }) => ({
       projectRoot,
       label,
@@ -311,6 +317,7 @@ function runSkillEval(scenario, k, options = {}) {
         textHash,
         filesHash,
         staged: stageSkillFiles,
+        copies,
         baselineHash: baseline.textHash,
         baselineFilesHash: baseline.filesHash,
       },
