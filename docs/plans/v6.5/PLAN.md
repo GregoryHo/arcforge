@@ -139,7 +139,7 @@ PR #282。
 - 有 archive 就推一行到 `contextParts` 與 `userParts`：上一份 archive 的 alias 或檔名、Saved 日期、`arcforge session resume <alias|path>`；alias 欄是 `-` 的用路徑。沒有 archive 就什麼都不加。只在 `source` 為 `startup`／`clear` 時加。
 - `try/catch` 全包（hooks 的錯誤策略是靜默）。不受 learning 開關影響。
 - 文件在同一個 PR：`docs/guide/hooks-system.md:66-69`、`hooks/README.md`、README 的 SessionStart 句子。hooks B-8 的重寫已在 WP-P。`.claude/rules/architecture.md` 的「minimal bootstrap」句子不動（一行符合）。
-- 測試：`hooks/__tests__/inject-context.test.js` 加三個 case（有 archive 的 `startup`、`resume` 不出現、無 archive 靜默）。
+- 測試：`hooks/__tests__/inject-context.test.js` 加四個 case（有 archive 的 `startup`、`resume` 不出現、無 archive 靜默、設了 `ARCFORGE_SPAWNED` 的 `startup` 不出現）。既有的 spawned 檢查只在 `loadPendingActions` 裡，管不到另外加在 `main()` 的 archive 載入，所以指引要有自己的檢查。
 
 ### WP-C `sessions` 瘦身
 
@@ -175,6 +175,7 @@ PR #283。
 - baseline 注入 #267 之前的 `diagramming-obsidian/SKILL.md`，treatment 注入現行版，兩臂各有 staged 目錄。
 - `## Environment` 拿掉 Chromium／`uv` 可用的條件，快取指到 trial 內。
 - fixture 是格式正確的 manual-fallback `.excalidraw.md`。
+- 關卡要在一個真 trial 裡證明 `uv` 與 Chromium 解析不到：`HOME` 保留，Claude Code 仍會 source operator 的 `~/.zshrc` 或 `~/.bashrc`，檔案若改了 `PATH`，operator 的目錄可能回到 trial 的指令前面（eval B-18 的 Residual）。證明不了就判 NOT MEASURABLE。
 - grader：vault 檔案 hash 不變，且有安裝後再 verify 的動作，是 PASS；重新產生是 FAIL。
 
 **D4 #185 `references/` 版面。** 新 scenario，兩文字 A/B。

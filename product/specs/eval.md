@@ -262,7 +262,13 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   still sources the operator's shell startup file (`~/.zshrc` or
   `~/.bashrc`) when it builds its shell snapshot, so the operator's shell
   functions and aliases still reach the commands a trial runs; the built
-  environment does not change that. The environment is not a pooling
+  environment does not change that. A startup file that itself changes
+  `PATH` may put the operator's directories back in front of those
+  commands, and no engine test establishes whether it does, so the built
+  `PATH` is a statement about what the engine passes, not a proof of what a
+  trial's shell resolves: a measurement that depends on a tool being absent
+  shows the absence inside a real trial, in its design gate, before it
+  spends a session. The environment is not a pooling
   condition, so rows from before and after this change pool together though
   their trials did not see the same `PATH`.
 - **B-19 A skill's files can be staged for the arm injected with it

@@ -1990,8 +1990,9 @@ reverse one, append a superseding entry (see AGENTS.md).
   directory listing plus one small file read on the synchronous SessionStart
   path.
 - Verification: cases in `hooks/__tests__/inject-context.test.js` for an
-  archive at `startup`, for silence on `resume`, and for silence with no
-  archive; and, in the post-release check, a live session in a project with
+  archive at `startup`, for silence on `resume`, for silence with no
+  archive, and for silence at `startup` in a session arcforge spawned
+  itself; and, in the post-release check, a live session in a project with
   an archive whose SessionStart context carries the line, beside one without
   an archive whose context does not.
 
@@ -2087,7 +2088,11 @@ reverse one, append a superseding entry (see AGENTS.md).
   Because `HOME` is kept, Claude Code still sources the operator's
   `~/.zshrc` or `~/.bashrc` when it builds its shell snapshot, so the
   operator's shell functions and aliases still reach a trial's commands;
-  the rebuilt environment does not fix that.
+  the rebuilt environment does not fix that. A startup file that itself
+  changes `PATH` may put the operator's directories back, and no engine
+  test establishes whether it does, so a gate of D-059 whose measurement
+  depends on a tool being absent — the verify-exit one — shows that
+  absence inside a real trial before it passes.
   The lock covers the three commands that run trials: `eval report`, an
   edit, or any other write in the checkout during a live run still reads to
   the write guard as the trial's. It is per checkout, so two worktrees are
