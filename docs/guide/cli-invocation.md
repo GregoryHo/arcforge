@@ -137,8 +137,13 @@ arcforge eval dashboard [--port N]
 | `--top` | `audit` | How many candidates to surface |
 | `--port` | `dashboard` | Port for the live dashboard (default: 3333) |
 
-See the [eval guide](eval-system.md) for scenario format and how to read a
-verdict.
+`run`, `preflight` and `ab` start trial sessions, and one project runs one of
+them at a time: while one holds `.eval-trials/run.lock`, a second exits
+non-zero at once and names the holder's command, PID and start time. The other
+subcommands are not affected.
+
+See the [eval guide](eval-system.md) for scenario format, the run lock and how
+to read a verdict.
 
 ## `learn`
 
