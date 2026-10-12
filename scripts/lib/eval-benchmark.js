@@ -499,9 +499,10 @@ function generateBenchmark(projectRoot, options = {}) {
  * @param {TrialResult[]} baseline - Baseline results
  * @param {TrialResult[]} treatment - Treatment results
  * @param {string} projectRoot - Project root directory
+ * @param {{ skipAnalyzer?: boolean }} [options] - skipAnalyzer: never spawn the analyzer session
  * @returns {{ delta: number, verdict: string, baseline: Object, treatment: Object, modelAnalysis?: Object }}
  */
-function compareResults(scenario, baseline, treatment, projectRoot) {
+function compareResults(scenario, baseline, treatment, projectRoot, options = {}) {
   const bStats = stats.statsFromResults(baseline);
   const tStats = stats.statsFromResults(treatment);
   const delta = stats.computeDelta(baseline, treatment);
@@ -520,7 +521,7 @@ function compareResults(scenario, baseline, treatment, projectRoot) {
     ...(baselineWarning ? { baselineWarning } : {}),
   };
 
-  if (scenario.grader !== 'code') {
+  if (scenario.grader !== 'code' && !options.skipAnalyzer) {
     const metrics = {
       baseline: bStats,
       treatment: tStats,

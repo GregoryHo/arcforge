@@ -256,6 +256,11 @@ dashboard's A/B view all apply it. That is the right policy for "this must keep
 working", the wrong one for "this should help". This `PASS` is an A/B verdict,
 not the preflight `PASS` from step 2.
 
+For a scenario whose grader is not `code`, `eval compare` also spawns an analyzer
+session that explains the delta in prose. The analyzer never decides the verdict,
+so `arcforge eval compare <name> --no-analyzer` prints the same verdict without
+spawning it — use it when you only need the reading again.
+
 When every assertion in a scenario is model-graded, `eval ab` also runs a
 **blind comparator** on each baseline/treatment pair and prints a preference
 count (treatment / baseline / tie / errors). It is a supplementary signal, never

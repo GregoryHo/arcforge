@@ -59,6 +59,7 @@ COMMANDS:
       --interleave   Alternate baseline/treatment trials instead of running arms back-to-back
       --effort       Reasoning effort passed to spawned trials
   eval compare <name>                Compare A/B results
+      --no-analyzer  Print the verdict without spawning the analyzer session
   eval report [name] [--since ISO] [--json]
                                      Benchmark report, optionally bounded to recent result rows
   eval history                       List benchmark snapshots
