@@ -109,8 +109,9 @@ on or between boxes: a shape whose `type` is text or a connector, or whose name
 also carries another pipeline node (`router-auth`), gives way when another
 candidate remains. Among the rest the largest area wins — a box contains its own
 text label, so a small text node never stands in for the box, whichever of the
-two was given the bare `auth` as its `id` or `label`. The audit line says which
-rule was used. The file may be a bare list or a list
+two was given the bare `auth` as its `id` or `label`. A candidate box with a
+missing or malformed coordinate fails the worker outright; the grader never
+falls back to the label beside it. The audit line says which rule was used. The file may be a bare list or a list
 wrapped in an object.
 
 The grader reads `layout.json` and the transcript as data and runs nothing
@@ -377,22 +378,17 @@ for name in WORKERS:
         continue
     # A box beats what is drawn on or between boxes: a text or connector type, and
     # a shape naming a second pipeline node (`router-auth`), give way when another
-    # candidate remains. Then the largest area: a box contains its own label, so a
-    # small text node never stands in for it, whatever id or label it was given.
+    # candidate remains. Every candidate left must be placed — a malformed box is a
+    # FAIL, never a reason to measure the label beside it. Then the largest area: a
+    # box contains its own label, whatever id or label either was given.
     boxes = [s for s in cands if not is_annotation(s, name)] or cands
-    if len(cands) == 1:
-        pick, rule = cands[0], "only match"
-    elif len(boxes) == 1:
-        pick, rule = boxes[0], "only box"
-    else:
-        sized = [s for s in boxes if placed(s)]
-        pick = max(sized, key=lambda s: s["w"] * s["h"]) if sized else boxes[0]
-        rule = "largest area"
-    if len(cands) > 1:
-        print(f"-- audit: {name}: {len(cands)} shapes carry the name, took {rule}")
-    if not placed(pick):
+    if not all(placed(s) for s in boxes):
         problems.append(f"{name}: x, y, width, height are not all finite numbers with width and height above 0")
         continue
+    pick = max(boxes, key=lambda s: s["w"] * s["h"])
+    if len(cands) > 1:
+        rule = "only box" if len(boxes) == 1 else "largest area"
+        print(f"-- audit: {name}: {len(cands)} shapes carry the name, took {rule}")
     workers[name] = pick
 if problems:
     fail("; ".join(problems))
