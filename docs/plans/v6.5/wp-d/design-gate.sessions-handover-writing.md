@@ -45,7 +45,7 @@ D5 以 `eval-sessions-handover-completeness` 的現行 Version 4、不改 scenar
 MEASURABLE，預先登記時要把讀法寫死：
 
 1. 主讀數是 treatment 的通過率與 A1 到 A4 的逐斷言比率，兩臂分開列。
-2. delta 照引擎回報的數字記，但註明其中 2/7（約 0.29）是先天的；delta 等於 0.29 讀成「treatment 未回歸，A1 到 A4 無鑑別」，不讀成 IMPROVED 的證據。
+2. delta 照引擎回報的數字記，但判讀以這一輪記下的逐斷言向量為準，不以 delta 的總數為準。同一個 5/7 可以是輸掉先天的兩個，也可以是 A1 到 A4 輸掉一個、先天的斷言過了一個。「treatment 未回歸，A1 到 A4 無鑑別」只在兩個條件都成立時才寫：baseline 每一列的 A1 到 A4 都通過，而且兩臂輸掉的斷言只有 `.handovers/` 的寫入與 A5。任一臂有任何一列在 A1 到 A4 失敗，就逐斷言分臂報告，那是行為上的差異，不歸入非回歸。delta 不論是多少，都不讀成 IMPROVED 的證據。
 3. 稽核表多一欄：treatment 各列有沒有讀 staged 的範本。
 4. preflight 的 PASS 不引用為鑑別力的證據；preflight 三列的 A1 到 A4 向量照實列出。
 
