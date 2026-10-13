@@ -187,3 +187,7 @@ live behind the CLI per [cli](cli.md) B-8.
   sentence is a finding at 0 sessions; the layout change (#185) is measured
   as a coordinate-plan task only, its arms differing in the staged
   `references/layout-heuristics.md` (B-10).
+- **D-064** — the layout change (#185) is NOT MEASURABLE at ceiling: every
+  baseline given the old reference kept its 200 px grid and drew the six
+  boxes 140 px wide, 60 px apart, so the preflight BLOCKed and no A/B ran;
+  the verify-exit sentence stays a finding at 0 sessions (B-10).
