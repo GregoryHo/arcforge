@@ -2416,8 +2416,9 @@ reverse one, append a superseding entry (see AGENTS.md).
 - Decision: The round D-063 fixed ran within its eight clauses with no
   departure, on `opus[1m]` / `xhigh`, isolated, with no `--plugin-dir`, the
   skill text injected at skill scope by `--skill-file`, Node v24.13.1, at
-  commit `853ea820`, one run at a time, and is read as three readings and
-  two findings. (1) `eval-sessions-handover-and-resume` Version 2
+  commit `853ea820`, one run at a time, and is read as one measured
+  result, one ceiling finding, one non-regression reading and two findings
+  at 0 sessions. (1) `eval-sessions-handover-and-resume` Version 2
   ([skill-system](specs/skill-system.md) B-11) passed preflight (baseline
   0/3) and read **+1.00 CI[1, 1] IMPROVED** at k=5: baseline 0/5, every
   baseline reading the archive through `arcforge session resume
@@ -2441,7 +2442,7 @@ reverse one, append a superseding entry (see AGENTS.md).
   `dispatching` handoff (#184) and the `diagramming-obsidian` verify-exit
   sentence ([obsidian](specs/obsidian.md) B-10) are findings at 0 sessions,
   as D-063 clause 1 fixed them, and #184 stays open. The one measured
-  reading, (1), is direction only: k=5 per arm, the engine's zero-variance
+  result, (1), is direction only: k=5 per arm, the engine's zero-variance
   interval, Fisher's exact p ≈ 0.008 and a Newcombe interval for the
   difference of about [0.39, 1.00], on one fixture and one model, for
   injected skill text and not plugin routing (D-024, D-044).
@@ -2488,7 +2489,7 @@ reverse one, append a superseding entry (see AGENTS.md).
   lock, preflight rows, the three row fields, the declared environment and
   staging in live trials, but B-20 only in its preflight half — no A/B
   between two skill texts has run — B-15 only uncontested, since no second
-  run tried the lock, and B-21 not at all. Three D4 rows suggest `uv` does
+  run tried the lock, and B-21 once, on D5's `eval compare`. Three D4 rows suggest `uv` does
   not resolve in a trial's built environment — two say so and two fell back
   to `python3` one call after `uv run --no-project` — against the
   verify-exit gate's offline evidence; a transcript keeps no output, so
@@ -2534,7 +2535,13 @@ reverse one, append a superseding entry (see AGENTS.md).
   `evals/skill-eval-coverage.md`. Preflight rows are in no pool and no
   snapshot ([eval](specs/eval.md) B-16), so D4's rows stay under the
   untracked `evals/results/`, and the audit is their record. The verdicts
-  are the engine's, as `eval ab` printed them and the snapshot's pooled
-  comparison records them. `node scripts/check-benchmark-freshness.js`
+  are the engine's, read as clause 4 requires with `eval compare` on the
+  pooled rows of each scenario's Version: D1 +1.00 CI[1, 1] IMPROVED on 5
+  rows an arm, and D5 +0.29 CI[0.29, 0.29] IMPROVED on 5 rows an arm with
+  `--no-analyzer`, the 5 rows an arm written before conditions were
+  recorded reported as not combined. Both match what `eval ab` printed and
+  what the snapshot records. That comparison was run while this entry was
+  under review, after the round and not by the operator at the time; it
+  reads rows and starts no session. `node scripts/check-benchmark-freshness.js`
   reports OK, and `git diff --stat 853ea820..HEAD -- skills evals/scenarios
   evals/fixtures` is empty. D2 and D3 spent 0 sessions, as D-063 recorded.

@@ -545,5 +545,6 @@ its rationale is inline at B-10.
   one included (B-17); a declared `PATH` put the wrapper in front of 13
   trials (B-18); staged files reached every trial they were staged for and
   none wrote into its copy (B-19); the two-text A/B ran only as its
-  preflight, which BLOCKed at ceiling (B-3, B-20); and `--no-analyzer` was
-  not used (B-21).
+  preflight, which BLOCKed at ceiling (B-3, B-20); and `eval compare
+  --no-analyzer` read the one model-graded verdict with no analyzer
+  session, printing its skip line (B-21).

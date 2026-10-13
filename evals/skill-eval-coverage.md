@@ -2191,6 +2191,12 @@ session 上限拒絕整個回合（「You've hit your session limit · resets 7:
 block 是上限訊息而不是回覆，引擎仍照檔案判 PASS，沒有標成錯誤。這一列屬於本來就不算讀數的那次
 preflight，標籤依斷言也沒有錯，但它暴露一個儀器缺口，見下文。
 
+**判定的讀法（D-063 第 4 點）**：兩個 A/B 的判定都以 `eval compare` 在該 Version 的合池列上
+讀出，與 `eval ab` 的輸出及快照一致：D1 +1.00 CI[1, 1] IMPROVED（每臂 5 列）；D5 帶
+`--no-analyzer`，+0.29 CI[0.29, 0.29] IMPROVED（每臂 5 列），修剪前、條件未記錄的每臂 5 列回報
+為「Not combined」。這一步是在本輪紀錄的 PR 審查期間補跑的，不是 operator 在 run 當下跑的；它
+只讀列，不啟動 session。
+
 三個 run 沒有重疊：每一個都在前一個的最後一列與紀錄寫完之後才開始（D1 A/B 22:28:38Z 起，
 preflight 紀錄 22:28:02Z；D4 22:40:14Z 起；D5 preflight 00:14:53Z 起，D4 紀錄 00:14:25Z）。
 
@@ -2258,8 +2264,8 @@ reference）一個 session 都沒有跑。
 **其他稽核項目**：5 列的寫入都只有以絕對路徑寫的 `<trial>/layout.json`，沒有一列寫進 staged
 複本（沒有 `trial_wrote_skill_files`），沒有一列讀 repository 裡的現行檔案，沒有一列建置、
 render 或存檔。2 列各跑了一次 `uv run --no-project python -B …`，`--no-project` 不建立
-`.venv`，所以沒有寫入；兩列的下一個工具呼叫都改用 `python3 -B`，另有 2 列的回覆寫 `uv` 沒有
-安裝。transcript 不記輸出，這只是跡象：在引擎建置的 trial 環境裡 `uv` 看來解析不到，與 verify-exit
+`.venv`，所以沒有寫入；兩列的下一個工具呼叫都改用 `python3 -B`。有 2 列的回覆寫 `uv` 沒有
+安裝，其中 1 列就是跑了 `uv run` 的列，合計 3 列。transcript 不記輸出，這只是跡象：在引擎建置的 trial 環境裡 `uv` 看來解析不到，與 verify-exit
 關卡的離線證據（shell 讀了 rc 檔，`uv` 就回來）方向相反。5 個 trial 耗時 395.5 到 472.7 s，
 output tokens 38,475 到 45,360，遠低於 1,800 s 的 ceiling。
 
@@ -2364,7 +2370,7 @@ untested」）；無 skill 的 8 列有 6 列仍寫「done」再補一句沒有�
 
 ### 儀器缺口
 
-**本輪第一次實際用到、已經關上的**（D-062，eval B-15 到 B-20）：
+**本輪第一次實際用到、已經關上的**（D-062，eval B-15 到 B-21）：
 
 - **run lock（B-15）**：六個 run 加一次 `eval report` 依序跑完，沒有一次被 write guard 中止；
   兩次以 BLOCK 結束（非零 exit）的 preflight 之後，下一個指令都正常取得鎖，結束時
@@ -2380,6 +2386,8 @@ untested」）；無 skill 的 8 列有 6 列仍寫「done」再補一句沒有�
 - **兩份 skill 文字的 A/B（B-20）**：只用到 preflight 那一半：preflight 跑的是 baseline 文字那
   一臂，`baselineSkillHash` 與 `baselineSkillFilesHash` 記在列上，也在紀錄的鍵裡。兩份文字之間
   的 A/B 本身沒有跑，因為 D4 停在 preflight。
+- **`eval compare --no-analyzer`（B-21）**：D5 的判定以它讀出，印出「Analyzer skipped」那一行，
+  沒有啟動 analyzer session，delta、區間與判定和 `eval ab` 印的相同。
 
 **仍然開著的**：
 
