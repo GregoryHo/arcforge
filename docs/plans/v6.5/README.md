@@ -18,7 +18,8 @@
 | [`wp-d/preflight.eval-diagramming-obsidian-layout-grid-1.json`](wp-d/preflight.eval-diagramming-obsidian-layout-grid-1.json) | D4 第一次 preflight 的紀錄，原樣複製：BLOCK，沒有通過率，1 個 trial 被 provider 拒絕 |
 | [`wp-d/preflight.eval-diagramming-obsidian-layout-grid-2.json`](wp-d/preflight.eval-diagramming-obsidian-layout-grid-2.json) | D4 重跑的 preflight 紀錄，原樣複製：BLOCK，baseline 3/3，天花板 |
 | [`wp-d/preflight.eval-sessions-handover-completeness.json`](wp-d/preflight.eval-sessions-handover-completeness.json) | D5 的 preflight 紀錄，原樣複製：PASS，baseline 0/3（三列都是 0.71） |
+| [`post-release-6.5.0.md`](post-release-6.5.0.md) | 6.5.0 發版後查核：release、網站、GitHub 來源安裝、hook 從快取執行、SessionStart 的 archive 行、`eval compare --no-analyzer`、run lock、alias 規則、版本 |
 
-量測輪的結果記在 `product/ROADMAP.md` 的 D-064 與 `evals/skill-eval-coverage.md` 的「6.5.0 量測輪」。發版後查核會隨它的 PR 加進這張表。
+量測輪的結果記在 `product/ROADMAP.md` 的 D-064 與 `evals/skill-eval-coverage.md` 的「6.5.0 量測輪」。
 
 上一輪的規劃在 [`../v6.4/`](../v6.4/)。
