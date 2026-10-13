@@ -2197,6 +2197,10 @@ preflight，標籤依斷言也沒有錯，但它暴露一個儀器缺口，見�
 為「Not combined」。這一步是在本輪紀錄的 PR 審查期間補跑的，不是 operator 在 run 當下跑的；它
 只讀列，不啟動 session。
 
+**指令（D-063 第 3 點）**：六行指令取自 operator session 的指令紀錄，抄在三份稽核的「指令」段。
+D5 的 preflight 列不記 staging 欄位，紀錄的鍵也不含它，所以它帶了 `--stage-skill-files` 這件事
+靠那一行指令證明（2026-10-13T00:14:52Z 送出）。
+
 三個 run 沒有重疊：每一個都在前一個的最後一列與紀錄寫完之後才開始（D1 A/B 22:28:38Z 起，
 preflight 紀錄 22:28:02Z；D4 22:40:14Z 起；D5 preflight 00:14:53Z 起，D4 紀錄 00:14:25Z）。
 

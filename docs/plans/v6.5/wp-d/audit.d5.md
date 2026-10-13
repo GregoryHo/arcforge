@@ -10,11 +10,22 @@ Repo `main` `853ea820`。稽核只閱讀：沒有啟動 `claude`，沒有 live e
 
 ## 條件
 
-每一列：`opus[1m]`、`xhigh`、`maxTurns 40`、`pluginDir false`、isolated、Version 4、scenario hash `708742f7f80f88f1`、Node `v24.13.1`、`repo_commit 853ea820…`、ceiling 900 s、`environment` 空。scenario 檔沒有修改。A/B 帶 `--stage-skill-files`：兩臂的列都記 `stageSkillFiles true`；treatment 列另記 `skillTextHash 951cd2d8ab6f57d0` 與 `skillFilesHash cc8e5da279b238b6`；baseline 沒有注入文字，也就沒有東西可以 stage，列上沒有 `skillFilesHash`。preflight 的 3 列沒有 `stageSkillFiles` 欄位。沒有 `infraError`，沒有 `gradeError`。
+每一列：`opus[1m]`、`xhigh`、`maxTurns 40`、`pluginDir false`、isolated、Version 4、scenario hash `708742f7f80f88f1`、Node `v24.13.1`、`repo_commit 853ea820…`、ceiling 900 s、`environment` 空。scenario 檔沒有修改。A/B 帶 `--stage-skill-files`：兩臂的列都記 `stageSkillFiles true`；treatment 列另記 `skillTextHash 951cd2d8ab6f57d0` 與 `skillFilesHash cc8e5da279b238b6`；baseline 沒有注入文字，也就沒有東西可以 stage，列上沒有 `skillFilesHash`。preflight 的 3 列沒有 `stageSkillFiles` 欄位，紀錄的鍵也不含它，所以 preflight 帶了旗標這件事由下面的指令紀錄證明，不是由列證明。沒有 `infraError`，沒有 `gradeError`。
 
 D5 的啟動條件是 D1 與 D4 結束時花掉的 session 不超過 67；實際是 19（D1 13、D4 6），條件成立。
 
 preflight 紀錄（`preflight.eval-sessions-handover-completeness.json`）：k=3、`pass_rate 0`、PASS、2026-10-13T00:21:04Z。三列的分數都是 0.71；mixed grader 的通過門檻是 0.8，所以通過率是 0。
+
+## 指令
+
+取自 operator session 的指令紀錄（該 session transcript 裡的 `Bash` 呼叫），時間是呼叫送出的時間；輸出導向 log 的部分略去。
+
+| 時間 | 指令 |
+|---|---|
+| 2026-10-13T00:14:52Z | `node scripts/cli.js eval preflight eval-sessions-handover-completeness --skill-file skills/core/sessions/SKILL.md --stage-skill-files --model 'opus[1m]' --effort xhigh` |
+| 2026-10-13T00:21:24Z | `node scripts/cli.js eval ab eval-sessions-handover-completeness --skill-file skills/core/sessions/SKILL.md --k 5 --stage-skill-files --model 'opus[1m]' --effort xhigh` |
+
+preflight 與 A/B 都帶 `--stage-skill-files`，都沒有 baseline 文字，也都沒有帶 `--max-turns`，turn 上限取 scenario 自己的 40（列上是 `maxTurns 40`）。與 D-063 第 3 點相符。
 
 ## 斷言向量的七個位置
 
@@ -109,5 +120,4 @@ A/B run 的 `grading/` 只有 5 個檔（`trial-1.json` 到 `trial-5.json`），
 ## 無法在本稽核確認的事
 
 - `npm test` 的實際輸出（transcript 不記）；「1 個測試、1 個通過」取自 13 份 handover，與 fixture 只有一個測試檔相符。
-- preflight 指令是否帶了 `--stage-skill-files`：preflight 的列不記這個欄位，紀錄的鍵也不含它（D-063 登記的就是同一把鍵）。baseline 沒有注入文字，帶不帶旗標都沒有東西被 stage。
 - baseline 臂的 `grading/` 檔（已被覆寫，見上）。

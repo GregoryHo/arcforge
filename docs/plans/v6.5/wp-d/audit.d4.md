@@ -8,6 +8,17 @@ Repo `main` `853ea820`。稽核只閱讀：沒有啟動 `claude`，沒有 live e
 
 每一列：`opus[1m]`、`xhigh`、`maxTurns` 未設、`pluginDir false`、isolated、Version 1、scenario hash `003f6bda689dafb4`、Node `v24.13.1`、`repo_commit 853ea820…`、ceiling 1,800 s（`ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000`）、`stageSkillFiles true`、`environment` 空。preflight 跑的是舊 reference 那一臂：`baselineSkillHash` 與 `skillTextHash` 都是 `51fe7cc9f5373b7e`（兩臂同一份 `SKILL.md`），`baselineSkillFilesHash` 與 `skillFilesHash` 都是 `0f3c574c1e448946`，與 D-063 登記的 baseline 目錄 digest 相同。treatment 目錄的 digest `42ec93e5d9d42cec` 沒有出現在任何一列，因為 treatment 一個 session 都沒有跑。
 
+## 指令
+
+取自 operator session 的指令紀錄（該 session transcript 裡的 `Bash` 呼叫），時間是呼叫送出的時間；輸出導向 log 的部分略去。`<baseline>` 是 operator 在 repository 之外組出的 baseline 目錄。
+
+| 時間 | 指令 |
+|---|---|
+| 2026-10-12T22:40:14Z | `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000 node scripts/cli.js eval preflight eval-diagramming-obsidian-layout-grid --model 'opus[1m]' --effort xhigh --stage-skill-files --baseline-skill-file <baseline>/SKILL.md` |
+| 2026-10-12T23:52:07Z | 同一行指令（重跑）。送出前先確認沒有鎖檔、重算兩個目錄的 digest，並把第一份紀錄複製出來 |
+
+與 D-063 第 3 點相符。
+
 ## 兩份 preflight 紀錄
 
 | 紀錄 | run | 時間 | `pass_rate` | 判定 | 引擎的理由 |

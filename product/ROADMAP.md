@@ -2545,3 +2545,9 @@ reverse one, append a superseding entry (see AGENTS.md).
   reads rows and starts no session. `node scripts/check-benchmark-freshness.js`
   reports OK, and `git diff --stat 853ea820..HEAD -- skills evals/scenarios
   evals/fixtures` is empty. D2 and D3 spent 0 sessions, as D-063 recorded.
+  Clause 3's flags are shown by the six command lines of the round, taken
+  from the operator session's own record and copied into the three audits:
+  a D5 preflight row records no staging field and its record's key holds
+  none, so that preflight's `--stage-skill-files` rests on its command
+  line, sent at 2026-10-13T00:14:52Z. The same record shows no
+  `eval compare` at run time.

@@ -10,6 +10,17 @@ Repo `main` `853ea820`。稽核只閱讀：沒有啟動 `claude`，沒有 live e
 
 preflight 紀錄（`preflight.eval-sessions-handover-and-resume.json`）：k=3、`pass_rate 0`、PASS、2026-10-12T22:28:02Z。A/B：baseline 0/5、treatment 5/5，delta +1.00 CI[1, 1]，IMPROVED（`eval ab` 的輸出與快照 `evals/benchmarks/2026-10-13.json` 一致）。
 
+## 指令
+
+取自 operator session 的指令紀錄（該 session transcript 裡的 `Bash` 呼叫），時間是呼叫送出的時間；輸出導向 log 的部分略去。
+
+| 時間 | 指令 |
+|---|---|
+| 2026-10-12T22:24:30Z | `node scripts/cli.js eval preflight eval-sessions-handover-and-resume --model 'opus[1m]' --effort xhigh --max-turns 30` |
+| 2026-10-12T22:28:37Z | `node scripts/cli.js eval ab eval-sessions-handover-and-resume --skill-file skills/core/sessions/SKILL.md --k 5 --model 'opus[1m]' --effort xhigh --max-turns 30` |
+
+沒有 staging，沒有 baseline 文字，與 D-063 第 3 點相符。
+
 ## 逐列
 
 「resume」欄是 `-- resume:` 行：transcript 裡的呼叫次數／wrapper log 的行數與 exit code。每一列的那一次呼叫都是 transcript 的第一個工具呼叫，獨立一行，沒有接在 `cd … &&` 後面，也不是 `echo`。「suite」都是完整 suite（`npm test`，沒有檔案引數）。
