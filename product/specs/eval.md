@@ -538,3 +538,13 @@ its rationale is inline at B-10.
   shows the instrument failed, or that wrote into its staged copy, makes the
   preflight a rerun and not a ceiling reading, and an A/B row that wrote
   into its staged copy is made up by a top-up (B-3, B-19).
+- **D-064** — the first live use of 6.5.0's instrument: six runs and a
+  report held the lock in turn with no guard abort, uncontested (B-15);
+  the audit read every preflight grade from its row, and no preflight row
+  reached a pool (B-16); all 32 rows carry the three fields, the refused
+  one included (B-17); a declared `PATH` put the wrapper in front of 13
+  trials (B-18); staged files reached every trial they were staged for and
+  none wrote into its copy (B-19); the two-text A/B ran only as its
+  preflight, which BLOCKed at ceiling (B-3, B-20); and `eval compare
+  --no-analyzer` read the one model-graded verdict with no analyzer
+  session, printing its skip line (B-21).

@@ -184,6 +184,12 @@ asserted by test (B-3).
   the `executing` to `dispatching` handoff (#184) is not measurable and is a
   finding at 0 sessions, and the trimmed handover-writing path is read as
   treatment non-regression only (B-9, B-10, B-11, B-12).
+- **D-064** — the round's outcome: present-then-stop measured +1.00
+  CI[1, 1] IMPROVED again, this time on an archive read through
+  `arcforge session resume` (B-11); the trimmed handover-writing path is
+  not regressed, its treatment opening the staged template in every row,
+  with A1 to A4 not discriminating (B-10, B-12); and the handoff (#184)
+  stays an unmeasured finding (B-9).
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
 

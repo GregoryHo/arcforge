@@ -107,6 +107,20 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 - ~~**eval-record-node-and-hash**~~ — graduated into 6.5.0 (D-062).
 - ~~**eval-trial-path**~~ — graduated into 6.5.0 (D-062).
 - ~~**eval-concurrent-run-guard**~~ — graduated into 6.5.0 (D-062).
+- **eval-layout-grid-v2** — `eval-diagramming-obsidian-layout-grid` Version 1
+  BLOCKed at ceiling: given the old reference, every baseline kept the 200 px
+  grid and drew the six boxes 140 px wide, so the 20 px contradiction never
+  came up. A Version 2 needs a task where the baseline arrives at Primary
+  width (180 px) without the prompt naming a width · needs: D-064, #185.
+- **eval-transcript-full-tool-input** — a transcript keeps the first 200
+  characters of an Agent call and no tool output or exit code, so no grader
+  can read a dispatch card and `uv`'s absence in a trial rests on what the
+  agent says. Keep an Agent call's whole prompt, and a `Bash` exit code
+  · needs: D-063, #184.
+- **eval-provider-limit-mid-trial** — a provider session limit that lands
+  after a trial's tool calls is scored as an ordinary row; only a refusal
+  that replaces the whole turn becomes `provider_refusal`. Detect the limit
+  text as a trial's last block and record the row as an error · needs: D-064.
 
 ## CLI
 

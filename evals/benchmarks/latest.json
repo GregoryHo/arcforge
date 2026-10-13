@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-03T04:58:59.807Z",
+  "generated": "2026-10-13T00:54:25.366Z",
   "by_claim_type": {
     "discriminative-lift": {
       "scenarios": 18,
@@ -605,7 +605,10 @@
               "trialTimeoutMs": null,
               "maxTurns": null,
               "pluginDir": null,
-              "isolation": null
+              "isolation": null,
+              "stageSkillFiles": null,
+              "baselineSkillHash": null,
+              "baselineSkillFilesHash": null
             },
             "rows": 10
           },
@@ -617,7 +620,10 @@
               "trialTimeoutMs": null,
               "maxTurns": null,
               "pluginDir": null,
-              "isolation": null
+              "isolation": null,
+              "stageSkillFiles": null,
+              "baselineSkillHash": null,
+              "baselineSkillFilesHash": null
             },
             "rows": 9
           }
@@ -659,7 +665,10 @@
             "trialTimeoutMs": null,
             "maxTurns": null,
             "pluginDir": null,
-            "isolation": null
+            "isolation": null,
+            "stageSkillFiles": null,
+            "baselineSkillHash": null,
+            "baselineSkillFilesHash": null
           },
           "rows": 9
         }
@@ -928,7 +937,10 @@
               "trialTimeoutMs": null,
               "maxTurns": null,
               "pluginDir": null,
-              "isolation": null
+              "isolation": null,
+              "stageSkillFiles": null,
+              "baselineSkillHash": null,
+              "baselineSkillFilesHash": null
             },
             "rows": 15
           },
@@ -940,7 +952,10 @@
               "trialTimeoutMs": null,
               "maxTurns": null,
               "pluginDir": null,
-              "isolation": null
+              "isolation": null,
+              "stageSkillFiles": null,
+              "baselineSkillHash": null,
+              "baselineSkillFilesHash": null
             },
             "rows": 15
           }
@@ -982,7 +997,10 @@
             "trialTimeoutMs": null,
             "maxTurns": null,
             "pluginDir": null,
-            "isolation": null
+            "isolation": null,
+            "stageSkillFiles": null,
+            "baselineSkillHash": null,
+            "baselineSkillFilesHash": null
           },
           "rows": 15
         }
@@ -1217,7 +1235,10 @@
               "trialTimeoutMs": null,
               "maxTurns": null,
               "pluginDir": null,
-              "isolation": null
+              "isolation": null,
+              "stageSkillFiles": null,
+              "baselineSkillHash": null,
+              "baselineSkillFilesHash": null
             },
             "rows": 5
           },
@@ -1229,7 +1250,10 @@
               "trialTimeoutMs": null,
               "maxTurns": null,
               "pluginDir": null,
-              "isolation": null
+              "isolation": null,
+              "stageSkillFiles": null,
+              "baselineSkillHash": null,
+              "baselineSkillFilesHash": null
             },
             "rows": 5
           }
@@ -1271,7 +1295,10 @@
             "trialTimeoutMs": null,
             "maxTurns": null,
             "pluginDir": null,
-            "isolation": null
+            "isolation": null,
+            "stageSkillFiles": null,
+            "baselineSkillHash": null,
+            "baselineSkillFilesHash": null
           },
           "rows": 5
         }
@@ -1398,28 +1425,28 @@
       },
       "pass_at_k": true,
       "pass_all_k": true,
-      "last_run": "2026-10-03T04:57:55.746Z",
+      "last_run": "2026-10-12T22:38:47.435Z",
       "metrics": {
         "duration_ms": {
           "count": 5,
-          "avg": 15675,
-          "min": 14313,
-          "max": 16833,
-          "total": 78375
+          "avg": 44651.8,
+          "min": 28468,
+          "max": 58425,
+          "total": 223259
         },
         "input_tokens": {
           "count": 5,
-          "avg": 7.6,
+          "avg": 6.4,
           "min": 6,
           "max": 8,
-          "total": 38
+          "total": 32
         },
         "output_tokens": {
           "count": 5,
-          "avg": 1341.2,
-          "min": 1228,
-          "max": 1454,
-          "total": 6706
+          "avg": 4103.4,
+          "min": 2565,
+          "max": 5402,
+          "total": 20517
         }
       },
       "compared": {
@@ -1459,21 +1486,21 @@
         "verdict_policy": "delta",
         "metrics": {
           "duration_ms": {
-            "baseline_avg": 28106.4,
-            "treatment_avg": 15675,
-            "delta": -12431.4,
+            "baseline_avg": 84909,
+            "treatment_avg": 44651.8,
+            "delta": -40257.2,
             "regression": false
           },
           "input_tokens": {
-            "baseline_avg": 9.6,
-            "treatment_avg": 7.6,
-            "delta": -2,
+            "baseline_avg": 8.8,
+            "treatment_avg": 6.4,
+            "delta": -2.4,
             "regression": false
           },
           "output_tokens": {
-            "baseline_avg": 2189,
-            "treatment_avg": 1341.2,
-            "delta": -847.8,
+            "baseline_avg": 7342.6,
+            "treatment_avg": 4103.4,
+            "delta": -3239.2,
             "regression": false
           }
         }
@@ -1483,7 +1510,7 @@
           "trials": 5,
           "pass_rate": 1,
           "avg_score": 1,
-          "last_run": "2026-10-03T04:57:55.746Z"
+          "last_run": "2026-10-12T22:38:47.435Z"
         }
       }
     },
@@ -1503,28 +1530,28 @@
       },
       "pass_at_k": true,
       "pass_all_k": true,
-      "last_run": "2026-08-15T08:09:38.087Z",
+      "last_run": "2026-10-13T00:38:01.258Z",
       "metrics": {
         "duration_ms": {
           "count": 5,
-          "avg": 85597.6,
-          "min": 74576,
-          "max": 100262,
-          "total": 427988
+          "avg": 46121.8,
+          "min": 37677,
+          "max": 67135,
+          "total": 230609
         },
         "input_tokens": {
           "count": 5,
-          "avg": 12,
-          "min": 10,
-          "max": 14,
-          "total": 60
+          "avg": 10,
+          "min": 8,
+          "max": 12,
+          "total": 50
         },
         "output_tokens": {
           "count": 5,
-          "avg": 2257.2,
-          "min": 1943,
-          "max": 2707,
-          "total": 11286
+          "avg": 4518.8,
+          "min": 3721,
+          "max": 6722,
+          "total": 22594
         }
       },
       "compared": {
@@ -1561,27 +1588,83 @@
           "width": 0
         },
         "verdict": "IMPROVED",
+        "other_pools": [
+          {
+            "arm": "baseline",
+            "conditions": {
+              "model": null,
+              "effort": null,
+              "trialTimeoutMs": null,
+              "maxTurns": null,
+              "pluginDir": null,
+              "isolation": null,
+              "stageSkillFiles": null,
+              "baselineSkillHash": null,
+              "baselineSkillFilesHash": null
+            },
+            "rows": 5
+          },
+          {
+            "arm": "treatment",
+            "conditions": {
+              "model": null,
+              "effort": null,
+              "trialTimeoutMs": null,
+              "maxTurns": null,
+              "pluginDir": null,
+              "isolation": null,
+              "stageSkillFiles": null,
+              "baselineSkillHash": null,
+              "baselineSkillFilesHash": null
+            },
+            "rows": 5
+          }
+        ],
         "metrics": {
           "duration_ms": {
-            "baseline_avg": 111572,
-            "treatment_avg": 85597.6,
-            "delta": -25974.4,
+            "baseline_avg": 37145.6,
+            "treatment_avg": 46121.8,
+            "delta": 8976.2,
             "regression": false
           },
           "input_tokens": {
-            "baseline_avg": 14.8,
-            "treatment_avg": 12,
-            "delta": -2.8,
+            "baseline_avg": 10,
+            "treatment_avg": 10,
+            "delta": 0,
             "regression": false
           },
           "output_tokens": {
-            "baseline_avg": 2712.8,
-            "treatment_avg": 2257.2,
-            "delta": -455.6,
+            "baseline_avg": 3599.6,
+            "treatment_avg": 4518.8,
+            "delta": 919.2,
             "regression": false
           }
         }
-      }
+      },
+      "by_model": {
+        "opus[1m]": {
+          "trials": 5,
+          "pass_rate": 1,
+          "avg_score": 1,
+          "last_run": "2026-10-13T00:38:01.258Z"
+        }
+      },
+      "other_pools": [
+        {
+          "conditions": {
+            "model": null,
+            "effort": null,
+            "trialTimeoutMs": null,
+            "maxTurns": null,
+            "pluginDir": null,
+            "isolation": null,
+            "stageSkillFiles": null,
+            "baselineSkillHash": null,
+            "baselineSkillFilesHash": null
+          },
+          "rows": 5
+        }
+      ]
     },
     "eval-speccing-no-bootstrap-unasked": {
       "scope": "skill",

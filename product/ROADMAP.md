@@ -2408,3 +2408,146 @@ reverse one, append a superseding entry (see AGENTS.md).
   operator audits, and the 6.5.0 section of `evals/skill-eval-coverage.md`
   carries the two findings' ledger text and the audit of every row. The
   outcome is a later entry.
+
+### D-064 — 6.5.0's round: resume through the archive measures, the layout grid is at ceiling, and the trimmed handover does not regress
+- Date: 2026-10-13
+- Version: 6.5.0
+- Status: Accepted
+- Decision: The round D-063 fixed ran within its eight clauses with no
+  departure, on `opus[1m]` / `xhigh`, isolated, with no `--plugin-dir`, the
+  skill text injected at skill scope by `--skill-file`, Node v24.13.1, at
+  commit `853ea820`, one run at a time, and is read as one measured
+  result, one ceiling finding, one non-regression reading and two findings
+  at 0 sessions. (1) `eval-sessions-handover-and-resume` Version 2
+  ([skill-system](specs/skill-system.md) B-11) passed preflight (baseline
+  0/3) and read **+1.00 CI[1, 1] IMPROVED** at k=5: baseline 0/5, every
+  baseline reading the archive through `arcforge session resume
+  duration-hours`, running the full suite and then applying the handover's
+  one-line `Next`, two of the five adding the unmentioned `d` as well;
+  treatment 5/5, every treatment reading the archive the same way, running
+  the suite, reporting where the work stands and where the repo disagrees,
+  and stopping with no edit. (2) `eval-diagramming-obsidian-layout-grid`
+  Version 1 (#185) is **NOT MEASURABLE at ceiling**. Its first preflight
+  measured nothing — the provider refused one trial on a session limit, and
+  the engine wrote a BLOCK with no pass rate — and the rerun clause 5
+  allows read baseline 3/3, a BLOCK at ceiling, so clause 4 applies: no
+  second preflight, no A/B, a finding, and #185 stays open. (3)
+  `eval-sessions-handover-completeness` Version 4, unedited and run with
+  `--stage-skill-files`, is read as **treatment not regressed, A1 to A4 not
+  discriminating** and as nothing more: every treatment row passes all
+  seven assertions, every baseline row passes A1 to A4, and the only two a
+  baseline row loses are the write under `.handovers/` and A5. The engine's
+  verdict for it, IMPROVED at +0.29 CI[0.29, 0.29], is recorded and is not
+  read as improvement (D-063 clause 7). (4) The `executing` to
+  `dispatching` handoff (#184) and the `diagramming-obsidian` verify-exit
+  sentence ([obsidian](specs/obsidian.md) B-10) are findings at 0 sessions,
+  as D-063 clause 1 fixed them, and #184 stays open. The one measured
+  result, (1), is direction only: k=5 per arm, the engine's zero-variance
+  interval, Fisher's exact p ≈ 0.008 and a Newcombe interval for the
+  difference of about [0.39, 1.00], on one fixture and one model, for
+  injected skill text and not plugin routing (D-024, D-044).
+- Why: Each reading survives an audit of every row — 32 transcripts read
+  against their rows. In (1) the per-row instrument rule never fired: all
+  13 rows hold one standalone resume call and the wrapper's log holds one
+  exit-0 line for each, so `arcforge` resolves on a real session's `Bash`
+  `PATH` and the 0/5 is behaviour, not a missing command. The arms differ
+  where 6.4.0's did (D-058), on the step the handover planned. Every
+  treatment stop is genuine — no `Edit` or `Write`, no shell write, no
+  change-and-revert, 4 to 6 tool calls of 30, every end-state
+  `src/duration.js` still the fixture's — and no row took a blind spot the
+  scenario lists: no `--help`, no discarded output, no archive body read
+  round the command, no detached worktree. In (2) the five trials that ran
+  to a file took one escape, the fourth of the five the gate listed. Each
+  opened the staged old `layout-heuristics.md` and kept its 200 px grid,
+  and each drew the six workers 140 px wide, as Secondary elements, which
+  leaves 60 px between neighbours against an asserted 40. The old text
+  contradicts itself only for a 180 px Primary element, a size no trial
+  chose, and no trial mentioned the contradiction. So the BLOCK answers
+  #185 for this task: the old grid did not make an agent plan a violating
+  layout. It says nothing about a task whose elements are Primary-sized,
+  and the current reference never ran. No row wrote into its staged copy
+  and none read the current file from the repository. In (3) all three of
+  clause 7's conditions hold, so its one sentence is the whole reading. The
+  0.29 is exactly 2/7, the two assertions an arm that never saw the
+  convention cannot meet. Staging did put the moved material in front of
+  the treatment: all five treatment rows opened
+  `references/handover-template.md` from their own staged copy before
+  writing, so D-059's Residual does not hold for this round. No result is
+  re-scored and no rule was departed from, so this records an outcome and
+  relates to no earlier entry.
+- Residual: B-11's effect size is not established at k=5, and its archive
+  is still one the fixture's Setup saved, not one the agent wrote in an
+  earlier session. B-10's five sections have no discriminating evidence:
+  (3) shows no regression and cannot show that moving the template
+  mattered (D-063). #185 is unmeasured wherever elements are Primary-sized,
+  and the build, render and save pipeline stays unmeasured; a Version 2
+  needs a task in which the baseline arrives at Primary width without the
+  prompt naming a width (the **eval-layout-grid-v2** wish). #184 and the
+  verify-exit sentence stay unmeasured (D-063); a transcript that keeps an
+  Agent call's whole prompt is the **eval-transcript-full-tool-input**
+  wish. Of [eval](specs/eval.md) B-15 to B-21, the round exercised the run
+  lock, preflight rows, the three row fields, the declared environment and
+  staging in live trials, but B-20 only in its preflight half — no A/B
+  between two skill texts has run — B-15 only uncontested, since no second
+  run tried the lock, and B-21 once, on D5's `eval compare`. Three D4 rows suggest `uv` does
+  not resolve in a trial's built environment — two say so and two fell back
+  to `python3` one call after `uv run --no-project` — against the
+  verify-exit gate's offline evidence; a transcript keeps no output, so
+  this is an indication, not proof. The first D4 preflight's second trial
+  was cut off by the same session limit after it wrote `layout.json` and
+  was scored as an ordinary row: the engine recognises a refusal that
+  replaces the agent's turn, not one that follows tool calls (the
+  **eval-provider-limit-mid-trial** wish). A preflight rerun overwrites the
+  record it replaces, an A/B's `grading/` files are keyed by trial number
+  and so keep the second arm's only, and D1's "archive file read directly"
+  flag fired on `aliases.json` in 8 rows and on the archive body in none.
+  C5 keeps the regex blind spots D-058 recorded.
+- Cost accepted: 32 trial sessions of the cap of about 80 — D1 preflight 3
+  and A/B 10, D4's first preflight 3 and its rerun 3, D5 preflight 3 and
+  A/B 10 — with no top-up and one of the two preflight reruns used. The
+  first D4 preflight's 3 sessions bought no reading, and the 10 sessions
+  D4's A/B would have taken were not spent. D5's 13 rows were model-graded;
+  D1 and D4 are code-graded. Of D-059's four measurements and its
+  conditional fifth, one is a measured reading, one a ceiling finding, two
+  are findings at 0 sessions and one is a non-regression. The `sessions`
+  treatment in (1) ran cheaper — 44.7 s against 84.9 s, 4,103 against 7,343
+  output tokens — because it stops before the edit, which is a consequence
+  of the behaviour, not an efficiency claim. In (3) the treatment cost 46.1
+  s against 37.1 s and 4,519 against 3,600 output tokens, reported and not
+  flagged. D4's trials ran 396 to 473 s under the 1,800 s ceiling.
+- Verification: the four preflight records under `docs/plans/v6.5/wp-d/` —
+  `preflight.eval-sessions-handover-and-resume.json` (scenario hash
+  `a08495af5b8259ff`, 2026-10-12T22:28:02Z, run `20261012-222430`),
+  `preflight.eval-diagramming-obsidian-layout-grid-1.json` (hash
+  `003f6bda689dafb4`, 2026-10-12T22:55:18Z, run `20261012-224014`, the
+  error BLOCK, kept from the operator's copy because the rerun overwrote
+  it), `preflight.eval-diagramming-obsidian-layout-grid-2.json`
+  (2026-10-13T00:14:25Z, run `20261012-235207`, baseline directory digest
+  `0f3c574c1e448946`) and
+  `preflight.eval-sessions-handover-completeness.json` (hash
+  `708742f7f80f88f1`, 2026-10-13T00:21:04Z, run `20261013-001453`); the A/B
+  runs `20261012-222837` (D1) and `20261013-002124` (D5, treatment
+  `skillFilesHash` `cc8e5da279b238b6`), pooled in the snapshot
+  `evals/benchmarks/2026-10-13.json` (= `latest.json`, generated
+  2026-10-13T00:54:25Z), their rows in `evals/benchmarks/raw/` under the
+  same name; the operator audits `docs/plans/v6.5/wp-d/audit.d1.md`,
+  `audit.d4.md` and `audit.d5.md`; and the 6.5.0 section of
+  `evals/skill-eval-coverage.md`. Preflight rows are in no pool and no
+  snapshot ([eval](specs/eval.md) B-16), so D4's rows stay under the
+  untracked `evals/results/`, and the audit is their record. The verdicts
+  are the engine's, read as clause 4 requires with `eval compare` on the
+  pooled rows of each scenario's Version: D1 +1.00 CI[1, 1] IMPROVED on 5
+  rows an arm, and D5 +0.29 CI[0.29, 0.29] IMPROVED on 5 rows an arm with
+  `--no-analyzer`, the 5 rows an arm written before conditions were
+  recorded reported as not combined. Both match what `eval ab` printed and
+  what the snapshot records. That comparison was run while this entry was
+  under review, after the round and not by the operator at the time; it
+  reads rows and starts no session. `node scripts/check-benchmark-freshness.js`
+  reports OK, and `git diff --stat 853ea820..HEAD -- skills evals/scenarios
+  evals/fixtures` is empty. D2 and D3 spent 0 sessions, as D-063 recorded.
+  Clause 3's flags are shown by the six command lines of the round, taken
+  from the operator session's own record and copied into the three audits:
+  a D5 preflight row records no staging field and its record's key holds
+  none, so that preflight's `--stage-skill-files` rests on its command
+  line, sent at 2026-10-13T00:14:52Z. The same record shows no
+  `eval compare` at run time.

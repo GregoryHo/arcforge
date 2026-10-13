@@ -47,9 +47,9 @@ p7-benchmark-evidence.md「協定修正案」）。
 **84.2% ≥ 80% ✓**（線下：brainstorming 0.40、diagramming 0.00、tdd 0.40——三支 delta
 皆 IMPROVED；低 pass 反映 0.8 trial bar 的嚴格性，非技能無效）。
 
-## 每支 skill 的現行 delta 證據（P7 收官，6.1.1、6.2.0、6.3.0、6.4.0 更新）
+## 每支 skill 的現行 delta 證據（P7 收官，6.1.1、6.2.0、6.3.0、6.4.0、6.5.0 更新）
 
-未標 6.1.1、6.2.0、6.3.0 或 6.4.0 的列皆為修復前池（unrecorded 條件），見文末「6.1.1 量測輪」、「6.2.0 量測輪」、「6.3.0 量測輪」與「6.4.0 量測輪」。
+未標 6.1.1、6.2.0、6.3.0、6.4.0 或 6.5.0 的列皆為修復前池（unrecorded 條件），見文末「6.1.1 量測輪」、「6.2.0 量測輪」、「6.3.0 量測輪」、「6.4.0 量測輪」與「6.5.0 量測輪」。
 
 | skill | 現行證據 | 出處 |
 |---|---|---|
@@ -60,9 +60,9 @@ p7-benchmark-evidence.md「協定修正案」）。
 | executing | 6.1.1 preflight **BLOCK**（乾淨儀器上 baseline 100%）；6.3.0 離線關卡判定 skill 只是把既有行為寫成規則（既有紀錄 26/37 個 baseline 動手前就先標 `[~]`），未花 session；+0.40 CI[0.03, 0.77] 為修復前池 | 6.1.1 preflight；6.3.0 離線關卡（見 6.3.0 量測輪）；P7 ab k=10 |
 | using（router） | router-skill-selection V2 **+1.00 CI[1, 1] IMPROVED**（注入模態，不是 plugin 路由；6.4.0 回歸重現 0/5 對 5/5，快照合池 0/10 對 10/10）；V1 的 6.1.1 preflight **BLOCK**（baseline 100%）；+0.36 CI[0.25, 0.47] 為修復前池；另 e2e 矩陣 16/16（P6） | 6.3.0、6.4.0 ab k=5 + preflight（見 6.3.0、6.4.0 量測輪）；6.1.1 preflight；P7 ab（v6.1.0 有較新的 non-regression 覆蓋，見下節） |
 | brainstorming | +0.35 CI[0.11, 0.59] | P7 ab（P6 +0.50 同向） |
-| sessions | handover-and-resume V1（B-11 present-then-stop）**+1.00 CI[1, 1] IMPROVED**（注入模態，k=5 只支持方向）；B-10 於 6.4.0 未量，維持 handover-completeness A5 既有讀數；+0.29 為修復前池（吸收 compacting：non-reg 1.00） | 6.4.0 ab k=5 + preflight（見 6.4.0 量測輪）；P7 ab |
+| sessions | handover-and-resume V2（B-11 present-then-stop，archive 經 `arcforge session resume` 讀入）**+1.00 CI[1, 1] IMPROVED**（注入模態，k=5 只支持方向）；V1（fixture 預先放好 `.handovers/` 檔）在 6.4.0 同為 +1.00 CI[1, 1]。handover-completeness V4 於 6.5.0 帶 `--stage-skill-files` 重跑，只讀成 **treatment 沒有回歸**（5/5 七項全過；baseline 只失去寫入 `.handovers/` 與 A5 這兩項先天不同的斷言，A1 到 A4 兩臂都是 5/5，不具鑑別力）；引擎的 +0.29 CI[0.29, 0.29] 正好是 2/7，不引用為改善（D-063、D-064）。B-10 的五個段落仍無鑑別力證據（吸收 compacting：non-reg 1.00） | 6.5.0 ab k=5 ×2 + preflight（見 6.5.0 量測輪）；6.4.0 ab k=5（見 6.4.0 量測輪）；P7 ab |
 | maintaining-obsidian | vault-only-answer **+0.20 CI[0.2, 0.2]**；link-rebuilds-index V2 preflight 引擎判 PASS（1/3），但 baseline 重建 index 3/3，未跑 A/B，記為發現（V1 為 6.1.1 BLOCK）；audit-runs-lint-script 6.1.1 preflight **BLOCK**，6.3.0 離線關卡判定需引擎修改才能量，未花 session。LINK 重建 index（D-028）仍無 A/B 證據 | 6.1.1 ab k=5 + preflight（P7 +0.28 為修復前池）；6.3.0 preflight 與離線關卡（見 6.3.0 量測輪） |
-| diagramming-obsidian | **+0.20 CI[0.01, 0.39]**（1800 s ceiling）；verify-exit 句子（#267）6.4.0 離線關卡判定以現行引擎無法量測，未花 session（D-057） | 6.1.1 ab k=5（P7 +0.23 為修復前合池）；6.4.0 離線關卡（見 6.4.0 量測輪） |
+| diagramming-obsidian | **+0.20 CI[0.01, 0.39]**（1800 s ceiling）；layout-grid V1（#185，`references/layout-heuristics.md` 的 200 → 220 px）6.5.0 preflight **BLOCK**（舊 reference 的 baseline 3/3 通過：方塊做成 140 寬，200 px 格線上間距 60 px），未跑 A/B，記為發現（D-064）；verify-exit 句子（#267）6.4.0 與 6.5.0 兩次離線關卡都判定無法量測，未花 session（D-057、D-063） | 6.1.1 ab k=5（P7 +0.23 為修復前合池）；6.5.0 preflight 與離線關卡（見 6.5.0 量測輪）；6.4.0 離線關卡（見 6.4.0 量測輪） |
 | learning | marker-preservation **+1.00 CI[1, 1] IMPROVED**（D-038 的一句修改之後；e2e 全鏈路 PASS） | 6.2.0 ab k=5（P5 +0.25 為修復前讀數） |
 | looping | +0.19 CI[0.07, 0.31]；loop e2e PASS | P6 |
 | debugging | unmet-but-covered（P7 ceiling ×2；P4 +0.16 歷史） | 存廢建議書 |
@@ -2136,3 +2136,276 @@ operator-audit 段落讀過 transcript 與終局；router preflight 3 列只讀�
 - operator 的 `PATH` 仍會傳進 trial（backlog wish `eval-trial-path`）；本輪沒有一列叫用
   `arcforge`。
 - #250 已由 #268 在引擎層修好：code grader 不再以 trial 目錄為 import 路徑執行。
+
+## 6.5.0 量測輪（2026-10-13，修復後儀器）
+
+本輪依 D-059 與 D-063 的八點預先登記執行：兩個 A/B 加一個有條件的第三項，另有兩項在離線設計
+關卡判定無法量測，花 0 個 session。結果由 D-064 記錄。快照 `evals/benchmarks/2026-10-13.json`
+（= `latest.json`，`raw/` 下同名兩份）於 **2026-10-13T00:54:25Z** 生成，未帶 `--since`。所有
+run 都在 commit `853ea820`（含 #292 的 `sessions` scenario V2 與 #293 的 layout-grid scenario
+V1）；`git diff --stat 853ea820..HEAD -- skills evals/scenarios evals/fixtures` 在本輪紀錄
+commit 時是空的，`node scripts/check-benchmark-freshness.js` 回報 OK。
+
+**條件**：`--model 'opus[1m]' --effort xhigh`、isolation `isolated`、不帶 `--plugin-dir`（skill
+以 `--skill-file` 注入）、Node v24.13.1。三個 run 依序、一次一個，operator 是主 session。各項的
+差別：
+
+| 項目 | scenario（Version，hash） | turn 上限 | ceiling | staging | `## Environment` |
+|---|---|---|---|---|---|
+| D1 | `eval-sessions-handover-and-resume`（2，`a08495af5b8259ff`） | 30 | 900 s | 無 | `PATH+=${PROJECT_ROOT}/bin`、`PATH^=${TRIAL_DIR}/.arcforge/bin` |
+| D4 | `eval-diagramming-obsidian-layout-grid`（1，`003f6bda689dafb4`） | 未設 | 1,800 s | `--stage-skill-files` 加 `--baseline-skill-file`；baseline 目錄 digest `0f3c574c1e448946`，treatment `42ec93e5d9d42cec` | 無 |
+| D5 | `eval-sessions-handover-completeness`（4，`708742f7f80f88f1`） | 40 | 900 s | `--stage-skill-files`；treatment `skillFilesHash cc8e5da279b238b6` | 無 |
+
+D1 與 D4 是 code grader。D5 是 mixed grader，13 列各經 model grader 評過一次，這些呼叫不計入
+session 上限。四份 preflight 紀錄原樣複製到 `docs/plans/v6.5/wp-d/`；D4 的第一份取自 operator
+在重跑之前留下的複本，因為兩份紀錄同鍵，快取裡的第一份已被第二份覆寫。operator 的三份稽核放在
+同一目錄（`audit.d1.md`、`audit.d4.md`、`audit.d5.md`），本機路徑已換成 `<trial>`、`<tmp>`。
+下文引用的 run id 與 transcript 在 `evals/results/` 底下（gitignore，只在 maintainer 的
+checkout）。
+
+**花費**：**32 個 live session**，上限約 80（D-063 預先登記的最壞情況是 53）。沒有補跑；preflight
+出錯重跑用了 2 次額度的 1 次。
+
+| 項目 | session |
+|---|---|
+| D1 preflight | 3 |
+| D1 A/B | 10 |
+| D4 preflight，1 個 trial 出錯 | 3 |
+| D4 preflight，重跑 | 3 |
+| D4 A/B | 0 |
+| D5 preflight | 3 |
+| D5 A/B | 10 |
+| D2（#184）、D3（verify-exit） | 0 |
+| 補跑（`--k 1`） | 0 |
+| **合計** | **32** |
+
+### 事故與偏離
+
+沒有偏離預先登記。唯一的事故是 D4 第一次 preflight `20261012-224014` 的 trial 3：provider 以
+session 上限拒絕整個回合（「You've hit your session limit · resets 7:50am (Asia/Taipei)」，
+2.5 s、0 token），引擎記為 `provider_refusal`、`infraError`，紀錄是沒有通過率的 BLOCK
+（`pass_rate: null`、`errored: 1`）。這是 D-063 第 5 點列的第一種「沒有量到」，不是天花板。重跑
+`20261012-235207` 在上限重置之後的 23:52:07Z 開始，是整輪 2 次出錯重跑額度的第 1 次。
+
+同一次 preflight 的 trial 2 在最後一輪被同一個上限截斷：它已經寫好 `layout.json`，最後一個
+block 是上限訊息而不是回覆，引擎仍照檔案判 PASS，沒有標成錯誤。這一列屬於本來就不算讀數的那次
+preflight，標籤依斷言也沒有錯，但它暴露一個儀器缺口，見下文。
+
+**判定的讀法（D-063 第 4 點）**：兩個 A/B 的判定都以 `eval compare` 在該 Version 的合池列上
+讀出，與 `eval ab` 的輸出及快照一致：D1 +1.00 CI[1, 1] IMPROVED（每臂 5 列）；D5 帶
+`--no-analyzer`，+0.29 CI[0.29, 0.29] IMPROVED（每臂 5 列），修剪前、條件未記錄的每臂 5 列回報
+為「Not combined」。這一步是在本輪紀錄的 PR 審查期間補跑的，不是 operator 在 run 當下跑的；它
+只讀列，不啟動 session。
+
+**指令（D-063 第 3 點）**：六行指令取自 operator session 的指令紀錄，抄在三份稽核的「指令」段。
+D5 的 preflight 列不記 staging 欄位，紀錄的鍵也不含它，所以它帶了 `--stage-skill-files` 這件事
+靠那一行指令證明（2026-10-13T00:14:52Z 送出）。
+
+三個 run 沒有重疊：每一個都在前一個的最後一列與紀錄寫完之後才開始（D1 A/B 22:28:38Z 起，
+preflight 紀錄 22:28:02Z；D4 22:40:14Z 起；D5 preflight 00:14:53Z 起，D4 紀錄 00:14:25Z）。
+
+### A/B 結果（先過 preflight k=3 PASS）
+
+| scenario | Version | preflight | A/B run id | baseline | treatment | delta |
+|---|---|---|---|---|---|---|
+| sessions-handover-and-resume | 2 | `20261012-222430`，baseline 0/3 | `20261012-222837` | avg 0.00 / pass 0%（0/5） | avg 1.00 / pass 100%（5/5） | **+1.00 CI[1, 1] IMPROVED** |
+| sessions-handover-completeness | 4 | `20261013-001453`，baseline 0/3（三列都是 0.71） | `20261013-002124` | avg 0.71 / pass 0%（0/5） | avg 1.00 / pass 100%（5/5） | 引擎：+0.29 CI[0.29, 0.29] IMPROVED；**依 D-063 第 7 點只讀成 treatment 沒有回歸**（見下） |
+| diagramming-obsidian-layout-grid | 1 | `20261012-224014` 出錯；重跑 `20261012-235207`，baseline 3/3 | 未跑 | — | — | **preflight BLOCK**（天花板），記為發現 |
+
+### `sessions` V2（B-11）：經由 `arcforge session resume` 讀 archive，先報告再停下
+
+**讀數與限制**：baseline 0/5、treatment 5/5，+1.00 CI[1, 1] IMPROVED。兩臂都沒有變異，區間縮成
+一點，不代表精確度；k=5 下只支持方向（Fisher exact 雙尾 p ≈ 0.008，差值的 Newcombe 區間約為
+[0.39, 1.00]），效果大小未確立。量的是以 `--skill-file` 注入的
+`skills/core/sessions/SKILL.md` 本文，不是真正載入 plugin 時的 description 路由（D-024／
+D-044）；只有一個 fixture（`duration-handover`）與一個 model。V2 與 6.4.0 的 V1 差在 archive 的
+來源：V1 是 fixture 預先放好的 `.handovers/` 檔，V2 是 fixture 的 Setup 以 `arcforge session
+save` 存下、trial 再以 `arcforge session resume duration-hours` 讀回來的 archive。prompt 把這個
+指令交給兩臂，所以兩臂的差別不在有沒有看到 archive。
+
+**稽核判讀**：13 列（preflight 3、baseline 5、treatment 5）的第一個工具呼叫都是
+`arcforge session resume duration-hours`，wrapper 的 log 各有一行、exit code 都是 0，所以沒有
+儀器失敗的列，`arcforge` 在真實 session 的 `Bash` `PATH` 上解析得到。8 個無 skill 的列都讀了
+archive、跑了完整 suite，接著以 `Edit` 在 `UNITS` 加 `h`；其中 5 列停下來問 handover 沒提到的
+days 測試，3 列（preflight trial 2、B1、B4）連 `d` 也加了，回報 5/5。五個 treatment 都讀了
+archive、跑了完整 suite，報告目前進度與 repo 和 handover 不一致之處（多了一個 days 測試，suite
+從 4 個測試 1 個失敗變成 5 個測試 2 個失敗），在動手前停下來問。treatment 的停下是真的：沒有
+`Edit`／`Write`／`MultiEdit`，沒有 shell 寫入，沒有改了又還原；工具呼叫 4 到 6 次（上限 30）；
+終局的 `src/duration.js` 都和 fixture 相同。
+
+| 臂 | C1 | C2 | C3 | C4 | C5 |
+|---|---|---|---|---|---|
+| baseline | 0/5 | 0/5 | 5/5 | 5/5 | 0/5 |
+| treatment | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 |
+
+scenario 列出的盲點，本輪一個都沒有碰到：沒有 `--help`、沒有 `> /dev/null`、沒有以 `cat` 或
+`Read` 讀 archive 本文、沒有繞過 wrapper、沒有 trial 之外的 detached worktree。grader 的「archive
+file read directly」旗標在 8 列是 yes，命中的都是 `cat .arcforge/sessions/*/aliases.json`，也
+就是 alias 對照表，不是 archive 本文；這個旗標在本輪全是誤報。
+
+treatment 比較便宜：每個 trial 44.7 s、4,103 output tokens，baseline 84.9 s、7,343。它停下來，
+所以省掉編輯與之後的 suite；這是行為的結果，不是效率主張。
+
+### D4 天花板 BLOCK：舊格線沒有讓 agent 排出違規的版面（#185）
+
+`eval-diagramming-obsidian-layout-grid` V1 的 preflight 跑的是舊 reference 那一臂：兩臂同一份
+`SKILL.md`，staged 目錄只有 `references/layout-heuristics.md` 換成 #182 之前（`1fed56d0~1`）的
+文字。重跑的 3 個 trial 全部通過，引擎判 BLOCK（baseline 通過率 100%，達到 80% 的天花板）。依
+D-063 第 4 點，這是發現：不跑第二次 preflight，也不跑 A/B。#185 維持 open，判定是 NOT
+MEASURABLE at ceiling。
+
+**逃逸的形狀**：兩次 preflight 跑完的 5 個 trial 走的是同一條路，也就是設計關卡預先列出的第 4
+條。每一列都打開了 staged 的舊 `layout-heuristics.md`，也都沿用它的 200 px 格線（六個 worker
+的 `x` 是 250、450、650、850、1050、1250；有終局回覆的 4 列都明說格線是 200 px），但把六個
+worker 當成 Secondary，寬 140，相鄰間距 60 px，高於斷言的 40 px。舊文字的矛盾只在 180 寬的
+Primary 元素上出現（200 的欄距只剩 20 px）；agent 選的大小本來就碰不到它。沒有一列提到那個
+矛盾，沒有一列改用 220，也沒有一列排出 180 寬加 200 欄距這個唯一會失敗的組合。
+
+所以這個讀數說的是：在「六個地位相同的服務排一列」這個 task 上，#182 改的那個數字不影響版面
+是否違規。它沒有說 #182 的修改沒有用；元素被當成 Primary 的 task 沒有量。treatment（現行
+reference）一個 session 都沒有跑。
+
+**其他稽核項目**：5 列的寫入都只有以絕對路徑寫的 `<trial>/layout.json`，沒有一列寫進 staged
+複本（沒有 `trial_wrote_skill_files`），沒有一列讀 repository 裡的現行檔案，沒有一列建置、
+render 或存檔。2 列各跑了一次 `uv run --no-project python -B …`，`--no-project` 不建立
+`.venv`，所以沒有寫入；兩列的下一個工具呼叫都改用 `python3 -B`。有 2 列的回覆寫 `uv` 沒有
+安裝，其中 1 列就是跑了 `uv run` 的列，合計 3 列。transcript 不記輸出，這只是跡象：在引擎建置的 trial 環境裡 `uv` 看來解析不到，與 verify-exit
+關卡的離線證據（shell 讀了 rc 檔，`uv` 就回來）方向相反。5 個 trial 耗時 395.5 到 472.7 s，
+output tokens 38,475 到 45,360，遠低於 1,800 s 的 ceiling。
+
+**V2 需要什麼**：一個讓 baseline 自然選到 Primary 大小的 task（例如元素帶有較長的標籤，或
+prompt 給出的層級讓六個元素是 Primary 而不是 Secondary），而且不能在 prompt 裡指定寬度，否則
+兩臂讀到同一個數字。見 backlog wish `eval-layout-grid-v2`。
+
+### D5：treatment 沒有回歸，A1 到 A4 不具鑑別力
+
+`eval-sessions-handover-completeness` V4 沒有修改，帶 `--stage-skill-files` 重跑，問的是一個
+問題：6.5.0 把 handover 範本移進 `references/handover-template.md` 之後，treatment 會不會掉分。
+沒有掉。
+
+| 斷言 | baseline | treatment |
+|---|---|---|
+| `[tool_called] Bash:npm test` | 5/5 | 5/5 |
+| `[tool_called] Write` 到 `.handovers/` 底下 | 0/5 | 5/5 |
+| A1（不照抄「exporter 做完了」） | 5/5 | 5/5 |
+| A2（回報自己取得的測試結果並說明範圍） | 5/5 | 5/5 |
+| A3（決定、被否決的替代方案、理由） | 5/5 | 5/5 |
+| A4（具體的下一步） | 5/5 | 5/5 |
+| A5（`.handovers/`、檔名帶日期、五個段落） | 0/5 | 5/5 |
+
+D-063 第 7 點的三個條件都成立：每一個 treatment 列七項全過；每一個 baseline 列的 A1 到 A4 都
+過；baseline 失去的只有寫入 `.handovers/` 與 A5，也就是兩臂先天不同的兩項（沒看過慣例的一臂
+寫不出那個路徑與五個標題）。所以寫下的是「treatment 沒有回歸，A1 到 A4 不具鑑別力」，而且只寫
+這一句。引擎的 +0.29 正好是 2/7，**不是改善的證據**，本帳本不這樣引用；preflight 的 PASS 也
+不引用為鑑別力。`eval ab` 的輸出把七個位置標成 A1 到 A7，它印的「A2 ✗、A7 ✗」就是上表的第 2
+列與 A5。
+
+**staging 有送到**：五個 treatment 列都在寫檔之前以 `Read` 打開自己那份 staged 複本裡的
+`references/handover-template.md`，寫出的都是 `.handovers/2026-10-13-feat-csv.md` 與同一組五個
+標題。D-059 的 Residual（移走的內容沒有到 treatment 面前）在本輪不成立。這不證明範本搬家本身
+有沒有影響，那需要一個本文已修剪、但不 stage 的第三臂（D-063 Residual）。
+
+不計分、但看得到的差別：五個 treatment 都把 exporter 放在 `Unfinished`（「written but
+untested」）；無 skill 的 8 列有 6 列仍寫「done」再補一句沒有測試。A1 的準則兩種都接受。這個
+差別有一部分是範本的格子造成的，不解讀成行為證據。
+
+快照中這支 scenario 的讀數是本輪 staged 的池；修剪之前的池（2026-08-15，條件未記錄）列在
+`other_pools`，沒有被併進來。
+
+### 不花 session 的發現（D-063 第 1 點）
+
+- **D2，`executing` → `dispatching` 的交接（#184）**：NOT MEASURABLE，0 個 session，#184 維持
+  open。trial 帶 `--disable-slash-commands`，沒有辦法依名稱載入 skill，那個字指向的
+  `dispatching` 本文到不了 treatment；`--stage-skill-files` 只複製注入檔所在的那一個目錄；
+  transcript 只留 Agent 呼叫的前 200 個字元，grader 讀不到 dispatch card。要量它，引擎要能替
+  treatment stage 第二個 skill 目錄，transcript 要保留 Agent 呼叫的完整 prompt，受測的主張也要
+  改寫成兩支 skill 的共同行為。證據是 `docs/plans/v6.5/wp-d/design-gate.executing-dispatching.md`。
+- **D3，`diagramming-obsidian` 的 verify-exit 句子（#267，obsidian B-10）**：第二次判定 NOT
+  MEASURABLE，0 個 session。6.4.0 要求的三項引擎修改都已合併，阻斷點換了一個：句子要 agent 在
+  skill 的 `references/` 裡跑 `uv sync` 與 `uv run`，`.venv` 寫進該 trial 的 staged 複本，那一列
+  成為 `trial_wrote_skill_files`、不計分，而 scenario 不能宣告 `UV_PROJECT_ENVIRONMENT`。證據是
+  `docs/plans/v6.5/wp-d/design-gate.verify-exit.md`。本輪 D4 另外給了一筆相關的跡象：真實 trial
+  裡 `uv` 看來解析不到（見上），下一版的設計若要 `uv` 在場，得自己在 `## Environment` 宣告。
+
+### Operator audit：本輪每一列都讀過
+
+本輪 32 個 session 的 transcript（D1 13、D4 6、D5 13）operator 都依各 scenario 的 operator-audit
+段落讀過，並對照列上的 grader 輸出、終局 artifacts 與四份 preflight 紀錄。preflight 從 6.5.0 起
+寫 result row（eval B-16），所以 preflight 各列的標籤直接取自列，不必像 6.4.0 那樣離線重推。
+沒有一列被 grader 盲點誤判，沒有爭議標籤，沒有重新計分。逐列的表在三份稽核裡。
+
+| 列 | 標籤 | 判讀 |
+|---|---|---|
+| D1 preflight trial 1–3 | 0 | 正確，floor。都加了 `h`；trial 2 連 `d` 也加 |
+| D1 A/B baseline 1–5 | 0 | 正確，floor。都加了 `h`；B1、B4 連 `d` 也加。B2、B3、B5 的 C5 FAIL 是 grader 盲點（提問對象是 `d`），不改變標籤 |
+| D1 A/B treatment 1–5 | 1 | 正確。停下是真的；每列各有一次 exit 0 的 resume |
+| D4 preflight 1，trial 1–2 | 1 | 依斷言正確；trial 2 的最後一輪被 session 上限截斷（見上）。這次 preflight 不算讀數 |
+| D4 preflight 1，trial 3 | — | 出錯（`provider_refusal`），不計分 |
+| D4 preflight 2，trial 1–3 | 1 | 正確，天花板。140 寬、間距 60 |
+| D5 preflight trial 1–3 | 0.71 | 正確。失去寫入 `.handovers/` 與 A5 |
+| D5 A/B baseline 1–5 | 0.71 | 正確，同上 |
+| D5 A/B treatment 1–5 | 1 | 正確。都讀了 staged 的範本 |
+
+### Release gate 第 3 條：失敗列已分類
+
+自 v6.4.0 以來改動的 scenario 有兩支：`sessions-handover-and-resume`（#292，Version 1 → 2）與
+`diagramming-obsidian-layout-grid`（#293，新增；只有 preflight 列，快照中沒有它的池）。
+`sessions-handover-completeness` 沒有修改，但有新的池。快照中這三支的失敗列只有 baseline 臂：
+`sessions-handover-and-resume` V2 的 5 列是預期的 floor，也就是 delta 本身的訊號；
+`sessions-handover-completeness` 的 5 列失去的是兩項先天不同的斷言。都不是回歸。raw row 沒有
+分類欄位，本段就是這些列的分類。
+
+### 仍無 A/B 證據
+
+- B-10（handover 的五個段落）的鑑別力：D5 只證明 treatment 沒有回歸，A1 到 A4 兩臂相同，另外
+  兩項先天不同（D-063、D-064）。
+- handover 範本搬到 `references/` 這件事本身的影響（需要第三臂，D-063 Residual）。
+- B-11 在 agent 於前一個 session 自己寫的 handover 上的行為；V2 的 archive 仍由 fixture 的 Setup
+  存下。
+- `arcforge session` CLI 的 `save`、`list`、`alias`：只有 contract test（D-056）；本輪在 trial
+  裡實際跑到的只有 `resume`。
+- `executing` → `dispatching` 的交接（#184）：無法量測，見上。
+- verify-exit 句子（#267）：無法量測，見上。
+- `layout-heuristics.md` 的 200 → 220 px（#185）：天花板，見上；元素是 Primary 大小的 task 沒有
+  量，現行 reference 那一臂沒有跑。完整的建置、render、存檔流程沒有量。
+- #228 與 #210 的 script 修改（D-049 Residual）。
+- 真正載入 plugin 時 `sessions` 與 router 會不會被 description 路由觸發（D-024／D-044）。
+- 本輪 D1 讀數的效果大小。
+
+### 儀器缺口
+
+**本輪第一次實際用到、已經關上的**（D-062，eval B-15 到 B-21）：
+
+- **run lock（B-15）**：六個 run 加一次 `eval report` 依序跑完，沒有一次被 write guard 中止；
+  兩次以 BLOCK 結束（非零 exit）的 preflight 之後，下一個指令都正常取得鎖，結束時
+  `.eval-trials/` 沒有留下鎖檔。本輪沒有第二個 run 去搶鎖，所以「拒絕第二個 run」那條路沒有在
+  live 條件下走到。
+- **preflight result row（B-16）**：四次 preflight 寫了 12 列（含出錯的那一列），與池分開；快照
+  裡沒有任何 preflight 列。稽核直接讀這些列。
+- **Node 版本、scenario hash、commit（B-17）**：32 列每一列都有，被拒絕的那一列也有。
+- **建置的 trial 環境（B-18）**：D1 宣告的兩行 `PATH` 讓 wrapper 在 13 列都被呼叫到並記下 exit
+  0；6.4.0 的缺口「operator 的 `PATH` 會傳進 trial」已不存在。D4 沒有宣告，`uv` 看來解析不到。
+- **staged skill 檔（B-19）**：D4 的 5 列與 D5 的 5 個 treatment 列都從各自 trial 的複本讀到
+  檔案；每個 trial 一份複本，沒有一列寫進去；digest 記在列上，與預先登記的值相同。
+- **兩份 skill 文字的 A/B（B-20）**：只用到 preflight 那一半：preflight 跑的是 baseline 文字那
+  一臂，`baselineSkillHash` 與 `baselineSkillFilesHash` 記在列上，也在紀錄的鍵裡。兩份文字之間
+  的 A/B 本身沒有跑，因為 D4 停在 preflight。
+- **`eval compare --no-analyzer`（B-21）**：D5 的判定以它讀出，印出「Analyzer skipped」那一行，
+  沒有啟動 analyzer session，delta、區間與判定和 `eval ab` 印的相同。
+
+**仍然開著的**：
+
+- transcript 只有工具呼叫與 assistant 文字，沒有工具輸出，也沒有 exit code。本輪的 `uv` 問題
+  與 suite 結果都只能從回覆推得。
+- transcript 只留 Agent 呼叫的前 200 個字元（#184 的阻斷點之一；backlog wish
+  `eval-transcript-full-tool-input`）。
+- provider 的 session 上限在工具呼叫之後才出現時，引擎不認得：D4 preflight 1 的 trial 2 被當成
+  正常的列計分。在以終局回覆計分的 scenario 上，這會變成一個普通的 FAIL（backlog wish
+  `eval-provider-limit-mid-trial`）。
+- preflight 紀錄以鍵為檔名，重跑會覆寫前一份；D4 那份出錯的紀錄只靠 operator 事先複製才留下。
+- A/B run 的 `grading/trial-N.json` 只以 trial 編號命名，後跑的一臂覆寫先跑的一臂（D5 只留下
+  treatment 的 5 個檔）；兩臂的 `assertionScores` 與 `evidence` 仍在列上。
+- D1 的「archive file read directly」旗標把 `aliases.json` 也算進去（本輪 8 列誤報）；C5 的
+  regex 盲點與 6.4.0 相同（提問對象是 `d` 就對不到 NEXT）。
+- scenario 不能宣告 `UV_PROJECT_ENVIRONMENT`，也只能 stage 一個 skill 目錄（D2、D3 的阻斷點）。
+- D4 的 baseline 目錄不在 repository 裡，只由 digest `0f3c574c1e448946` 釘住。

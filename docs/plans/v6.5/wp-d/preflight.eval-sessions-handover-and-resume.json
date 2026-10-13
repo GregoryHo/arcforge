@@ -1,0 +1,16 @@
+{
+  "scenario_hash": "a08495af5b8259ff",
+  "scenario_name": "eval-sessions-handover-and-resume",
+  "model": "opus[1m]",
+  "max_turns": 30,
+  "plugin_dir": false,
+  "effort": "xhigh",
+  "trial_timeout_ms": 900000,
+  "node_version": "v24.13.1",
+  "repo_commit": "853ea8206ab816d4652079fa67ed3597ff11f1c4",
+  "k": 3,
+  "pass_rate": 0,
+  "verdict": "PASS",
+  "reason": "Baseline pass rate 0% < 80% — scenario is discriminative. Proceed with arcforge eval ab.",
+  "timestamp": "2026-10-12T22:28:02.459Z"
+}
