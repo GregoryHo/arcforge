@@ -314,6 +314,10 @@ stdout as JSON, as described under *Exit codes* below. They are:
 - `arcforge learn instinct deactivate`, `arcforge learn reflect record`, `arcforge learn recall record`
 - `arcforge obsidian register`, `arcforge obsidian unregister`, `arcforge obsidian set-default`
 
+One exception: `arcforge worktree add --setup` lets the project's installer
+write its own output to stdout ahead of the object, so only an add without
+`--setup` is safe to pipe.
+
 Those that write a timestamp, an id or an archive path print a new one on each
 run, so two runs differ in those per-run values and nothing else. Some commands
 change their output with the flag: `arcforge eval report`, for example, prints
