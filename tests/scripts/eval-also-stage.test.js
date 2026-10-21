@@ -258,6 +258,41 @@ skip
     expect(runSkillEval).not.toHaveBeenCalled();
   });
 
+  describe('a # in the description', () => {
+    const stageWith = async (description) => {
+      writeScenario('hash');
+      writeSkill(tempDir, 'hashed', 'HASHED BODY', description);
+      await run(
+        args(
+          ['ab', 'hash'],
+          { 'skill-file': main, 'also-stage': path.join('skills', 'hashed') },
+          { 'stage-skill-files': true },
+        ),
+      );
+      return runSkillEval.mock.calls[0][2].alsoStage.description;
+    };
+
+    it.each([
+      ['Helper. Use when asked. # internal note'],
+      ['"Helper." # internal note'],
+    ])('is refused as an inline YAML comment: %s', async (description) => {
+      await expect(stageWith(description)).rejects.toThrow(
+        /hashed: its SKILL\.md description carries an inline YAML comment \(# internal note\)/,
+      );
+      expect(runSkillEval).not.toHaveBeenCalled();
+    });
+
+    it('is kept inside a quoted value, which the reader unquotes', async () => {
+      expect(await stageWith('"Helper. # not a comment"')).toBe('Helper. # not a comment');
+      runSkillEval.mockClear();
+      expect(await stageWith("'Helper. # not a comment'")).toBe('Helper. # not a comment');
+    });
+
+    it('is kept with no whitespace before it', async () => {
+      expect(await stageWith('Measures issue#184 and C#.')).toBe('Measures issue#184 and C#.');
+    });
+  });
+
   it('hands the runner nothing to also stage without the flag', async () => {
     writeScenario('none');
     await run(args(['ab', 'none'], { 'skill-file': main }, { 'stage-skill-files': true }));

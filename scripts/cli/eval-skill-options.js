@@ -107,6 +107,16 @@ function readAlsoStage(dir, projectRoot, stage) {
       `--also-stage ${dir}: its SKILL.md description spans more than one line, which the line naming the skill cannot carry; write the description on one line.`,
     );
   }
+  // The reader keeps a plain value's ` # comment`, which YAML drops; it
+  // unquotes only a value quoted end to end, where a # is text.
+  const raw = front[1].match(/^description:[ \t]*(.*?)[ \t]*\r?$/m)?.[1] || '';
+  const quoted = raw.length > 1 && /^(["']).*\1$/.test(raw);
+  const comment = quoted ? null : raw.match(/\s(#.*)$/);
+  if (comment) {
+    throw new Error(
+      `--also-stage ${dir}: its SKILL.md description carries an inline YAML comment (${comment[1]}), which the line naming the skill would inject; write the description without it.`,
+    );
+  }
   return { dir: resolved, name: path.basename(resolved), description: description.trim() };
 }
 

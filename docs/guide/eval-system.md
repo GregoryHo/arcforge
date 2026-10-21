@@ -426,7 +426,8 @@ arcforge eval ab <name> --skill-file path/to/SKILL.md --stage-skill-files --also
 ```
 
 The directory must hold a `SKILL.md` whose frontmatter has a `description`
-written on one line; a block scalar (`description: >-`) is refused.
+written on one line without an inline comment; a block scalar
+(`description: >-`) is refused.
 `--also-stage` is refused without `--stage-skill-files`, on a workflow-scope
 scenario, and on `eval preflight`, which runs the baseline. It is refused, too,
 with no directory after it or an empty one, and when the `--skill-file` text is
