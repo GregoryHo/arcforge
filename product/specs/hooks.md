@@ -1,6 +1,6 @@
 # hooks — spec
 
-> Status: shipped v6.5.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.5.0 · extended by 6.5.1 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -126,7 +126,10 @@ down, never block the user, and never observe them uninvited.
   diary draft, which is killed after 5 s. The transcript parse is not bounded:
   it reads and decodes every line of the transcript, however long the session
   has run, although what it keeps is a capped tail — about 5 ms per MB on real
-  transcripts.
+  transcripts. From 6.5.1 the parse reads at most the last 8 MiB of the
+  transcript, starting at the first whole line in that window, and marks its
+  result truncated when it did; above the bound the diary's tool and file
+  lists are the window's, not the whole session's (#172, D-065).
 - **B-9 The diary threshold counts every tool call (6.4.0).** The per-session
   tool count behind B-7's 50-call threshold gains exactly one for every
   PostToolUse, however many of those hooks run at the same moment, so a session
@@ -232,3 +235,5 @@ implements fail-open is pinned in `.claude/rules/coding-standards.md`.
   older engine recorded is not counted (B-6).
 - **D-055** — 6.4.0 stops the diary tool counter losing increments under
   concurrent PostToolUse hooks (B-9).
+- **D-065** — from 6.5.1 the diary transcript parse reads at most the
+  transcript's last 8 MiB (B-7).

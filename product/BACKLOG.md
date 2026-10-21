@@ -47,11 +47,7 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 - ~~**learn-enable-erases-config**~~ — graduated into 6.1.1 (D-018).
 
 - ~~**unify-candidate-queues**~~ — graduated into 6.1.0 (D-012).
-- **bound-transcript-parse** — `parseTranscript` reads and splits the whole
-  session transcript on every above-threshold Stop and PreCompact even though
-  every output it returns is a capped tail (about 5 ms per MB on real transcripts);
-  bound the read. The hooks spec's B-7 now names this parse and the diary
-  subprocess as costs (6.1.2), so what is left is the bound itself · issue: [#172](https://github.com/GregoryHo/arcforge/issues/172).
+- ~~**bound-transcript-parse**~~ — graduated into 6.5.1 (D-065).
 - ~~**stale-probe-window-vs-rendered-paths**~~ — graduated into 6.1.2 (D-019).
 - ~~**dashboard-activation-ack**~~ — graduated into 6.1.1 (D-018).
 - ~~**cli-draft-path-redaction**~~ — graduated into 6.2.0 (D-035).
@@ -112,22 +108,12 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
   grid and drew the six boxes 140 px wide, so the 20 px contradiction never
   came up. A Version 2 needs a task where the baseline arrives at Primary
   width (180 px) without the prompt naming a width · needs: D-064, #185.
-- **eval-transcript-full-tool-input** — a transcript keeps the first 200
-  characters of an Agent call and no tool output or exit code, so no grader
-  can read a dispatch card and `uv`'s absence in a trial rests on what the
-  agent says. Keep an Agent call's whole prompt, and a `Bash` exit code
-  · needs: D-063, #184.
-- **eval-provider-limit-mid-trial** — a provider session limit that lands
-  after a trial's tool calls is scored as an ordinary row; only a refusal
-  that replaces the whole turn becomes `provider_refusal`. Detect the limit
-  text as a trial's last block and record the row as an error · needs: D-064.
+- ~~**eval-transcript-full-tool-input**~~ — graduated into 6.5.1 (D-065).
+- ~~**eval-provider-limit-mid-trial**~~ — graduated into 6.5.1 (D-065).
 
 ## CLI
 
-- **cli-human-output** — commands without `--json` still print pretty JSON
-  through the shared `output()` helper; either give the status and list
-  commands a human format, or say in `docs/guide/cli-invocation.md` that JSON
-  is the default and `--json` is a no-op for them.
+- ~~**cli-human-output**~~ — graduated into 6.5.1 (D-065).
 
 ## Hooks
 
