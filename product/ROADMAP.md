@@ -2674,15 +2674,16 @@ reverse one, append a superseding entry (see AGENTS.md).
   `## Trials`; D1 runs before D2; a preflight BLOCK at ceiling is a
   finding — no rerun, no A/B; a preflight that measured nothing may be
   rerun, at most twice in the whole round; an A/B that ends with an arm
-  short of scorable rows gets at most two `eval ab --k 1` top-ups per arm;
+  short of scorable rows gets at most two top-ups of one trial per arm
+  (`eval ab --k 1`);
   and every verdict is the engine's, read with `eval compare` on the merged
   pool of the scenario's Version. The cap is about 45 trial sessions: 26
   when both items run once through (6 preflight, 20 A/B), up to 8 for
   top-ups and up to 6 for preflight reruns, 40 at worst; an A/B that would
   pass the cap is not started, and its k is not lowered to fit. Version 2
-  is #185's second and last design: if its preflight BLOCKs at ceiling,
-  #185 is closed as a finding and the **eval-layout-grid-v2** wish leaves
-  the backlog as a tombstone. The `diagramming-obsidian` verify-exit
+  is #185's second and last design, and the **eval-layout-grid-v2** wish
+  graduates into this version on promotion, whatever the round reads: if
+  Version 2's preflight BLOCKs at ceiling, #185 is closed as a finding. The `diagramming-obsidian` verify-exit
   sentence ([obsidian](specs/obsidian.md) B-10) is not in the round, and
   `eval-router-skill-selection` is not rerun. The detailed pre-registration
   — each gate's verdict, each k, the staged digests, the per-row audit —
@@ -2741,7 +2742,7 @@ reverse one, append a superseding entry (see AGENTS.md).
   CHANGELOG also carries the 6.5.0 post-release check (#297), by the
   precedent of earlier releases, which D-065 does not mention.
 - Residual: if D1's gate ends NOT MEASURABLE, #184 stays open on a finding
-  for the third time and the word keeps shipping on its text (D-049).
+  for the second time and the word keeps shipping on its text (D-049).
   D1's treatment is told that `dispatching` is available in one line the
   engine writes; it is not a plugin load, so a reading is about the two
   texts' joint behaviour with the second one reachable, not about routing
@@ -2812,9 +2813,15 @@ reverse one, append a superseding entry (see AGENTS.md).
   not the listing itself, so the treatment's chance of reading the second
   body may differ from a real session's. Nothing but the write guard and
   the prompt's advice keeps an arm away from a directory it was not given
-  (B-19). The second directory's digest is not pooled, so a `dispatching`
-  edit under an unchanged scenario version joins the earlier treatment
-  pool, the residual B-20 already records for the treatment's own text.
+  (B-19). The second directory's digest is not pooled, so two runs of one
+  scenario version given different `--also-stage` directories — or a
+  `dispatching` edited between them — land in one pool, exactly as a
+  treatment's own `skillTextHash` and `skillFilesHash` do under D-062. A
+  reader tells such runs apart by each row's `alsoStagedFilesHash` and the
+  conditions `ranWith()` records; changing which skill the handoff is
+  measured against is a bump of the scenario's Version, not a new pool.
+- Cost accepted: a second directory whose content does not split a pool,
+  and one more flag for the CLI manifest and the eval guide to carry.
 - Verification: contract tests in the PR that lands it — the treatment's
   injection carries the base-directory line and the one-line listing,
   both paths under `os.tmpdir()`, and the baseline's carries only its

@@ -456,7 +456,11 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   `--stage-skill-files` and a skill-scope A/B, and `eval preflight` refuses
   it, since the preflight runs the baseline; the directory must contain a
   `SKILL.md`. Each trial is staged a copy of its own, as the main directory
-  is (B-19). The injection appends one line after the skill text: "Skill
+  is, under the same two checks B-19 gives the main directory: the arm is
+  staged once before the first trial and a later copy with another digest
+  refuses the run from that trial on, and a trial that wrote into its copy
+  of the second directory is `trial_wrote_skill_files`, excluded from
+  scored pools. The injection appends one line after the skill text: "Skill
   `<name>` (<frontmatter description>) is available; its base directory is
   `<copy>` — read `<copy>/SKILL.md` to use it." That line stands in for the
   host's listing of an available skill: the second skill's body is not
@@ -469,9 +473,13 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   the trial directory names both staged directories as exceptions (B-19)
   (D-066, D-067). Residual: the line imitates a host listing and is not
   one, so a treatment may read the second body more or less often than a
-  real session would; and because the second digest is not pooled, a
-  second skill edited under an unchanged scenario version joins the
-  earlier treatment pool.
+  real session would. And because the second digest is not pooled, two
+  runs of one scenario version given different `--also-stage` directories,
+  or a second skill edited between them, land in one pool — as a
+  treatment's own `skillTextHash` and `skillFilesHash` do (B-20) — told
+  apart only by each row's `alsoStagedFilesHash` and recorded conditions;
+  changing which skill the handoff is measured against bumps the
+  scenario's Version rather than opening a new pool.
 
 ### Benchmarks
 - **B-9 Snapshots keep history and gate releases.** `eval report` writes

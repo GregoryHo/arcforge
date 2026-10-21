@@ -66,15 +66,17 @@ work carries provenance a reader can check.
   instead of a number invented. Every audit writes a typed report into the
   vault. The lint script treats a `[[wikilink]]` inside inline code or a fenced
   block as an example, not a link; an inline code span closes only on a
-  backtick run of its own length before the next blank line or fence opener,
-  so a fence that opens later in the note never closes it, and the fence's
-  contents are not read as links. A heading, a blockquote or list item, or a
-  quoted blank line does not end a span's search (#210, D-049). From 6.6.0
-  the script's block model covers four more shapes, so each is read as a
-  reader sees it: a block indented four spaces or more is code, a fence
-  opened inside a blockquote closes where the quote does, a lazy
-  continuation line stays inside its list item, and an inline code span is
-  bounded by the block it opens in (#256, D-066).
+  backtick run of its own length, so a fence that opens later in the note
+  never closes it, and the fence's contents are not read as links (#210,
+  D-049). Before 6.6.0 a span's search ended only at a blank line or a fence
+  opener, so it could run across a heading, a blockquote or list item, or a
+  quoted blank line — a limit #210 recorded. From 6.6.0 the script's block
+  model covers four more shapes, so each is read as a reader sees it: a
+  block indented four spaces or more is code; a fence opened inside a
+  blockquote closes where the quote does; a lazy continuation line stays
+  inside its list item; and an inline code span is bounded by the block it
+  opens in, so an ATX heading, the start of a blockquote, the start of a
+  list item or a quoted blank line ends its search (#256, D-066).
 - **B-6 Every operation leaves a log line.** Each ingest, query, audit, or
   bootstrap appends to the vault's `log.md` and reports the artifacts it
   produced by path — an operation that cannot run says which mode, what
