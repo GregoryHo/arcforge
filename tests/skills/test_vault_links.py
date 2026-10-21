@@ -288,6 +288,49 @@ def test_a_fence_after_an_unclosed_span_is_a_fence_with_crlf_endings(vault):
     assert links["notes"]["Wiki/alpha-note.md"]["inbound"] == 1
 
 
+
+# #256: four block shapes where the link set must match CommonMark's. Each body
+# links to notes L0–L4; the helper returns the ones that got a backlink.
+def _linked(vault, body):
+    names = ("L0", "L1", "L2", "L3", "L4")
+    for name in names:
+        (vault / "Wiki" / f"{name}.md").write_text("---\ntype: entity\n---\nnote\n", encoding="utf-8")
+    (vault / "Wiki" / "gamma-orphan.md").write_text(GAMMA + "\n" + body, encoding="utf-8")
+    notes = _run(vault)["links"]["notes"]
+    return {name for name in names if notes[f"Wiki/{name}.md"]["inbound"]}
+
+
+def test_an_indented_code_block_is_code(vault):
+    # Four spaces after a blank line (or at the start) is an indented code block,
+    # so its backticks open no span, and a fence right after it is a fence.
+    for fence in ("```\n[[L1]]\n```\n", "> ```\n", "  ```\n"):
+        assert _linked(vault, "    ``` [[L0]]\n" + fence) == set()
+    assert _linked(vault, "Text.\n\n    [[L0]]\n    [[L1]]\n\nAfter: [[L2]].\n") == {"L2"}
+
+
+def test_a_fence_in_a_blockquote_closes_when_the_quote_ends(vault):
+    # A fenced block has no lazy continuation: the unquoted line ends the quote,
+    # and the fence inside it with it.
+    assert _linked(vault, "> text ``` q\n>```\n[[L2]]\n") == {"L2"}
+
+
+def test_a_lazy_continuation_line_stays_in_its_list_item(vault):
+    # `z ``` w` continues the item's paragraph, so the fence after it opens inside
+    # the item and closes when the unindented paragraph ends the item.
+    body = "- item [[L0]]\nz ``` w\n  ```\nText ```lit [[L3]]\nx` y [[L4]]\n```\n"
+    assert _linked(vault, body) == {"L0", "L3", "L4"}
+
+
+@pytest.mark.parametrize(
+    "boundary",
+    ["# h ` [[L1]]\n", "> q ` [[L1]]\n", "- i ` [[L1]]\n", ">\n> q ` [[L1]]\n"],
+    ids=["heading", "blockquote-start", "list-item-start", "quoted-blank"],
+)
+def test_an_inline_code_span_is_bounded_by_its_block(vault, boundary):
+    opener = "> a `x [[L0]]\n" if boundary.startswith(">\n") else "a `x [[L0]]\n"
+    assert _linked(vault, opener + boundary) == {"L0", "L1"}
+
+
 def test_self_links_under_any_spelling_are_not_edges(vault):
     (vault / "Wiki" / "gamma-orphan.md").write_text(
         GAMMA + "\nSelf: [[gamma-orphan]] and [[Wiki/gamma-orphan]] and [[gamma-orphan#Heading|me]].\n",
