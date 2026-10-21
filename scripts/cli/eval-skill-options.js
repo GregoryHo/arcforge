@@ -63,15 +63,17 @@ function readBaselineSkill(file, projectRoot, stage) {
 /**
  * The second skill directory a treatment is given (B-22): its path, and the
  * name and description its one injected line names it by.
- * @param {string|boolean|undefined} dir - The --also-stage value; true when given bare
+ * @param {string|boolean|undefined} dir - The --also-stage value; true when given bare,
+ *   undefined only when not given
  * @param {string} projectRoot
  * @param {boolean} stage - Whether skill files are staged; the flag requires it
  * @returns {{ dir: string, name: string, description: string }|undefined}
  */
 function readAlsoStage(dir, projectRoot, stage) {
-  if (!dir) return undefined;
-  // A bare `--also-stage` is parsed as a flag: refused, not run as an A/B without it.
-  if (dir === true) {
+  if (dir === undefined) return undefined;
+  // A bare `--also-stage` is parsed as a flag, and `--also-stage ""` as an empty
+  // value: both refused, not run as an A/B without it.
+  if (dir === true || !String(dir).trim()) {
     throw new Error('--also-stage requires a skill directory: --also-stage <skill-dir>.');
   }
   if (!stage) {
@@ -140,7 +142,7 @@ function refuseSkillTextFlagsForWorkflow(scenario, given, cmd) {
  *   baseline text's hash, and the digest of its directory when it is staged
  */
 function preflightBaseline(scenario, projectRoot, given) {
-  if (given.alsoStage) {
+  if (given.alsoStage !== undefined) {
     throw new Error(
       'eval preflight refuses --also-stage: the second skill reaches the treatment only, and a preflight runs the baseline. Drop the flag; the A/B with it is gated by the same preflight (B-22).',
     );
@@ -179,7 +181,7 @@ function preflightBaseline(scenario, projectRoot, given) {
 function resolveSkillOptions(scenario, projectRoot, given) {
   const skillFile = given.skillFile || scenario.target;
   const stageSkillFiles = Boolean(given.stage);
-  if (given.alsoStage && scenario.scope === 'workflow') {
+  if (given.alsoStage !== undefined && scenario.scope === 'workflow') {
     throw new Error(
       'eval ab --also-stage is refused for a workflow-scope scenario: it stages a second skill beside the injected one, and a workflow A/B injects none (B-22).',
     );
@@ -192,13 +194,21 @@ function resolveSkillOptions(scenario, projectRoot, given) {
     );
   }
   const skill = readSkillFile(skillFile, projectRoot);
+  const alsoStage = readAlsoStage(given.alsoStage, projectRoot, stageSkillFiles);
+  // An empty treatment text is injected as none, so nothing would be staged
+  // while every row recorded the second skill.
+  if (alsoStage && skill.text === '') {
+    throw new Error(
+      `--also-stage needs a treatment skill text: --skill-file ${skillFile} is empty, so nothing would be staged. Name a file with text in it.`,
+    );
+  }
   return {
     skillFile,
     skillPath: skill.path,
     skillInstruction: skill.text,
     stageSkillFiles,
     ...readBaselineSkill(given.baselineSkillFile, projectRoot, stageSkillFiles),
-    alsoStage: readAlsoStage(given.alsoStage, projectRoot, stageSkillFiles),
+    alsoStage,
   };
 }
 

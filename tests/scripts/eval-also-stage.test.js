@@ -184,6 +184,50 @@ skip
     expect(runSkillEval).not.toHaveBeenCalled();
   });
 
+  it.each([[''], ['   ']])('is refused when given an empty directory (%j)', async (value) => {
+    writeScenario('empty-value');
+    await expect(
+      run(
+        args(
+          ['ab', 'empty-value'],
+          { 'skill-file': main, 'also-stage': value },
+          { 'stage-skill-files': true },
+        ),
+      ),
+    ).rejects.toThrow(/--also-stage requires a skill directory/);
+    expect(runSkillEval).not.toHaveBeenCalled();
+  });
+
+  it('is refused empty on eval preflight and on a workflow scenario too', async () => {
+    writeScenario('pre-empty');
+    writeScenario('flow-empty', 'workflow');
+    await expect(
+      run(args(['preflight', 'pre-empty'], { 'also-stage': '' }, { 'stage-skill-files': true })),
+    ).rejects.toThrow(/eval preflight refuses --also-stage/);
+    await expect(
+      run(args(['ab', 'flow-empty'], { model: 'opus', effort: 'high', 'also-stage': '' })),
+    ).rejects.toThrow(/--also-stage is refused for a workflow-scope scenario/);
+    expect(evalLib.runTrial).not.toHaveBeenCalled();
+    expect(evalLib.runWorkflowEval).not.toHaveBeenCalled();
+  });
+
+  it('is refused when the treatment skill file is empty, since nothing would be staged', async () => {
+    writeScenario('empty-skill');
+    fs.writeFileSync(path.join(tempDir, 'skills', 'main', 'SKILL.md'), '');
+    await expect(
+      run(
+        args(
+          ['ab', 'empty-skill'],
+          { 'skill-file': main, 'also-stage': dispatch },
+          { 'stage-skill-files': true },
+        ),
+      ),
+    ).rejects.toThrow(
+      /--also-stage needs a treatment skill text: --skill-file skills[/\\]main[/\\]SKILL\.md is empty/,
+    );
+    expect(runSkillEval).not.toHaveBeenCalled();
+  });
+
   it('is refused for a description written as a YAML block scalar', async () => {
     writeScenario('folded');
     writeSkill(tempDir, 'folded', 'FOLDED BODY', '>-\n  Folded over\n  two lines.');
