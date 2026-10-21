@@ -14,11 +14,13 @@ const path = require('node:path');
 const os = require('node:os');
 
 const {
+  GRADING_FILE_RE,
   collectGradingData,
   buildPromotionCandidates,
   buildRetirementCandidates,
   runAudit,
 } = require('../../scripts/lib/eval-audit');
+const { getGradingPath } = require('../../scripts/lib/eval-grader-io');
 
 function makeTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'test-audit-'));
@@ -342,5 +344,66 @@ describe('runAudit', () => {
     expect(result.trialCount).toBe(0);
 
     fs.rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('grading files per arm', () => {
+  const claim = (text) => ({ text, category: 'process', passed: false, evidence: 'e' });
+
+  test('baseline and treatment trial N of one run both survive and are both collected', () => {
+    const dir = makeTempDir();
+    for (const arm of ['baseline', 'treatment']) {
+      const file = getGradingPath({ eval: `scenario-a-${arm}`, runId: 'r1', trial: 1 }, dir);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, JSON.stringify({ discovered_claims: [claim(`${arm} claim`)] }));
+    }
+
+    const gradingDir = path.join(dir, 'evals', 'results', 'scenario-a', 'r1', 'grading');
+    expect(fs.readdirSync(gradingDir).sort()).toEqual([
+      'baseline-trial-1.json',
+      'treatment-trial-1.json',
+    ]);
+    const { claimsEntries, trialCount } = collectGradingData(dir);
+    expect(trialCount).toBe(2);
+    expect(claimsEntries.map((c) => c.text).sort()).toEqual(['baseline claim', 'treatment claim']);
+
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('old unsuffixed names and new arm names are both collected; dumps are not', () => {
+    const dir = makeTempDir();
+    writeGradingJson(dir, 'scenario-a', 'old-run', 1, { discovered_claims: [claim('old')] });
+    const gradingDir = path.join(dir, 'evals', 'results', 'scenario-a', 'new-run', 'grading');
+    fs.mkdirSync(gradingDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(gradingDir, 'treatment-trial-1.json'),
+      JSON.stringify({ discovered_claims: [claim('new')] }),
+    );
+    fs.writeFileSync(path.join(gradingDir, 'treatment-trial-2-unparseable.txt'), 'raw');
+
+    const { claimsEntries, trialCount } = collectGradingData(dir);
+    expect(trialCount).toBe(2);
+    expect(claimsEntries.map((c) => c.text).sort()).toEqual(['new', 'old']);
+
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('GRADING_FILE_RE accepts trial files and nothing else', () => {
+    for (const f of [
+      'trial-1.json',
+      'baseline-trial-2.json',
+      'treatment-trial-10.json',
+      'preflight-trial-3.json',
+    ]) {
+      expect(GRADING_FILE_RE.test(f)).toBe(true);
+    }
+    for (const f of [
+      'other-trial-1.json',
+      'trial-1-unparseable.txt',
+      'trial-x.json',
+      'grading.json',
+    ]) {
+      expect(GRADING_FILE_RE.test(f)).toBe(false);
+    }
   });
 });

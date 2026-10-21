@@ -102,6 +102,15 @@ describe('eval-graders.js', () => {
       // produces — otherwise grading and run JSONL diverge.
       expect(gradingPath.split(path.sep)).toContain(scenarioName);
     });
+
+    it('files each arm under its own name, so trial N of one arm does not overwrite the other', () => {
+      const pathFor = (evalName) =>
+        path.basename(getGradingPath(makeTrialResult({ eval: evalName, trial: 3 }), '/root'));
+      expect(pathFor('my-eval-baseline')).toBe('baseline-trial-3.json');
+      expect(pathFor('my-eval-treatment')).toBe('treatment-trial-3.json');
+      expect(pathFor('my-eval-preflight')).toBe('preflight-trial-3.json');
+      expect(pathFor('my-eval')).toBe('trial-3.json');
+    });
   });
 
   // ── fr-gr-003: discovered_claims[] in grading.json ──────────

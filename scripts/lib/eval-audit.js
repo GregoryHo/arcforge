@@ -21,6 +21,14 @@ const path = require('node:path');
 const GRADING_RESULTS_DIR = path.join('evals', 'results');
 
 /**
+ * A trial's grading file: `<condition>-trial-N.json` for an arm's trial, or the
+ * unsuffixed `trial-N.json` an unsuffixed eval (and every run graded before
+ * arms got their own files) writes. Raw grader dumps (`*-unparseable.txt`) and
+ * anything else in `grading/` do not match.
+ */
+const GRADING_FILE_RE = /^(?:(?:baseline|treatment|preflight)-)?trial-\d+\.json$/;
+
+/**
  * Derive a stable short hash for a canonical key (e.g., claim text).
  * Used for stable deduplication identifiers in output.
  * @param {string} key - Canonical key to hash
@@ -41,8 +49,9 @@ function normalizeClaim(text) {
 }
 
 /**
- * Walk evals/results/<scenario>/<runId>/grading/trial-*.json and collect all
- * discovered_claims and weak_assertions entries.
+ * Walk the grading files (GRADING_FILE_RE) under
+ * evals/results/<scenario>/<runId>/grading/ and collect all discovered_claims
+ * and weak_assertions entries.
  *
  * Each claim entry is decorated with { ...claim, scenario }.
  * Each weak entry is decorated with { ...weak, scenario }.
@@ -76,9 +85,7 @@ function collectGradingData(projectRoot) {
       const gradingDir = path.join(scenarioDir, runId, 'grading');
       if (!fs.existsSync(gradingDir)) continue;
 
-      const gradingFiles = fs
-        .readdirSync(gradingDir)
-        .filter((f) => f.startsWith('trial-') && f.endsWith('.json'));
+      const gradingFiles = fs.readdirSync(gradingDir).filter((f) => GRADING_FILE_RE.test(f));
 
       for (const gradingFile of gradingFiles) {
         const filePath = path.join(gradingDir, gradingFile);
@@ -242,6 +249,7 @@ function runAudit(projectRoot) {
 }
 
 module.exports = {
+  GRADING_FILE_RE,
   collectGradingData,
   buildPromotionCandidates,
   buildRetirementCandidates,

@@ -821,6 +821,18 @@ arcforge eval dashboard --port 3333
 ```
 
 `audit` reads grading history and surfaces scenarios worth promoting or retiring.
+Grading history is the `grading/` directory in each run under `evals/results/`:
+one file per successfully model-graded trial (a `model` grader, or a `mixed`
+one whose scenario has text assertions). An A/B or preflight arm's file is
+named after its arm as the transcripts are (`baseline-trial-<n>.json`,
+`treatment-trial-<n>.json`, `preflight-trial-<n>.json`), so the two arms of a
+run never overwrite each other; an unlabelled `eval run` trial writes
+`trial-<n>.json`, as A/B runs graded before arms got their own names did, and
+`audit` reads all of them. A model grade that fails leaves only its raw
+response, in the same name with `-graderfail.txt`, `-unparseable.txt` or
+`-empty-scores.txt` in place of `.json` (`baseline-trial-<n>-unparseable.txt`);
+code-graded trials, and a `mixed` trial whose action log
+is missing, write no grading file, and their verdicts are in the result row.
 `dashboard` serves a live view at `localhost:3333` for browsing runs, arms, and
 per-trial detail.
 

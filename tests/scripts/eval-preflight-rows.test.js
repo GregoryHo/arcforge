@@ -189,7 +189,7 @@ describe('preflight result rows', () => {
       const transcript = saveTranscript(`${NAME}-preflight`, 2, 'out', tempDir, RUN_ID);
       expect(transcript).toBe(path.join(runDir, 'transcripts', 'preflight-trial-2.txt'));
       const grading = getGradingPath(trialRow(`${NAME}-preflight`, 2), tempDir);
-      expect(grading).toBe(path.join(runDir, 'grading', 'trial-2.json'));
+      expect(grading).toBe(path.join(runDir, 'grading', 'preflight-trial-2.json'));
     });
   });
 
