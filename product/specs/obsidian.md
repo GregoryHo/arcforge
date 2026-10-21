@@ -1,6 +1,6 @@
 # obsidian — spec
 
-> Status: shipped v6.5.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.5.0 · extended by 6.6.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -69,7 +69,12 @@ work carries provenance a reader can check.
   backtick run of its own length before the next blank line or fence opener,
   so a fence that opens later in the note never closes it, and the fence's
   contents are not read as links. A heading, a blockquote or list item, or a
-  quoted blank line does not end a span's search (#210, D-049).
+  quoted blank line does not end a span's search (#210, D-049). From 6.6.0
+  the script's block model covers four more shapes, so each is read as a
+  reader sees it: a block indented four spaces or more is code, a fence
+  opened inside a blockquote closes where the quote does, a lazy
+  continuation line stays inside its list item, and an inline code span is
+  bounded by the block it opens in (#256, D-066).
 - **B-6 Every operation leaves a log line.** Each ingest, query, audit, or
   bootstrap appends to the vault's `log.md` and reports the artifacts it
   produced by path — an operation that cannot run says which mode, what
@@ -191,3 +196,7 @@ live behind the CLI per [cli](cli.md) B-8.
   baseline given the old reference kept its 200 px grid and drew the six
   boxes 140 px wide, 60 px apart, so the preflight BLOCKed and no A/B ran;
   the verify-exit sentence stays a finding at 0 sessions (B-10).
+- **D-066** — 6.6.0 carries the lint script's block-model fix (#256) on
+  contract tests, gives the layout change (#185) its second and last
+  scenario design, and leaves the verify-exit sentence out of the round
+  (B-5, B-10).
