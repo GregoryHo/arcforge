@@ -5,7 +5,7 @@ Claude Code 2.1.306。方法同 [`../v6.5/post-release-6.5.0.md`](../v6.5/post-r
 | 查核 | 方式 | 結果 |
 |---|---|---|
 | Release | `gh run view 39632983252`、`gh release view v6.5.1` | run `success`，tag `v6.5.1` 指向 4a684202；Release 已發布（非 draft、非 prerelease，`publishedAt` 2026-10-21T16:18:44Z），body 與 CHANGELOG `[6.5.1]` 段 `diff -wB` 無差異 |
-| 網站 | curl `arcforge.greghojob.workers.dev` 的 `page/hero.js`、`page/sections.js` | **失敗**：16:19:56Z 到 16:25:35Z 每 30 秒查一次，共 12 次，兩個 bundle 一直是 `v6.5.0`（`cf-cache-status: HIT`，加 query string 繞過快取也一樣）。4a684202 沒有 `Workers Builds: arcforge` 這個 check run，而 0ca06913、19b262b1、dcccc5e8 都有；release 分支的 preview（`540b8052-arcforge.greghojob.workers.dev`）已是 `v6.5.1`。正式站沒有為這次合併重新建置。安裝版裡的 `website/page/*.js` 是 6.5.1，見「版本」列 |
+| 網站 | curl `arcforge.greghojob.workers.dev` 的 `page/hero.js`、`page/sections.js` | **失敗**：16:19:56Z 到 16:25:35Z 每 30 秒查一次，共 12 次，兩個 bundle 一直是 `v6.5.0`（`cf-cache-status: HIT`，加 query string 繞過快取也一樣）。4a684202 沒有 `Workers Builds: arcforge` 這個 check run，而 0ca06913、19b262b1、dcccc5e8 都有；release 分支的 preview（`540b8052-arcforge.greghojob.workers.dev`）已是 `v6.5.1`。正式站沒有為這次合併重新建置。安裝版裡的 `website/page/*.js` 是 6.5.1，見「版本」列。**補記（2026-10-22）**：release commit 4a684202 一直沒有建置，直到 #306 合併推上 main（0bce8da3）才觸發，該次 `Workers Builds: arcforge` 在 2026-10-21T16:47:24Z 完成（`success`），之後 `hero.js` 與 `sections.js` 都是 `v6.5.1` |
 | GitHub 來源安裝 | 全新 `CLAUDE_CONFIG_DIR`、`claude plugin marketplace add GregoryHo/arcforge`、`claude plugin install arcforge@arcforge-dev` | payload 在 `plugins/cache/arcforge-dev/arcforge/6.5.1/`，是複本（無 `.git`）；`installed_plugins.json` 的 `installPath` 指向該路徑，`gitCommitSha` 為 4a684202。`node_modules` 又出現了，見下方說明 |
 | SessionStart hook 從快取執行 | 在 repo 外的空目錄跑一個 `claude -p "reply with the word ok" --model opus --debug`，`ARCFORGE_HOME` 指向暫時目錄 | hook 已執行，見下方說明。該 turn 以 `Not logged in · Please run /login` 結束（exit 1），與 6.5.0 相同，未重跑 |
 | preflight 歷史（#299） | 探測專案，同一個 key 跑兩次安裝版 `eval preflight probe651`：第一次 grader 全判 FAIL，第二次全判 PASS | 第一次 `Verdict: PASS`（baseline 0%），第二次 `Verdict: BLOCK`（100%）。`evals/preflight/` 下只剩第二次的紀錄（`timestamp` 2026-10-21T16:18:12.412Z），第一次的 PASS 紀錄搬到 `history/c6e1f75d3858a759-default.2026-10-21T16-17-53-689Z.json`，檔名就是它自己的 timestamp。之後呼叫安裝版 `checkPreflightGate('probe651', …)`，回的是 `Preflight BLOCK …`：gate 讀最新的那一份，不讀 `history/` |
@@ -40,7 +40,6 @@ Claude Code 2.1.306。方法同 [`../v6.5/post-release-6.5.0.md`](../v6.5/post-r
 
 ## 還欠
 
-- 網站：正式站仍是 `v6.5.0`，要從 Cloudflare 重新觸發 main 的 Workers 建置，再重查兩個 bundle。
 - `qmd` 索引更新。
 - 6.6.0 的 issue：#184、#185、#256。
 - vault 的 `index.md` 計數落後，發版時已記下，尚未補。
