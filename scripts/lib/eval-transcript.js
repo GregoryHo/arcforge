@@ -16,8 +16,16 @@
  * Extracts assistant messages with tool calls to build a rich transcript
  * showing the full conversation flow (text + tool use in order).
  * Also extracts usage metrics (tokens, duration) from the terminal result event.
+ *
+ * A tool result is recorded only when it failed, as `[Result: <tool>] error`,
+ * and never with its content: a grader pattern must not be able to match the
+ * output of a file or a command. Successful results emit nothing.
+ *
+ * endedSynthetic is true when the last assistant message was written by Claude
+ * Code rather than a model: `message.model` is `<synthetic>`, text only, zero
+ * output tokens (the shape a session-limit message takes in a session log).
  * @param {string} rawOutput - Raw JSONL output from stream-json
- * @returns {{ textResult: string, richTranscript: string, usage: { input_tokens: number|null, output_tokens: number|null, duration_ms: number|null } }}
+ * @returns {{ textResult: string, richTranscript: string, usage: { input_tokens: number|null, output_tokens: number|null, duration_ms: number|null }, endedSynthetic: boolean }}
  */
 function parseStreamJsonOutput(rawOutput) {
   if (!rawOutput)
@@ -25,12 +33,15 @@ function parseStreamJsonOutput(rawOutput) {
       textResult: '',
       richTranscript: '',
       usage: { input_tokens: null, output_tokens: null, duration_ms: null },
+      endedSynthetic: false,
     };
 
   const lines = rawOutput.split('\n').filter((l) => l.trim());
   const parts = [];
   let textResult = '';
   const usage = { input_tokens: null, output_tokens: null, duration_ms: null };
+  const toolNames = new Map();
+  let endedSynthetic = false;
 
   for (const line of lines) {
     let event;
@@ -41,13 +52,20 @@ function parseStreamJsonOutput(rawOutput) {
     }
 
     if (event.type === 'assistant' && event.message?.content) {
+      endedSynthetic = isSyntheticMessage(event.message);
       for (const block of event.message.content) {
         if (block.type === 'text' && block.text) {
           parts.push(`[Assistant] ${block.text}`);
         } else if (block.type === 'tool_use') {
+          toolNames.set(block.id, block.name);
           const inputSummary = summarizeToolInput(block.name, block.input);
           parts.push(`[Tool: ${block.name}] ${inputSummary}`);
         }
+      }
+    } else if (event.type === 'user' && Array.isArray(event.message?.content)) {
+      for (const block of event.message.content) {
+        if (block.type !== 'tool_result' || block.is_error !== true) continue;
+        parts.push(summarizeToolError(toolNames.get(block.tool_use_id) || 'unknown', block));
       }
     } else if (event.type === 'result') {
       textResult = event.result || '';
@@ -59,7 +77,36 @@ function parseStreamJsonOutput(rawOutput) {
     }
   }
 
-  return { textResult, richTranscript: parts.join('\n\n'), usage };
+  return { textResult, richTranscript: parts.join('\n\n'), usage, endedSynthetic };
+}
+
+/**
+ * Was this assistant message written by Claude Code itself, not a model turn?
+ * Absent usage is not evidence, so it is never flagged.
+ * @param {Object} message - stream-json assistant `message`
+ * @returns {boolean}
+ */
+function isSyntheticMessage(message) {
+  if (message.model !== '<synthetic>') return false;
+  if (message.usage?.output_tokens !== 0) return false;
+  return message.content.length > 0 && message.content.every((b) => b.type === 'text');
+}
+
+/**
+ * Transcript block for a failed tool result. Bash appends its exit code, read
+ * off the `Exit code N` prefix of the result text — stream-json carries no
+ * structured exit-code field. The content itself is never copied.
+ * @param {string} toolName - Name of the tool_use the result answers
+ * @param {Object} block - tool_result content block
+ * @returns {string}
+ */
+function summarizeToolError(toolName, block) {
+  if (toolName !== 'Bash') return `[Result: ${toolName}] error`;
+  const content = block.content;
+  const firstText =
+    typeof content === 'string' ? content : (content || []).find((c) => c.type === 'text')?.text;
+  const exit = /^Exit code (\d+)/.exec(firstText || '');
+  return `[Result: Bash] error${exit ? ` (exit ${exit[1]})` : ''}`;
 }
 
 /**
@@ -85,7 +132,10 @@ function parseActionsFromTranscript(richTranscript) {
     // first line, so `[tool_called] Bash:<pattern>` could not see anything the
     // agent ran after a line break. Same instrument-fix lineage as the trial
     // timeout raises — it changes what assertions can match, so pools that
-    // straddle it are not directly comparable.
+    // straddle it are not directly comparable. The same holds across
+    // TRANSCRIPT_FORMAT 2: an Agent/Task call's args went from 200 characters
+    // to its whole input. A `[Result: ...]` block matches neither marker
+    // below, so it is never an action.
     const toolMatch = block.match(/^\[Tool: ([^\]]+)\]\s*([\s\S]*)/);
     if (toolMatch) {
       const args = toolMatch[2].trim();
@@ -128,12 +178,22 @@ function summarizeToolInput(toolName, input) {
       return `pattern: ${input.pattern || ''}`;
     case 'Grep':
       return `pattern: ${input.pattern || ''} ${input.path ? `in ${input.path}` : ''}`;
+    // Whole input, on one line: a block ends at the first blank line, so a
+    // multi-paragraph prompt must not be laid out over several.
+    case 'Agent':
+    case 'Task':
+      return JSON.stringify(input);
     default:
       return JSON.stringify(input).slice(0, 200);
   }
 }
 
+// Version of the transcript shape, recorded on every trial row. 2: Agent/Task
+// input kept whole, failed tool results as `[Result:]` blocks. Absent means 1.
+const TRANSCRIPT_FORMAT = 2;
+
 module.exports = {
+  TRANSCRIPT_FORMAT,
   parseStreamJsonOutput,
   parseActionsFromTranscript,
 };

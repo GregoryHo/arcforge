@@ -26,7 +26,11 @@ const {
   buildIsolationSettings,
 } = require('./eval-trial-env');
 const { claudeShim, declaredEnvironment, trialEnv } = require('./eval-trial-environment');
-const { parseStreamJsonOutput, parseActionsFromTranscript } = require('./eval-transcript');
+const {
+  TRANSCRIPT_FORMAT,
+  parseStreamJsonOutput,
+  parseActionsFromTranscript,
+} = require('./eval-transcript');
 const {
   isTrialKilled,
   isOutputComplete,
@@ -276,7 +280,7 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   // With stream-json, stdout may contain valid tool-use data even on non-zero exit
   // (e.g., max-turns reached). Try stdout first, fall back to stderr.
   const rawOutput = result.stdout || result.stderr || '';
-  const { textResult, richTranscript, usage } = parseStreamJsonOutput(rawOutput);
+  const { textResult, richTranscript, usage, endedSynthetic } = parseStreamJsonOutput(rawOutput);
   // duration_ms is the trial's wall-clock cost, measured around the subprocess.
   // The CLI's own `duration_ms` (result event) covers only the API turn — it
   // excludes process start, hook and MCP init, and teardown, so preferring it
@@ -290,6 +294,9 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   const parsedOutput = richTranscript || textResult;
   const transcriptOutput = parsedOutput || rawOutput;
   const transcript = saveTranscript(evalName, trialNumber, transcriptOutput, projectRoot, runId);
+  // stdout only: a session that never wrote any (a spawn failure) has no
+  // stream-json to keep, and its stderr is already the transcript.
+  if (result.stdout) saveRawOutput(evalName, trialNumber, result.stdout, projectRoot, runId);
   const actions = parseActionsFromTranscript(richTranscript);
 
   const base = {
@@ -306,6 +313,9 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
     output_tokens: usage.output_tokens,
     trialTimeoutMs,
     transcript,
+    // Recorded only, not a pooling condition: which transcript shape the
+    // assertions were matched against.
+    transcript_format: TRANSCRIPT_FORMAT,
     trialDir,
     ...(actions.length > 0 ? { actions } : {}),
     ...ranWith(),
@@ -381,13 +391,18 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   // A provider refusal (session limit, quota) is the provider talking, not the
   // agent: scored, the fixture's own files pass some assertions and an exhausted
   // quota reads as a behavioral regression (#195). Excluded like a killed trial.
-  if (isProviderRefusal({ textResult, actions, usage })) {
+  // One that lands mid-session cuts the agent off: refusalAfterActions records
+  // how far it had got.
+  if (isProviderRefusal({ textResult, actions, usage, endedSynthetic })) {
+    const toolCalls = actions.filter((a) => a.type === 'tool').length;
+    const after = toolCalls > 0 ? ` after ${toolCalls} tool calls` : '';
     return {
       ...base,
       output: parsedOutput || '',
-      error: `Provider refused the trial in place of the agent's turn: ${textResult.trim().slice(0, 200)}`,
+      error: `Provider refused the trial in place of the agent's turn${after}: ${textResult.trim().slice(0, 200)}`,
       errorType: 'provider_refusal',
       infraError: true,
+      refusalAfterActions: toolCalls,
     };
   }
 
@@ -522,6 +537,29 @@ function saveTranscript(evalName, trialNumber, output, projectRoot, runId) {
     condition === 'results' ? `trial-${trialNumber}.txt` : `${condition}-trial-${trialNumber}.txt`;
   const filePath = path.join(transcriptsPath, fileName);
   fs.writeFileSync(filePath, output);
+  return filePath;
+}
+
+/**
+ * Save a trial's raw stream-json stdout beside its transcript, under raw/:
+ * the transcript keeps only what grading reads, this keeps everything.
+ * @param {string} evalName - Eval name (may include label suffix)
+ * @param {number} trialNumber - Trial number
+ * @param {string} rawOutput - The session's stream-json stdout
+ * @param {string} projectRoot - Project root directory
+ * @returns {string} Path to the raw file
+ */
+function saveRawOutput(evalName, trialNumber, rawOutput, projectRoot, runId) {
+  const { scenarioName, condition } = parseEvalName(evalName);
+  const prefix = runId || compactDate();
+  const rawPath = path.join(projectRoot, RESULTS_DIR, scenarioName, prefix, 'raw');
+  ensureDir(rawPath);
+  const fileName =
+    condition === 'results'
+      ? `trial-${trialNumber}.jsonl`
+      : `${condition}-trial-${trialNumber}.jsonl`;
+  const filePath = path.join(rawPath, fileName);
+  fs.writeFileSync(filePath, rawOutput);
   return filePath;
 }
 

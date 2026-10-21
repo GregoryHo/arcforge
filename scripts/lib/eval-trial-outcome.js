@@ -61,13 +61,21 @@ function isOutputComplete({ textResult, actions } = {}) {
  * usage was not reported (output_tokens null) is never flagged — absence of the
  * number is not evidence.
  *
+ * A limit that lands after tool calls hides from that rule: the result event's
+ * output_tokens covers the whole session. That case is told by its last
+ * assistant message instead — one Claude Code wrote itself (endedSynthetic, see
+ * parseStreamJsonOutput). `result.is_error` is deliberately not used: it is
+ * also set for a run that hit its turn budget, which is a scored outcome.
+ *
  * @param {Object} params
  * @param {string} [params.textResult] - Final text from the stream-json result event
  * @param {Array<{type: string}>} [params.actions] - Parsed action log
  * @param {{ output_tokens?: number|null }} [params.usage] - Usage from the result event
+ * @param {boolean} [params.endedSynthetic] - The session ended on a synthetic message
  * @returns {boolean}
  */
-function isProviderRefusal({ textResult, actions, usage } = {}) {
+function isProviderRefusal({ textResult, actions, usage, endedSynthetic } = {}) {
+  if (endedSynthetic === true) return true;
   if (usage?.output_tokens !== 0) return false;
   if (typeof textResult !== 'string' || !textResult.trim()) return false;
   return !(Array.isArray(actions) && actions.some((a) => a.type === 'tool'));

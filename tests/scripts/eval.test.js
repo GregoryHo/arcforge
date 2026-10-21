@@ -468,23 +468,15 @@ MARKER
 
   describe('parseStreamJsonOutput', () => {
     const nullUsage = { input_tokens: null, output_tokens: null, duration_ms: null };
+    const empty = { textResult: '', richTranscript: '', usage: nullUsage, endedSynthetic: false };
 
     it('should return empty strings for empty input', () => {
-      const result = parseStreamJsonOutput('');
-      expect(result).toEqual({ textResult: '', richTranscript: '', usage: nullUsage });
+      expect(parseStreamJsonOutput('')).toEqual(empty);
     });
 
     it('should return empty strings for null/undefined', () => {
-      expect(parseStreamJsonOutput(null)).toEqual({
-        textResult: '',
-        richTranscript: '',
-        usage: nullUsage,
-      });
-      expect(parseStreamJsonOutput(undefined)).toEqual({
-        textResult: '',
-        richTranscript: '',
-        usage: nullUsage,
-      });
+      expect(parseStreamJsonOutput(null)).toEqual(empty);
+      expect(parseStreamJsonOutput(undefined)).toEqual(empty);
     });
 
     it('should extract text from assistant messages', () => {

@@ -29,7 +29,7 @@ const ALLOWLIST = {
   'scripts/lib/learning-curator/activate.js': 846,
   'scripts/lib/utils.js': 749,
   'hooks/__tests__/observe.test.js': 1246,
-  'tests/scripts/eval.test.js': 3385,
+  'tests/scripts/eval.test.js': 3377,
   'tests/scripts/check-product.test.js': 2433,
   'tests/scripts/learning.test.js': 1856,
   'tests/scripts/learning-dashboard.test.js': 1770,

@@ -40,6 +40,23 @@ function broadcast(event, data) {
 
 // ── File Watcher for Real-Time Updates ────────────────────────
 
+// A run directory's raw/ (each trial's stream-json stdout) and transcripts/
+// hold per-trial files, not result rows: a `.jsonl` under them is never one.
+// Matched at that depth only (<scenario>/<runId>/raw), so a scenario that is
+// itself called `raw` is still watched.
+const NON_RESULT_DIRS = new Set(['raw', 'transcripts']);
+
+/** Is this path, relative to the results directory, inside a run's raw/ or transcripts/? */
+function inNonResultDir(relPath) {
+  const segments = relPath.split(/[\\/]/);
+  return segments.length >= 3 && NON_RESULT_DIRS.has(segments[2]);
+}
+
+/** Is this path, relative to the results directory, a result-row file? */
+function isResultFile(relFile) {
+  return relFile.endsWith('.jsonl') && !inNonResultDir(relFile);
+}
+
 function setupWatchers(projectRoot) {
   const resultsDir = path.join(projectRoot, eval_.RESULTS_DIR);
   const fileSizes = new Map();
@@ -49,7 +66,7 @@ function setupWatchers(projectRoot) {
   function processChanges() {
     for (const relFile of pendingFiles) {
       const absPath = path.join(resultsDir, relFile);
-      if (!relFile.endsWith('.jsonl')) continue;
+      if (!isResultFile(relFile)) continue;
       if (!fs.existsSync(absPath)) {
         fileSizes.delete(absPath);
         continue;
@@ -92,7 +109,7 @@ function setupWatchers(projectRoot) {
 
   // Polling fallback used when recursive fs.watch is unsupported (e.g.
   // older Node on Linux without inotify aggregation). Walks resultsDir
-  // for *.jsonl files, adds new/changed paths to pendingFiles so the
+  // for *.jsonl result files (not raw/ or transcripts/), adds new/changed paths to pendingFiles so the
   // existing debounced processChanges() handles broadcast — preserves
   // append-detection via fileSizes without duplicating that logic.
   function pollResultsDir() {
@@ -108,8 +125,8 @@ function setupWatchers(projectRoot) {
       for (const entry of entries) {
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) {
-          stack.push(full);
-        } else if (entry.isFile() && entry.name.endsWith('.jsonl')) {
+          if (!inNonResultDir(path.relative(resultsDir, full))) stack.push(full);
+        } else if (entry.isFile() && isResultFile(path.relative(resultsDir, full))) {
           pendingFiles.add(path.relative(resultsDir, full));
         }
       }
