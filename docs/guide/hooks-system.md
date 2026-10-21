@@ -156,8 +156,8 @@ Two costs are added each time the diary threshold trips — 10 messages or 50 to
 calls since the last draft — on the Stop and PreCompact that trip it. The session
 transcript is parsed to stamp the tools and files the diary draft shows, and a
 short subprocess renders the draft (it is killed after 5 seconds). The parse reads
-the whole transcript, not just its end, so its cost grows with the length of the
-session: about 5 ms per MB of transcript.
+at most the last 8 MiB of the transcript, so its cost grows with the length of the
+session only up to that bound: about 5 ms per MB, roughly 40 ms at most.
 
 In practice hooks are not what makes a session feel slow. If one ever is, the
 first thing to check is whether learning is enabled, since that is what turns the

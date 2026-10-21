@@ -206,4 +206,68 @@ describe('transcript parser', () => {
       expect(result.filesModified).toContain('/test.js');
     });
   });
+
+  describe('parseTranscript size bound', () => {
+    const userLine = (i) => ({ type: 'user', content: `message ${i}` });
+
+    it('parses a transcript under the bound whole, without truncated', () => {
+      const filePath = writeTranscript('under-bound.jsonl', [
+        userLine(1),
+        { type: 'tool_use', tool_name: 'Write', tool_input: { file_path: '/a.js' } },
+        userLine(2),
+      ]);
+      const size = fs.statSync(filePath).size;
+
+      const bounded = parseTranscript(filePath, { maxBytes: size });
+      expect(bounded).toEqual(parseTranscript(filePath));
+      expect(bounded).toEqual({
+        userMessages: ['message 1', 'message 2'],
+        toolsUsed: ['Write'],
+        filesModified: ['/a.js'],
+        totalMessages: 2,
+      });
+    });
+
+    it('over the bound parses only the tail, drops its first line, sets truncated', () => {
+      const lines = Array.from({ length: 100 }, (_, i) => userLine(i));
+      const filePath = writeTranscript('over-bound.jsonl', lines);
+      // Exactly the last 10 lines: the window opens on a line boundary, and its
+      // first line is dropped all the same, since the reader cannot tell.
+      const maxBytes = lines
+        .slice(90)
+        .map((l) => JSON.stringify(l))
+        .join('\n').length;
+
+      const result = parseTranscript(filePath, { maxBytes });
+      expect(result.truncated).toBe(true);
+      expect(result.userMessages).toEqual(Array.from({ length: 9 }, (_, i) => `message ${91 + i}`));
+      expect(result.totalMessages).toBe(9);
+
+      // A few bytes more opens mid-way through line 89: that cut line is
+      // dropped and line 90 is now kept whole.
+      const midLine = parseTranscript(filePath, { maxBytes: maxBytes + 5 });
+      expect(midLine.userMessages).toEqual(['message 90', ...result.userMessages]);
+    });
+
+    it('parses a ~50 MB transcript in bounded time', () => {
+      const filler = {
+        type: 'assistant',
+        message: { content: [{ type: 'text', text: 'x'.repeat(1000) }] },
+      };
+      const chunk = `${Array.from({ length: 1000 }, () => JSON.stringify(filler)).join('\n')}\n`;
+      const filePath = path.join(testDir, 'huge.jsonl');
+      const fd = fs.openSync(filePath, 'w');
+      while (fs.fstatSync(fd).size < 50 * 1024 * 1024) fs.writeSync(fd, chunk);
+      fs.writeSync(fd, `${JSON.stringify(userLine('last'))}\n`);
+      fs.closeSync(fd);
+
+      const start = Date.now();
+      const result = parseTranscript(filePath);
+      const elapsed = Date.now() - start;
+
+      expect(result.truncated).toBe(true);
+      expect(result.userMessages).toEqual(['message last']);
+      expect(elapsed).toBeLessThan(1000);
+    });
+  });
 });
