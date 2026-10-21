@@ -99,6 +99,12 @@ function readAlsoStage(dir, projectRoot, stage) {
       `--also-stage ${dir}: its SKILL.md description is a YAML block scalar (${description.trim()}), which is not read; write the description on one line.`,
     );
   }
+  // A quoted `\n` is read as a newline, which would inject a line of its own.
+  if (/[\r\n]/.test(description.trim())) {
+    throw new Error(
+      `--also-stage ${dir}: its SKILL.md description spans more than one line, which the line naming the skill cannot carry; write the description on one line.`,
+    );
+  }
   return { dir: resolved, name: path.basename(resolved), description: description.trim() };
 }
 
