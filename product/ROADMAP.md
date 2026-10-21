@@ -16,7 +16,8 @@ decision *and* every reversal. How to maintain this file: [`product/AGENTS.md`](
 | 6.2.1 | `v6.2.1` | instrument and state repairs, no measurement | **shipped** | Repairs to promises already shipped: same-day benchmark snapshots stop overwriting each other and `eval history` lists them all, the eval dashboard shows an instrument-failure pool instead of hiding it, loop run state is written atomically, the observe hook's lazy daemon start reclaims a dead process's lock, `check:product` rejects a relation aimed at an already-dead decision, and the `releasing` skill describes what a squash-only ruleset does to the flip commit. Nothing under `skills/`, `evals/scenarios/` or `evals/fixtures/`, so it ships without a live eval session. | [eval](specs/eval.md) · [worktrees-loop](specs/worktrees-loop.md) · [learning](specs/learning.md) |
 | 6.3.0 | `v6.3.0` | ceiling redesigns · skill-local script fixes · the enable stamp | **shipped** | Two of the five scenarios whose baseline sat at ceiling on the repaired instrument are redesigned to Version 2 — router skill selection and the LINK-mode index rebuild — and the round, capped at about 80 trial sessions, spent 16 for one A/B result (router skill selection) and four findings without an A/B (D-054); the `diagramming-obsidian` helpers and `lint_vault` fixes ship in it on contract tests because they sit under `skills/`; and the stale-draft floor stops losing an overlapping opt-in, through additive `enabled_at` and `disabled_at` stamps in the learning config. | [skill-system](specs/skill-system.md) · [obsidian](specs/obsidian.md) · [sdd](specs/sdd.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) |
 | 6.4.0 | `v6.4.0` | session archive returns · daemon, write and counter races · grader isolation | **shipped** | v5's session archive, dropped at 6.0.0 without a record, returns as a sixth CLI group, `arcforge session` (`save`, `resume`, `list`, `alias`), over the engine modules that survived unexposed: an engine-written metrics header plus the handover file's five sections, written by the agent in-session, and the `sessions` skill learns to drive it (D-056). The engine fixes planned as 6.3.1 ride along — observer daemon starts and stops that can leave two daemons (#247, #252), the shared atomic-write helper's temporary-file race (#253), the diary tool counter that loses increments (#260), and code graders that can import from the trial directory (#250) — with the README naming `speccing` as the v5 pipeline's file-based replacement and two corrections to past CHANGELOG entries. A minor because it adds a CLI group; the round, capped at about 40 trial sessions, spent 29 and read the `sessions` skill's present-then-stop behaviour (B-11) at baseline 0/5 against treatment 5/5 and the router at 0/5 against 5/5 again, reproducing 6.3.0 — direction only, at k=5 on one fixture and one model each, for injected skill text — while the `diagramming-obsidian` verify-exit sentence already on `main` (#267) was found not measurable on the current engine and is recorded as a finding (D-055, D-057, D-058). | [cli](specs/cli.md) · [skill-system](specs/skill-system.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) · [eval](specs/eval.md) · [obsidian](specs/obsidian.md) |
-| 6.5.0 | `v6.5.0` | eval instrument debts · session continuity · four gated measurements | **shipped ← we are here** | The debts two measurement rounds left on the eval instrument are paid first: one live eval per checkout becomes a lock the engine holds instead of a rule the operator keeps, preflight writes result rows under a label of its own, every row records the Node version and the scenario hash, the operator's `PATH` stops reaching trials and a scenario can declare its trial environment, and `eval compare` can skip the analyzer session. Two additions then open what 6.4.0's design gate found not measurable: a skill's files staged outside the trial tree, and an A/B between two skill texts (D-062). SessionStart names the project's newest session archive and the command that reads it — the promise D-031 withdrew, which 6.4.0's archive makes keepable — in one line, never the archive's contents (D-061), and the `sessions` body moves its reference material into its own `references/`. A minor because it adds hook behaviour and eval flags; the round, capped at about 80 trial sessions and run one scenario at a time, spent 32 and put each measurement behind an offline design gate: the `sessions` skill's present-then-stop behaviour (B-11), on an archive read through `arcforge session resume`, read baseline 0/5 against treatment 5/5 — direction only, at k=5 on one fixture and one model, for injected skill text — the `diagramming-obsidian` `references/` layout change (#185) was at ceiling in preflight and is recorded as a finding with no A/B, the trimmed `sessions` handover path did not regress with the skill's files staged, and the `executing` to `dispatching` handoff (#184) and the `diagramming-obsidian` verify-exit sentence were found not measurable before any session (D-059, D-063, D-064). | [eval](specs/eval.md) · [hooks](specs/hooks.md) · [skill-system](specs/skill-system.md) · [obsidian](specs/obsidian.md) · [cli](specs/cli.md) |
+| 6.5.0 | `v6.5.0` | eval instrument debts · session continuity · four gated measurements | **shipped** | The debts two measurement rounds left on the eval instrument are paid first: one live eval per checkout becomes a lock the engine holds instead of a rule the operator keeps, preflight writes result rows under a label of its own, every row records the Node version and the scenario hash, the operator's `PATH` stops reaching trials and a scenario can declare its trial environment, and `eval compare` can skip the analyzer session. Two additions then open what 6.4.0's design gate found not measurable: a skill's files staged outside the trial tree, and an A/B between two skill texts (D-062). SessionStart names the project's newest session archive and the command that reads it — the promise D-031 withdrew, which 6.4.0's archive makes keepable — in one line, never the archive's contents (D-061), and the `sessions` body moves its reference material into its own `references/`. A minor because it adds hook behaviour and eval flags; the round, capped at about 80 trial sessions and run one scenario at a time, spent 32 and put each measurement behind an offline design gate: the `sessions` skill's present-then-stop behaviour (B-11), on an archive read through `arcforge session resume`, read baseline 0/5 against treatment 5/5 — direction only, at k=5 on one fixture and one model, for injected skill text — the `diagramming-obsidian` `references/` layout change (#185) was at ceiling in preflight and is recorded as a finding with no A/B, the trimmed `sessions` handover path did not regress with the skill's files staged, and the `executing` to `dispatching` handoff (#184) and the `diagramming-obsidian` verify-exit sentence were found not measurable before any session (D-059, D-063, D-064). | [eval](specs/eval.md) · [hooks](specs/hooks.md) · [skill-system](specs/skill-system.md) · [obsidian](specs/obsidian.md) · [cli](specs/cli.md) |
+| 6.5.1 | — | instrument repairs · flaky tests · bounded transcript parse, no measurement | **next ← we are here** | Repairs to the instrument 6.5.0's round left in debt: a transcript keeps an Agent call's whole input and marks a tool result the host flagged as an error, with the `Bash` exit code when the result text carries one, and each row records the transcript format it was written under; a provider limit that lands after the agent's tool calls is recognised by the shape of the session's last message and leaves every scored pool; each trial's raw stream-json is kept beside its run; a preflight rerun keeps the record it replaces; and an A/B's grading files are named per arm, so the two arms no longer overwrite each other. Four flaky tests are fixed at their causes and a fifth, a jest worker crash, gets a reproduction attempt; the diary transcript parse reads at most its last 8 MiB (#172); and the CLI guide names the commands that have no human format and print the same JSON with or without `--json`. No new flag or command, and nothing under `skills/`, `evals/scenarios/` or `evals/fixtures/`, so it ships as a patch without a live eval session (D-065). | [eval](specs/eval.md) · [hooks](specs/hooks.md) · [cli](specs/cli.md) |
 
 > Un-scheduled ideas live in the [Backlog](BACKLOG.md); a wish graduates into a
 > version (row + spec + Decision Log entry) when picked.
@@ -2551,3 +2552,97 @@ reverse one, append a superseding entry (see AGENTS.md).
   none, so that preflight's `--stage-skill-files` rests on its command
   line, sent at 2026-10-13T00:14:52Z. The same record shows no
   `eval compare` at run time.
+
+### D-065 — 6.5.1: the instrument repairs 6.5.0's round left, the flaky tests, and a bounded transcript parse
+- Date: 2026-10-21
+- Version: 6.5.1
+- Status: Accepted
+- Decision: 6.5.1, a patch, carries (1) the instrument repairs D-064's
+  Residual leaves: a trial transcript writes an Agent (or Task) call's whole
+  input as one line of JSON, and writes a `[Result: <tool>] error` block —
+  with `(exit N)` appended for `Bash` when the result text opens with an
+  `Exit code N`, there being no structured field — only for a tool result the host marked
+  `is_error`, never a successful result and never a result's content, and
+  every row records `transcript_format`, the version of that grammar,
+  recorded and not pooled ([eval](specs/eval.md) B-17); a provider refusal
+  that arrives after the agent's tool calls is recognised by the shape of
+  the session's last assistant message — one the host wrote, its model
+  `<synthetic>`, with zero output tokens and text only — never by its
+  wording, and is recorded as `provider_refusal` with `infraError` and
+  `refusalAfterActions`, the number of tool calls before it (B-10); the raw
+  stream-json of every trial is kept under its run's `raw/`; a preflight
+  rerun moves the record it replaces into `evals/preflight/history/`, from
+  which no reader takes a record (B-16); and grading files are named per
+  arm, `<condition>-trial-N.json`. (2) Four flaky tests fixed at their
+  causes — the diary-capture test's marker, written non-atomically and read
+  empty; the session-alias lock test, whose lock waits by busy-looping and
+  whose spawned children have no `error` handler; the observer daemon's
+  ZB-T1, which assumes a zombie after a fixed sleep; the proposal-ingestor
+  test whose `run_id` changes at a second boundary — and a reproduction
+  attempt on the jest worker SIGSEGV, with `jest.config.js` changed only
+  if the default worker count reproduces it and a bounded one does not.
+  (3) `parseTranscript` reads at most the last 8 MiB of a transcript ([hooks](specs/hooks.md) B-7, #172). (4)
+  `docs/guide/cli-invocation.md` names exactly which commands have no human
+  format and print the same JSON with and without `--json`, a list built
+  by running each command both ways, as [cli](specs/cli.md) B-6 now says;
+  no human output format is added. It graduates the wishes
+  **eval-provider-limit-mid-trial**, **eval-transcript-full-tool-input**,
+  **bound-transcript-parse** and **cli-human-output**.
+- Why: D-064's Residual names three of the four instrument gaps — a
+  refusal after tool calls scored as an ordinary row, a preflight rerun
+  overwriting the record it replaces, and `grading/` files that keep the
+  second arm's only — and its wish for a transcript that keeps an Agent
+  call's whole prompt is what #184's measurement needs to read a dispatch
+  card at all. The refusal is told apart by the message's shape because
+  the `result` event's output tokens count the whole session, so after a
+  tool call they are never zero, and a wording match would break on the
+  provider's next phrasing; `result.is_error` is not used because it also
+  marks `error_max_turns`, which is a scored outcome. The new transcript
+  content leaves every existing `[Tool: …]` block's text as it was, and a
+  `[Result:` block is not an action, so the shipped graders, the
+  completeness check and the refusal check read an old transcript and a
+  new one alike; that is why `transcript_format` is recorded and not a
+  pooling condition, like the Node version. It is a patch, not a minor:
+  no flag or command is added — what is added is transcript content, two
+  row fields and an untracked `raw/` directory — where 6.5.0 was a minor
+  because it added hook behaviour and eval flags (D-059). It spends no
+  trial session because `scripts/check-benchmark-freshness.js` counts only
+  `skills/`, `evals/scenarios/` and `evals/fixtures/` as eval-backed
+  surface and 6.5.1 touches none of them — the 6.2.1 shape (D-048). The
+  flaky tests and #172 ride along because they are engine and test
+  repairs of the same kind, and the CLI guide is corrected rather than the
+  output changed because a human format would change stdout that scripts
+  already parse, which a patch must not do.
+- Residual: the `<synthetic>` shape is observed in Claude Code's session
+  JSONL, not yet in a stream-json event, since the runner kept no raw
+  stdout before this version; if the host stops marking such messages, a
+  refusal after tool calls scores as a completed turn again, which is
+  today's behaviour, not a regression. `[Result:]` blocks are written for
+  errors only, so a grader still cannot read a successful tool's output.
+  A subagent's tool calls stay unmarked in the transcript. The D1
+  scenario's "archive file read directly" flag still fires on
+  `aliases.json`: it is printed for the operator and not scored, and
+  fixing its regex would bump the scenario's Version and empty its +1.00
+  pool. Above the 8 MiB bound the diary's tool and file lists are the
+  window's, not the session's. The jest SIGSEGV may stay unexplained: if
+  it does not reproduce, the configuration is left as it is and the
+  suspects are recorded on the PR.
+- Cost accepted: 0 trial sessions; one release cycle before 6.6.0's
+  measurements, which wait on (1).
+- Verification: one test or check per repair, each in the PR that lands
+  it — a real trial's transcript shows an Agent call's whole prompt and a
+  failed `Bash` call's exit code, and the shipped graders score an
+  existing fixture's transcript as before; a constructed stream-json with
+  two tool calls and a final `<synthetic>` text-only message with zero
+  output tokens yields a row with `infraError` and `refusalAfterActions: 2`,
+  its raw stream-json under the run's `raw/`; two preflights on one key
+  leave both records, the gate reading the newer; `eval ab --k 1` leaves
+  `baseline-trial-1.json` and `treatment-trial-1.json` under `grading/`
+  and `eval audit` reads both; each of the four tests fixed at its cause
+  passes 20 runs in a row, and the jest SIGSEGV is a reproduction attempt
+  whose result is recorded on the PR;
+  a 50 MB synthetic transcript parses in bounded time and memory, with
+  output identical to a whole-file parse within the bound; and a
+  `tests/node` case asserts two of the listed commands print the same
+  stdout with and without `--json`. Before the tag,
+  `node scripts/check-benchmark-freshness.js` reports OK.

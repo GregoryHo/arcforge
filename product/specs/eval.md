@@ -1,6 +1,6 @@
 # eval — spec
 
-> Status: shipped v6.5.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.5.0 · extended by 6.5.1 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -176,10 +176,15 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   every scored pool, its trial directory removed (B-18, D-062). The ceiling is part of
   the measurement conditions, so a run that moved it MUST be reported with the
   value it used, the way B-9 treats a `--since`-bounded snapshot, and every
-  result row records the ceiling its trial ran under (D-018). Residual: a
-  refusal that arrives after the agent has already acted — tool calls made,
-  output tokens spent — is not distinguished from a completed turn and scores
-  as one.
+  result row records the ceiling its trial ran under (D-018). A refusal that
+  arrives after the agent has already acted — tool calls made, output tokens
+  spent — is recognised by the shape of the session's last assistant message:
+  one the host wrote rather than the model — `<synthetic>` where a model name
+  would be, no output tokens, text only — never by its wording. It is
+  recorded as `provider_refusal` with `infraError`, like a refusal in place
+  of the whole turn, and its row's `refusalAfterActions` counts the tool calls
+  before it (6.5.1, D-065). Residual: a host that stops marking such messages
+  makes the refusal score as a completed turn again.
 - **B-13 A pool that only failed is flagged, never stood in for.** A
   pool whose rows all carry `infraError` or `gradeError` is never the
   measurement (B-10), and no reader puts another pool's verdict in its place.
@@ -232,7 +237,9 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   shows preflight rows, labelled as such. So a preflight trial's grade is read from its row, not rebuilt
   from the trial's end state, and a preflight never moves an A/B verdict or
   a benchmark. The record under `evals/preflight/` stays what the `eval ab`
-  gate reads (B-2, B-3). Because a row file's name ends in its condition, a
+  gate reads (B-2, B-3). A preflight that replaces a record moves the old one
+  into `evals/preflight/history/`, named with its timestamp, and no reader
+  takes a record from there (6.5.1, D-065). Because a row file's name ends in its condition, a
   scenario whose name ends in `-baseline`, `-treatment` or `-preflight` is
   refused before any session and reported by `eval lint`; no shipped
   scenario has such a name (D-062).
@@ -248,7 +255,14 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   Node upgrade, nor by a cosmetic edit to a scenario, nor by a new commit,
   and rows written before 6.5.0, which carry none of them, pool as they
   did. The three fields are there so a reader can see that a pool mixes
-  them, not so the engine refuses one that does (D-062).
+  them, not so the engine refuses one that does (D-062). Every row also
+  records `transcript_format`, the version of the transcript grammar it was
+  written under — 2 from 6.5.1: an Agent (or Task) call's whole input as one
+  line of JSON, and a `[Result: <tool>] error` block only for a tool result
+  the host marked as an error, with the exit code appended for `Bash` when
+  the result text opens with an `Exit code N` — recorded and not
+  pooled, like the Node version; a row without the field was written under
+  format 1 (D-065).
 - **B-18 A trial's environment is built, not inherited (6.5.0).** The engine
   starts each contained trial session, and its fixture `Setup`, with an
   environment it builds from an allowlist. A variable is forwarded by name
@@ -455,7 +469,10 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
 A **scenario** is markdown with a fixed section set; `scripts/lib/eval-scenario.js`
 owns its parsing, discovery, and evidence claim types. A **result** is a JSONL row
 under `evals/results/` that records the scenario version it ran under — the field
-that makes a pool version-scoped (B-8) — and a **benchmark** is the snapshot
+that makes a pool version-scoped (B-8). From 6.5.1 a run's grading files are
+written per arm, as `<condition>-trial-N.json` under its `grading/`, so the two arms
+of one run never overwrite each other, and the raw stream-json of every trial is
+kept beside them under `raw/` (D-065). A **benchmark** is the snapshot
 `eval report` writes under `evals/benchmarks/` (B-9). The A/B verdict vocabulary and
 the arithmetic that produces it belong to `scripts/lib/eval-stats.js`; no other
 module invents a verdict. Delta-CI judging returns `IMPROVED`, `REGRESSED`,
@@ -548,3 +565,7 @@ its rationale is inline at B-10.
   preflight, which BLOCKed at ceiling (B-3, B-20); and `eval compare
   --no-analyzer` read the one model-graded verdict with no analyzer
   session, printing its skip line (B-21).
+- **D-065** — 6.5.1 repairs what that round left: a refusal after tool
+  calls recognised by the last message's shape (B-10), a replaced preflight
+  record kept in `history/` (B-16), `transcript_format` on every row
+  (B-17), and grading files named per arm, with no live session spent.

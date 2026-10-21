@@ -1,6 +1,6 @@
 # cli — spec
 
-> Status: shipped v6.5.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.5.0 · extended by 6.5.1 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -124,7 +124,11 @@ underneath without breaking anything written against it.
   test (their manifest `output` is `null`), so a renamed or dropped field
   there fails nothing. Pinning them needs deterministic fixtures for the
   `~/.arcforge` state they read; until then a script built on one of their
-  fields is relying on intent, not on a check.
+  fields is relying on intent, not on a check. The commands that have no
+  human format print the same JSON with and without `--json`, and
+  `docs/guide/cli-invocation.md` names exactly which — a list built by
+  running each command both ways — backed by a `tests/node` case that
+  compares two of them (6.5.1, D-065).
 
 ### Implementation stance
 - **B-7 Zero external runtime dependencies.** The engine runs on the Node.js
@@ -177,6 +181,9 @@ directory basename, so two same-named projects share both (D-037, D-056).
 - **D-061** — 6.5.0's SessionStart line names an alias inside a command, so
   an alias may not begin with a hyphen: `alias set` and `save` refuse one
   (B-9).
+- **D-065** — 6.5.1's guide names the commands that have no human format
+  and print the same JSON with and without `--json`, rather than adding a
+  human format (B-6).
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
 
