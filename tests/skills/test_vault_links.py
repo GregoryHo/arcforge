@@ -288,6 +288,90 @@ def test_a_fence_after_an_unclosed_span_is_a_fence_with_crlf_endings(vault):
     assert links["notes"]["Wiki/alpha-note.md"]["inbound"] == 1
 
 
+
+# #256: four block shapes where the link set must match CommonMark's. Each body
+# links to notes L0–L4; the helper returns the ones that got a backlink.
+def _linked(vault, body):
+    names = ("L0", "L1", "L2", "L3", "L4")
+    for name in names:
+        (vault / "Wiki" / f"{name}.md").write_text("---\ntype: entity\n---\nnote\n", encoding="utf-8")
+    (vault / "Wiki" / "gamma-orphan.md").write_text(GAMMA + "\n" + body, encoding="utf-8")
+    notes = _run(vault)["links"]["notes"]
+    return {name for name in names if notes[f"Wiki/{name}.md"]["inbound"]}
+
+
+def test_an_indented_code_block_is_code(vault):
+    # Four spaces after a blank line (or at the start) is an indented code block,
+    # so its backticks open no span, and a fence right after it is a fence.
+    for fence in ("```\n[[L1]]\n```\n", "> ```\n", "  ```\n"):
+        assert _linked(vault, "    ``` [[L0]]\n" + fence) == set()
+    assert _linked(vault, "Text.\n\n    [[L0]]\n    [[L1]]\n\nAfter: [[L2]].\n") == {"L2"}
+
+
+def test_a_fence_in_a_blockquote_closes_when_the_quote_ends(vault):
+    # A fenced block has no lazy continuation: the unquoted line ends the quote,
+    # and the fence inside it with it.
+    assert _linked(vault, "> text ``` q\n>```\n[[L2]]\n") == {"L2"}
+
+
+def test_a_lazy_continuation_line_stays_in_its_list_item(vault):
+    # `z ``` w` continues the item's paragraph, so the fence after it opens inside
+    # the item and closes when the unindented paragraph ends the item.
+    body = "- item [[L0]]\nz ``` w\n  ```\nText ```lit [[L3]]\nx` y [[L4]]\n```\n"
+    assert _linked(vault, body) == {"L0", "L3", "L4"}
+
+
+@pytest.mark.parametrize(
+    "boundary",
+    ["# h ` [[L1]]\n", "> q ` [[L1]]\n", "- i ` [[L1]]\n", ">\n> q ` [[L1]]\n"],
+    ids=["heading", "blockquote-start", "list-item-start", "quoted-blank"],
+)
+def test_an_inline_code_span_is_bounded_by_its_block(vault, boundary):
+    opener = "> a `x [[L0]]\n" if boundary.startswith(">\n") else "a `x [[L0]]\n"
+    assert _linked(vault, opener + boundary) == {"L0", "L1"}
+
+
+
+
+def test_an_ordered_marker_past_1_does_not_interrupt_a_paragraph(vault):
+    # §5.2: `2019.` cannot start a list inside a paragraph, so the line continues
+    # it and the span opened on the line before closes there.
+    assert _linked(vault, "The year `[[L0]]\n2019. was` good, [[L1]]\n") == {"L1"}
+
+
+def test_a_thematic_break_ends_a_paragraph(vault):
+    # `***` is not a lazy line of the item's paragraph: it ends the paragraph,
+    # and the span opened in it, before the next line starts a new one.
+    assert _linked(vault, "- item `x\nlazy [[L0]]\n***\n` [[L1]]\n") == {"L0", "L1"}
+
+def test_a_setext_underline_needs_its_paragraphs_own_line(vault):
+    # `===` underlines only a paragraph it continues in the same container: on
+    # the first line of a new blockquote it is that quote's text, and on a lazy
+    # line — unquoted, or quoted fewer times — it is paragraph text (§4.3). Either way the indented line after it
+    # continues the paragraph instead of opening indented code.
+    assert _linked(vault, "para [[L1]]\n> ===\n     [[L0]]\n") == {"L0", "L1"}
+    assert _linked(vault, "> a\n===\n    [[L1]]\n") == {"L1"}
+    # A quoted line with fewer `>` than the paragraph's is lazy too.
+    assert _linked(vault, "> > a\n> ===\n     [[L1]]\n") == {"L1"}
+
+def test_a_dedented_ordered_marker_starts_a_new_list_per_commonmark(vault):
+    # Pins CommonMark, not a bug fix: `2.` short of the `-` item's content
+    # column does not continue that item, so it is tested against the list,
+    # not the paragraph, and the start-at-1 rule for interrupting a paragraph
+    # (§5.2) does not apply. It opens `<ol start="2">`, and the fence indented
+    # two spaces — short of that item's column 3 — is top-level: a declaration.
+    schema = vault / "SCHEMA.md"
+    schema.write_text(
+        schema.read_text(encoding="utf-8").replace(
+            "## Tag Taxonomy\n",
+            "## Pinned\n\n- explanation\n2. continuation\n  ```yaml\n---\ntype: pinned\n---\n  ```\n\n"
+            "## Tag Taxonomy\n",
+        ),
+        encoding="utf-8",
+    )
+    assert _run(vault)["schema"]["declared_types"] == ["entity", "pinned", "source"]
+
+
 def test_self_links_under_any_spelling_are_not_edges(vault):
     (vault / "Wiki" / "gamma-orphan.md").write_text(
         GAMMA + "\nSelf: [[gamma-orphan]] and [[Wiki/gamma-orphan]] and [[gamma-orphan#Heading|me]].\n",
