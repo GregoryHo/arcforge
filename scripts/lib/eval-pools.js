@@ -4,7 +4,8 @@
  * A pool is a scenario version plus its run conditions: model, effort, the
  * per-trial ceiling, the turn budget, whether a plugin dir was loaded (B-8),
  * whether the run staged skill files for its injected arms (B-19), and which
- * text its baseline was given and which files were staged for it, if any (B-20).
+ * text its baseline was given and which files were staged for it, if any (B-20),
+ * and whether its treatment was given a second staged skill (B-22).
  * Rows measured under different conditions answered different questions, so a
  * reader never combines them. It judges the newest condition's pool and lists
  * the others beside it (D-021: pools measured on another instrument stay on
@@ -36,6 +37,7 @@ const CONDITION_FIELDS = [
   'stageSkillFiles',
   'baselineSkillHash',
   'baselineSkillFilesHash',
+  'alsoStaged',
 ];
 
 /**
@@ -219,6 +221,7 @@ function describeCondition(conditions) {
     ...(conditions.baselineSkillFilesHash
       ? [`baseline files ${conditions.baselineSkillFilesHash}`]
       : []),
+    ...(conditions.alsoStaged ? ['second staged skill yes'] : []),
   ].join(', ');
 }
 

@@ -272,6 +272,7 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
     const baseline = require('./eval-skill-options').preflightBaseline(scenario, projectRoot, {
       baselineSkillFile: args.options['baseline-skill-file'],
       stage: args.flags['stage-skill-files'],
+      alsoStage: args.options['also-stage'] ?? args.flags['also-stage'],
     });
     const runLock = takeRunLock('preflight');
     console.log(`Running preflight for "${scenarioName}"...`);
@@ -399,6 +400,7 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
       skillFile: args.options['skill-file'],
       baselineSkillFile: args.options['baseline-skill-file'],
       stage: args.flags['stage-skill-files'],
+      alsoStage: args.options['also-stage'] ?? args.flags['also-stage'],
     });
     const { skillFile } = skill;
     // Before the gate: it reads the record a running preflight is still writing.
@@ -442,7 +444,8 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
       console.log(
         `A/B eval (skill): ${scenario.name} (k=${k})${interleave ? ' [interleaved]' : ''}`,
       );
-      console.log(`Skill: ${skillFile}${skill.stageSkillFiles ? ' (files staged)' : ''}`);
+      const also = skill.alsoStage ? ` | Also staged: ${skill.alsoStage.dir}` : '';
+      console.log(`Skill: ${skillFile}${skill.stageSkillFiles ? ' (files staged)' : ''}${also}`);
       console.log(skill.baselineSkillGiven ? `Baseline text: ${skill.baselineSkillGiven}\n` : '');
       result = eval_.runSkillEval(scenario, k, {
         projectRoot,
@@ -451,6 +454,7 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
         baselineSkillInstruction: skill.baselineSkillInstruction,
         baselineSkillFile: skill.baselineSkillFile,
         stageSkillFiles: skill.stageSkillFiles,
+        alsoStage: skill.alsoStage,
         interleave,
         onTrialComplete,
         model,
@@ -471,8 +475,12 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
 
     // fr-gr-005: blind-comparator auto-trigger
     const { runBlindAutoTrigger } = require('../lib/eval-blind-autotrigger');
-    // Both arms' names in a two-text A/B: a baseline that repeats its own is as identifying.
-    const skillName = [skillFile, skill.baselineSkillFile].filter(Boolean).map(skillNameFromFile);
+    // Both arms' names in a two-text A/B: a baseline that repeats its own is as
+    // identifying. So is the second skill a treatment was given (B-22).
+    const skillName = [skillFile, skill.baselineSkillFile]
+      .filter(Boolean)
+      .map(skillNameFromFile)
+      .concat(skill.alsoStage ? [skill.alsoStage.name] : []);
     const blindResult = runBlindAutoTrigger(
       scenario,
       result.baseline,

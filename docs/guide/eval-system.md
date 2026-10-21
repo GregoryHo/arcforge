@@ -74,7 +74,9 @@ For an A/B between two skill texts, give `preflight` the same
 then runs the baseline that A/B will run, injected with that text and given its
 staged files. Without `--baseline-skill-file` the baseline is injected with
 nothing, so `--stage-skill-files` on its own changes nothing in preflight:
-nothing is staged, and its rows record no staging.
+nothing is staged, and its rows record no staging. `--also-stage` reaches the
+treatment only, so `preflight` refuses it; an A/B with it is gated by the same
+preflight as one without.
 
 Preflight results are cached per scenario **and per model**, keyed on the
 scenario's content, and per turn budget, plugin dir, `--effort`, per-trial
@@ -132,6 +134,7 @@ Runs both arms and stores every trial. Useful flags:
 | `--skill-file` | Skill-scope only: inject this skill body into the treatment prompt. Falls back to the scenario's `## Target` |
 | `--baseline-skill-file` | Skill-scope only: inject the baseline with this file's text instead of nothing. See [Comparing two skill texts](#comparing-two-skill-texts) |
 | `--stage-skill-files` | Skill-scope only: also give the injected arm the skill's files. See [Staging a skill's files](#staging-a-skills-files) |
+| `--also-stage` | Skill-scope only, with `--stage-skill-files`: also stage this skill directory for the treatment, named in one line. See [A second skill for the treatment](#a-second-skill-for-the-treatment) |
 | `--plugin-dir` | `workflow` scope only: load this plugin into the treatment arm. Refused for any other scope |
 
 Each trial's `claude -p` session is capped at 900 s; a trial killed at the cap is
@@ -409,8 +412,51 @@ given.
 
 Each injected arm gets one staged directory, the one its skill file sits in:
 `--skill-file` for the treatment and, in a two-text A/B, `--baseline-skill-file`
-for the baseline (next section). An arm that needs a second skill's files is
-not supported yet.
+for the baseline (next section). The treatment can be given one more, a
+second skill's directory, with `--also-stage`.
+
+#### A second skill for the treatment
+
+A skill that hands work to another skill cannot be measured on its own text: a
+trial loads no skill by name, so the skill it points at is out of reach.
+`--also-stage` stages a second skill directory for the treatment alone:
+
+```bash
+arcforge eval ab <name> --skill-file path/to/SKILL.md --stage-skill-files --also-stage path/to/other-skill
+```
+
+The directory must hold a `SKILL.md` whose frontmatter `description` is a
+one-line plain or quoted scalar with no inline comment. Any other shape, such as
+a block scalar (`description: >-`) or a value continued on the next line, is
+refused, naming the shape.
+`--also-stage` is refused without `--stage-skill-files`, on a workflow-scope
+scenario, and on `eval preflight`, which runs the baseline. It is refused, too,
+with no directory after it or an empty one, and when the `--skill-file` text is
+empty, since a treatment given no text is staged nothing. Each treatment trial
+gets a copy of its own, staged, watched, digested and checked for edits during
+the run exactly as the first directory is.
+
+The second skill's body is not injected. One line after the skill text names it
+the way a host lists a skill that is available:
+
+```text
+Skill `other-skill` (<its description>) is available; its base directory is `<copy>` — read `<copy>/SKILL.md` to use it.
+```
+
+Whether the agent reads that file is the agent's choice, as in a session with
+the plugin loaded. The name is the directory's name. The trial's instruction to
+stay inside its own directory names both copies as exceptions.
+
+Every row of both arms records `alsoStaged: true`, a run condition that pools,
+so a run with the flag never pools with one without it, and
+`alsoStagedFilesHash`, the second directory's digest, which is recorded and does
+not pool. `skillTextHash`, `skillFilesHash` and the preflight a run needs are
+the same as without the flag. Because the digest does not pool, two runs of one
+scenario `## Version` given different `--also-stage` directories, or a second
+skill edited between them, land in one pool, told apart only by each row's
+`alsoStagedFilesHash`. To measure the handoff against another skill, bump the
+scenario's `## Version`. And the line imitates a host's listing; it is not one, so a treatment may
+read the second skill more or less often than a real session would.
 
 ### Comparing two skill texts
 

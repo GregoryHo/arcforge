@@ -60,6 +60,7 @@ COMMANDS:
       --max-turns    Max turns for both arms (overrides scenario)
       --stage-skill-files  Skill scope: copy the skill file's directory outside the trial for the injected arm
       --baseline-skill-file  Skill scope: inject the baseline with this file's text, comparing two skill texts
+      --also-stage   With --stage-skill-files: also stage this skill directory for the treatment
       --interleave   Alternate baseline/treatment trials instead of running arms back-to-back
       --effort       Reasoning effort passed to spawned trials
   eval compare <name>                Compare A/B results

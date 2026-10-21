@@ -13,9 +13,9 @@
  * of its own, removed when that trial ends (trialArm), so what a trial writes
  * into its copy is never what a later trial is given.
  *
- * One call stages one directory. A run that needs a second skill's files in an
- * arm calls stageSkillDir again for that directory and adds its own
- * base-directory line; nothing here assumes a single staged directory per trial.
+ * One call stages one directory. An arm given a second skill's directory
+ * (B-22) is staged it with the same call, and the injection names it in one
+ * line after the skill text rather than injecting its body.
  *
  * Zero external dependencies — Node.js standard library only.
  */
@@ -261,49 +261,96 @@ function changedCopies(copies = []) {
 }
 
 /**
+ * Stage a skill file's directory and digest the copy.
+ * @param {string} skillFile - Absolute path to the skill file
+ * @returns {{ dir: string, filesHash: string }}
+ */
+function stageAndDigest(skillFile) {
+  const dir = stageSkillDir(skillFile);
+  try {
+    return { dir, filesHash: digestSkillDir(dir) };
+  } catch (err) {
+    removeStagedDir(dir);
+    throw new Error(`Failed to digest staged skill files in ${dir}: ${err.message}`);
+  }
+}
+
+/**
+ * The line that names a second staged skill the way a host lists a skill that
+ * is available (B-22): its body is not injected.
+ * @param {{ name: string, description: string }} skill
+ * @param {string} dir - The skill's staged copy
+ * @returns {string}
+ */
+function availableSkillLine({ name, description }, dir) {
+  return `Skill \`${name}\` (${description}) is available; its base directory is \`${dir}\` — read \`${dir}/SKILL.md\` to use it.`;
+}
+
+/**
+ * Remove every copy staged for one injection.
+ * @param {{ baseDir: string|null, also: { dir: string }|null }} injection - From buildInjection
+ */
+function removeInjection({ baseDir, also }) {
+  removeStagedDir(baseDir);
+  removeStagedDir(also?.dir);
+}
+
+/**
  * Build what one arm is injected with. An arm given no text is injected with
  * nothing and gets no staged directory.
  * @param {Object} arm
  * @param {string} [arm.text] - Skill text to inject
  * @param {string} [arm.skillFile] - Absolute path the text was read from (staging needs it)
  * @param {boolean} [arm.stage] - Stage the skill file's directory for this arm
- * @returns {{ text: string|null, textHash: string|null, baseDir: string|null, filesHash: string|null }}
+ * @param {{ dir: string, name: string, description: string }} [arm.alsoStage] - A second
+ *   skill directory to stage, named in one line after the text (B-22); needs stage
+ * @returns {{ text: string|null, textHash: string|null, baseDir: string|null, filesHash: string|null, also: { dir: string, filesHash: string, name: string }|null }}
  *   text is what is prepended to the scenario context; the hash is of the skill
  *   text alone, since the base-directory line differs on every run; filesHash
- *   is the digest of the staged copy (digestSkillDir), null when nothing is staged
+ *   is the digest of the staged copy (digestSkillDir), null when nothing is
+ *   staged; also is the second skill's staged copy and its digest
  */
-function buildInjection({ text, skillFile, stage } = {}) {
-  if (!text) return { text: null, textHash: null, baseDir: null, filesHash: null };
+function buildInjection({ text, skillFile, stage, alsoStage } = {}) {
+  const none = { baseDir: null, filesHash: null, also: null };
+  if (alsoStage && !stage) {
+    throw new Error('A second skill directory is reached through its staged copy: it needs stage');
+  }
+  if (!text) return { text: null, textHash: null, ...none };
   const textHash = hashSkillText(text);
-  if (!stage) return { text, textHash, baseDir: null, filesHash: null };
+  if (!stage) return { text, textHash, ...none };
   if (!skillFile) {
     throw new Error('Staging skill files needs the path of the skill file, and none was given');
   }
-  const baseDir = stageSkillDir(skillFile);
-  let filesHash;
-  try {
-    filesHash = digestSkillDir(baseDir);
-  } catch (err) {
-    removeStagedDir(baseDir);
-    throw new Error(`Failed to digest staged skill files in ${baseDir}: ${err.message}`);
+  const { dir: baseDir, filesHash } = stageAndDigest(skillFile);
+  let also = null;
+  if (alsoStage) {
+    try {
+      also = { ...stageAndDigest(path.join(alsoStage.dir, 'SKILL.md')), name: alsoStage.name };
+    } catch (err) {
+      removeStagedDir(baseDir);
+      throw err;
+    }
   }
+  const named = also ? `\n\n${availableSkillLine(alsoStage, also.dir)}` : '';
   return {
-    text: `${baseDirectoryLine(baseDir)}\n\n${text}`,
+    text: `${baseDirectoryLine(baseDir)}\n\n${text}${named}`,
     textHash,
     baseDir,
     filesHash,
+    also,
   };
 }
 
 /**
  * The staged copies of a trial's injections, as changedCopies checks them.
- * @param {Array<{ baseDir: string|null, filesHash: string|null }>} injections - From buildInjection
+ * @param {Array<{ baseDir: string|null, filesHash: string|null, also?: { dir: string, filesHash: string }|null }>} injections - From buildInjection
  * @returns {Array<{ dir: string, filesHash: string }>}
  */
 function stagedCopies(injections) {
-  return injections
-    .filter(({ baseDir }) => baseDir)
-    .map(({ baseDir, filesHash }) => ({ dir: baseDir, filesHash }));
+  return injections.flatMap(({ baseDir, filesHash, also }) => [
+    ...(baseDir ? [{ dir: baseDir, filesHash }] : []),
+    ...(also ? [{ dir: also.dir, filesHash: also.filesHash }] : []),
+  ]);
 }
 
 /**
@@ -321,33 +368,46 @@ function withInjection(scenario, { text }) {
  * staged once here and the copy removed, so a directory that cannot be staged
  * is refused before any trial runs, and the digest every row records is
  * taken. A later copy with another digest means the skill directory changed
- * under the run, and is refused: its rows would not be of one arm.
+ * under the run, and is refused: its rows would not be of one arm. A second
+ * skill directory (B-22) is staged, digested and checked the same way.
  * @param {Object} scenario - Parsed scenario
- * @param {{ text?: string, skillFile?: string, stage?: boolean }} arm - As buildInjection
- * @returns {{ textHash: string|null, filesHash: string|null, forTrial: () => { scenario: Object, skillInjection: { baseDir: string|null, copies: Array<{ dir: string, filesHash: string }> }, remove: () => void } }}
+ * @param {{ text?: string, skillFile?: string, stage?: boolean, alsoStage?: Object }} arm - As buildInjection
+ * @returns {{ textHash: string|null, filesHash: string|null, alsoFilesHash: string|null, forTrial: () => { scenario: Object, skillInjection: { baseDir: string|null, alsoBaseDir: string|null, alsoName: string|null, copies: Array<{ dir: string, filesHash: string }> }, remove: () => void } }}
  *   forTrial stages a copy for one trial: the scenario as that trial runs it,
  *   the part of runTrial's skillInjection that is the trial's own, and what
  *   removes the copy once the trial has ended
  */
 function trialArm(scenario, arm) {
   const first = buildInjection(arm);
-  removeStagedDir(first.baseDir);
+  removeInjection(first);
   const { textHash, filesHash } = first;
+  const alsoFilesHash = first.also?.filesHash ?? null;
+  const refuseDrift = (injection, dir, was, now) => {
+    removeInjection(injection);
+    throw new Error(
+      `Skill files in ${dir} changed during the run: staged as ${was} when it started, ${now} now`,
+    );
+  };
   const forTrial = () => {
     const injection = buildInjection(arm);
     if (injection.filesHash !== filesHash) {
-      removeStagedDir(injection.baseDir);
-      throw new Error(
-        `Skill files in ${path.dirname(arm.skillFile)} changed during the run: staged as ${filesHash} when it started, ${injection.filesHash} now`,
-      );
+      refuseDrift(injection, path.dirname(arm.skillFile), filesHash, injection.filesHash);
     }
+    const alsoNow = injection.also?.filesHash ?? null;
+    if (alsoNow !== alsoFilesHash)
+      refuseDrift(injection, arm.alsoStage.dir, alsoFilesHash, alsoNow);
     return {
       scenario: withInjection(scenario, injection),
-      skillInjection: { baseDir: injection.baseDir, copies: stagedCopies([injection]) },
-      remove: () => removeStagedDir(injection.baseDir),
+      skillInjection: {
+        baseDir: injection.baseDir,
+        alsoBaseDir: injection.also?.dir ?? null,
+        alsoName: injection.also?.name ?? null,
+        copies: stagedCopies([injection]),
+      },
+      remove: () => removeInjection(injection),
     };
   };
-  return { textHash, filesHash, forTrial };
+  return { textHash, filesHash, alsoFilesHash, forTrial };
 }
 
 /**

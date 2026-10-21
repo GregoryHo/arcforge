@@ -114,7 +114,7 @@ arcforge eval list
 arcforge eval lint <name>
 arcforge eval preflight <name> [--baseline-skill-file <path>] [--stage-skill-files]
 arcforge eval run <name> [--k N] [--model <m>]
-arcforge eval ab <name> [--skill-file <path>] [--baseline-skill-file <path>] [--stage-skill-files]
+arcforge eval ab <name> [--skill-file <path>] [--baseline-skill-file <path>] [--stage-skill-files] [--also-stage <skill-dir>]
 arcforge eval compare <name> [--no-analyzer]
 arcforge eval report [name] [--since <ISO>] [--json]
 arcforge eval history
@@ -133,6 +133,7 @@ arcforge eval dashboard [--port N]
 | `--skill-file` | `ab` | The skill body injected into the treatment arm |
 | `--baseline-skill-file` | `ab`, `preflight` | Inject the baseline with this file's text, so the A/B compares two skill texts |
 | `--stage-skill-files` | `ab`, `preflight` | Copy the skill file's directory outside the trial for the injected arm, which is told where it is |
+| `--also-stage` | `ab` | With `--stage-skill-files`: also stage this skill directory for the treatment, named in one line, its body not injected |
 | `--interleave` | `ab` | Alternate baseline and treatment trials instead of running each arm in a block |
 | `--no-analyzer` | `compare` | Print the verdict without spawning the analyzer session; the verdict itself does not change |
 | `--since` | `report` | Bound the report to results at or after an ISO timestamp |

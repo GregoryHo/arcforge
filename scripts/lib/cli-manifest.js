@@ -107,6 +107,7 @@ const CLI_MANIFEST = {
       '--skill-file',
       '--stage-skill-files',
       '--baseline-skill-file',
+      '--also-stage',
       '--interleave',
       '--json',
     ],

@@ -60,6 +60,95 @@ function readBaselineSkill(file, projectRoot, stage) {
   };
 }
 
+/** Characters a YAML plain scalar may not open with (`-`, `?`, `:` only before a space), beyond the quotes and block indicators. */
+const PLAIN_INDICATORS = '[]{}&*!%@`,?:-#';
+
+/**
+ * A `description:` value as the line naming a second skill takes it: exactly
+ * one line, either a plain scalar or a scalar quoted end to end. Anything
+ * else is a shape the frontmatter reader does not read as YAML does, so it is
+ * named rather than injected (B-22).
+ * @param {string} raw - The value after `description:`, trimmed
+ * @param {string|undefined} next - The frontmatter line after it
+ * @returns {{ description: string, shape?: string }} shape names what was refused
+ */
+function readDescriptionLine(raw, next) {
+  const refuse = (shape) => ({ description: '', shape });
+  if (/^[>|][+-]?$/.test(raw)) return refuse(`is a YAML block scalar (${raw})`);
+  const quote = raw[0] === '"' || raw[0] === "'" ? raw[0] : null;
+  const closedThenComment = raw.match(/^(["']).*\1\s+(#.*)$/);
+  if (closedThenComment) return refuse(`carries an inline YAML comment (${closedThenComment[2]})`);
+  if (quote && (raw.length < 2 || !raw.endsWith(quote))) {
+    return refuse('opens a quote it does not close on its line');
+  }
+  if (next !== undefined && /^\s+\S/.test(next)) return refuse('continues on the next line');
+  if (quote) {
+    // The reader neither un-doubles `''` nor reads escapes beyond these, where YAML does.
+    const inner = raw.slice(1, -1);
+    const plainInner = quote === '"' ? inner.replace(/\\[\\"]/g, '') : inner;
+    if (plainInner.includes(quote)) return refuse('holds its quote inside its quotes');
+    if (quote === '"' && /\\[^nrt]/.test(plainInner)) {
+      return refuse('uses an escape the reader does not read');
+    }
+    const { parseValue } = require('../lib/yaml-parser');
+    const value = parseValue(raw);
+    // A quoted `\n` is read as a newline, which would inject a line of its own.
+    if (/[\r\n]/.test(value)) return refuse('spans more than one line');
+    return { description: value };
+  }
+  if (raw && PLAIN_INDICATORS.includes(raw[0]) && !/^[-?:]\S/.test(raw)) {
+    return refuse(`opens with the YAML indicator ${raw[0]}`);
+  }
+  const comment = raw.match(/\s(#.*)$/);
+  if (comment) return refuse(`carries an inline YAML comment (${comment[1]})`);
+  if (/:(\s|$)/.test(raw)) return refuse('holds ": ", which YAML reads as a mapping');
+  return { description: raw };
+}
+
+/**
+ * The second skill directory a treatment is given (B-22): its path, and the
+ * name and description its one injected line names it by.
+ * @param {string|boolean|undefined} dir - The --also-stage value; true when given bare,
+ *   undefined only when not given
+ * @param {string} projectRoot
+ * @param {boolean} stage - Whether skill files are staged; the flag requires it
+ * @returns {{ dir: string, name: string, description: string }|undefined}
+ */
+function readAlsoStage(dir, projectRoot, stage) {
+  if (dir === undefined) return undefined;
+  // A bare `--also-stage` is parsed as a flag, and `--also-stage ""` as an empty
+  // value: both refused, not run as an A/B without it.
+  if (dir === true || !String(dir).trim()) {
+    throw new Error('--also-stage requires a skill directory: --also-stage <skill-dir>.');
+  }
+  if (!stage) {
+    throw new Error(
+      `--also-stage requires --stage-skill-files: the second skill is reached through its staged copy, and without staging there is none (B-22).`,
+    );
+  }
+  const resolved = path.resolve(projectRoot, dir);
+  const skillMd = path.join(resolved, 'SKILL.md');
+  if (!fs.existsSync(skillMd)) {
+    throw new Error(`--also-stage ${dir} has no SKILL.md: name a skill directory.`);
+  }
+  const front = fs.readFileSync(skillMd, 'utf8').match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  const lines = front ? front[1].split(/\r?\n/) : [];
+  const at = lines.findIndex((line) => /^description:/.test(line));
+  const raw = at < 0 ? '' : lines[at].slice('description:'.length).trim();
+  const { description, shape } = readDescriptionLine(raw, at < 0 ? undefined : lines[at + 1]);
+  if (shape) {
+    throw new Error(
+      `--also-stage ${dir}: its SKILL.md description ${shape}, which the line naming the skill cannot carry; write the description on one line.`,
+    );
+  }
+  if (!description.trim()) {
+    throw new Error(
+      `--also-stage ${dir}: its SKILL.md has no frontmatter description, which the line naming the skill carries.`,
+    );
+  }
+  return { dir: resolved, name: path.basename(resolved), description: description.trim() };
+}
+
 /**
  * Refuse the skill-text flags on a workflow scenario: both belong to an injected
  * skill text, and a workflow comparison injects none.
@@ -86,12 +175,17 @@ function refuseSkillTextFlagsForWorkflow(scenario, given, cmd) {
  * nothing to stage for it.
  * @param {{ scope: string }} scenario
  * @param {string} projectRoot
- * @param {{ baselineSkillFile?: string, stage?: boolean }} given - Parsed CLI values
+ * @param {{ baselineSkillFile?: string, stage?: boolean, alsoStage?: string }} given - Parsed CLI values
  * @returns {{ arm: Function, conditions: Object }} arm as
  *   baselineArm; conditions are what the preflight record is keyed on: the
  *   baseline text's hash, and the digest of its directory when it is staged
  */
 function preflightBaseline(scenario, projectRoot, given) {
+  if (given.alsoStage !== undefined) {
+    throw new Error(
+      'eval preflight refuses --also-stage: the second skill reaches the treatment only, and a preflight runs the baseline. Drop the flag; the A/B with it is gated by the same preflight (B-22).',
+    );
+  }
   refuseSkillTextFlagsForWorkflow(scenario, given, 'preflight');
   const { baselineArm } = require('../lib/eval-skill-staging');
   const stage = Boolean(given.stage);
@@ -118,13 +212,19 @@ function preflightBaseline(scenario, projectRoot, given) {
  * it takes neither a baseline text nor staging.
  * @param {{ scope: string, target?: string }} scenario
  * @param {string} projectRoot
- * @param {{ skillFile?: string, baselineSkillFile?: string, stage?: boolean }} given - Parsed CLI values
- * @returns {{ skillFile?: string, skillPath?: string, skillInstruction?: string, stageSkillFiles: boolean, baselineSkillFile?: string, baselineSkillInstruction?: string, baselineSkillHash?: string }}
- *   skillFile is the path as given (for display), skillPath the resolved one
+ * @param {{ skillFile?: string, baselineSkillFile?: string, stage?: boolean, alsoStage?: string }} given - Parsed CLI values
+ * @returns {{ skillFile?: string, skillPath?: string, skillInstruction?: string, stageSkillFiles: boolean, baselineSkillFile?: string, baselineSkillInstruction?: string, baselineSkillHash?: string, alsoStage?: { dir: string, name: string, description: string } }}
+ *   skillFile is the path as given (for display), skillPath the resolved one;
+ *   alsoStage is the second skill directory the treatment is given (B-22)
  */
 function resolveSkillOptions(scenario, projectRoot, given) {
   const skillFile = given.skillFile || scenario.target;
   const stageSkillFiles = Boolean(given.stage);
+  if (given.alsoStage !== undefined && scenario.scope === 'workflow') {
+    throw new Error(
+      'eval ab --also-stage is refused for a workflow-scope scenario: it stages a second skill beside the injected one, and a workflow A/B injects none (B-22).',
+    );
+  }
   refuseSkillTextFlagsForWorkflow(scenario, given, 'ab');
   if (scenario.scope === 'workflow') return { skillFile, stageSkillFiles };
   if (!skillFile) {
@@ -133,12 +233,21 @@ function resolveSkillOptions(scenario, projectRoot, given) {
     );
   }
   const skill = readSkillFile(skillFile, projectRoot);
+  const alsoStage = readAlsoStage(given.alsoStage, projectRoot, stageSkillFiles);
+  // An empty treatment text is injected as none, so nothing would be staged
+  // while every row recorded the second skill.
+  if (alsoStage && skill.text === '') {
+    throw new Error(
+      `--also-stage needs a treatment skill text: --skill-file ${skillFile} is empty, so nothing would be staged. Name a file with text in it.`,
+    );
+  }
   return {
     skillFile,
     skillPath: skill.path,
     skillInstruction: skill.text,
     stageSkillFiles,
     ...readBaselineSkill(given.baselineSkillFile, projectRoot, stageSkillFiles),
+    alsoStage,
   };
 }
 
