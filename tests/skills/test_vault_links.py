@@ -332,6 +332,18 @@ def test_an_inline_code_span_is_bounded_by_its_block(vault, boundary):
 
 
 
+
+def test_an_ordered_marker_past_1_does_not_interrupt_a_paragraph(vault):
+    # §5.2: `2019.` cannot start a list inside a paragraph, so the line continues
+    # it and the span opened on the line before closes there.
+    assert _linked(vault, "The year `[[L0]]\n2019. was` good, [[L1]]\n") == {"L1"}
+
+
+def test_a_thematic_break_ends_a_paragraph(vault):
+    # `***` is not a lazy line of the item's paragraph: it ends the paragraph,
+    # and the span opened in it, before the next line starts a new one.
+    assert _linked(vault, "- item `x\nlazy [[L0]]\n***\n` [[L1]]\n") == {"L0", "L1"}
+
 def test_a_setext_underline_needs_its_paragraphs_own_line(vault):
     # `===` underlines only a paragraph it continues in the same container: on
     # the first line of a new blockquote it is that quote's text, and on a lazy
