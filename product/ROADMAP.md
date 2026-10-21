@@ -2669,8 +2669,10 @@ reverse one, append a superseding entry (see AGENTS.md).
   the way D-063 clause 3 ran Version 1; (3) the block-model fix to the
   `maintaining-obsidian` lint helpers (#256), a skill-local script change
   whose evidence is contract tests under `tests/skills/` and no A/B. The
-  round's skeleton, in D-059's shape: every item starts with one preflight
-  at k=3, always, and goes on a PASS to an A/B at its scenario's
+  round's skeleton, in D-059's shape: every item whose design gate passes
+  starts with one preflight at k=3, always — an item the gate finds NOT
+  MEASURABLE stops at the gate, at 0 sessions — and goes on a PASS to an
+  A/B at its scenario's
   `## Trials`; D1 runs before D2; a preflight BLOCK at ceiling is a
   finding — no rerun, no A/B; a preflight that measured nothing may be
   rerun, at most twice in the whole round; an A/B that ends with an arm
