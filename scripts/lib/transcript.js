@@ -1,10 +1,44 @@
 // scripts/lib/transcript.js
-const { readFileSafe } = require('./utils');
+const fs = require('node:fs');
 
 const MAX_USER_MESSAGES = 10;
 const MAX_TOOLS = 20;
 const MAX_FILES = 30;
 const MSG_TRUNCATE_LENGTH = 200;
+// Every output is a capped tail, so a long session's transcript is parsed only
+// from its last 8 MiB rather than read and split whole on every Stop/PreCompact.
+const MAX_TRANSCRIPT_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Read a transcript, or only its last `maxBytes` when it is larger.
+ * The tail starts at the first whole line in the window: one byte before the
+ * window is read too, and everything through the first newline is dropped, so
+ * a window that opens on a line boundary loses only that preceding newline.
+ *
+ * @param {string} transcriptPath
+ * @param {number} maxBytes
+ * @returns {{ content: string, truncated: boolean } | null} null when unreadable
+ */
+function readTranscriptWindow(transcriptPath, maxBytes) {
+  let fd;
+  try {
+    fd = fs.openSync(transcriptPath, 'r');
+    const { size } = fs.fstatSync(fd);
+    if (size <= maxBytes) {
+      return { content: fs.readFileSync(fd, 'utf8'), truncated: false };
+    }
+    const buf = Buffer.alloc(maxBytes + 1);
+    const bytesRead = fs.readSync(fd, buf, 0, maxBytes + 1, size - maxBytes - 1);
+    const window = buf.subarray(0, bytesRead);
+    const firstNewline = window.indexOf(0x0a);
+    const content = firstNewline === -1 ? '' : window.subarray(firstNewline + 1).toString('utf8');
+    return { content, truncated: true };
+  } catch {
+    return null;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
 
 /**
  * Parse a JSONL transcript file to extract session summary data.
@@ -17,14 +51,21 @@ const MSG_TRUNCATE_LENGTH = 200;
  * - Direct entries: { type: 'tool_use', tool_name: '...', tool_input: { file_path: '...' } }
  * - Content blocks inside assistant messages: { type: 'assistant', message: { content: [{ type: 'tool_use', name: '...', input: { file_path: '...' } }] } }
  *
+ * A transcript over `maxBytes` is parsed from its tail only and the result
+ * carries `truncated: true`. Then `toolsUsed`/`filesModified` are first-seen
+ * within that window and `totalMessages` counts the window's user messages —
+ * nothing outside this module and its tests reads `totalMessages`.
+ *
  * @param {string} transcriptPath - Path to the JSONL transcript file
- * @returns {{ userMessages: string[], toolsUsed: string[], filesModified: string[], totalMessages: number } | null}
+ * @param {Object} [opts]
+ * @param {number} [opts.maxBytes=MAX_TRANSCRIPT_BYTES] - Read bound; larger files are tail-read
+ * @returns {{ userMessages: string[], toolsUsed: string[], filesModified: string[], totalMessages: number, truncated?: boolean } | null}
  */
-function parseTranscript(transcriptPath) {
-  const content = readFileSafe(transcriptPath);
-  if (!content) return null;
+function parseTranscript(transcriptPath, opts = {}) {
+  const window = readTranscriptWindow(transcriptPath, opts.maxBytes || MAX_TRANSCRIPT_BYTES);
+  if (!window || !window.content) return null;
 
-  const lines = content.split('\n').filter(Boolean);
+  const lines = window.content.split('\n').filter(Boolean);
   const userMessages = [];
   const toolsUsed = new Set();
   const filesModified = new Set();
@@ -71,12 +112,14 @@ function parseTranscript(transcriptPath) {
 
   if (userMessages.length === 0 && toolsUsed.size === 0) return null;
 
-  return {
+  const result = {
     userMessages: userMessages.slice(-MAX_USER_MESSAGES),
     toolsUsed: Array.from(toolsUsed).slice(0, MAX_TOOLS),
     filesModified: Array.from(filesModified).slice(0, MAX_FILES),
     totalMessages: userMessages.length,
   };
+  if (window.truncated) result.truncated = true;
+  return result;
 }
 
 /**
@@ -101,4 +144,5 @@ module.exports = {
   MAX_TOOLS,
   MAX_FILES,
   MSG_TRUNCATE_LENGTH,
+  MAX_TRANSCRIPT_BYTES,
 };
