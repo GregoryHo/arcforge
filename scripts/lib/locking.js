@@ -1,5 +1,5 @@
 /**
- * locking.js - Cross-platform file locking for dag.yaml
+ * locking.js - Cross-platform file locking
  *
  * Uses a simple lock file approach instead of fcntl (which is Unix-only).
  * This works across macOS, Linux, and Windows.
@@ -25,6 +25,11 @@ const DEFAULT_TIMEOUT = 5000;
 const STALE_THRESHOLD = 30000; // 30 seconds
 
 /**
+ * Cell for Atomics.wait — nothing ever notifies it, so a wait is a plain sleep
+ */
+const SLEEP_CELL = new Int32Array(new SharedArrayBuffer(4));
+
+/**
  * Error thrown when lock acquisition fails
  */
 class LockError extends Error {
@@ -35,7 +40,7 @@ class LockError extends Error {
 }
 
 /**
- * Acquire a lock for DAG operations
+ * Acquire a lock file in a directory
  *
  * @param {string} projectRoot - Project root directory
  * @param {Object} options - Lock options
@@ -98,10 +103,8 @@ function acquireLock(projectRoot, options = {}) {
 
         // Wait and retry with exponential backoff
         const waitTime = Math.min(currentInterval, 500);
-        const endWait = Date.now() + waitTime;
-        while (Date.now() < endWait) {
-          // Busy wait (Node.js doesn't have sleep)
-        }
+        // Block without spinning, so waiting processes don't starve the holder
+        Atomics.wait(SLEEP_CELL, 0, 0, waitTime);
         currentInterval = Math.min(currentInterval * 2, 500);
       } else {
         throw err;
@@ -135,7 +138,7 @@ function releaseLock(lockPath) {
 }
 
 /**
- * Execute a function with DAG lock
+ * Execute a function while holding the lock
  *
  * @param {string} projectRoot - Project root directory
  * @param {Function} fn - Function to execute while holding lock

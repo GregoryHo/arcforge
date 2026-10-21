@@ -895,21 +895,21 @@ describe('recordRunFailure — writes failure manifest', () => {
 
   test('run_id is deterministic-ish: same batchId+parseStatus within same second gives same run_id', () => {
     const { recordRunFailure } = getIngestor();
-    // Same call twice should produce manifests with the same run_id (idempotent-ish)
-    const r1 = recordRunFailure({
-      batchId: 'batch_idem',
-      parseStatus: 'timeout',
-      detail: 'first call',
-      homeDir: tmpDir,
-    });
-    const r2 = recordRunFailure({
-      batchId: 'batch_idem',
-      parseStatus: 'timeout',
-      detail: 'second call',
-      homeDir: tmpDir,
-    });
-    // Both runs produce same run_id (same batchId+parseStatus+timestamp-second)
-    expect(r1.run_id).toBe(r2.run_id);
+    // Pin the clock: run_id is second-granular, so real-time calls can straddle a second.
+    jest.useFakeTimers({ now: new Date('2026-01-01T00:00:00Z') });
+    try {
+      const call = (detail) =>
+        recordRunFailure({
+          batchId: 'batch_idem',
+          parseStatus: 'timeout',
+          detail,
+          homeDir: tmpDir,
+        });
+      // Both runs produce same run_id (same batchId+parseStatus+timestamp-second)
+      expect(call('first call').run_id).toBe(call('second call').run_id);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 

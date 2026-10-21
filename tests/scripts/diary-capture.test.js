@@ -358,9 +358,10 @@ process.stdout.write(String(min));`;
       savedPath = process.env.PATH;
       process.env.PATH = `${binDir}${path.delimiter}${savedPath}`;
       // Stub `claude`: record ARCFORGE_SPAWNED to a marker so we can assert the
-      // detached enricher actually ran with the relay-isolation env.
+      // detached enricher actually ran with the relay-isolation env. Write to a
+      // temp file and mv it into place so waitForMarker never sees it empty.
       const marker = path.join(binDir, 'spawned.marker');
-      const stub = `#!/bin/sh\ncat > /dev/null\nprintf '%s' "$ARCFORGE_SPAWNED" > "${marker}"\n`;
+      const stub = `#!/bin/sh\ncat > /dev/null\nprintf '%s' "$ARCFORGE_SPAWNED" > "${marker}.tmp"\nmv "${marker}.tmp" "${marker}"\n`;
       fs.writeFileSync(path.join(binDir, 'claude'), stub, { mode: 0o755 });
     });
 
