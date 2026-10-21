@@ -102,6 +102,9 @@ rather than inferring it from the gate having let the run through. The record
 also notes the `node_version` it ran on and the `repo_commit` of the checkout.
 Those two are notes, not keys: upgrading Node.js or committing does not
 invalidate a preflight.
+Rerunning a preflight under the same key replaces the record, but not the
+old one: it moves to `evals/preflight/history/`, named after its own
+timestamp, and the gate never reads it.
 
 A scenario that measures "this must not get worse" rather than "this must
 improve" opts out by declaring `skip`:

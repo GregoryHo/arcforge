@@ -18,6 +18,7 @@ const {
   checkPreflightGate,
   shouldSkipPreflightGate,
   PREFLIGHT_DIR,
+  PREFLIGHT_HISTORY_DIR,
 } = require('../../scripts/lib/eval-preflight');
 
 function makeTempDir() {
@@ -610,5 +611,80 @@ describe('preflight is keyed on the per-trial ceiling the baseline ran under', (
     preflightUnder({});
     expect(gate({ trialTimeoutMs: 900000 })).toBeNull();
     expect(gate({})).toBeNull();
+  });
+});
+
+describe('a rerun keeps the record it replaces in history/', () => {
+  let tempDir;
+  let hash;
+
+  beforeEach(() => {
+    tempDir = makeTempDir();
+    writeScenario(tempDir, 'test-scenario', SCENARIO_CONTENT);
+    hash = computeScenarioHash(SCENARIO_CONTENT);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const historyDir = () => path.join(tempDir, PREFLIGHT_DIR, PREFLIGHT_HISTORY_DIR);
+
+  test('a second write moves the first record into history under its timestamp', () => {
+    const preflightAt = (passed) =>
+      runPreflight('test-scenario', tempDir, {
+        runTrial: () => ({ passed, score: passed ? 1 : 0 }),
+        gradeResult: (r) => r,
+      });
+    const first = preflightAt(true);
+    expect(first.verdict).toBe('BLOCK');
+    const second = preflightAt(false);
+    expect(second.verdict).toBe('PASS');
+
+    const base = preflightFilename(hash).replace(/\.json$/, '');
+    const archived = `${base}.${first.timestamp.replace(/[:.]/g, '-')}.json`;
+    expect(fs.readdirSync(historyDir())).toEqual([archived]);
+    const kept = JSON.parse(fs.readFileSync(path.join(historyDir(), archived), 'utf8'));
+    expect(kept.verdict).toBe('BLOCK');
+    const current = path.join(tempDir, PREFLIGHT_DIR, preflightFilename(hash));
+    expect(JSON.parse(fs.readFileSync(current, 'utf8')).verdict).toBe('PASS');
+  });
+
+  test('a record without a timestamp is archived under its mtime', () => {
+    writePreflightFile(tempDir, hash, { verdict: 'BLOCK' });
+    const current = path.join(tempDir, PREFLIGHT_DIR, preflightFilename(hash));
+    const mtime = new Date('2026-01-02T03:04:05.678Z');
+    fs.utimesSync(current, mtime, mtime);
+    runPreflight('test-scenario', tempDir, {
+      runTrial: () => ({ passed: false, score: 0 }),
+      gradeResult: (r) => r,
+    });
+    const base = preflightFilename(hash).replace(/\.json$/, '');
+    expect(fs.readdirSync(historyDir())).toEqual([`${base}.2026-01-02T03-04-05-678Z.json`]);
+  });
+
+  test('the gate reads the current record, not one in history', () => {
+    writePreflightFile(tempDir, hash, { verdict: 'PASS' });
+    fs.mkdirSync(historyDir(), { recursive: true });
+    const base = preflightFilename(hash).replace(/\.json$/, '');
+    fs.writeFileSync(
+      path.join(historyDir(), `${base}.2026-01-01T00-00-00-000Z.json`),
+      JSON.stringify({ verdict: 'BLOCK', reason: 'old' }),
+    );
+    expect(checkPreflightGate('test-scenario', tempDir)).toBeNull();
+  });
+
+  test('the missing-preflight message lists no history entry', () => {
+    writePreflightFile(tempDir, hash, { verdict: 'PASS', max_turns: 10 });
+    fs.mkdirSync(historyDir(), { recursive: true });
+    const base = preflightFilename(hash).replace(/\.json$/, '');
+    fs.writeFileSync(
+      path.join(historyDir(), `${base}-t5.2026-01-01T00-00-00-000Z.json`),
+      JSON.stringify({ verdict: 'PASS', max_turns: 5 }),
+    );
+    const message = checkPreflightGate('test-scenario', tempDir, { conditions: { maxTurns: 20 } });
+    expect(message).toMatch(/recorded under: [^\n]*10/);
+    expect(message).not.toMatch(/history/);
+    expect(message).not.toMatch(/recorded under: [^\n]*\b5\b/);
   });
 });

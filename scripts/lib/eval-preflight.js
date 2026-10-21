@@ -27,6 +27,9 @@ const { stopIfTrialWroteRepo, DEFAULT_TRIAL_TIMEOUT_MS } = require('./eval-trial
 /** Directory where preflight JSON files are stored */
 const PREFLIGHT_DIR = path.join('evals', 'preflight');
 
+/** Subdirectory of PREFLIGHT_DIR where superseded records are kept */
+const PREFLIGHT_HISTORY_DIR = 'history';
+
 /** Threshold above which baseline pass rate signals a ceiling (not discriminative) */
 const CEILING_THRESHOLD = 0.8;
 
@@ -65,6 +68,32 @@ function shouldSkipPreflightGate(scenario) {
 function preflightFilename(hash, model, conditions = {}) {
   const modelKey = (model || 'default').replace(/[^A-Za-z0-9._-]/g, '_');
   return `${hash}-${modelKey}${conditionsSuffix(conditions)}.json`;
+}
+
+/**
+ * Move the record already filed under `cacheFile`, if any, into
+ * `history/<base>.<its timestamp>.json`, so a rerun under the same key keeps
+ * the record it replaces. The timestamp is the old record's own, with `:` and
+ * `.` made filename-safe; a record without one (or unreadable) falls back to
+ * the file's mtime. The gate never reads `history/`.
+ * @param {string} preflightDir - Absolute preflight directory
+ * @param {string} cacheFile - Record filename from preflightFilename
+ */
+function archivePreflightRecord(preflightDir, cacheFile) {
+  const current = path.join(preflightDir, cacheFile);
+  if (!fs.existsSync(current)) return;
+  let stamp;
+  try {
+    stamp = JSON.parse(fs.readFileSync(current, 'utf8')).timestamp;
+  } catch {
+    stamp = undefined; // unreadable record: fall back to its mtime below
+  }
+  if (typeof stamp !== 'string' || !stamp) stamp = fs.statSync(current).mtime.toISOString();
+  const historyDir = path.join(preflightDir, PREFLIGHT_HISTORY_DIR);
+  fs.mkdirSync(historyDir, { recursive: true });
+  const base = cacheFile.replace(/\.json$/, '');
+  const safeStamp = stamp.replace(/[:.]/g, '-');
+  fs.renameSync(current, path.join(historyDir, `${base}.${safeStamp}.json`));
 }
 
 /**
@@ -220,6 +249,7 @@ function runPreflight(name, projectRoot, opts = {}) {
     };
     const preflightDir = path.join(projectRoot, PREFLIGHT_DIR);
     fs.mkdirSync(preflightDir, { recursive: true });
+    archivePreflightRecord(preflightDir, cacheFile);
     fs.writeFileSync(path.join(preflightDir, cacheFile), JSON.stringify(record, null, 2));
     return record;
   };
@@ -388,7 +418,9 @@ function missingPreflightMessage(name, projectRoot, { hash, model, conditions })
       : '';
   const prefix = preflightFilename(hash, model).replace(/\.json$/, '');
   const dir = path.join(projectRoot, PREFLIGHT_DIR);
-  const recorded = (fs.existsSync(dir) ? fs.readdirSync(dir) : [])
+  const recorded = (fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }) : [])
+    .filter((e) => e.isFile())
+    .map((e) => e.name)
     .filter(
       (f) =>
         f === `${prefix}.json` ||
@@ -438,6 +470,7 @@ module.exports = {
   checkPreflightGate,
   shouldSkipPreflightGate,
   PREFLIGHT_DIR,
+  PREFLIGHT_HISTORY_DIR,
   CEILING_THRESHOLD,
   PREFLIGHT_K,
   PREFLIGHT_LABEL,
