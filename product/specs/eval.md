@@ -257,9 +257,10 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   did. The three fields are there so a reader can see that a pool mixes
   them, not so the engine refuses one that does (D-062). Every row also
   records `transcript_format`, the version of the transcript grammar it was
-  written under — 2 from 6.5.1: an Agent call's whole input as one line of
-  JSON, and a `[Result: <tool>] error` block only for a tool result the host
-  marked as an error, with the exit code for `Bash` — recorded and not
+  written under — 2 from 6.5.1: an Agent (or Task) call's whole input as one
+  line of JSON, and a `[Result: <tool>] error` block only for a tool result
+  the host marked as an error, with the exit code appended for `Bash` when
+  the result text opens with an `Exit code N` — recorded and not
   pooled, like the Node version; a row without the field was written under
   format 1 (D-065).
 - **B-18 A trial's environment is built, not inherited (6.5.0).** The engine
