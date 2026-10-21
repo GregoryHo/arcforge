@@ -61,6 +61,37 @@ function readBaselineSkill(file, projectRoot, stage) {
 }
 
 /**
+ * The second skill directory a treatment is given (B-22): its path, and the
+ * name and description its one injected line names it by.
+ * @param {string|undefined} dir - The --also-stage value
+ * @param {string} projectRoot
+ * @param {boolean} stage - Whether skill files are staged; the flag requires it
+ * @returns {{ dir: string, name: string, description: string }|undefined}
+ */
+function readAlsoStage(dir, projectRoot, stage) {
+  if (!dir) return undefined;
+  if (!stage) {
+    throw new Error(
+      `--also-stage requires --stage-skill-files: the second skill is reached through its staged copy, and without staging there is none (B-22).`,
+    );
+  }
+  const resolved = path.resolve(projectRoot, dir);
+  const skillMd = path.join(resolved, 'SKILL.md');
+  if (!fs.existsSync(skillMd)) {
+    throw new Error(`--also-stage ${dir} has no SKILL.md: name a skill directory.`);
+  }
+  const { parse } = require('../lib/yaml-parser');
+  const front = fs.readFileSync(skillMd, 'utf8').match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  const description = front ? parse(front[1]).description : undefined;
+  if (typeof description !== 'string' || !description.trim()) {
+    throw new Error(
+      `--also-stage ${dir}: its SKILL.md has no frontmatter description, which the line naming the skill carries.`,
+    );
+  }
+  return { dir: resolved, name: path.basename(resolved), description: description.trim() };
+}
+
+/**
  * Refuse the skill-text flags on a workflow scenario: both belong to an injected
  * skill text, and a workflow comparison injects none.
  * @param {{ scope: string }} scenario
@@ -86,12 +117,17 @@ function refuseSkillTextFlagsForWorkflow(scenario, given, cmd) {
  * nothing to stage for it.
  * @param {{ scope: string }} scenario
  * @param {string} projectRoot
- * @param {{ baselineSkillFile?: string, stage?: boolean }} given - Parsed CLI values
+ * @param {{ baselineSkillFile?: string, stage?: boolean, alsoStage?: string }} given - Parsed CLI values
  * @returns {{ arm: Function, conditions: Object }} arm as
  *   baselineArm; conditions are what the preflight record is keyed on: the
  *   baseline text's hash, and the digest of its directory when it is staged
  */
 function preflightBaseline(scenario, projectRoot, given) {
+  if (given.alsoStage) {
+    throw new Error(
+      'eval preflight refuses --also-stage: the second skill reaches the treatment only, and a preflight runs the baseline. Drop the flag; the A/B with it is gated by the same preflight (B-22).',
+    );
+  }
   refuseSkillTextFlagsForWorkflow(scenario, given, 'preflight');
   const { baselineArm } = require('../lib/eval-skill-staging');
   const stage = Boolean(given.stage);
@@ -118,13 +154,19 @@ function preflightBaseline(scenario, projectRoot, given) {
  * it takes neither a baseline text nor staging.
  * @param {{ scope: string, target?: string }} scenario
  * @param {string} projectRoot
- * @param {{ skillFile?: string, baselineSkillFile?: string, stage?: boolean }} given - Parsed CLI values
- * @returns {{ skillFile?: string, skillPath?: string, skillInstruction?: string, stageSkillFiles: boolean, baselineSkillFile?: string, baselineSkillInstruction?: string, baselineSkillHash?: string }}
- *   skillFile is the path as given (for display), skillPath the resolved one
+ * @param {{ skillFile?: string, baselineSkillFile?: string, stage?: boolean, alsoStage?: string }} given - Parsed CLI values
+ * @returns {{ skillFile?: string, skillPath?: string, skillInstruction?: string, stageSkillFiles: boolean, baselineSkillFile?: string, baselineSkillInstruction?: string, baselineSkillHash?: string, alsoStage?: { dir: string, name: string, description: string } }}
+ *   skillFile is the path as given (for display), skillPath the resolved one;
+ *   alsoStage is the second skill directory the treatment is given (B-22)
  */
 function resolveSkillOptions(scenario, projectRoot, given) {
   const skillFile = given.skillFile || scenario.target;
   const stageSkillFiles = Boolean(given.stage);
+  if (given.alsoStage && scenario.scope === 'workflow') {
+    throw new Error(
+      'eval ab --also-stage is refused for a workflow-scope scenario: it stages a second skill beside the injected one, and a workflow A/B injects none (B-22).',
+    );
+  }
   refuseSkillTextFlagsForWorkflow(scenario, given, 'ab');
   if (scenario.scope === 'workflow') return { skillFile, stageSkillFiles };
   if (!skillFile) {
@@ -139,6 +181,7 @@ function resolveSkillOptions(scenario, projectRoot, given) {
     skillInstruction: skill.text,
     stageSkillFiles,
     ...readBaselineSkill(given.baselineSkillFile, projectRoot, stageSkillFiles),
+    alsoStage: readAlsoStage(given.alsoStage, projectRoot, stageSkillFiles),
   };
 }
 

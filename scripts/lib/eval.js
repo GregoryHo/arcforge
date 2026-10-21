@@ -97,6 +97,8 @@ const { trialArm } = require('./eval-skill-staging');
  * @property {string} [baselineSkillHash] - Hash of the text the run's baseline was given (both arms record it)
  * @property {string} [skillFilesHash] - Digest of the skill directory staged for this arm
  * @property {string} [baselineSkillFilesHash] - Digest of the directory staged for the run's baseline (both arms record it)
+ * @property {boolean} [alsoStaged] - true when the run gave its treatment a second staged skill (both arms record it)
+ * @property {string} [alsoStagedFilesHash] - Digest of that second staged directory (both arms record it)
  * @property {number[]} [assertionScores] - Per-assertion scores (0.0-1.0)
  * @property {string[]} [evidence] - Per-assertion evidence notes from grader
  * @property {number[][]} [blockRefs] - Per-assertion transcript block references (1-indexed)
@@ -269,6 +271,9 @@ function sharedArmOptions(scenario, { maxTurns, pluginDir }) {
  *   directory outside the trial tree and open its injection with the
  *   base-directory line (B-19); each trial gets a copy of its own, removed
  *   when that trial ends
+ * @param {{ dir: string, name: string, description: string }} [options.alsoStage] - A
+ *   second skill directory staged for the treatment alone and named in one line
+ *   after its skill text (B-22); needs stageSkillFiles
  * @param {boolean} [options.interleave=false] - Alternate baseline/treatment trials
  * @returns {{ baseline: TrialResult[], treatment: TrialResult[], delta: number }}
  */
@@ -280,6 +285,7 @@ function runSkillEval(scenario, k, options = {}) {
     baselineSkillInstruction,
     baselineSkillFile,
     stageSkillFiles = false,
+    alsoStage,
     onTrialComplete,
     interleave = false,
     model,
@@ -305,7 +311,7 @@ function runSkillEval(scenario, k, options = {}) {
     skillFile: baselineSkillFile,
     stage,
   });
-  const treatment = trialArm(scenario, { text: skillInstruction, skillFile, stage });
+  const treatment = trialArm(scenario, { text: skillInstruction, skillFile, stage, alsoStage });
   const armOptions = (label, { textHash, filesHash, forTrial }) => ({
     projectRoot,
     label,
@@ -322,6 +328,9 @@ function runSkillEval(scenario, k, options = {}) {
       staged: stageSkillFiles,
       baselineHash: baseline.textHash,
       baselineFilesHash: baseline.filesHash,
+      // Both arms record the treatment's second skill, as they record the baseline's text.
+      alsoStaged: Boolean(alsoStage),
+      alsoFilesHash: treatment.alsoFilesHash,
     },
   });
   return runAbTrials(

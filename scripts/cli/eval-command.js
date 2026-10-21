@@ -272,6 +272,7 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
     const baseline = require('./eval-skill-options').preflightBaseline(scenario, projectRoot, {
       baselineSkillFile: args.options['baseline-skill-file'],
       stage: args.flags['stage-skill-files'],
+      alsoStage: args.options['also-stage'],
     });
     const runLock = takeRunLock('preflight');
     console.log(`Running preflight for "${scenarioName}"...`);
@@ -399,6 +400,7 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
       skillFile: args.options['skill-file'],
       baselineSkillFile: args.options['baseline-skill-file'],
       stage: args.flags['stage-skill-files'],
+      alsoStage: args.options['also-stage'],
     });
     const { skillFile } = skill;
     // Before the gate: it reads the record a running preflight is still writing.
@@ -451,6 +453,7 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
         baselineSkillInstruction: skill.baselineSkillInstruction,
         baselineSkillFile: skill.baselineSkillFile,
         stageSkillFiles: skill.stageSkillFiles,
+        alsoStage: skill.alsoStage,
         interleave,
         onTrialComplete,
         model,

@@ -46,6 +46,7 @@ describe('conditionOf', () => {
       'stageSkillFiles',
       'baselineSkillHash',
       'baselineSkillFilesHash',
+      'alsoStaged',
     ]);
     expect(conditionOf({ model: 'opus' })).toEqual({
       model: 'opus',
@@ -57,6 +58,7 @@ describe('conditionOf', () => {
       stageSkillFiles: null,
       baselineSkillHash: null,
       baselineSkillFilesHash: null,
+      alsoStaged: null,
     });
   });
 });

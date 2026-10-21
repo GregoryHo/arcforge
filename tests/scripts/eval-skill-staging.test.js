@@ -374,6 +374,7 @@ describe('buildInjection', () => {
       textHash: null,
       baseDir: null,
       filesHash: null,
+      also: null,
     });
     expect(buildInjection({ text: 'BODY' }).filesHash).toBeNull();
   });
