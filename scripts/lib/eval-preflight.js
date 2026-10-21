@@ -73,9 +73,11 @@ function preflightFilename(hash, model, conditions = {}) {
 /**
  * Move the record already filed under `cacheFile`, if any, into
  * `history/<base>.<its timestamp>.json`, so a rerun under the same key keeps
- * the record it replaces. The timestamp is the old record's own, with `:` and
- * `.` made filename-safe; a record without one (or unreadable) falls back to
- * the file's mtime. The gate never reads `history/`.
+ * the record it replaces. The timestamp is the old record's own, with every
+ * character outside `[A-Za-z0-9T-]` made `-`, so even a hand-edited one is a
+ * plain filename; a record without one (or unreadable) falls back to the
+ * file's mtime. A name already taken gets `-1`, `-2`, … rather than being
+ * replaced. The gate never reads `history/`.
  * @param {string} preflightDir - Absolute preflight directory
  * @param {string} cacheFile - Record filename from preflightFilename
  */
@@ -92,8 +94,12 @@ function archivePreflightRecord(preflightDir, cacheFile) {
   const historyDir = path.join(preflightDir, PREFLIGHT_HISTORY_DIR);
   fs.mkdirSync(historyDir, { recursive: true });
   const base = cacheFile.replace(/\.json$/, '');
-  const safeStamp = stamp.replace(/[:.]/g, '-');
-  fs.renameSync(current, path.join(historyDir, `${base}.${safeStamp}.json`));
+  const safeStamp = stamp.replace(/[^A-Za-z0-9T-]/g, '-');
+  let target = path.join(historyDir, `${base}.${safeStamp}.json`);
+  for (let n = 1; fs.existsSync(target); n++) {
+    target = path.join(historyDir, `${base}.${safeStamp}-${n}.json`);
+  }
+  fs.renameSync(current, target);
 }
 
 /**
@@ -249,7 +255,13 @@ function runPreflight(name, projectRoot, opts = {}) {
     };
     const preflightDir = path.join(projectRoot, PREFLIGHT_DIR);
     fs.mkdirSync(preflightDir, { recursive: true });
-    archivePreflightRecord(preflightDir, cacheFile);
+    // A paid preflight must never be lost to the archive: on failure, say so
+    // and overwrite the old record.
+    try {
+      archivePreflightRecord(preflightDir, cacheFile);
+    } catch (err) {
+      console.error(`preflight: could not archive ${cacheFile} (${err.message}); overwriting`);
+    }
     fs.writeFileSync(path.join(preflightDir, cacheFile), JSON.stringify(record, null, 2));
     return record;
   };
