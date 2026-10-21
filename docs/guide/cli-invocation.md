@@ -302,14 +302,16 @@ Commands that take `--json` emit a stable shape you can pipe into `jq`:
 arcforge worktree list --json | jq '.worktrees[] | select(.kind == "generic") | .path'
 ```
 
-Commands that print data print JSON whether or not `--json` is given; for them
-`--json` is accepted and changes nothing. Those commands are `worktree add`,
-`worktree list` and `worktree remove`; `learn status`, `enable`, `disable`,
-`review`, `inbox`, `inspect`, `drafts`, `approve`, `reject`, `materialize`,
-`accept` and `activate`; `learn instinct deactivate`, `learn reflect record`
-and `learn recall record`; and `obsidian register`, `unregister` and
-`set-default`. Commands with a human format of their own, such as
-`obsidian list-vaults`, print JSON only under `--json`.
+The commands that have no human format print the same JSON with and without
+`--json`; for them the flag is accepted and changes nothing. They are
+`worktree add`, `worktree list` and `worktree remove`; `learn status`, `enable`,
+`disable`, `review`, `inbox`, `inspect`, `drafts`, `approve`, `reject`,
+`materialize`, `accept` and `activate`; `learn instinct deactivate`,
+`learn reflect record` and `learn recall record`; and `obsidian register`,
+`unregister` and `set-default`. Other commands change their output with the
+flag: `eval report`, for example, prints explanatory lines and a different
+object without it, and `obsidian list-vaults`, `session list` and
+`session alias list` print readable lines unless `--json` is given.
 
 Prefer `--json` for anything scripted. `worktree list` has its shape pinned by a
 test that runs the live command, so the fields named in this guide are the fields
