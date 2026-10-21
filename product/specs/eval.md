@@ -457,7 +457,11 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   it, since the preflight runs the baseline; the directory must contain a
   `SKILL.md` with a frontmatter `description`, which the listing line below
   carries in its parenthesis, and `eval ab` refuses a directory whose
-  `SKILL.md` has none. Each trial is staged a copy of its own, as the main directory
+  `SKILL.md` has none. The listing line's `<name>` is the staged
+  directory's basename as given (resolved against the project root, not
+  through symlinks), and the frontmatter `name` is not read: the skill schema makes the two equal
+  ([skill-system](skill-system.md) B-1), and on a directory where they
+  differ the line still carries the basename. Each trial is staged a copy of its own, as the main directory
   is, under the same two checks B-19 gives the main directory: the arm is
   staged once before the first trial and a later copy with another digest
   refuses the run from that trial on, and a trial that wrote into its copy
