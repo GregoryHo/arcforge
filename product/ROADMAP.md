@@ -2772,7 +2772,9 @@ reverse one, append a superseding entry (see AGENTS.md).
 - Decision: `eval ab --also-stage <skill-dir>` stages a second skill
   directory for the treatment arm alone. It requires `--stage-skill-files`
   and a skill-scope A/B, and `eval preflight` refuses it; the directory
-  must contain a `SKILL.md`, and each trial is staged a copy of its own,
+  must contain a `SKILL.md` with a frontmatter `description`, which the
+  listing line below carries in its parenthesis, and `eval ab` refuses a
+  directory whose `SKILL.md` has none; each trial is staged a copy of its own,
   as the main directory is (B-19). The injection appends one line after
   the skill text — "Skill `<name>` (<frontmatter description>) is
   available; its base directory is `<copy>` — read `<copy>/SKILL.md` to
