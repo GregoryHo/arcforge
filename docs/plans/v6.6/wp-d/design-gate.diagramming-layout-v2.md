@@ -1,6 +1,6 @@
 # `diagramming-obsidian` 版面 reference 設計關卡 Version 2（D-066 D2，#185）
 
-**判定：MEASURABLE。** task 改成六個對等、各帶兩行說明的服務排成一列，不給 hub、不給箭頭、不點名寬度；計分斷言不變，仍是相鄰方塊間距 ≥40。預算照 PLAN：preflight 3 + A/B 10，共 13 個 session，D1 結束後才跑。preflight 天花板 BLOCK 是可能的結果，依 D-066 就是 #185 的最後答案；本文件判斷它不是最可能的結果，理由在「天花板」一節。
+**判定：MEASURABLE。** task 改成六個對等、各帶兩行說明的服務排成一列，不給 hub、不給箭頭、不點名寬度；計分斷言仍只有一個 `A1`：相鄰方塊間距 ≥40，加一個前提條件，每個 worker 的 `text` 要是名稱加兩行說明的三行。預算照 PLAN：preflight 3 + A/B 10，共 13 個 session，D1 結束後才跑。preflight 天花板 BLOCK 是可能的結果，依 D-066 就是 #185 的最後答案；本文件判斷它不是最可能的結果，理由在「天花板」一節。
 
 本文件只閱讀檔案，並在不啟動 session 的前提下執行 `git archive`、`git show` 與引擎的 `digestSkillDir`。行號以 `main` 的 `d06656e2` 為準。Version 1 的關卡是 `docs/plans/v6.5/wp-d/design-gate.diagramming-layout.md`，本文件只寫 Version 2 改了什麼、為什麼；沒改的部分（只交座標計畫、絕對路徑、寫進 staged 複本的列不計分）照那份關卡的理由沿用。
 
@@ -34,7 +34,7 @@ preflight 紀錄本身只有通過率：`docs/plans/v6.5/wp-d/preflight.eval-dia
 
 ### prompt（提議全文）
 
-> I want an Excalidraw diagram of our platform's six core services for the team vault, but before you build anything, give me the coordinate plan to review: write it to `layout.json` at the top of this project folder — use the full absolute path, not a relative one — as a JSON array of elements, each `{"id", "type", "x", "y", "width", "height", "text"}` with `type` either `"box"` or `"label"`. Each service gets exactly one `"box"`: its `id` is the service's name as written below, and its `text` is that name on the first line followed by the service's two description lines. Don't build, render or save a diagram yet. The six services are peers of equal weight: none of them calls another, there is no gateway or hub in front of them, and the diagram has no arrows. Put them side by side in one row:
+> I want an Excalidraw diagram of our platform's six core services for the team vault, but before you build anything, give me the coordinate plan to review: write it to `layout.json` at the top of this project folder — use the full absolute path, not a relative one — as a JSON array of elements, each `{"id", "type", "x", "y", "width", "height", "text"}` with `type` either `"box"` or `"label"`. Each service gets exactly one `"box"`: its `id` is the service's name as written below, and its `text` is three lines separated by `\n`: the service's name, then its two description lines exactly as given. Don't build, render or save a diagram yet. The six services are peers of equal weight: none of them calls another, there is no gateway or hub in front of them, and the diagram has no arrows. Put them side by side in one row:
 >
 > - `auth` — check tokens / new sessions
 > - `billing` — meter usage / send bills
@@ -43,7 +43,7 @@ preflight 紀錄本身只有通過率：`docs/plans/v6.5/wp-d/preflight.eval-dia
 > - `export` — make reports / write CSV
 > - `audit` — log actions / keep history
 
-與 Version 1 的差別：沒有 router、沒有 event-log、沒有分區與分隔線、沒有 connector；每個方塊多一個 `text` 欄位，內容是名稱加兩行說明；服務名稱沿用 Version 1 的六個，grader 的 `WORKERS` 不必改。沒變的：只交座標計畫、不建置不 render 不存檔、`layout.json` 以絕對路徑寫在專案目錄（理由見 Version 1 關卡的「殘餘風險」前兩項）、每個服務恰一個 `"type": "box"` 且 `id` 是服務名稱。prompt 沒有提到寬度、間距、格線、40、180、200 或 220。
+與 Version 1 的差別：沒有 router、沒有 event-log、沒有分區與分隔線、沒有 connector；每個方塊多一個 `text` 欄位，內容是名稱加兩行說明；服務名稱沿用 Version 1 的六個，grader 的 `WORKERS` 不必改。`text` 的寫法明說「three lines separated by `\n`: the service's name, then its two description lines exactly as given」：第一版草稿只寫「name on the first line followed by the two description lines」，兩行說明可以被併成一行，或用 ` / ` 連起來，`text` 是否三行就成了 grader 要猜的事；這個欄位現在是計分的前提條件（見「grader 要改什麼」第 3 項），寫法不能留歧義。沒變的：只交座標計畫、不建置不 render 不存檔、`layout.json` 以絕對路徑寫在專案目錄（理由見 Version 1 關卡的「殘餘風險」前兩項）、每個服務恰一個 `"type": "box"` 且 `id` 是服務名稱。prompt 沒有提到寬度、間距、格線、40、180、200 或 220。
 
 ### 為什麼這個 task 會讓 baseline 走到 Primary
 
@@ -74,12 +74,15 @@ baseline 失敗的走法只有一條：**照抄 200 的欄距，寬度取 161 �
 
 **判斷。** preflight 是 k=3、門檻 `CEILING_THRESHOLD = 0.8`（`scripts/lib/eval-preflight.js:34`），2/3 是 0.67 判 PASS，所以 BLOCK 要三列全部走上述某條通過的路。Version 1 的證據指向 agent 照抄格線、寬度取預設尺寸表；Version 2 移動的是尺寸類別，若 agent 叫它們 `primary`，兩個預設來源都給 180，照抄 200 欄距就失敗。主要的反向力量是第 2 條，它在 Version 2 才變得適用，Version 1 沒有提供它會不會被用到的證據。本文件的判斷是 BLOCK 有實際可能，但不是最可能的結果；這個判斷只建立在一個 task 的五列上，不給機率。BLOCK 發生時照 D-066 記為發現、關閉 #185，不重新設計。
 
+**跳過文字要求的列不能把 baseline 推到天花板。** Version 2 靠三行文字把 worker 推到 Primary；如果 `text` 不計分，一列可以省掉 `text`、給非字串、或把兩行說明併成一行，留著 Secondary 大小的方塊，照 200 欄距排出 60 的間距，仍以 PASS 計入 3/3 的 BLOCK，而 BLOCK 會關閉 #185。所以 `text` 是 `A1` 的前提條件（「grader 要改什麼」第 3 項）：這樣的列判 FAIL，不計入天花板。天花板只能由交出三行文字、仍然排出 ≥40 間距的列達到，也就是上面六條路之一，不能靠跳過 task 的操縱達到。
+
 ## 地板：treatment 會不會也失敗
 
 preflight 只跑 baseline 臂（`scripts/cli/eval-command.js` 的 preflight 路徑，Version 1 關卡已列），treatment 的地板要到 A/B 才看得到。treatment 失敗的路：
 
 - **寬度超過 180 排在 220 的格線上。** 寬 190 間距 30、寬 200 間距 20。行長壓在 12 讓 16 號字在兩種 padding 下都放得進 180，沒有理由加寬；字級 20 會打開這條路（見上第 5 條），兩臂同時。
 - **直排。** 同上，兩臂相同。
+- **不照格式寫 `text`。** 缺漏、非字串、行數不是三、第一行不是服務名稱，都讓 `A1` 判 FAIL（「grader 要改什麼」第 3 項）。兩臂讀同一個 prompt 與同一份 `SKILL.md`，這種 FAIL 對兩臂機率相同，是雜訊，不是偏差；它拉低兩臂的通過率、縮小可見的 delta，列在殘餘風險。
 - **寫進 staged 複本、或 `uv run` 建 `.venv`。** 列不計分（`trial_wrote_skill_files`），由補跑補上；Version 1 五列沒有一列發生（`audit.d4.md`「逐項稽核」）。
 
 treatment 照現行 `:16`、`:20` 排 180 寬，間距正好 40，通過。它不是先天通過：寬度選錯一樣失敗。
@@ -90,8 +93,12 @@ treatment 照現行 `:16`、`:20` 排 180 寬，間距正好 40，通過。它�
 
 1. `## Scenario` 換成上面的 prompt；`## Version` 1 → 2。scenario 文字改了，hash 跟著改，preflight 的鍵與 pool 都換新；Version 1 只有 preflight 紀錄，沒有 A/B 列，帳本裡的 BLOCK 照留。
 2. 拿掉 `C2`（分隔線淨空）與 `MIN_SEPARATOR_CLEARANCE`：沒有分區，每列都只會印「no separators in the plan」。Design Notes 的 C2 一條同時刪。
-3. 加一行不計分的 audit：每個 worker 的 `text` 有幾行，以及寬度落在哪個尺寸類別（≤140 Secondary、160–200 Primary、其他）。稽核要回答的第一個問題就是「baseline 有沒有走到 Primary」；寬度已由 `-- audit: widths:` 印出，這一行讓答案不必人工換算。`text` 缺漏或不是字串不判 FAIL：`A1` 不讀它。
-4. `## Assertions` 的 A1 句子不變。Design Notes 改寫成 Version 2：權威文件指向本關卡，「What is measured」加 Version 1 的結果與 Version 2 的理由，baseline 的逃生路換成本關卡的六條，預算出處換成 `docs/plans/v6.6/PLAN.md`。
+3. **`A1` 加一個前提條件：三行文字。** 六個 worker 的 box 各自要有字串型別的 `text`，以 `\n` 分成恰好三行（去掉結尾的一個換行、每行去掉前後空白後皆非空），第一行等於 prompt 寫的服務名稱（即該 box 的 `id`）。任何一個 worker 不符，`A1` 判 FAIL，原因寫明是哪個 worker、哪一項：`text` 缺漏、不是字串、行數（印出實際行數）、第一行（印出實際內容）。兩行說明只檢查非空，不比對逐字內容：操縱靠的是三行的高度與行長，逐字比對只會把「email, push」寫成「email & push」這類與版面無關的差異判成 FAIL。
+
+   **放在 `A1` 裡，不另立 `A2`。** scenario 的計分斷言維持一個，row 的 pass 就是 `A1` 的 pass，引擎讀這個 scenario 的方式與 Version 1 相同；`A1` 本來就把「不符合指定 schema」判為 FAIL（現行 scenario `:97-99`、`:111-118`），`text` 是 schema 的新欄位，同一條規則延伸過去即可。另立 `A2` 會讓同一個 row 有兩個計分標籤，「格式錯」與「間距錯」在 pool 裡看起來是同一種 FAIL，卻要多一套讀法。預先登記的 decision 記下這個選擇。
+
+   **不計分的 audit 保留**：每個 worker 的寬度落在哪個尺寸類別（≤140 Secondary、160–200 Primary、其他）。稽核要回答的第一個問題是「baseline 有沒有走到 Primary」；寬度已由 `-- audit: widths:` 印出，這一行讓答案不必人工換算。
+4. `## Assertions` 的 A1 句子加上第 3 項的前提條件：六個 worker 的 box 各有三行的字串 `text`、第一行是服務名稱。Design Notes 改寫成 Version 2：權威文件指向本關卡，「What is measured」加 Version 1 的結果與 Version 2 的理由，baseline 的逃生路換成本關卡的六條，預算出處換成 `docs/plans/v6.6/PLAN.md`。
 
 ## 執行計畫
 
@@ -115,11 +122,12 @@ treatment 照現行 `:16`、`:20` 排 180 寬，間距正好 40，通過。它�
 
 - **#309（M-A，`--also-stage`）在本關卡寫成時仍未合併。** PLAN 的順序是關卡在 M-A 合併後寫；D2 不用 `--also-stage`，但 M-A 改了 staging 與注入。PLAN 的 M-A 要求單一目錄時注入句逐字不變（golden test），所以預期不影響 D2；量測前以量測 commit 重算兩個 digest，並確認 row 沒有 `alsoStaged`。
 - **Version 1 的其他殘餘照舊**：寫進 staged 複本的列不計分；`uv` 在 trial 裡解析不到的跡象（`audit.d4.md`「`uv` 與 staged 複本」）不是證明；baseline 讀 repository 裡的現行檔案就不再是舊 reference 那一臂，稽核逐列檢查 `-- audit: outside the trial tree`；沒打開 reference 的列分開報告。
+- **格式不符的 FAIL 是兩臂對稱的雜訊。** `text` 不照格式寫的列判 FAIL；兩臂同一個 prompt、同一份 `SKILL.md`，這種 FAIL 不偏向任何一臂，但會拉低兩臂的通過率、縮小可見的 delta。稽核逐列寫出 FAIL 是格式還是間距，兩臂各有幾列格式 FAIL 寫進結果的 decision，不解讀成鑑別。
 - **不能讀成格線之外的事。** 斷言量的是 Primary 寬度的元素在兩種格線下的間距，不是完整的建置、render 與存檔，也不是 router 這類 hub 存在時的版面。
 
 ## 判定與 #185
 
-**MEASURABLE**，條件四項：(1) prompt 用上面的全文，不點名寬度，說明行不超過 12 個字元；(2) 唯一計分斷言是六個 worker 同一列、相鄰間距 ≥40；(3) 兩文字 A/B，baseline 目錄 digest `0f3c574c1e448946`、treatment `42ec93e5d9d42cec`，在量測 commit 重算相符；(4) Version 1 關卡的條件 (1)、(3)、(4) 照舊：只交座標計畫、絕對路徑、寫進 staged 複本的列不計分且由補跑補上。
+**MEASURABLE**，條件四項：(1) prompt 用上面的全文，不點名寬度，說明行不超過 12 個字元；(2) 唯一計分斷言 `A1` 是六個 worker 同一列、相鄰間距 ≥40，且每個 worker 的 box 帶三行的字串 `text`、第一行是服務名稱（「grader 要改什麼」第 3 項），不符者判 FAIL；(3) 兩文字 A/B，baseline 目錄 digest `0f3c574c1e448946`、treatment `42ec93e5d9d42cec`，在量測 commit 重算相符；(4) Version 1 關卡的條件 (1)、(3)、(4) 照舊：只交座標計畫、絕對路徑、寫進 staged 複本的列不計分且由補跑補上。
 
 各結果對 #185：
 
