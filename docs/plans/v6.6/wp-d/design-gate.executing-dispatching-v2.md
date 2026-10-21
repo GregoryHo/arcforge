@@ -107,9 +107,9 @@ T1 與 T3 是 T2 之外的工作，讓 task list 是一份真的要跑完的清�
 
 讀 `TRANSCRIPT_PATH`（只讀一般檔案、有大小上限，照 `eval-diagramming-obsidian-layout-grid.md` 的 `regular_bytes` 寫法），以空行切 block，取所有以 `[Tool: Agent] ` 或 `[Tool: Task] ` 開頭的 block，對其餘部分 `json.loads`，取 `prompt`（不是字串就當空字串）。
 
-**A1，唯一計分的斷言**：至少一個 Agent／Task block 的 `prompt` 同時含有三條 acceptance criteria。比對前兩邊都做同樣的正規化：連續空白併成一個空格、去掉反引號、去掉句尾句點、轉小寫。沒有任何 Agent／Task block 判 FAIL（原因：沒有派工）；有 block 但 `json.loads` 失敗，該 block 記為不可讀、不算含有條件。
+**A1，唯一計分的斷言**：T2 的 writer 派工帶著三條 acceptance criteria。writer 派工以順序與主題認定：transcript 裡**第一個** `prompt` 提到 limiter 的 Agent／Task block，「提到」是正規化後含 `specs/limiter.md`、`src/limiter.js` 或 `limiter` 其中之一。這個 block 的 `prompt` 要同時含有三條條件；沒有任何提到 limiter 的 Agent／Task block 判 FAIL（原因：T2 沒有派工）。之後提到 limiter 的 block 不計分，只進 audit。比對前兩邊都做同樣的正規化：連續空白併成一個空格、去掉反引號、去掉句尾句點、轉小寫。`json.loads` 失敗的 block 記為不可讀，不參與認定。
 
-- **為什麼是「至少一個」而不是「每一個」**：T1、T3 也可能被派出去，它們的 prompt 本來就不該含 limiter 的條件；`dispatching` Step 4 的 acceptance agent（`:91-96`）也是 Agent 呼叫。要的是 T2 那一次派工帶著逐字條件，至少一個 block 含三條就是它。
+- **為什麼是「第一個提到 limiter 的派工」，不是「至少一個」**：「至少一個」會讓 treatment 在它要被抓的那個失敗上通過。`dispatching` Step 4（`:91-96`）要求把 acceptance 交給另一個 fresh-context agent，檢查「does the delivered code satisfy every criterion」；照做的 treatment 可以只給 writer `specs/limiter.md` 的路徑，再把三條條件貼給 acceptance agent，「至少一個」就判它 PASS。這條指示只有 treatment 讀得到，所以這個假 PASS 只會出現在 treatment 一邊，會把 delta 往上推，還可能錯誤地關閉 #184。format 2 沒有 parent／top-level 的標記（事實 7），grader 只能靠別的特徵分辨 writer 與 acceptance agent。順序就是那個特徵：`dispatching` 的步驟是 Step 3 寫 card 派 writer（`:56-78`），Step 4 在 writer 回報之後才驗收（`:80-96`，「A completion report is a claim」），所以 writer 的 card 一定在 acceptance 的 prompt 之前。先派 T1 或 T3 不影響認定：它們的 prompt 不提 limiter。6.5.0 的關卡沒有討論這個 acceptance agent 的混淆：它的論點是 card 的全文讀不到、「有 acceptance criteria」量的是 `dispatching` Step 3（`design-gate.executing-dispatching.md`「兩個斷言能鑑別嗎？」），沒有走到「讀得到全文之後，哪一個 block 才是 card」這一步。
 - **為什麼去反引號與大小寫**：第 2、3 條含反引號，agent 把條件改寫成清單時常拿掉或加上 code 標記、句首大小寫跟著清單格式變；這些不改變條件的字。逐字比對要抓的是改寫（「10 per second」），不是排版。
 - **依賴的格式**：grader 依賴 format 2 的單行 JSON（事實 6）。format 1 的 row 只有 200 字元，條件幾乎一定不在裡面，所以 grader 不必判斷格式；量測在 `d1ae3060` 之後跑，每一列都是 format 2，稽核逐列確認 `transcript_format: 2`。
 
@@ -117,7 +117,8 @@ T1 與 T3 是 T2 之外的工作，讓 task list 是一份真的要跑完的清�
 
 - `-- audit: specs/limiter.md opened`：有沒有 `[Tool: Read]`、或 `Bash` 指令含 `specs/limiter.md`。沒開 spec 的 FAIL 與開了卻沒照貼的 FAIL 分開報告。
 - `-- audit: dispatching/SKILL.md opened`：有沒有工具呼叫讀 staged 的 `dispatching/SKILL.md`（路徑含 `arcforge-eval-skill-` 與 `SKILL.md`，且不是 `executing` 的那一份）。treatment 的地板指標；baseline 若出現，表示它往 trial 樹外找。
-- `-- audit: agent calls`：Agent／Task block 的數目，每個 block 含幾條條件（0–3）、`description` 的前 80 字元、`prompt` 是否含 `specs/limiter.md` 這個路徑。
+- `-- audit: agent calls`：Agent／Task block 的總數。
+- `-- audit: limiter dispatch`：每一個提到 limiter 的 block 一行：它在所有 Agent／Task block 中的位置、含幾條條件（0–3）、`description` 的前 80 字元、`prompt` 是否含 `specs/limiter.md` 這個路徑，以及它讀起來是不是驗收（正規化後含 `review`、`verify`、`accept`、`check against` 其中之一）。第一行就是 `A1` 評分的那個 block。稽核者看得到 writer 與 acceptance 的 prompt 並排，看得到「writer 只給路徑、acceptance 才貼條件」這種列，也看得到驗收失敗後再派的 writer。
 - `-- audit: not top-level`：無法判斷。format 2 不標記 subagent 的呼叫（事實 7），這一行固定印出這句，提醒稽核者一個含條件的 block 理論上可能出自 subagent。
 - `-- audit: model tier`：prompt 裡有沒有 `model:`、`haiku`、`sonnet`、`opus` 這類欄位。不計分：6.5.0 關卡與 D-066 都判它在兩臂都是天花板，不斷言。
 - `-- audit: outside the trial tree`：照 layout-grid grader 的寫法，列出指向 trial 目錄外的路徑；baseline 若去找 repository 裡的 `skills/core/dispatching`，就不再是「本體不在」那一臂。
@@ -178,12 +179,18 @@ baseline 通過，要三條條件在它的 Agent prompt 裡逐字出現，而它
 - **預期的 digest**（`d1ae3060`，`digestSkillDir` 離線計算）：`skills/core/executing` `1ef6e3967679cf2b`、`skills/core/dispatching` `9479e63210fdc2be`；`executing/SKILL.md` 的文字 hash `17fa36f1535cb446`。量測前在量測 commit 重算，不同就停下、重新登記，不花 session。`alsoStagedFilesHash` 不是 pool 條件（B-22），所以這一步是唯一確認 `dispatching` 沒有在量測前被改的地方。
 - **session**：preflight 3；A/B 兩臂各 5，共 10。補跑與 preflight 出錯重跑照 PLAN 的額度表，與 D2 共用。
 - **順序**：D1 先跑，結束後才開始 D2；一個 checkout 一次一個 live eval。
-- **稽核**：逐列報告 A1、四條 audit 行、`transcript_format`、耗時與是否被砍、treatment 有沒有開 `dispatching/SKILL.md`、baseline 有沒有往 trial 樹外找。
+- **稽核**：逐列報告 A1、所有 audit 行（`limiter dispatch` 的第一行是不是 T2 的實作 card 逐列判讀）、`transcript_format`、耗時與是否被砍、treatment 有沒有開 `dispatching/SKILL.md`、baseline 有沒有往 trial 樹外找。
 
 ## 殘餘風險
 
 - **列名不是 host 的列名**（B-22 Residual）：treatment 讀本體的頻率可能與真實 session 不同。讀數只說明「本體可及時」的行為，不是 plugin 載入後的行為。
-- **subagent 的呼叫沒有標記**（事實 7）。含條件的 block 若出自 subagent，仍會被算進 A1；稽核者逐列看含條件的 block 前後的工具呼叫。
+- **subagent 的呼叫沒有標記**（事實 7）。第一個提到 limiter 的 block 若出自 subagent，仍會被當成 writer；稽核者逐列看那個 block 前後的工具呼叫。
+- **第一個提到 limiter 的派工不是 writer 時，`A1` 判 FAIL**，是假陰性。兩種形狀，方向相反，所以不能說它只會縮小 delta：
+  - **treatment 一邊（縮小 delta）。** `dispatching` 的 card 有「Constraints」一欄（`:66`），Step 1 要寫下「which piece owns which files」（`:21-22`）；照做的 treatment 若先派 T1，T1 的 card 很可能寫「do not touch `src/limiter.js`, T2 owns it」，這個 block 就成了第一個提到 limiter 的派工，`A1` 對一張 T1 的 card 評分而判 FAIL。`dispatching` 也把 research、review、investigation 列為可派的唯讀工作（`:53-54`），先派一個讀 spec 的 agent 是同一種形狀。這兩條指示只有 treatment 讀得到，所以 treatment 比較容易碰到。
+  - **baseline 一邊（放大 delta）。** baseline 若先派一個規劃或探索的 agent 去讀 spec，再派 writer 並貼條件，`A1` 同樣判 FAIL，delta 因此變大。baseline 沒有任何文字叫它這樣做，本文件判斷它比 treatment 少見，但不是不可能。
+
+  兩個方向都由 `-- audit: limiter dispatch` 逐列看得到：第一行的 block 讀起來不是 T2 的實作 card（description 是 T1、T3、research 或 review），就是這種列。稽核逐列標出，兩臂各有幾列寫進結果的 decision；不改標籤、不重新計分（D-063 第 4 點的規則）。若 A/B 的判定靠這幾列翻轉，結果的 decision 要照實寫出。
+- **驗收失敗後再派 writer。** 第一個 block 仍是原本的 writer card，`A1` 評的是它；重派的 card 只出現在 audit 行。這是想要的行為：量的是第一次交接帶不帶條件。
 - **`aliases.json` 的誤報**：brief 把它歸到本關卡，與檔案不符。D-065、D-066 的 Residual 記的是 6.5.0 resume scenario（`eval-sessions-handover-and-resume`）的「archive file read directly」旗標在 `aliases.json` 上誤報；本 scenario 是新的，不讀 archive，不受影響。那個誤報照 D-066 維持原狀。
 - **方向性讀數**：k=5、一個 fixture、一個模型、注入的 skill 文字（D-059、D-066）。
 
@@ -192,7 +199,7 @@ baseline 通過，要三條條件在它的 Agent prompt 裡逐字出現，而它
 **MEASURABLE**，條件五項：
 
 1. prompt 指定 unattended 並說不要問模式；派給 subagent 的要求只在 T2，三條條件只在 `specs/limiter.md`，T2 寫出它的路徑。
-2. 唯一計分斷言 `A1`：至少一個 Agent／Task 呼叫的 `prompt` 在上述正規化後逐字含三條條件；沒有派工判 FAIL。model tier 不斷言。
+2. 唯一計分斷言 `A1`：第一個 `prompt` 提到 limiter 的 Agent／Task 呼叫（T2 的 writer 派工）在上述正規化後逐字含三條條件；沒有提到 limiter 的派工判 FAIL；之後的 limiter 派工（例如 acceptance agent）不計分。model tier 不斷言。
 3. grader 讀存檔 transcript 的 format 2 單行 JSON，不讀 `raw/`；稽核確認每列 `transcript_format: 2`。
 4. 兩臂旗標如上；兩個 digest 與文字 hash 在量測 commit 重算相符。
 5. `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000`，preflight 與 A/B 同值；Setup 建 git repo 並設定身分。
