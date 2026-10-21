@@ -360,6 +360,22 @@ def _list_content(line: str, offsets: list[int], para: bool) -> tuple[int, str, 
         starts = True
 
 
+def _fence_line(line: str, prefix: str, base: int) -> str | None:
+    """`line` inside a fence opened in a blockquote (`prefix`) or a list item
+    (content column `base`), with the container's prefix or indentation removed;
+    None when the line ends that container, and the fence with it (a fence has
+    no lazy lines). Each quoted line carries its own `>` run: strip that line's
+    prefix, not the opener's (`> ```yaml` may close as `>```` `)."""
+    if prefix:
+        quoted = QUOTE_PREFIX_RE.match(line)
+        if quoted and quoted.group(0).count(">") >= prefix.count(">"):
+            return line[quoted.end():]
+        return None
+    if line.strip() and len(line) - len(line.lstrip(" ")) < base:
+        return None
+    return line[base:]
+
+
 def _walk_fences(text: str):
     """Yield (state, info, line, nested) per line: `text` outside any fence;
     `open`, `body`, `close` inside one; `code` in an indented code block;
@@ -391,19 +407,10 @@ def _walk_fences(text: str):
     lines = text.split("\n")
     for i, line in enumerate(lines):
         if marker is not None:
-            # Inside a quoted fence each line carries its own `>` run; strip that
-            # line's prefix, not the opener's (`> ```yaml` may close as `>```` `).
-            if prefix:
-                quoted = QUOTE_PREFIX_RE.match(line)
-                if quoted and quoted.group(0).count(">") >= prefix.count(">"):
-                    inner = line[quoted.end():]
-                else:
-                    marker = None  # the blockquote ended, and its fence with it
-            elif line.strip() and len(line) - len(line.lstrip(" ")) < base:
-                marker = None  # the list item ended, and its fence with it
+            inner = _fence_line(line, prefix, base)
+            if inner is None:
+                marker = None  # its container ended, and the fence with it
             else:
-                inner = line[base:]
-            if marker is not None:
                 if re.fullmatch(rf" {{0,3}}{re.escape(marker[0])}{{{len(marker)},}}\s*", inner):
                     yield "close", info, line, bool(prefix or base)
                     marker = None
