@@ -59,6 +59,7 @@ function runCli(args, input = '') {
     child.stderr.on('data', (d) => {
       stderr += d;
     });
+    child.on('error', (err) => resolve({ code: -1, stdout, stderr: `${stderr}${err.message}` }));
     child.on('close', (code) => resolve({ code, stdout, stderr }));
   });
 }
