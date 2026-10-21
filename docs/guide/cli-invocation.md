@@ -308,7 +308,9 @@ The commands that have no human format print the same JSON with and without
 `disable`, `review`, `inbox`, `inspect`, `drafts`, `approve`, `reject`,
 `materialize`, `accept` and `activate`; `learn instinct deactivate`,
 `learn reflect record` and `learn recall record`; and `obsidian register`,
-`unregister` and `set-default`. Other commands change their output with the
+`unregister` and `set-default`. Those that write a timestamp, an id or an
+archive path print a new one on each run, so two runs differ in those per-run
+values and nothing else. Other commands change their output with the
 flag: `eval report`, for example, prints explanatory lines and a different
 object without it, and `obsidian list-vaults`, `session list` and
 `session alias list` print readable lines unless `--json` is given.
