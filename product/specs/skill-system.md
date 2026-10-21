@@ -1,6 +1,6 @@
 # skill-system — spec
 
-> Status: shipped v6.5.0 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.5.0 · extended by 6.6.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -91,7 +91,12 @@ situations to skills.
   change agent behavior ships with an eval delta from the [eval](eval.md)
   harness, not a self-report. Form constraints (line budget, description
   registers) are enforced mechanically per skill-schema §6, so review effort
-  goes to behavior, not formatting.
+  goes to behavior, not formatting. The `executing` to `dispatching` handoff
+  (#184) has no such evidence yet: 6.5.0 found it not measurable (D-063,
+  D-064), and 6.6.0 schedules it again — the same `executing` text injected
+  in both arms, the treatment alone given
+  `--also-stage skills/core/dispatching` ([eval](eval.md) B-22), behind an offline design
+  gate that may end NOT MEASURABLE at 0 sessions (D-066).
 
 ### The `sessions` skill
 - **B-10 A handover is five sections, every one filled.** Before writing, the
@@ -190,6 +195,10 @@ asserted by test (B-3).
   not regressed, its treatment opening the staged template in every row,
   with A1 to A4 not discriminating (B-10, B-12); and the handoff (#184)
   stays an unmeasured finding (B-9).
+- **D-066** — 6.6.0 schedules the handoff (#184) again as its round's D1:
+  one `executing` text in both arms, `dispatching` staged for the treatment
+  alone, an offline design gate before any session; the outcome is a later
+  entry (B-9).
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
 

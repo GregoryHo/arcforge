@@ -103,11 +103,7 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 - ~~**eval-record-node-and-hash**~~ — graduated into 6.5.0 (D-062).
 - ~~**eval-trial-path**~~ — graduated into 6.5.0 (D-062).
 - ~~**eval-concurrent-run-guard**~~ — graduated into 6.5.0 (D-062).
-- **eval-layout-grid-v2** — `eval-diagramming-obsidian-layout-grid` Version 1
-  BLOCKed at ceiling: given the old reference, every baseline kept the 200 px
-  grid and drew the six boxes 140 px wide, so the 20 px contradiction never
-  came up. A Version 2 needs a task where the baseline arrives at Primary
-  width (180 px) without the prompt naming a width · needs: D-064, #185.
+- ~~**eval-layout-grid-v2**~~ — graduated into 6.6.0 (D-066).
 - ~~**eval-transcript-full-tool-input**~~ — graduated into 6.5.1 (D-065).
 - ~~**eval-provider-limit-mid-trial**~~ — graduated into 6.5.1 (D-065).
 

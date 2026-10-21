@@ -1,6 +1,6 @@
 # eval — spec
 
-> Status: shipped v6.5.1 · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.5.1 · extended by 6.6.0 (next) · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
@@ -131,7 +131,8 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   text (`baselineSkillHash`, B-20) and, when that baseline is staged, the
   digest of its staged files (`baselineSkillFilesHash`, B-20); a
   run that uses none records none, so its rows pool with those written
-  before 6.5.0 (D-062).
+  before 6.5.0 (D-062). From 6.6.0 a treatment given a second staged skill
+  directory adds one more, `alsoStaged` (B-22, D-067).
 - **B-12 A grader reads what a trial produced; it never runs it.** No grader
   executes code a trial wrote — no probe, no import, no test run over the
   trial's files — because the agent under test wrote it, it would run on the
@@ -363,7 +364,9 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   session with the skill loaded would. The files are part of the injection:
   an arm injected with nothing gets no staged directory and cannot list one
   from inside its trial. The trial's instruction to stay inside its own
-  directory names the staged directory as its one exception. Each trial is
+  directory names each staged directory as an exception; with one staged
+  directory the sentence is the one it was before 6.6.0, word for word
+  (B-22, D-067). Each trial is
   staged a copy of its own, removed when that trial ends or the command
   exits, so no trial is given what another wrote. Each arm is also staged
   once before the first trial and that copy removed: a directory that
@@ -424,7 +427,9 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   will run; its record is keyed on the baseline text's hash and, when the
   baseline is staged, on its staged files' digest, on top of B-3's
   conditions, so `eval ab` is refused until a preflight exists for that
-  baseline (D-057, D-062). Residual: the treatment's text hash is recorded
+  baseline (D-057, D-062). The key does not look at `--also-stage`, which
+  reaches the treatment only (B-22), so a run with it is gated by the same
+  preflight as one without (6.6.0, D-067). Residual: the treatment's text hash is recorded
   but, as before 6.5.0, is not a pooling condition, so a skill edited and
   re-measured under an unchanged scenario version joins the earlier
   treatment pool. When both arms are given one text and differ only in
@@ -444,6 +449,43 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   print as they would have, since they come from the rows alone (B-4). On a
   code-graded scenario, which never starts the analyzer, the flag changes
   nothing (D-062).
+- **B-22 A treatment can be given a second skill's directory (6.6.0).**
+  `eval ab --also-stage <skill-dir>` stages a second skill directory for
+  the treatment arm alone, so an A/B can measure a skill that hands work to
+  another, which a trial cannot load by name. It requires
+  `--stage-skill-files` and a skill-scope A/B, and `eval preflight` refuses
+  it, since the preflight runs the baseline; the directory must contain a
+  `SKILL.md` with a frontmatter `description`, which the listing line below
+  carries in its parenthesis, and `eval ab` refuses a directory whose
+  `SKILL.md` has none. The listing line's `<name>` is the staged
+  directory's basename as given (resolved against the project root, not
+  through symlinks), and the frontmatter `name` is not read: the skill schema makes the two equal
+  ([skill-system](skill-system.md) B-1), and on a directory where they
+  differ the line still carries the basename. Each trial is staged a copy of its own, as the main directory
+  is, under the same two checks B-19 gives the main directory: the arm is
+  staged once before the first trial and a later copy with another digest
+  refuses the run from that trial on, and a trial that wrote into its copy
+  of the second directory is `trial_wrote_skill_files`, excluded from
+  scored pools. The injection appends one line after the skill text: "Skill
+  `<name>` (<frontmatter description>) is available; its base directory is
+  `<copy>` — read `<copy>/SKILL.md` to use it." That line stands in for the
+  host's listing of an available skill: the second skill's body is not
+  injected, and whether the agent reads it is the agent's choice, as it is
+  in a session with the plugin loaded. Every row of such a run records
+  `alsoStaged: true`, a run condition that pools (B-8), and
+  `alsoStagedFilesHash`, the digest of the second staged directory,
+  recorded and not pooled. `skillTextHash`, `skillFilesHash` and the
+  preflight key (B-20) do not change, and the instruction to stay inside
+  the trial directory names both staged directories as exceptions (B-19)
+  (D-066, D-067). Residual: the line imitates a host listing and is not
+  one, so a treatment may read the second body more or less often than a
+  real session would. And because the second digest is not pooled, two
+  runs of one scenario version given different `--also-stage` directories,
+  or a second skill edited between them, land in one pool — as a
+  treatment's own `skillTextHash` and `skillFilesHash` do (B-20) — told
+  apart only by each row's `alsoStagedFilesHash` and recorded conditions;
+  changing which skill the handoff is measured against bumps the
+  scenario's Version rather than opening a new pool.
 
 ### Benchmarks
 - **B-9 Snapshots keep history and gate releases.** `eval report` writes
@@ -495,7 +537,8 @@ scenario hash, the scenario's declared trial environment, whether skill files we
 staged, a hash of the text its arm was injected with, and a digest of the files
 staged for its arm (`skillFilesHash`) (B-17 to B-20). Of those,
 only staging, the baseline's text and the baseline's staged files' digest are
-pool conditions, and
+pool conditions — from 6.6.0, with `alsoStaged` beside them, while
+`alsoStagedFilesHash` is recorded only (B-22) — and
 `scripts/lib/eval-pools.js` owns the list of fields that are.
 
 ## Decisions
@@ -569,3 +612,11 @@ its rationale is inline at B-10.
   calls recognised by the last message's shape (B-10), a replaced preflight
   record kept in `history/` (B-16), `transcript_format` on every row
   (B-17), and grading files named per arm, with no live session spent.
+- **D-066** — 6.6.0's scope and its round's skeleton: two measurements,
+  each behind a design gate, the first of them the first A/B between two
+  skill texts to run past its preflight if its gate passes (B-3, B-20,
+  B-22).
+- **D-067** — the second staged skill directory, `--also-stage`, for the
+  treatment only, its line a stand-in for a host skill listing, with
+  `alsoStaged` a pool condition and the preflight key unchanged (B-8,
+  B-19, B-20, B-22).
