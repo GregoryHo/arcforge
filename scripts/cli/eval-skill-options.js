@@ -60,6 +60,51 @@ function readBaselineSkill(file, projectRoot, stage) {
   };
 }
 
+/** Characters a YAML plain scalar may not open with (`-`, `?`, `:` only before a space), beyond the quotes and block indicators. */
+const PLAIN_INDICATORS = '[]{}&*!%@`,?:-#';
+
+/**
+ * A `description:` value as the line naming a second skill takes it: exactly
+ * one line, either a plain scalar or a scalar quoted end to end. Anything
+ * else is a shape the frontmatter reader does not read as YAML does, so it is
+ * named rather than injected (B-22).
+ * @param {string} raw - The value after `description:`, trimmed
+ * @param {string|undefined} next - The frontmatter line after it
+ * @returns {{ description: string, shape?: string }} shape names what was refused
+ */
+function readDescriptionLine(raw, next) {
+  const refuse = (shape) => ({ description: '', shape });
+  if (/^[>|][+-]?$/.test(raw)) return refuse(`is a YAML block scalar (${raw})`);
+  const quote = raw[0] === '"' || raw[0] === "'" ? raw[0] : null;
+  const closedThenComment = raw.match(/^(["']).*\1\s+(#.*)$/);
+  if (closedThenComment) return refuse(`carries an inline YAML comment (${closedThenComment[2]})`);
+  if (quote && (raw.length < 2 || !raw.endsWith(quote))) {
+    return refuse('opens a quote it does not close on its line');
+  }
+  if (next !== undefined && /^\s+\S/.test(next)) return refuse('continues on the next line');
+  if (quote) {
+    // The reader neither un-doubles `''` nor reads escapes beyond these, where YAML does.
+    const inner = raw.slice(1, -1);
+    const plainInner = quote === '"' ? inner.replace(/\\[\\"]/g, '') : inner;
+    if (plainInner.includes(quote)) return refuse('holds its quote inside its quotes');
+    if (quote === '"' && /\\[^nrt]/.test(plainInner)) {
+      return refuse('uses an escape the reader does not read');
+    }
+    const { parseValue } = require('../lib/yaml-parser');
+    const value = parseValue(raw);
+    // A quoted `\n` is read as a newline, which would inject a line of its own.
+    if (/[\r\n]/.test(value)) return refuse('spans more than one line');
+    return { description: value };
+  }
+  if (raw && PLAIN_INDICATORS.includes(raw[0]) && !/^[-?:]\S/.test(raw)) {
+    return refuse(`opens with the YAML indicator ${raw[0]}`);
+  }
+  const comment = raw.match(/\s(#.*)$/);
+  if (comment) return refuse(`carries an inline YAML comment (${comment[1]})`);
+  if (/:(\s|$)/.test(raw)) return refuse('holds ": ", which YAML reads as a mapping');
+  return { description: raw };
+}
+
 /**
  * The second skill directory a treatment is given (B-22): its path, and the
  * name and description its one injected line names it by.
@@ -86,35 +131,19 @@ function readAlsoStage(dir, projectRoot, stage) {
   if (!fs.existsSync(skillMd)) {
     throw new Error(`--also-stage ${dir} has no SKILL.md: name a skill directory.`);
   }
-  const { parse } = require('../lib/yaml-parser');
   const front = fs.readFileSync(skillMd, 'utf8').match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  const description = front ? parse(front[1]).description : undefined;
-  if (typeof description !== 'string' || !description.trim()) {
+  const lines = front ? front[1].split(/\r?\n/) : [];
+  const at = lines.findIndex((line) => /^description:/.test(line));
+  const raw = at < 0 ? '' : lines[at].slice('description:'.length).trim();
+  const { description, shape } = readDescriptionLine(raw, at < 0 ? undefined : lines[at + 1]);
+  if (shape) {
+    throw new Error(
+      `--also-stage ${dir}: its SKILL.md description ${shape}, which the line naming the skill cannot carry; write the description on one line.`,
+    );
+  }
+  if (!description.trim()) {
     throw new Error(
       `--also-stage ${dir}: its SKILL.md has no frontmatter description, which the line naming the skill carries.`,
-    );
-  }
-  // The YAML reader keeps a block scalar's indicator as the value: refuse it
-  // rather than name the skill `(>-)`.
-  if (/^[>|][+-]?$/.test(description.trim())) {
-    throw new Error(
-      `--also-stage ${dir}: its SKILL.md description is a YAML block scalar (${description.trim()}), which is not read; write the description on one line.`,
-    );
-  }
-  // A quoted `\n` is read as a newline, which would inject a line of its own.
-  if (/[\r\n]/.test(description.trim())) {
-    throw new Error(
-      `--also-stage ${dir}: its SKILL.md description spans more than one line, which the line naming the skill cannot carry; write the description on one line.`,
-    );
-  }
-  // The reader keeps a plain value's ` # comment`, which YAML drops; it
-  // unquotes only a value quoted end to end, where a # is text.
-  const raw = front[1].match(/^description:[ \t]*(.*?)[ \t]*\r?$/m)?.[1] || '';
-  const quoted = raw.length > 1 && /^(["']).*\1$/.test(raw);
-  const comment = quoted ? null : raw.match(/\s(#.*)$/);
-  if (comment) {
-    throw new Error(
-      `--also-stage ${dir}: its SKILL.md description carries an inline YAML comment (${comment[1]}), which the line naming the skill would inject; write the description without it.`,
     );
   }
   return { dir: resolved, name: path.basename(resolved), description: description.trim() };

@@ -425,9 +425,10 @@ trial loads no skill by name, so the skill it points at is out of reach.
 arcforge eval ab <name> --skill-file path/to/SKILL.md --stage-skill-files --also-stage path/to/other-skill
 ```
 
-The directory must hold a `SKILL.md` whose frontmatter has a `description`
-written on one line without an inline comment; a block scalar
-(`description: >-`) is refused.
+The directory must hold a `SKILL.md` whose frontmatter `description` is a
+one-line plain or quoted scalar with no inline comment. Any other shape, such as
+a block scalar (`description: >-`) or a value continued on the next line, is
+refused, naming the shape.
 `--also-stage` is refused without `--stage-skill-files`, on a workflow-scope
 scenario, and on `eval preflight`, which runs the baseline. It is refused, too,
 with no directory after it or an empty one, and when the `--skill-file` text is

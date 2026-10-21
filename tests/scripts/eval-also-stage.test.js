@@ -258,6 +258,57 @@ skip
     expect(runSkillEval).not.toHaveBeenCalled();
   });
 
+  describe('a description that is not one line of plain or quoted text', () => {
+    const refusedWith = async (description, shape) => {
+      writeScenario('shape');
+      writeSkill(tempDir, 'shaped', 'SHAPED BODY', description);
+      await expect(
+        run(
+          args(
+            ['ab', 'shape'],
+            { 'skill-file': main, 'also-stage': path.join('skills', 'shaped') },
+            { 'stage-skill-files': true },
+          ),
+        ),
+      ).rejects.toThrow(
+        new RegExp(
+          `shaped: its SKILL\\.md description ${shape}.*write the description on one line\\.$`,
+        ),
+      );
+      expect(runSkillEval).not.toHaveBeenCalled();
+    };
+
+    it.each([
+      ['"Delegation helper for complex work.\n  Use when another worker is needed."'],
+      ["'Delegation helper for complex work.\n  Use when another worker is needed.'"],
+      ['"'],
+      ["'"],
+    ])('is refused as an unterminated quote: %j', (description) =>
+      refusedWith(description, 'opens a quote it does not close on its line'));
+
+    it('is refused as a plain value continued on the next line', () =>
+      refusedWith('Delegation helper\n  for complex work.', 'continues on the next line'));
+
+    it.each([
+      ['[a, b]'],
+      ['&anchor text'],
+      ['!tag text'],
+    ])('is refused when it opens with a YAML indicator: %s', (description) =>
+      refusedWith(description, 'opens with the YAML indicator'));
+
+    it.each([
+      ["'it''s here'"],
+      ['"a" "b"'],
+    ])('is refused when its quotes hold the quote again: %s', (description) =>
+      refusedWith(description, 'holds its quote inside its quotes'));
+
+    it('is refused for an escape the reader does not read', () =>
+      refusedWith('"caf\\u00e9 helper"', 'uses an escape the reader does not read'));
+
+    it('is refused as a plain value holding ": "', () =>
+      refusedWith('Helper: use when asked.', 'holds ": "'));
+  });
+
   describe('a # in the description', () => {
     const stageWith = async (description) => {
       writeScenario('hash');
@@ -286,6 +337,14 @@ skip
       expect(await stageWith('"Helper. # not a comment"')).toBe('Helper. # not a comment');
       runSkillEval.mockClear();
       expect(await stageWith("'Helper. # not a comment'")).toBe('Helper. # not a comment');
+    });
+
+    it('keeps an escaped quote inside double quotes', async () => {
+      expect(await stageWith('"Say \\"hi\\" first."')).toBe('Say "hi" first.');
+    });
+
+    it('keeps a plain value that opens with - before a non-space', async () => {
+      expect(await stageWith('-based helper for work.')).toBe('-based helper for work.');
     });
 
     it('is kept with no whitespace before it', async () => {
