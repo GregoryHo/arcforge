@@ -1505,7 +1505,17 @@ zb_zombie_lock() {
   # Not on the caller's $(...) pipe, which would otherwise wait out the sleep.
   bash -c 'sleep 0 & echo $! > "$1"; exec sleep 30' _ "${lock}/pid" > /dev/null 2>&1 &
   local parent=$!
-  sleep 0.5
+  # Poll up to 5 s until the pid file is written and its PID has become a zombie.
+  local i pid
+  for i in $(seq 50); do
+    pid=$(cat "${lock}/pid" 2>/dev/null)
+    if [ -n "$pid" ]; then
+      case "$(ps -o stat= -p "$pid" 2>/dev/null | tr -d ' ')" in
+        Z*) break ;;
+      esac
+    fi
+    sleep 0.1
+  done
   echo "$parent"
 }
 
