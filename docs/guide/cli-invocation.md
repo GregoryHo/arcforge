@@ -303,8 +303,9 @@ arcforge worktree list --json | jq '.worktrees[] | select(.kind == "generic") | 
 ```
 
 The commands that have no human format print the same JSON with and without
-`--json`: on success, `--json` changes nothing; on failure the error moves to
-stdout as JSON, as described under *Exit codes* below. They are:
+`--json`: on success, `--json` changes nothing; when the command fails while
+running, the error moves to stdout as JSON. A usage error does not; see
+*Exit codes* below. They are:
 
 - `arcforge worktree add`, `arcforge worktree list`, `arcforge worktree remove`
 - `arcforge learn status`, `arcforge learn enable`, `arcforge learn disable`
@@ -373,5 +374,7 @@ and fails, a plain invocation prints a single-line reason to stderr, while
 `--json` returns a machine-readable `{"error": "..."}` object on stdout — so a
 script parsing stdout reads the reason in the shape it already expects.
 
-Usage errors are the exception: naming no command, or one that does not exist,
-prints the help text and exits non-zero regardless of `--json`.
+Usage errors are the exception, and `--json` does not change them. Naming no
+command, or one that does not exist, prints the help text and exits non-zero.
+Calling a known command or subcommand with missing or invalid arguments prints
+that command's `Usage:` text on stderr, leaves stdout empty, and exits 1.
