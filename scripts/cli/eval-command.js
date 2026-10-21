@@ -444,7 +444,8 @@ async function runEvalSubcommand(args, { projectRoot, asJson, takeRunLock }) {
       console.log(
         `A/B eval (skill): ${scenario.name} (k=${k})${interleave ? ' [interleaved]' : ''}`,
       );
-      console.log(`Skill: ${skillFile}${skill.stageSkillFiles ? ' (files staged)' : ''}`);
+      const also = skill.alsoStage ? ` | Also staged: ${skill.alsoStage.dir}` : '';
+      console.log(`Skill: ${skillFile}${skill.stageSkillFiles ? ' (files staged)' : ''}${also}`);
       console.log(skill.baselineSkillGiven ? `Baseline text: ${skill.baselineSkillGiven}\n` : '');
       result = eval_.runSkillEval(scenario, k, {
         projectRoot,

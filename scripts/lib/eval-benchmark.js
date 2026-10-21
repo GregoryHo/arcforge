@@ -171,6 +171,8 @@ function rawRowsForScenario(scenario, projectRoot, options = {}) {
         baselineSkillFilesHash: result.baselineSkillFilesHash ?? null,
         skillTextHash: result.skillTextHash ?? null,
         skillFilesHash: result.skillFilesHash ?? null,
+        alsoStaged: result.alsoStaged ?? null,
+        alsoStagedFilesHash: result.alsoStagedFilesHash ?? null,
         scenario_hash: result.scenario_hash ?? null,
         node_version: result.node_version ?? null,
         repo_commit: result.repo_commit ?? null,

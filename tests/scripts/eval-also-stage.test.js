@@ -21,6 +21,7 @@ const evalLib = require('../../scripts/lib/eval');
 const { runEvalCommand } = require('../../scripts/cli/eval-command');
 const { buildClaudeArgs } = require('../../scripts/lib/eval-trial');
 const { digestSkillDir } = require('../../scripts/lib/eval-skill-staging');
+const { rawRowsForScenario } = require('../../scripts/lib/eval-benchmark');
 const {
   CONDITION_FIELDS,
   conditionKey,
@@ -99,12 +100,14 @@ skip
   const args = (positional, options = {}, flags = {}) => ({ positional, options, flags });
   const run = (argv) => runEvalCommand(argv, { projectRoot: tempDir, asJson: false });
   let runSkillEval;
+  let logs;
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-also-stage-cli-'));
     writeSkill(tempDir, 'main', 'MAIN BODY');
     writeSkill(tempDir, 'dispatch', 'DISPATCH BODY');
-    jest.spyOn(console, 'log').mockImplementation(() => {});
+    logs = [];
+    jest.spyOn(console, 'log').mockImplementation((...a) => logs.push(a.join(' ')));
     jest.spyOn(console, 'error').mockImplementation(() => {});
     jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
     runSkillEval = jest
@@ -140,10 +143,25 @@ skip
     });
   });
 
+  it('names the second directory on the line that starts the run', async () => {
+    writeScenario('shown');
+    await run(
+      args(
+        ['ab', 'shown'],
+        { 'skill-file': main, 'also-stage': dispatch },
+        { 'stage-skill-files': true },
+      ),
+    );
+    expect(logs).toContain(
+      `Skill: ${main} (files staged) | Also staged: ${path.join(tempDir, dispatch)}`,
+    );
+  });
+
   it('hands the runner nothing to also stage without the flag', async () => {
     writeScenario('none');
     await run(args(['ab', 'none'], { 'skill-file': main }, { 'stage-skill-files': true }));
     expect(runSkillEval.mock.calls[0][2].alsoStage).toBeUndefined();
+    expect(logs).toContain(`Skill: ${main} (files staged)`);
   });
 
   it('is refused without --stage-skill-files', async () => {
@@ -320,6 +338,22 @@ describe('a second staged skill directory in the treatment (B-22)', () => {
     }
     const hashes = (r) => [r.label, r.skillTextHash, r.skillFilesHash, r.baselineSkillHash];
     expect(plain.map(hashes)).toEqual(without.map(hashes));
+  });
+
+  it('carries both fields into the raw benchmark export, null for a run without the flag', () => {
+    run(1);
+    const digest = digestSkillDir(alsoDir);
+    const fields = (r) => [r.condition, r.alsoStaged, r.alsoStagedFilesHash];
+    expect(rawRowsForScenario({ ...SCENARIO, scope: 'skill' }, tempDir).map(fields)).toEqual([
+      ['baseline', true, digest],
+      ['treatment', true, digest],
+    ]);
+    fs.rmSync(path.join(tempDir, 'evals'), { recursive: true, force: true });
+    run(1, { alsoStage: undefined });
+    expect(rawRowsForScenario({ ...SCENARIO, scope: 'skill' }, tempDir).map(fields)).toEqual([
+      ['baseline', null, null],
+      ['treatment', null, null],
+    ]);
   });
 
   it('refuses the run when the second directory changes under it', () => {
