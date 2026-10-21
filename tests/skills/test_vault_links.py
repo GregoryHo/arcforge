@@ -331,6 +331,15 @@ def test_an_inline_code_span_is_bounded_by_its_block(vault, boundary):
     assert _linked(vault, opener + boundary) == {"L0", "L1"}
 
 
+
+def test_a_setext_underline_needs_its_paragraphs_own_line(vault):
+    # `===` underlines only a paragraph it continues in the same container: on
+    # the first line of a new blockquote it is that quote's text, and on a lazy
+    # line it is paragraph text (§4.3). Either way the indented line after it
+    # continues the paragraph instead of opening indented code.
+    assert _linked(vault, "para [[L1]]\n> ===\n     [[L0]]\n") == {"L0", "L1"}
+    assert _linked(vault, "> a\n===\n    [[L1]]\n") == {"L1"}
+
 def test_a_dedented_ordered_marker_starts_a_new_list_per_commonmark(vault):
     # Pins CommonMark, not a bug fix: `2.` short of the `-` item's content
     # column does not continue that item, so it is tested against the list,

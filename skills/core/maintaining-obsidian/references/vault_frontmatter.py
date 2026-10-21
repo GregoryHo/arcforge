@@ -218,22 +218,27 @@ class _Blocks:
         quoted = QUOTE_PREFIX_RE.match(line)
         depth = quoted.group(0).count(">") if quoted else 0
         empty, self.empty = self.empty, False
+        lazy = False
         if quoted:
             self.offsets.clear()
             content, base = line[quoted.end():], 0
             starts = depth > self.depth  # a blockquote start
         elif self.depth and self.para and line.strip() and not _interrupts(line):
             content, base, starts, depth = line, 0, False, self.depth  # lazy: the quote stays open
+            lazy = True
         elif line.strip():
             # A line that leaves a blockquote does not continue its paragraph.
             base, content, starts = _list_content(line, self.offsets, self.para and not self.depth)
             self.empty = starts and not content.strip()
+            lazy = bool(self.offsets) and base < self.offsets[-1]
         else:
             if empty:
                 self.offsets.pop()
             content, base, starts = line, self.offsets[-1] if self.offsets else 0, False
         indent = len(content) - len(content.lstrip(" "))
-        underline = self.para and SETEXT_RE.match(content)
+        # A setext underline belongs to a paragraph in its own container: not a
+        # lazy line (§4.3), and not one that opens a blockquote or an item.
+        underline = self.para and not (lazy or starts) and SETEXT_RE.match(content)
         if not content.strip():
             flow = "new"
         elif self.para and not (
