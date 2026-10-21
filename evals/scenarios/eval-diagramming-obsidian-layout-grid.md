@@ -13,7 +13,14 @@ directory, with a `Diagrams` folder inside it.
 ## Scenario
 The user says:
 
-> I want an Excalidraw diagram of our ingest pipeline for the team vault, but before you build anything, give me the coordinate plan to review: write it to `layout.json` at the top of this project folder — use the full absolute path, not a relative one — as a JSON array of elements, each `{"id", "type", "x", "y", "width", "height"}` with `type` one of `"box"`, `"label"` or `"connector"`, plus `{"id", "type": "separator", "y"}` for any zone separator. Each service gets exactly one `"box"`, and that box's `id` is the service's name as written below. Don't build, render or save a diagram yet. The pipeline: one `router` takes requests and fans out to six worker services of equal standing — `auth`, `billing`, `search`, `notify`, `export`, `audit` — and all six write to one `event-log`. Top zone: router. Middle zone: the six workers, side by side. Bottom zone: the event log.
+> I want an Excalidraw diagram of our platform's six core services for the team vault, but before you build anything, give me the coordinate plan to review: write it to `layout.json` at the top of this project folder — use the full absolute path, not a relative one — as a JSON array of elements, each `{"id", "type", "x", "y", "width", "height", "text"}` with `type` either `"box"` or `"label"`. Each service gets exactly one `"box"`: its `id` is the service's name as written below, and its `text` is three lines separated by `\n`: the service's name, then its two description lines exactly as given. Don't build, render or save a diagram yet. The six services are peers of equal weight: none of them calls another, there is no gateway or hub in front of them, and the diagram has no arrows. Put them side by side in one row:
+>
+> - `auth` — check tokens / new sessions
+> - `billing` — meter usage / send bills
+> - `search` — index docs / run queries
+> - `notify` — queue alerts / email, push
+> - `export` — make reports / write CSV
+> - `audit` — log actions / keep history
 
 ## Preflight
 run
@@ -24,8 +31,11 @@ delta
 ## Design Notes
 Not sent to the agent (only `## Context` and `## Scenario` reach it) — this
 section is for whoever maintains or runs the scenario. The authority for every
-choice below is the design gate,
-`docs/plans/v6.5/wp-d/design-gate.diagramming-layout.md` (#185).
+choice below is the Version 2 design gate,
+`docs/plans/v6.6/wp-d/design-gate.diagramming-layout-v2.md` (D-066 D2, #185).
+What Version 2 did not change — a coordinate plan only, the absolute path, rows
+that write into their staged copy do not score — keeps the reasons of the
+Version 1 gate, `docs/plans/v6.5/wp-d/design-gate.diagramming-layout.md`.
 
 ### What is measured
 
@@ -49,46 +59,95 @@ differs is the staged directory beside it:
 The text hashes are equal, so the arms are told apart by `skillFilesHash`, and
 the baseline's digest is the pool condition and part of the preflight key.
 
-### The task shape, and why it is not the full pipeline
+**Version 1 never reached the contradiction.** Its preflight was a ceiling
+BLOCK, `pass_rate: 1` (`docs/plans/v6.5/wp-d/preflight.eval-diagramming-obsidian-layout-grid-2.json`;
+the per-row audit is `docs/plans/v6.5/wp-d/audit.d4.md`). All five audited rows
+opened the old `layout-heuristics.md` and copied its 200 px column pitch, but
+every row called the six workers `secondary` — the task had a `router` and an
+`event-log` drawn as larger hubs — and took the 140 px width of
+`plan_layout.py`'s size table. 140 on a 200 px grid is a 60 px gap. The old text
+is only wrong at the Primary width of 180, and the Version 1 task never put the
+workers there. That record stays in the ledger as it is.
+
+**Version 2 moves the size class, not the grid.** The task is six peers of equal
+weight in one row: no hub, no arrows, no width named, and each box carries its
+name and two description lines. Three reasons point the baseline at Primary
+without the prompt naming it: with nothing else on the diagram there is no
+Primary for a Secondary to support (`painters-toolkit.md:208-209`); a symmetric
+concept gets equal-sized peers and no invented hero (`SKILL.md:89-93`,
+`painters-toolkit.md:216`); and three lines of 16 px text with 20 px padding are
+100 px tall, inside Primary's 70–100 and over Secondary's 50–70
+(`element-templates.md:27`, `:32`). The longest description line is 12
+characters, about 115 px of text, so it fits a 180 px box with either padding —
+the pull toward 180 comes from the size class, not from text forcing a box
+wider. A baseline that calls the workers `primary` gets 180 from both default
+sources (old `:20`, `plan_layout.py:46`); copying the 200 px pitch then gives
+20 px and fails.
+
+### The task shape
 
 The task asks for a coordinate plan and nothing else. The skill's check, render
 and verify steps all go through `uv run`, and `uv run` writes a `.venv` into
 `references/` — inside the trial's staged copy — which makes the row
-`trial_wrote_skill_files` and unscored. A task that walks the full pipeline
-therefore yields no scored rows in either arm. #182 changed where shapes go at
-the moment `x` and `y` are decided; nothing after that moment reads this file.
+`trial_wrote_skill_files` and unscored. #182 changed where shapes go at the
+moment `x` and `y` are decided; nothing after that moment reads this file.
 There is no Obsidian in a trial and none is needed.
 
-The prompt says nothing about spacing, a grid, 40, 200 or 220. It differs from
-the gate's draft in one sentence: the gate asked for `{id, label, x, y, width,
-height}` per shape, and this prompt prescribes a `type` (`"box"`, `"label"`,
-`"connector"`) and one box per service whose `id` is the service's name. An
-untyped plan left the grader guessing which shape was a worker's box, and four
-review rounds on #293 each found a plan the guess got wrong, in both
-directions. Both arms read the same sentence, and it says nothing about where a
-box goes. Six workers "side
-by side" in one zone is a requirement of the layout, not a hint; no arrows run
-between them. The prompt is fixed text and cannot carry the trial's real path, so
-it says "at the top of this project folder" and asks for the full absolute path:
-`SKILL.md` tells the agent to `cd "$BASE/references"`, and a relative
-`layout.json` written after that lands in the staged copy.
+The prompt says nothing about width, spacing, a grid, 40, 180, 200 or 220. It
+prescribes the schema — a `type` of `"box"` or `"label"`, one box per service
+whose `id` is the service's name, and a `text` written as "three lines separated
+by `\n`: the service's name, then its two description lines exactly as given" —
+so the grader never guesses which shape is a worker's box or how many lines a
+`text` was meant to have. Both arms read the same sentence, and it says nothing
+about where a box goes. The prompt is fixed text and cannot carry the trial's
+real path, so it says "at the top of this project folder" and asks for the full
+absolute path: `SKILL.md` tells the agent to `cd "$BASE/references"`, and a
+relative `layout.json` written after that lands in the staged copy.
 
 ### The assertion
 
-**A1 is the only scored assertion**: the six workers sit in one row and every
-adjacent pair is at least 40 px apart horizontally (`x₂ − (x₁ + width₁)`).
+**A1 is the only scored assertion**: each worker's box carries the three-line
+`text`, the six workers sit in one row, and every adjacent pair is at least
+40 px apart horizontally (`x₂ − (x₁ + width₁)`).
 
 - 40 is the same-level minimum **both** versions of the reference state. It is
   not a number only the treatment has seen. "Column pitch equals 220" is
   deliberately not asserted: the old text never contains 220, so a baseline
   would fail that by construction rather than by behavior.
-- The baseline has five ways to pass without ever seeing the new text: notice the
-  contradiction and use the table's 40 px; use the Arrow Corridor's 60 px or the
-  60–100 px of `painters-toolkit.md`; pick a width under 180 (160 on a 200 px
-  grid is exactly 40); treat the workers as Secondary (110–140 wide); or never
-  open the file. It fails one way: copy the grid at 180 wide — x = 50, 250, 450,
-  …, 20 px gaps. Running `python3 check_overlaps.py` on that suggests widening to
-  30 px, still under 40.
+- **The `text` precondition is part of A1, not a second assertion.** The text is
+  what pushes a box to Primary height; a row that drops it, gives a non-string,
+  or folds the two description lines into one can keep a Secondary-sized box,
+  space it 60 px on the old grid, and count toward a 3/3 ceiling BLOCK that
+  would close #185. A1 therefore fails such a row, naming the worker and the
+  cause: missing, not a string, the line count found, or the first line found.
+  Only the line count, non-emptiness and the first line are checked; the two
+  description lines are not compared word for word, since "email & push" for
+  "email, push" says nothing about layout. One scored label keeps the row's pass
+  equal to A1's pass, as in Version 1, where A1 already failed a plan that broke
+  the prescribed schema.
+- The baseline has six ways to pass without ever seeing the new text:
+  1. 160 wide on the 200 px grid, exactly 40 (`≥ 40` passes). 160 is the bottom
+     of Primary (`painters-toolkit.md:208`).
+  2. `painters-toolkit.md:214`, "Primaries get 60-100px buffer between peers",
+     present in both arms. It did not apply to Version 1's Secondary workers and
+     applies directly here; it is the largest ceiling risk. Against it: all five
+     Version 1 rows read `painters-toolkit.md` and none used its buffer.
+  3. The spacing table's 40 px (old `:162`, `:231`) or the "minimum 40px" in
+     old `:20` itself — noticing the contradiction. No Version 1 row mentioned
+     it, but no Version 1 row was ever at 180.
+  4. Treating the workers as Secondary again (110–140 wide, 60 px or more on the
+     200 px grid).
+  5. A font larger than 16 (the skill's free-text template uses 20,
+     `element-templates.md:81`) pushes a 12-character line with 30 px padding to
+     204 px, which a 200 px grid cannot hold; the agent then chooses its own
+     gap, usually ≥ 40.
+  6. Never opening `layout-heuristics.md`, though `SKILL.md:108-109` asks for it
+     before Phase 1 and all five Version 1 rows opened it.
+
+  It fails one way: copy the 200 px pitch at a width of 161 or more — 180 gives
+  20, 175 gives 25, 170 gives 30. Running `python3 check_overlaps.py` on that
+  suggests widening to 30 px, still under 40; the task builds nothing for it to
+  check in any case.
 - The treatment does not pass by construction either: 200 px wide on the 220 px
   grid is 20 px, 190 is 30. The assertion reads the coordinates, not which
   numbers the agent quoted.
@@ -98,24 +157,24 @@ adjacent pair is at least 40 px apart horizontally (`x₂ − (x₁ + width₁)`
   prescribed schema, is a FAIL, not a grade error: the file is what the agent
   was asked for.
 
-Printed, never scored:
-
-- `-- C2:` separator clearance, every separator to its nearest box ≥ 30 px. It
-  is a floor that cannot discriminate — the old text asked for 200 px there,
-  which is stricter than the new text, and the Zone Layout Template gives 30 px
-  in both versions.
-- `-- audit:` the six widths, the adjacent gaps, the column pitch, whether a tool
-  call names `layout-heuristics.md` and by which path, whether any tool call
-  reached outside the trial tree, and whether `uv` was run.
+Printed, never scored — the `-- audit:` lines: the six widths, the adjacent
+gaps, the column pitch, each worker's `text` line count with its width's size
+tier (≤ 140 Secondary, 160–200 Primary, otherwise other), whether a tool call
+names `layout-heuristics.md` and by which path, whether any tool call reached
+outside the trial tree, and whether `uv` was run. The size-tier line answers the
+audit's first question — did the baseline reach Primary — without converting
+widths by hand.
 
 How the grader finds a worker: the schema is prescribed, so it does not guess.
 The file is a JSON array; a worker is the one element with `"type": "box"` whose
-`id` is exactly the worker's name. Labels and connectors are ignored by their
-declared `type`, never by size or by name. A plan that does not follow the
-schema fails as malformed, in both arms: a top level that is not an array, a
-worker with no box or more than one, or a box whose `x`, `y`, `width`, `height`
-are not finite numbers with width and height above 0. If a row reads as a sound
-plan and still fails as malformed, report it as that; do not re-score by hand.
+`id` is exactly the worker's name. Labels are ignored by their declared `type`,
+never by size or by name. A plan that does not follow the schema fails as
+malformed, in both arms: a top level that is not an array, a worker with no box
+or more than one, or a box whose `x`, `y`, `width`, `height` are not finite
+numbers with width and height above 0. A worker whose `text` is not its name
+plus two lines fails A1 with that cause, before the row and the gaps are
+judged. If a row reads as a sound plan and still fails on its schema or its
+`text`, report it as that; do not re-score by hand.
 
 The grader reads `layout.json` and the transcript as data and runs nothing
 (eval B-12). It runs as `python3 -I`, and the engine runs it from a fresh empty
@@ -129,7 +188,7 @@ from the skill it copies; the digest pins it instead. Build it outside the
 repository, from the repository root, before the preflight:
 
 ```bash
-BASE="${TMPDIR:-/tmp}/arcforge-d4-baseline/diagramming-obsidian"
+BASE="${TMPDIR:-/tmp}/arcforge-d2-baseline/diagramming-obsidian"
 rm -rf "$BASE" && mkdir -p "$BASE"
 git archive HEAD:skills/core/diagramming-obsidian | tar -x -C "$BASE"
 git show 1fed56d0~1:skills/core/diagramming-obsidian/references/layout-heuristics.md \
@@ -147,7 +206,8 @@ If either digest differs, `skills/core/diagramming-obsidian/` has changed since
 the gate: stop, and re-register both digests before spending a session. The
 digest covers each file's path, executable bit and bytes, not where the
 directory sits or its timestamps, so the directory can be rebuilt between the
-preflight and the A/B.
+preflight and the A/B. A main checkout whose `references/` holds `.venv` or
+`__pycache__` lists them in `diff -rq` too; the digest skips both.
 
 Preflight and A/B take the same flags and the same ceiling — the ceiling and the
 baseline's digest are both in the preflight key:
@@ -163,9 +223,10 @@ ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000 arcforge eval ab eval-diagramming-obsidia
   --stage-skill-files --baseline-skill-file "$BASE/SKILL.md"
 ```
 
-Budget (`docs/plans/v6.5/wp-d/budget.md`): preflight 3 + A/B 10 = 13 sessions.
-Do not edit `skills/` or `$BASE` while a run is going — a trial's copy with
-another digest stops the run.
+No `--also-stage` and no `--plugin-dir`; a row of this scenario carries no
+`alsoStaged`. Budget (`docs/plans/v6.6/PLAN.md`): preflight 3 + A/B 10 = 13
+sessions, run after D1. Do not edit `skills/` or `$BASE` while a run is going —
+a trial's copy with another digest stops the run.
 
 `## Max Turns` is unset on purpose: the task needs no turn limit, and a declared
 one would enter the preflight key. `## Environment` is not declared: the task
@@ -186,11 +247,17 @@ needs no tool and depends on no tool being absent.
   read as discrimination.
 - **A preflight with such a row is BLOCK with `pass_rate: null`.** That is "not
   measured", not a ceiling. It spends the preflight-rerun allowance (2 for the
-  whole measurement round), not a top-up.
+  whole measurement round, shared with D1), not a top-up.
 - **Ceiling.** Preflight runs the old-reference arm. Three passes of three is a
-  ceiling BLOCK and is itself the answer to #185: the old grid's contradiction
-  did not make an agent plan a violating layout. Record it; do not re-tune the
-  task until a number appears.
+  ceiling BLOCK; under D-066 Version 2 is the last design, so a BLOCK closes
+  #185 as a finding — the current reference was never measured against the old
+  one. Record it; do not re-tune the task or run the A/B.
+- **A `text` FAIL is noise shared by both arms.** Both arms read the same prompt
+  and the same `SKILL.md`, so a row that wrote `text` wrongly is not a sign of
+  either reference; it lowers both pass rates and narrows the visible delta.
+  The audit says per row whether a FAIL was the `text` or the spacing, and the
+  result's decision records how many `text` FAILs each arm had, not read as
+  discrimination.
 - **A write into the project stops the run** (`trial_wrote_repo`). Nothing in the
   prompt asks for one; if it happens, record it as a finding.
 - **Rows that never opened the reference** measured something else. The grader's
@@ -200,12 +267,15 @@ needs no tool and depends on no tool being absent.
   is the current file. A baseline row that read it is no longer the old-reference
   arm. The `-- audit: outside the trial tree` lines print every such tool call;
   check each baseline row.
+- **Not a reading beyond the grid.** A1 measures the gap between Primary-sized
+  boxes under two grids, not a full build, render and save, and not a layout
+  with a hub such as a router.
 
 ## Setup
 mkdir -p vault/Diagrams
 
 ## Assertions
-- [ ] A1: `layout.json` at the top of the trial directory parses as a JSON array and holds exactly one `"type": "box"` element for each of the six workers (`id` `auth`, `billing`, `search`, `notify`, `export`, `audit`) with finite numeric `x`, `y` and positive `width`, `height`; the six share one row (their vertical extents overlap pairwise); and, ordered by `x`, every adjacent pair is at least 40 px apart (`x₂ − (x₁ + width₁) ≥ 40`).
+- [ ] A1: `layout.json` at the top of the trial directory parses as a JSON array and holds exactly one `"type": "box"` element for each of the six workers (`id` `auth`, `billing`, `search`, `notify`, `export`, `audit`) with finite numeric `x`, `y` and positive `width`, `height`; each of those six boxes carries a string `text` that, after dropping one trailing newline and trimming each line, splits on `\n` into exactly three non-empty lines whose first line is the box's `id` (the service's name); the six share one row (their vertical extents overlap pairwise); and, ordered by `x`, every adjacent pair is at least 40 px apart (`x₂ − (x₁ + width₁) ≥ 40`).
 
 ## Grader
 code
@@ -222,7 +292,7 @@ from pathlib import Path
 # grader or stand in for the plan.
 MAX_BYTES = 1 << 20
 MIN_GAP = 40
-MIN_SEPARATOR_CLEARANCE = 30
+TEXT_LINES = 3
 EPS = 1e-6
 WORKERS = ("auth", "billing", "search", "notify", "export", "audit")
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -315,7 +385,6 @@ def audit_transcript():
 
 def fail(reason):
     emit("A1", False, reason)
-    print("-- C2: not evaluated")
     audit_transcript()
     sys.exit(1)
 
@@ -351,25 +420,55 @@ def placed(s):
     return None not in (s["x"], s["y"], s["w"], s["h"]) and s["w"] > 0 and s["h"] > 0
 
 
+def text_lines(v):
+    """The box's text as lines: one trailing newline dropped, each line trimmed."""
+    if v.endswith("\n"):
+        v = v[:-1]
+    return [line.strip() for line in v.split("\n")]
+
+
+def text_problem(name, e):
+    """Why a worker's text is not its name plus two description lines, or None."""
+    if "text" not in e:
+        return f"{name}: text is missing"
+    v = e["text"]
+    if not isinstance(v, str):
+        return f"{name}: text is not a string ({type(v).__name__})"
+    lines = text_lines(v)
+    empty = sum(1 for line in lines if not line)
+    if len(lines) != TEXT_LINES or empty:
+        blank = f", {empty} empty" if empty else ""
+        return f"{name}: text has {len(lines)} lines{blank}, expected {TEXT_LINES} non-empty"
+    if lines[0] != name:
+        return f"{name}: text's first line is {lines[0]!r}, expected {name!r}"
+    return None
+
+
+def size_tier(w):
+    return "Secondary" if w <= 140 + EPS else "Primary" if 160 - EPS <= w <= 200 + EPS else "other"
+
+
 boxes = [e for e, k in zip(elements, kinds) if k == "box"]
-separators = [
-    (str(e.get("id", "?")), num(e.get("y")))
-    for e, k in zip(elements, kinds)
-    if k == "separator" and num(e.get("y")) is not None
-]
 
 # ---- the six workers: exactly one box each ----
-workers, problems = {}, []
+workers, texts, problems = {}, {}, []
 for name in WORKERS:
-    mine = [box_of(e) for e in boxes if e.get("id") == name]
+    mine = [e for e in boxes if e.get("id") == name]
     if len(mine) != 1:
         problems.append(f'{name}: {len(mine)} elements with "type": "box" and that id, expected 1')
-    elif not placed(mine[0]):
+    elif not placed(box_of(mine[0])):
         problems.append(f"{name}: x, y, width, height are not all finite numbers with width and height above 0")
     else:
-        workers[name] = mine[0]
+        workers[name] = box_of(mine[0])
+        texts[name] = mine[0]
 if problems:
     fail("malformed plan: " + "; ".join(problems))
+
+# ---- the precondition: each worker's text is its name plus two description lines ----
+# Scored inside A1 (a row that skips the text cannot keep a Secondary-sized box and still
+# count toward the ceiling). Only the line count, non-emptiness and the first line are
+# checked; the description wording is not compared.
+text_problems = [p for p in (text_problem(n, texts[n]) for n in WORKERS) if p]
 
 # ---- one row ----
 row = sorted(workers.items(), key=lambda kv: kv[1]["x"])
@@ -385,7 +484,21 @@ print("-- audit: widths: " + ", ".join(fmt(s["w"]) for _, s in row))
 print("-- audit: adjacent gaps: " + ", ".join(fmt(g) for _, _, g in gaps))
 print("-- audit: column pitch: " + ", ".join(fmt(sb["x"] - sa["x"]) for (_, sa), (_, sb) in zip(row, row[1:])))
 
-if apart:
+
+def line_count(e):
+    v = e.get("text")
+    return "missing" if "text" not in e else str(len(text_lines(v))) if isinstance(v, str) else "not a string"
+
+
+print(
+    "-- audit: text lines / size tier: "
+    + ", ".join(f"{n} {line_count(texts[n])} / {size_tier(s['w'])}" for n, s in row)
+)
+
+if text_problems:
+    reason = "text is not the name plus two description lines: " + "; ".join(text_problems)
+    a1 = False
+elif apart:
     reason = f"the six workers are not in one row: no vertical overlap between {', '.join(apart[:6])}"
     a1 = False
 else:
@@ -393,22 +506,6 @@ else:
     a1 = not tight
     reason = f"same-row workers closer than {MIN_GAP}px: {', '.join(tight)}"
 emit("A1", a1, reason)
-
-# ---- C2: separator clearance, a floor that is printed and never scored ----
-solid = [b for b in map(box_of, boxes) if placed(b)]
-if not separators:
-    print("-- C2: no separators in the plan")
-for sid, sy in separators:
-    dists = []
-    for s in solid:
-        top, bottom = s["y"], s["y"] + s["h"]
-        dists.append(sy - bottom if bottom <= sy else top - sy if top >= sy else -min(sy - top, bottom - sy))
-    if not dists:
-        print(f"-- C2: separator {sid} y={fmt(sy)}: no placed boxes to measure against")
-        continue
-    nearest = min(dists)
-    verdict = "ok" if nearest >= MIN_SEPARATOR_CLEARANCE - EPS else "under"
-    print(f"-- C2: separator {sid} y={fmt(sy)}: nearest box {fmt(nearest)}px ({verdict}, floor {MIN_SEPARATOR_CLEARANCE})")
 
 audit_transcript()
 sys.exit(0 if a1 else 1)
@@ -418,4 +515,4 @@ PY
 5
 
 ## Version
-1
+2
