@@ -223,6 +223,7 @@ class _Blocks:
             self.offsets.clear()
             content, base = line[quoted.end():], 0
             starts = depth > self.depth  # a blockquote start
+            lazy = depth < self.depth  # a lazy line of the deeper quote's paragraph
         elif self.depth and self.para and line.strip() and not _interrupts(line):
             content, base, starts, depth = line, 0, False, self.depth  # lazy: the quote stays open
             lazy = True
