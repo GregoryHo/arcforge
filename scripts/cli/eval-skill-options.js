@@ -63,13 +63,17 @@ function readBaselineSkill(file, projectRoot, stage) {
 /**
  * The second skill directory a treatment is given (B-22): its path, and the
  * name and description its one injected line names it by.
- * @param {string|undefined} dir - The --also-stage value
+ * @param {string|boolean|undefined} dir - The --also-stage value; true when given bare
  * @param {string} projectRoot
  * @param {boolean} stage - Whether skill files are staged; the flag requires it
  * @returns {{ dir: string, name: string, description: string }|undefined}
  */
 function readAlsoStage(dir, projectRoot, stage) {
   if (!dir) return undefined;
+  // A bare `--also-stage` is parsed as a flag: refused, not run as an A/B without it.
+  if (dir === true) {
+    throw new Error('--also-stage requires a skill directory: --also-stage <skill-dir>.');
+  }
   if (!stage) {
     throw new Error(
       `--also-stage requires --stage-skill-files: the second skill is reached through its staged copy, and without staging there is none (B-22).`,
@@ -86,6 +90,13 @@ function readAlsoStage(dir, projectRoot, stage) {
   if (typeof description !== 'string' || !description.trim()) {
     throw new Error(
       `--also-stage ${dir}: its SKILL.md has no frontmatter description, which the line naming the skill carries.`,
+    );
+  }
+  // The YAML reader keeps a block scalar's indicator as the value: refuse it
+  // rather than name the skill `(>-)`.
+  if (/^[>|][+-]?$/.test(description.trim())) {
+    throw new Error(
+      `--also-stage ${dir}: its SKILL.md description is a YAML block scalar (${description.trim()}), which is not read; write the description on one line.`,
     );
   }
   return { dir: resolved, name: path.basename(resolved), description: description.trim() };

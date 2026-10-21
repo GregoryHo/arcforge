@@ -16,6 +16,7 @@ jest.mock('../../scripts/lib/utils', () => {
 jest.mock('../../scripts/lib/eval-blind-autotrigger', () => ({
   runBlindAutoTrigger: jest.fn(() => ({ skipped: true })),
 }));
+const { runBlindAutoTrigger } = require('../../scripts/lib/eval-blind-autotrigger');
 const mockUtils = require('../../scripts/lib/utils');
 const evalLib = require('../../scripts/lib/eval');
 const { runEvalCommand } = require('../../scripts/cli/eval-command');
@@ -155,6 +156,47 @@ skip
     expect(logs).toContain(
       `Skill: ${main} (files staged) | Also staged: ${path.join(tempDir, dispatch)}`,
     );
+  });
+
+  it('hands the blind comparator the second skill name to redact', async () => {
+    writeScenario('blind');
+    await run(
+      args(
+        ['ab', 'blind'],
+        { 'skill-file': main, 'also-stage': dispatch },
+        { 'stage-skill-files': true },
+      ),
+    );
+    expect(runBlindAutoTrigger.mock.calls.at(-1)[4].skillName).toEqual(['main', 'dispatch']);
+  });
+
+  it('is refused when given bare, with no directory after it', async () => {
+    writeScenario('bare');
+    await expect(
+      run(
+        args(
+          ['ab', 'bare'],
+          { 'skill-file': main },
+          { 'stage-skill-files': true, 'also-stage': true },
+        ),
+      ),
+    ).rejects.toThrow(/--also-stage requires a skill directory/);
+    expect(runSkillEval).not.toHaveBeenCalled();
+  });
+
+  it('is refused for a description written as a YAML block scalar', async () => {
+    writeScenario('folded');
+    writeSkill(tempDir, 'folded', 'FOLDED BODY', '>-\n  Folded over\n  two lines.');
+    await expect(
+      run(
+        args(
+          ['ab', 'folded'],
+          { 'skill-file': main, 'also-stage': path.join('skills', 'folded') },
+          { 'stage-skill-files': true },
+        ),
+      ),
+    ).rejects.toThrow(/description is a YAML block scalar \(>-\)/);
+    expect(runSkillEval).not.toHaveBeenCalled();
   });
 
   it('hands the runner nothing to also stage without the flag', async () => {

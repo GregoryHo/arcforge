@@ -425,7 +425,8 @@ trial loads no skill by name, so the skill it points at is out of reach.
 arcforge eval ab <name> --skill-file path/to/SKILL.md --stage-skill-files --also-stage path/to/other-skill
 ```
 
-The directory must hold a `SKILL.md` whose frontmatter has a `description`.
+The directory must hold a `SKILL.md` whose frontmatter has a `description`
+written on one line; a block scalar (`description: >-`) is refused.
 `--also-stage` is refused without `--stage-skill-files`, on a workflow-scope
 scenario, and on `eval preflight`, which runs the baseline. Each treatment trial
 gets a copy of its own, staged, watched, digested and checked for edits during
