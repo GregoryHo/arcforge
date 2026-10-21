@@ -11,8 +11,9 @@ const MAX_TRANSCRIPT_BYTES = 8 * 1024 * 1024;
 
 /**
  * Read a transcript, or only its last `maxBytes` when it is larger.
- * The tail drops everything up to and including its first newline, which may
- * be the end of a line cut in half.
+ * The tail starts at the first whole line in the window: one byte before the
+ * window is read too, and everything through the first newline is dropped, so
+ * a window that opens on a line boundary loses only that preceding newline.
  *
  * @param {string} transcriptPath
  * @param {number} maxBytes
@@ -26,8 +27,8 @@ function readTranscriptWindow(transcriptPath, maxBytes) {
     if (size <= maxBytes) {
       return { content: fs.readFileSync(fd, 'utf8'), truncated: false };
     }
-    const buf = Buffer.alloc(maxBytes);
-    const bytesRead = fs.readSync(fd, buf, 0, maxBytes, size - maxBytes);
+    const buf = Buffer.alloc(maxBytes + 1);
+    const bytesRead = fs.readSync(fd, buf, 0, maxBytes + 1, size - maxBytes - 1);
     const window = buf.subarray(0, bytesRead);
     const firstNewline = window.indexOf(0x0a);
     const content = firstNewline === -1 ? '' : window.subarray(firstNewline + 1).toString('utf8');
