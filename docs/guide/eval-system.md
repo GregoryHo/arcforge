@@ -141,10 +141,19 @@ positive integer is refused before the run starts, ahead of any fixture
 value whenever a run moved it.
 
 A trial the provider refused — a session-limit or quota message in place of the
-agent's turn, reported with zero output tokens and no tool call — is recorded as
-an infra error (`provider_refusal`) and never scores either. Without that, the
-fixture's own files would pass some assertions and an exhausted quota would read
-as a regression.
+agent's turn — is recorded as an infra error (`provider_refusal`) and never
+scores either. Without that, the fixture's own files would pass some assertions
+and an exhausted quota would read as a regression. A refusal is recognised two
+ways: the session reported zero output tokens and called no tool, or its last
+message was written by Claude Code rather than the model (a limit that landed
+after the agent had already worked). In the second case the row records
+`refusalAfterActions`, the number of tool calls the agent made before it was cut
+off, and the error message says so.
+
+Each trial's raw `claude -p` stream-json output is kept beside its transcript,
+in `raw/<condition>-trial-<n>.jsonl` under the run's directory in
+`evals/results/`. The transcript holds only what grading reads; the raw file
+holds everything, for when you need to see what the session actually received.
 
 A trial whose session never started — no `claude` to run, or an environment the
 system refuses to pass on — is an infra error too (`trial_spawn_failed`). It
@@ -631,6 +640,20 @@ other arguments — prefix the pattern with `re:` to make it a regular expressio
 
 The `re:` marker is opt-in on purpose: patterns like `Write:/test/` are already
 meaningful as substrings, so a regex is never inferred from punctuation.
+
+What a call's arguments contain depends on the tool. `Bash` is the command,
+`Read` the path, `Write` the path and the content, and `Agent` (or `Task`) the
+whole input as one line of JSON, so a pattern can match anything in a
+subagent's prompt. Other tools keep the first 200 characters of their JSON
+input. A tool call that failed is followed in the transcript by a
+`[Result: <tool>] error` line — `Bash` adds its exit code, as in
+`[Result: Bash] error (exit 1)` — but never by what the tool returned, so a
+pattern cannot match a file's or a command's output. Successful results are not
+recorded, and a result line is never an action an assertion counts. Every result
+row notes the transcript shape it was graded against as `transcript_format`
+(`2` for the shape described here; a row without the field predates it). It is
+not a pooling condition, but a pool that straddles the change matched its
+assertions against different text.
 
 **Text** assertions are graded by a model reading the transcript, and carry an
 id:

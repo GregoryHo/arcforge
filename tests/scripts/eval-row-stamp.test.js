@@ -33,6 +33,7 @@ const {
 } = require('../../scripts/lib/eval');
 const { rawRowsForScenario } = require('../../scripts/lib/eval-benchmark');
 const { CONDITION_FIELDS, pairArms, splitPools } = require('../../scripts/lib/eval-pools');
+const { TRANSCRIPT_FORMAT } = require('../../scripts/lib/eval-transcript');
 const {
   computeScenarioHash,
   checkPreflightGate,
@@ -96,6 +97,7 @@ const ROW_KEYS = [
   'score',
   'timestamp',
   'transcript',
+  'transcript_format',
   'trial',
   'trialDir',
   'trialTimeoutMs',
@@ -236,6 +238,23 @@ describe('rows and preflight records carry scenario_hash, node_version and repo_
         expect(row.repo_commit).toBe(COMMIT);
         expect(row.version).toBe('2');
       }
+    });
+
+    it('records the transcript format on every row, outside the pooling conditions', () => {
+      runAb(1);
+      const rows = [
+        ...loadResults(`${NAME}-baseline`, tempDir),
+        ...loadResults(`${NAME}-treatment`, tempDir),
+      ];
+      for (const row of rows) expect(row.transcript_format).toBe(TRANSCRIPT_FORMAT);
+      expect(CONDITION_FIELDS).not.toContain('transcript_format');
+      // An older row (format 1, no field) pools with a new one.
+      const { current, others } = splitPools([
+        { ...rows[0], transcript_format: undefined },
+        rows[0],
+      ]);
+      expect(current).toHaveLength(2);
+      expect(others).toEqual([]);
     });
 
     it('stamps infra-error rows too', () => {

@@ -5,6 +5,10 @@ const {
   isSpawnFailure,
 } = require('../../scripts/lib/eval-trial-outcome');
 const { execCommand } = require('../../scripts/lib/utils');
+const {
+  parseStreamJsonOutput,
+  parseActionsFromTranscript,
+} = require('../../scripts/lib/eval-transcript');
 
 describe('eval-trial-outcome', () => {
   describe('isTrialKilled', () => {
@@ -108,6 +112,58 @@ describe('eval-trial-outcome', () => {
 
     it('should not flag an empty turn — that is trial_output_missing', () => {
       expect(isProviderRefusal({ textResult: '', usage: { output_tokens: 0 } })).toBe(false);
+    });
+
+    describe('a limit that lands after tool calls', () => {
+      const actions = [
+        { type: 'tool', name: 'Bash', index: 0 },
+        { type: 'tool', name: 'Write', index: 1 },
+        { type: 'text', content: limitText, index: 2 },
+      ];
+      // The result event's tokens cover the whole session, so they are not 0.
+      const usage = { output_tokens: 4430 };
+
+      it('should flag tools then a synthetic message', () => {
+        expect(
+          isProviderRefusal({ textResult: limitText, actions, usage, endedSynthetic: true }),
+        ).toBe(true);
+      });
+
+      it('should not flag tools then real text', () => {
+        expect(
+          isProviderRefusal({ textResult: limitText, actions, usage, endedSynthetic: false }),
+        ).toBe(false);
+      });
+
+      it('should not flag a synthetic message followed by a tool call', () => {
+        const stream = [
+          {
+            type: 'assistant',
+            message: {
+              model: '<synthetic>',
+              usage: { output_tokens: 0 },
+              content: [{ type: 'text', text: limitText }],
+            },
+          },
+          {
+            type: 'assistant',
+            message: {
+              content: [{ type: 'tool_use', id: 't', name: 'Bash', input: { command: 'ls' } }],
+            },
+          },
+          { type: 'result', result: '', usage: { output_tokens: 4430 } },
+        ]
+          .map((e) => JSON.stringify(e))
+          .join('\n');
+        const parsed = parseStreamJsonOutput(stream);
+        expect(parsed.endedSynthetic).toBe(false);
+        expect(
+          isProviderRefusal({
+            ...parsed,
+            actions: parseActionsFromTranscript(parsed.richTranscript),
+          }),
+        ).toBe(false);
+      });
     });
   });
 
