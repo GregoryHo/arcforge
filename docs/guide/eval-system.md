@@ -790,6 +790,11 @@ arcforge eval dashboard --port 3333
 ```
 
 `audit` reads grading history and surfaces scenarios worth promoting or retiring.
+Grading history is the `grading/` directory in each run under `evals/results/`:
+one file per graded trial, named after its arm as the transcripts are
+(`baseline-trial-<n>.json`, `treatment-trial-<n>.json`), so the two arms of a
+run never overwrite each other. Runs graded before this naming wrote
+`trial-<n>.json`, and `audit` still reads them.
 `dashboard` serves a live view at `localhost:3333` for browsing runs, arms, and
 per-trial detail.
 

@@ -246,7 +246,9 @@ function numberTranscriptBlocks(output) {
 }
 
 /**
- * Compute the path to grading.json for a specific trial result.
+ * Compute the path to a trial's grading file. An arm's trial is filed as
+ * `<condition>-trial-N.json`, as its transcript is, so baseline and treatment
+ * trial N of one run never share a file; an unsuffixed eval keeps `trial-N.json`.
  * @param {import('./eval').TrialResult} result - Trial result
  * @param {string} projectRoot - Project root directory
  * @returns {string} Absolute path to grading.json
@@ -257,6 +259,7 @@ function getGradingPath(result, projectRoot) {
   // same scenario directory as the run JSONL. Diverging here (e.g. via an
   // ad-hoc /[^a-zA-Z0-9-]/ replacement) splits grading artifacts from
   // their run for any scenario containing characters like `_`.
+  const condition = evalName.match(CONDITION_SUFFIX)?.[1];
   const stripped = evalName.replace(CONDITION_SUFFIX, '');
   const scenarioName = stripped ? sanitizeFilename(stripped) : '';
   const runId =
@@ -268,7 +271,7 @@ function getGradingPath(result, projectRoot) {
     scenarioName,
     runId,
     'grading',
-    `trial-${result.trial}.json`,
+    condition ? `${condition}-trial-${result.trial}.json` : `trial-${result.trial}.json`,
   );
 }
 
