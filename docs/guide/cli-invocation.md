@@ -303,17 +303,23 @@ arcforge worktree list --json | jq '.worktrees[] | select(.kind == "generic") | 
 ```
 
 The commands that have no human format print the same JSON with and without
-`--json`; for them the flag is accepted and changes nothing. They are
-`worktree add`, `worktree list` and `worktree remove`; `learn status`, `enable`,
-`disable`, `review`, `inbox`, `inspect`, `drafts`, `approve`, `reject`,
-`materialize`, `accept` and `activate`; `learn instinct deactivate`,
-`learn reflect record` and `learn recall record`; and `obsidian register`,
-`unregister` and `set-default`. Those that write a timestamp, an id or an
-archive path print a new one on each run, so two runs differ in those per-run
-values and nothing else. Other commands change their output with the
-flag: `eval report`, for example, prints explanatory lines and a different
-object without it, and `obsidian list-vaults`, `session list` and
-`session alias list` print readable lines unless `--json` is given.
+`--json`: on success, `--json` changes nothing; on failure the error moves to
+stdout as JSON, as described under *Exit codes* below. They are:
+
+- `arcforge worktree add`, `arcforge worktree list`, `arcforge worktree remove`
+- `arcforge learn status`, `arcforge learn enable`, `arcforge learn disable`
+- `arcforge learn review`, `arcforge learn inbox`, `arcforge learn inspect`, `arcforge learn drafts`
+- `arcforge learn approve`, `arcforge learn reject`, `arcforge learn materialize`
+- `arcforge learn accept`, `arcforge learn activate`
+- `arcforge learn instinct deactivate`, `arcforge learn reflect record`, `arcforge learn recall record`
+- `arcforge obsidian register`, `arcforge obsidian unregister`, `arcforge obsidian set-default`
+
+Those that write a timestamp, an id or an archive path print a new one on each
+run, so two runs differ in those per-run values and nothing else. Some commands
+change their output with the flag: `arcforge eval report`, for example, prints
+explanatory lines and a different object without it, and
+`arcforge obsidian list-vaults`, `arcforge session list` and
+`arcforge session alias list` print readable lines unless `--json` is given.
 
 Prefer `--json` for anything scripted. `worktree list` has its shape pinned by a
 test that runs the live command, so the fields named in this guide are the fields
