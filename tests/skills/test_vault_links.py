@@ -331,6 +331,24 @@ def test_an_inline_code_span_is_bounded_by_its_block(vault, boundary):
     assert _linked(vault, opener + boundary) == {"L0", "L1"}
 
 
+def test_a_dedented_ordered_marker_starts_a_new_list_per_commonmark(vault):
+    # Pins CommonMark, not a bug fix: `2.` short of the `-` item's content
+    # column does not continue that item, so it is tested against the list,
+    # not the paragraph, and the start-at-1 rule for interrupting a paragraph
+    # (§5.2) does not apply. It opens `<ol start="2">`, and the fence indented
+    # two spaces — short of that item's column 3 — is top-level: a declaration.
+    schema = vault / "SCHEMA.md"
+    schema.write_text(
+        schema.read_text(encoding="utf-8").replace(
+            "## Tag Taxonomy\n",
+            "## Pinned\n\n- explanation\n2. continuation\n  ```yaml\n---\ntype: pinned\n---\n  ```\n\n"
+            "## Tag Taxonomy\n",
+        ),
+        encoding="utf-8",
+    )
+    assert _run(vault)["schema"]["declared_types"] == ["entity", "pinned", "source"]
+
+
 def test_self_links_under_any_spelling_are_not_edges(vault):
     (vault / "Wiki" / "gamma-orphan.md").write_text(
         GAMMA + "\nSelf: [[gamma-orphan]] and [[Wiki/gamma-orphan]] and [[gamma-orphan#Heading|me]].\n",
