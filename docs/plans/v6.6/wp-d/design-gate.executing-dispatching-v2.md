@@ -50,7 +50,7 @@ D-066 把主張改寫成兩支 skill 合起來的行為：兩臂都注入同一�
 6. **transcript format 2 的 Agent block。** `summarizeToolInput` 對 `Agent` 與 `Task` 回傳 `JSON.stringify(input)`（`eval-transcript.js:183-185`），整行寫成 `[Tool: Agent] <json>`（`:61-62`），block 之間以空行分隔（`:79`）。JSON 把 prompt 裡的換行轉成 `\n`，所以 block 是單行。測試 `tests/scripts/eval-transcript-fidelity.test.js:83-94` 以一份超過 2000 字元、含空行的 prompt 驗證：`parseActionsFromTranscript` 得到一個 action，`JSON.parse(actions[0].args)` 等於原輸入 `{description, prompt}`。grader 讀的就是存檔 transcript 裡這一行，不是 `raw/`。row 記 `transcript_format`（`eval-trial.js:331`）。
 7. **subagent 的呼叫沒有標記。** 解析器只看 `event.type` 與 `content`，不讀 `parent_tool_use_id`（`eval-transcript.js:54-63`），subagent 的工具呼叫與主 agent 的混在一起。grader 無法分辨一個 `[Tool: Agent]` 出自主 agent 還是 subagent。
 8. **ceiling 預設 900 s，被砍的 trial 不計分。** `DEFAULT_TRIAL_TIMEOUT_MS = 900000`（`eval-trial.js:53`），「A killed trial never scores」（`:52`，`trial_killed_incomplete`，`:387-399`）。
-9. **trial 裡的 `arcforge` 與 git。** `ARCFORGE_HOME` 設在 trial 目錄下的 `.arcforge`（`scripts/lib/eval-trial-environment.js:404`）；D-064 (1) 記錄 `arcforge` 在真 trial 的 `Bash` 解析得到。`dispatching` Step 2 要 writer 用 `arcforge worktree add … --json`（`dispatching/SKILL.md:30-44`），那需要一個 git repo；fixture 的 Setup 要 `git init`，前例是 `evals/scenarios/eval-code-review-range-fidelity.md:59-61`。
+9. **trial 的 `PATH` 沒有 `arcforge`，除非 scenario 宣告。** eval B-18（`product/specs/eval.md:267` 起，`PATH` 的部分在 `:286-297`）：trial 的 `PATH` 是建出來的，只有 `.eval-trials/.bin` 的 shim（`claude`、`node`、`npm`、`npx`、`python3`）加上 `/usr/bin`、`/bin`、`/usr/sbin`、`/sbin`，operator 自己的 `PATH` 不帶過去，「`arcforge` included — is not something a trial can run unless the scenario says so」。本文件第一版引用 D-064 (1) 說 `arcforge` 在真 trial 解析得到，那是錯的引用：D-064 (1) 是 resume scenario，它自己在 `## Environment` 宣告了 `PATH+=${PROJECT_ROOT}/bin`（`evals/scenarios/eval-sessions-handover-and-resume.md` 的 `## Environment`；依據是 `docs/plans/v6.5/wp-d/design-gate.sessions-resume.md` 的「離線驗證」表）。不宣告，treatment 照 `dispatching` Step 2（`dispatching/SKILL.md:30-44`）執行 `arcforge worktree add … --json` 會得到 `command not found`，可能在 `A1` 評分的那個 Agent block 之前就停下或改道，而 baseline 直接派工，實驗量到的就成了 CLI 在不在。所以本 scenario 宣告同一條（見「`## Environment`」）。`ARCFORGE_HOME` 設在 trial 目錄下的 `.arcforge`（`scripts/lib/eval-trial-environment.js:404`），`getWorktreeRoot` 經 `getArcforgeHome()` 跟著它走（`scripts/lib/worktree-paths.js:36-42`），所以 worktree 落在 trial 樹裡。worktree 需要 git repo，fixture 的 Setup 要 `git init` 並設定身分，前例是 `evals/scenarios/eval-code-review-range-fidelity.md:59-61`。
 
 ## scenario 設計
 
@@ -80,6 +80,30 @@ git add -A && git commit -qm "fixture"
 - [ ] T3 — Log each request's method and path to stdout in `src/server.js`
   - verify: `npm test`
 ```
+
+### `## Environment`（提議全文）
+
+```
+## Environment
+# arcforge is what dispatching's Step 2 runs to make a worktree; the trial PATH has no arcforge otherwise (eval B-18)
+PATH+=${PROJECT_ROOT}/bin
+```
+
+只有這一行。resume scenario 另有一行 `PATH^=${TRIAL_DIR}/.arcforge/bin` 與 Setup 寫的包裝 script，用途是把每次 `arcforge` 呼叫的 exit code 記進 log，因為當時 transcript 不記 exit code（`design-gate.sessions-resume.md`「離線驗證」表最後兩列；D-063 第 5 點的 per-row 規則）。format 2 已經把失敗的 Bash 呼叫記成 `[Result: Bash] error (exit N)`（`scripts/lib/eval-transcript.js:103-110`），本 scenario 不需要那支包裝，也就不宣告第二行。
+
+**離線驗證（未啟動 session）。** 以引擎的 `trialEnv(<trial>, {environment: ['PATH+=${PROJECT_ROOT}/bin']}, {projectRoot})` 建環境：`parseEnvironment` 接受這一行（`{name: 'PATH', op: 'append'}`），`PATH` 是 `<repo>/.eval-trials/.bin:/usr/bin:/bin:/usr/sbin:/sbin:<repo>/bin`，`ARCFORGE_HOME` 是 `<trial>/.arcforge`。在 `<trial>` 以這個環境執行：
+
+| 檢查 | 結果 |
+|---|---|
+| `command -v arcforge` | `<repo>/bin/arcforge`（shim 轉到 `scripts/cli.js`） |
+| Setup 的 `git init -q -b main`、`git config user.*`、`git add -A && git commit -qm fixture` | 成功 |
+| `arcforge worktree add limiter --json` | exit 0；`"branch_created": true`，`"path": "<trial>/.arcforge/worktrees/<trial 目錄名>-<hash>-limiter"` |
+| `arcforge worktree list --json` | 兩筆：`<trial>`（`kind: base`）與上面那個 worktree |
+| `git status --short` | `?? .arcforge/` |
+
+這次檢查的 `command -v git` 印出 `/opt/homebrew/bin/git`，與 B-18 說的「`git` 只在系統目錄」不符；`/usr/bin/git` 存在，原因可能是執行檢查的 shell，不是 trial 的環境，本文件沒有追。worktree 的結果不受影響。
+
+**worktree 在 trial 樹裡。** 路徑在 `<trial>/.arcforge/worktrees/` 下，`-- audit: outside the trial tree` 不會因它出現（它比對的是 trial 目錄以外的路徑），隔離不受影響，也不寫到專案根目錄（不觸發 `trial_wrote_repo`）。一個副作用：`.arcforge/` 在 trial repo 裡是未追蹤的目錄，agent 之後若在 trial 根目錄 `git add -A`，會碰到裡面的 worktree（git 把它當成嵌入的 repo 並警告）。這只會在 treatment 建了 worktree 之後發生，在 T2 的 writer 派工之後，不影響 `A1`。
 
 T1 與 T3 是 T2 之外的工作，讓 task list 是一份真的要跑完的清單；兩者都碰 `src/server.js`，T2 只碰 `src/limiter.js`，依 `dispatching` Step 1（`:16-24`）T2 是獨立的一塊。路徑寫在 T2 裡，兩臂都找得到 spec；baseline 若沒開 spec，失敗原因就是沒開，不是沒照貼，稽核行會分開（見 grader）。
 
@@ -121,6 +145,7 @@ T1 與 T3 是 T2 之外的工作，讓 task list 是一份真的要跑完的清�
 - `-- audit: limiter dispatch`：每一個提到 limiter 的 block 一行：它在所有 Agent／Task block 中的位置、含幾條條件（0–3）、`description` 的前 80 字元、`prompt` 是否含 `specs/limiter.md` 這個路徑，以及它讀起來是不是驗收（正規化後含 `review`、`verify`、`accept`、`check against` 其中之一）。第一行就是 `A1` 評分的那個 block。稽核者看得到 writer 與 acceptance 的 prompt 並排，看得到「writer 只給路徑、acceptance 才貼條件」這種列，也看得到驗收失敗後再派的 writer。
 - `-- audit: not top-level`：無法判斷。format 2 不標記 subagent 的呼叫（事實 7），這一行固定印出這句，提醒稽核者一個含條件的 block 理論上可能出自 subagent。
 - `-- audit: model tier`：prompt 裡有沒有 `model:`、`haiku`、`sonnet`、`opus` 這類欄位。不計分：6.5.0 關卡與 D-066 都判它在兩臂都是天花板，不斷言。
+- `-- audit: arcforge errors`：每個指令含 `arcforge` 的 `[Tool: Bash]` block，若緊接著的是 `[Result: Bash] error (exit N)`，印出指令的第一行與 exit code。format 2 只記失敗的結果、不記內容（`eval-transcript.js:20-22`、`:103-110`），所以這一行只能說「失敗了、exit 多少」，不能說為什麼。
 - `-- audit: outside the trial tree`：照 layout-grid grader 的寫法，列出指向 trial 目錄外的路徑；baseline 若去找 repository 裡的 `skills/core/dispatching`，就不再是「本體不在」那一臂。
 
 ## 兩臂
@@ -157,7 +182,7 @@ baseline 通過，要三條條件在它的 Agent prompt 裡逐字出現，而它
 
 ## 執行計畫
 
-- **條件**：`--model 'opus[1m]' --effort xhigh`、隔離、不帶 `--plugin-dir`、`ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000`（preflight 與 A/B 同值，它在 preflight 的鍵裡，`eval-preflight.js:129-136`）。`## Max Turns` 不設：subagent 與 acceptance agent 會吃掉回合，設了就進鍵。`## Environment` 不宣告。
+- **條件**：`--model 'opus[1m]' --effort xhigh`、隔離、不帶 `--plugin-dir`、`ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000`（preflight 與 A/B 同值，它在 preflight 的鍵裡，`eval-preflight.js:129-136`）。`## Max Turns` 不設：subagent 與 acceptance agent 會吃掉回合，設了就進鍵。`## Environment` 宣告上面那一行，兩臂相同：它屬於 scenario，不屬於任何一臂，`trialEnv` 對兩臂以同一個 scenario 建環境。它不是獨立的 preflight 條件，而是經由 scenario hash 進鍵：preflight 紀錄的檔名是 `<scenario hash>-<model><條件>.json`（`scripts/lib/eval-preflight.js:67-70`），hash 是整份 scenario 檔內容的 SHA-256 前 16 碼（`scripts/lib/eval-scenario.js:132-140`、`eval-preflight.js:362-364`），所以改這一行就要重跑 preflight。
 - **preflight**（baseline 臂，不帶 `--also-stage`）：
 
   ```bash
@@ -192,6 +217,7 @@ baseline 通過，要三條條件在它的 Agent prompt 裡逐字出現，而它
   兩個方向都由 `-- audit: limiter dispatch` 逐列看得到：第一行的 block 讀起來不是 T2 的實作 card（description 是 T1、T3、research 或 review），就是這種列。稽核逐列標出，兩臂各有幾列寫進結果的 decision；不改標籤、不重新計分（D-063 第 4 點的規則）。若 A/B 的判定靠這幾列翻轉，結果的 decision 要照實寫出。
 - **驗收失敗後再派 writer。** 第一個 block 仍是原本的 writer card，`A1` 評的是它；重派的 card 只出現在 audit 行。這是想要的行為：量的是第一次交接帶不帶條件。
 - **`aliases.json` 的誤報**：brief 把它歸到本關卡，與檔案不符。D-065、D-066 的 Residual 記的是 6.5.0 resume scenario（`eval-sessions-handover-and-resume`）的「archive file read directly」旗標在 `aliases.json` 上誤報；本 scenario 是新的，不讀 archive，不受影響。那個誤報照 D-066 維持原狀。
+- **`arcforge worktree add` 在 trial 裡因別的原因失敗。** `PATH` 已宣告，離線也跑通；仍可能失敗的原因有 `ARCFORGE_HOME` 在 trial 下的路徑、git 身分、或 agent 在 worktree 裡再建 worktree（`dispatching:48`「Never nest a worktree inside a worktree」）。失敗會留在 transcript：`-- audit: arcforge errors` 逐列印出。treatment 的 row 若在這裡失敗、之後沒有派 writer，`A1` 判 FAIL；稽核逐列標出這是「CLI 失敗」而不是「沒照貼」，寫進結果的 decision，不改標籤。
 - **方向性讀數**：k=5、一個 fixture、一個模型、注入的 skill 文字（D-059、D-066）。
 
 ## 判定
@@ -202,7 +228,7 @@ baseline 通過，要三條條件在它的 Agent prompt 裡逐字出現，而它
 2. 唯一計分斷言 `A1`：第一個 `prompt` 提到 limiter 的 Agent／Task 呼叫（T2 的 writer 派工）在上述正規化後逐字含三條條件；沒有提到 limiter 的派工判 FAIL；之後的 limiter 派工（例如 acceptance agent）不計分。model tier 不斷言。
 3. grader 讀存檔 transcript 的 format 2 單行 JSON，不讀 `raw/`；稽核確認每列 `transcript_format: 2`。
 4. 兩臂旗標如上；兩個 digest 與文字 hash 在量測 commit 重算相符。
-5. `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000`，preflight 與 A/B 同值；Setup 建 git repo 並設定身分。
+5. `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000`，preflight 與 A/B 同值；Setup 建 git repo 並設定身分；`## Environment` 宣告 `PATH+=${PROJECT_ROOT}/bin`，讓 `dispatching` Step 2 的 `arcforge worktree add` 在 trial 裡解析得到。
 
 各結果對 #184：
 
