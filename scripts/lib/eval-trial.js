@@ -294,7 +294,9 @@ function runTrial(scenario, trialNumber, totalTrials, options = {}) {
   const parsedOutput = richTranscript || textResult;
   const transcriptOutput = parsedOutput || rawOutput;
   const transcript = saveTranscript(evalName, trialNumber, transcriptOutput, projectRoot, runId);
-  saveRawOutput(evalName, trialNumber, rawOutput, projectRoot, runId);
+  // stdout only: a session that never wrote any (a spawn failure) has no
+  // stream-json to keep, and its stderr is already the transcript.
+  if (result.stdout) saveRawOutput(evalName, trialNumber, result.stdout, projectRoot, runId);
   const actions = parseActionsFromTranscript(richTranscript);
 
   const base = {
@@ -543,7 +545,7 @@ function saveTranscript(evalName, trialNumber, output, projectRoot, runId) {
  * the transcript keeps only what grading reads, this keeps everything.
  * @param {string} evalName - Eval name (may include label suffix)
  * @param {number} trialNumber - Trial number
- * @param {string} rawOutput - The session's stdout (stderr when stdout was empty)
+ * @param {string} rawOutput - The session's stream-json stdout
  * @param {string} projectRoot - Project root directory
  * @returns {string} Path to the raw file
  */

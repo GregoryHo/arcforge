@@ -207,11 +207,9 @@ describe('runTrial with transcript format 2', () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  const trial = (stdout) => {
+  const trial = (stdout, session = { stdout, stderr: '', exitCode: 0 }) => {
     mockUtils.execCommand.mockImplementation((cmd) =>
-      path.basename(cmd) === 'claude'
-        ? { stdout, stderr: '', exitCode: 0 }
-        : { stdout: '', stderr: '', exitCode: 0 },
+      path.basename(cmd) === 'claude' ? session : { stdout: '', stderr: '', exitCode: 0 },
     );
     return runTrial(findScenario(NAME, tempDir), 3, 5, {
       projectRoot: tempDir,
@@ -229,6 +227,14 @@ describe('runTrial with transcript format 2', () => {
     );
     expect(row.transcript).toBe(path.join(runDir, 'transcripts', 'treatment-trial-3.txt'));
     expect(row.transcript_format).toBe(TRANSCRIPT_FORMAT);
+  });
+
+  it('writes no raw file for a session that never produced stdout', () => {
+    const error = Object.assign(new Error('spawn claude ENOENT'), { code: 'ENOENT' });
+    const row = trial('', { stdout: '', stderr: 'spawn claude ENOENT', exitCode: 1, error });
+    expect(row.errorType).toBe('trial_spawn_failed');
+    expect(fs.existsSync(path.join(tempDir, RESULTS_DIR, NAME, RUN_ID, 'raw'))).toBe(false);
+    expect(fs.readFileSync(row.transcript, 'utf8')).toBe('spawn claude ENOENT');
   });
 
   it('records a limit that landed after tool calls as a provider refusal', () => {
