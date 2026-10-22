@@ -117,14 +117,19 @@ clause (4) in `product/ROADMAP.md`). Keep notes in a scratch directory
 outside the repo, or write them after the run ends. The guard skips `.git`,
 `node_modules`, `.eval-trials/`, `evals/results/`, and any nested directory
 that holds its own `.git` entry — a nested repository or worktree is watched
-only when it is passed as a root of its own (`watchForWrites` in that file);
-the engine writes `evals/preflight/` itself, between trials.
+only when it is passed as a root of its own (`watchForWrites` in that file).
+The engine writes the `evals/preflight/` record itself, once, after the
+preflight's last trial has run (`writeRecord` in
+`scripts/lib/eval-preflight.js`), never between trials.
 
 A scenario Setup that runs `git commit` in its fixture must run
-`git config commit.gpgsign false` first. The trial environment forwards
-only a whitelist of variables, and `SSH_AUTH_SOCK` is not on it (#286).
-So if your `~/.gitconfig` turns signing on for `~/GitHub/` through an
-`includeIf`, the fixture under `.eval-trials/` inherits it, the Setup
+`git config commit.gpgsign false` first. A contained trial — isolated, or
+run with a plugin directory, which is every `preflight` and `ab` trial —
+forwards only a whitelist of variables, and `SSH_AUTH_SOCK` is not on it
+(#286); only `eval run --no-isolate` without a plugin directory inherits
+the whole parent environment. So if your `~/.gitconfig` turns signing on
+for `~/GitHub/` through an `includeIf`, the fixture under `.eval-trials/`
+inherits it, the Setup
 fails asking for a signing passphrase, and every trial comes back `setup_failed`
 before a session starts. That was 3/3 rows in 6.6.0's run 1, fixed in
 #317 (`evals/scenarios/eval-executing-dispatch-acceptance.md`) with the
