@@ -1,0 +1,18 @@
+{
+  "scenario_hash": "57ac855bb7f12eef",
+  "scenario_name": "eval-diagramming-obsidian-layout-grid",
+  "model": "opus[1m]",
+  "max_turns": null,
+  "plugin_dir": false,
+  "effort": "xhigh",
+  "trial_timeout_ms": 1800000,
+  "baseline_skill_hash": "51fe7cc9f5373b7e",
+  "baseline_skill_files_hash": "0f3c574c1e448946",
+  "node_version": "v24.13.1",
+  "repo_commit": "61b19e464a691dfa2d8e7180d3a3ee347149019d",
+  "k": 3,
+  "pass_rate": 1,
+  "verdict": "BLOCK",
+  "reason": "Baseline pass rate 100% >= 80% ceiling — scenario is not discriminative. Redesign the scenario to be harder.",
+  "timestamp": "2026-10-22T09:46:46.766Z"
+}
