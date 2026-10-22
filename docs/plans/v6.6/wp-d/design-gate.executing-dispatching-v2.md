@@ -91,7 +91,7 @@ PATH^=${PROJECT_ROOT}/bin
 
 只有這一行。`^=` 把 `bin/` 放在 `PATH` 最前面（`scripts/lib/eval-trial-environment.js:102`、`:255`）；`bin/` 只有 `arcforge`，不會蓋過 trial 的任何 shim。resume scenario 另有一行 `PATH^=${TRIAL_DIR}/.arcforge/bin` 與 Setup 寫的包裝 script，用途是把每次 `arcforge` 呼叫的 exit code 記進 log，因為當時 transcript 不記 exit code（`design-gate.sessions-resume.md`「離線驗證」表最後兩列；D-063 第 5 點的 per-row 規則）。format 2 已經把失敗的 Bash 呼叫記成 `[Result: Bash] error (exit N)`（`scripts/lib/eval-transcript.js:103-110`），本 scenario 不需要那支包裝，也就不宣告第二行。
 
-**離線驗證（未啟動 session）。** 以引擎的 `trialEnv(<trial>, {environment: ['PATH+=${PROJECT_ROOT}/bin']}, {projectRoot})` 建環境：`parseEnvironment` 接受這一行（`{name: 'PATH', op: 'append'}`），`PATH` 是 `<repo>/.eval-trials/.bin:/usr/bin:/bin:/usr/sbin:/sbin:<repo>/bin`，`ARCFORGE_HOME` 是 `<trial>/.arcforge`。在 `<trial>` 以這個環境執行：
+**離線驗證（未啟動 session；2026-10-22 以 `PATH^=` 重跑）。** 以引擎的 `trialEnv(<trial>, {environment: ['PATH^=${PROJECT_ROOT}/bin']}, {projectRoot})` 建環境：`parseEnvironment` 接受這一行（`{name: 'PATH', op: 'prepend'}`），`PATH` 是 `<repo>/bin:<repo>/.eval-trials/.bin:/usr/bin:/bin:/usr/sbin:/sbin`，`ARCFORGE_HOME` 是 `<trial>/.arcforge`。在 `<trial>` 以這個環境執行（下表五項結果與第一次以 `PATH+=` 跑的相同；這次的 `command -v git` 印出 `/usr/bin/git`）：
 
 | 檢查 | 結果 |
 |---|---|
