@@ -2917,12 +2917,15 @@ reverse one, append a superseding entry (see AGENTS.md).
   without a usable record when the reruns are spent — leaves the issue open,
   annotated "not measured in 6.6.0". "No model-tier field" is at ceiling in
   both arms of D1 and is not asserted. (7) The result decision reports per
-  arm, from the audit lines and without changing a label or re-scoring a
-  row: in D1, rows whose scored block is not T2's writer; rows whose
-  staged-copy audit line cannot name which copy was read; writes of
-  `src/limiter.js` by means the grader cannot see (`sed -i`, `node -e`, `cp`
-  or `mv`); and `arcforge worktree add` failures inside the trial; in D2, how
-  many FAILs are the `text` format and how many the spacing.
+  arm, without changing a label or re-scoring a row: from the audit lines,
+  in D1, rows whose scored block is not T2's writer, rows whose staged-copy
+  audit line cannot name which copy was read, and `arcforge worktree add`
+  failures inside the trial, and in D2 how many FAILs are the `text` format
+  and how many the spacing; and from each D1 row's saved transcript
+  (`transcripts/<arm>-trial-N.txt` in the run directory), read by hand, rows
+  that write `src/limiter.js` by a means the grader does not see (`sed -i`,
+  `node -e`, `cp` or `mv`) — the scenario prints no audit line for those,
+  so the transcript is the only place they show.
 - Why: the gates left these choices to this entry. D1's gate assigns no
   disposition for a D1 BLOCK or an unrecovered run, and D2's none for an
   unrecovered run; D-066 named only a D2 BLOCK. A D1 BLOCK closes #184
@@ -2936,8 +2939,9 @@ reverse one, append a superseding entry (see AGENTS.md).
   pool (B-22), so the recomputation is the only check that `dispatching` was
   not edited before the round. The budget is D-066's arithmetic unchanged.
   The residuals in (7) are the D1 gate's 「殘餘風險」 and D2's format-FAIL
-  count; each is visible only in an audit line, so it is counted, not
-  scored. This refines D-066 and reverses nothing.
+  count; each is visible only in an audit line or in the transcript, never
+  in a label, so it is counted, not scored. This refines D-066 and reverses
+  nothing.
 - Residual: every reading is direction only, at k=5 on one fixture and one
   model, for injected skill text (D-059). D1's listing line imitates a host
   listing and is not one (B-22), and a subagent's tool calls carry no marker
