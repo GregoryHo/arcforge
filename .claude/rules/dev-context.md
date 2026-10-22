@@ -105,8 +105,12 @@ audience never encounters that situation.
 Write nothing inside the repository checkout while a live eval
 (`arcforge eval preflight`, `eval ab`, `eval run`) is running. The trial
 write guard (`scripts/lib/eval-trial-guard.js`) snapshots the project
-around every trial and attributes any change to that trial: the row comes
-back `trial_wrote_repo` with `infraError`, and the run stops. In the 6.6.0
+around each trial's Claude subprocess and attributes any change in that
+window to the trial: the row comes back `trial_wrote_repo` with
+`infraError`, and the run stops. That window is all the guard enforces: a
+scenario's Setup runs before the snapshot and model grading runs after the
+check, so a write during either is never flagged and silently becomes the
+next trial's baseline. The no-write rule covers the whole run. In the 6.6.0
 round this cost a rerun when the operator saved ledger notes into
 `docs/plans/` mid-trial (`docs/plans/v6.6/wp-d/round.md` run 3, D-069
 clause (4) in `product/ROADMAP.md`). Keep notes in a scratch directory
