@@ -110,9 +110,11 @@ back `trial_wrote_repo` with `infraError`, and the run stops. In the 6.6.0
 round this cost a rerun when the operator saved ledger notes into
 `docs/plans/` mid-trial (`docs/plans/v6.6/wp-d/round.md` run 3, D-069
 clause (4) in `product/ROADMAP.md`). Keep notes in a scratch directory
-outside the repo, or write them after the run ends. The guard skips only
-`.git`, `node_modules`, `.eval-trials/` and `evals/results/`; the engine
-writes `evals/preflight/` itself, between trials.
+outside the repo, or write them after the run ends. The guard skips `.git`,
+`node_modules`, `.eval-trials/`, `evals/results/`, and any nested directory
+that holds its own `.git` entry — a nested repository or worktree is watched
+only when it is passed as a root of its own (`watchForWrites` in that file);
+the engine writes `evals/preflight/` itself, between trials.
 
 A scenario Setup that runs `git commit` in its fixture must run
 `git config commit.gpgsign false` first. The trial environment forwards
