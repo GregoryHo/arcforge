@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-13T00:54:25.366Z",
+  "generated": "2026-10-22T09:48:04.283Z",
   "by_claim_type": {
     "discriminative-lift": {
       "scenarios": 18,
@@ -608,7 +608,8 @@
               "isolation": null,
               "stageSkillFiles": null,
               "baselineSkillHash": null,
-              "baselineSkillFilesHash": null
+              "baselineSkillFilesHash": null,
+              "alsoStaged": null
             },
             "rows": 10
           },
@@ -623,7 +624,8 @@
               "isolation": null,
               "stageSkillFiles": null,
               "baselineSkillHash": null,
-              "baselineSkillFilesHash": null
+              "baselineSkillFilesHash": null,
+              "alsoStaged": null
             },
             "rows": 9
           }
@@ -668,7 +670,8 @@
             "isolation": null,
             "stageSkillFiles": null,
             "baselineSkillHash": null,
-            "baselineSkillFilesHash": null
+            "baselineSkillFilesHash": null,
+            "alsoStaged": null
           },
           "rows": 9
         }
@@ -940,7 +943,8 @@
               "isolation": null,
               "stageSkillFiles": null,
               "baselineSkillHash": null,
-              "baselineSkillFilesHash": null
+              "baselineSkillFilesHash": null,
+              "alsoStaged": null
             },
             "rows": 15
           },
@@ -955,7 +959,8 @@
               "isolation": null,
               "stageSkillFiles": null,
               "baselineSkillHash": null,
-              "baselineSkillFilesHash": null
+              "baselineSkillFilesHash": null,
+              "alsoStaged": null
             },
             "rows": 15
           }
@@ -1000,7 +1005,8 @@
             "isolation": null,
             "stageSkillFiles": null,
             "baselineSkillHash": null,
-            "baselineSkillFilesHash": null
+            "baselineSkillFilesHash": null,
+            "alsoStaged": null
           },
           "rows": 15
         }
@@ -1238,7 +1244,8 @@
               "isolation": null,
               "stageSkillFiles": null,
               "baselineSkillHash": null,
-              "baselineSkillFilesHash": null
+              "baselineSkillFilesHash": null,
+              "alsoStaged": null
             },
             "rows": 5
           },
@@ -1253,7 +1260,8 @@
               "isolation": null,
               "stageSkillFiles": null,
               "baselineSkillHash": null,
-              "baselineSkillFilesHash": null
+              "baselineSkillFilesHash": null,
+              "alsoStaged": null
             },
             "rows": 5
           }
@@ -1298,7 +1306,8 @@
             "isolation": null,
             "stageSkillFiles": null,
             "baselineSkillHash": null,
-            "baselineSkillFilesHash": null
+            "baselineSkillFilesHash": null,
+            "alsoStaged": null
           },
           "rows": 5
         }
@@ -1600,7 +1609,8 @@
               "isolation": null,
               "stageSkillFiles": null,
               "baselineSkillHash": null,
-              "baselineSkillFilesHash": null
+              "baselineSkillFilesHash": null,
+              "alsoStaged": null
             },
             "rows": 5
           },
@@ -1615,7 +1625,8 @@
               "isolation": null,
               "stageSkillFiles": null,
               "baselineSkillHash": null,
-              "baselineSkillFilesHash": null
+              "baselineSkillFilesHash": null,
+              "alsoStaged": null
             },
             "rows": 5
           }
@@ -1660,7 +1671,8 @@
             "isolation": null,
             "stageSkillFiles": null,
             "baselineSkillHash": null,
-            "baselineSkillFilesHash": null
+            "baselineSkillFilesHash": null,
+            "alsoStaged": null
           },
           "rows": 5
         }

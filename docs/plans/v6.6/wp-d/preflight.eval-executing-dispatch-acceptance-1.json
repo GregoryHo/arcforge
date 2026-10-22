@@ -1,0 +1,19 @@
+{
+  "scenario_hash": "7e87d69148242413",
+  "scenario_name": "eval-executing-dispatch-acceptance",
+  "model": "opus[1m]",
+  "max_turns": null,
+  "plugin_dir": false,
+  "effort": "xhigh",
+  "trial_timeout_ms": 1800000,
+  "baseline_skill_hash": "17fa36f1535cb446",
+  "baseline_skill_files_hash": "1ef6e3967679cf2b",
+  "node_version": "v24.13.1",
+  "repo_commit": "2b633b762b0132031ff3ba2658decbf244e1911f",
+  "k": 3,
+  "pass_rate": null,
+  "errored": 3,
+  "verdict": "BLOCK",
+  "reason": "3/3 preflight trials errored (infraError or gradeError) — no discriminability signal. Fix the trial environment or grader before re-running preflight.",
+  "timestamp": "2026-10-22T08:40:00.768Z"
+}
