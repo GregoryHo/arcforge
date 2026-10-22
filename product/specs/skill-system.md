@@ -96,7 +96,10 @@ situations to skills.
   D-064), and 6.6.0 schedules it again — the same `executing` text injected
   in both arms, the treatment alone given
   `--also-stage skills/core/dispatching` ([eval](eval.md) B-22), behind an offline design
-  gate that may end NOT MEASURABLE at 0 sessions (D-066).
+  gate that may end NOT MEASURABLE at 0 sessions (D-066). That gate passed
+  and the preflight BLOCKed at ceiling: every baseline, with no
+  `dispatching` body in reach, pasted the criteria word for word, so #184
+  closes as a finding and the sentence ships on its text (D-068, D-069).
 
 ### The `sessions` skill
 - **B-10 A handover is five sections, every one filled.** Before writing, the
@@ -203,6 +206,10 @@ asserted by test (B-3).
   scored on carrying the three acceptance criteria word for word, a ceiling
   BLOCK closes #184 as a finding, and a run not measured leaves it open
   (B-9).
+- **D-069** — the handoff's preflight BLOCKed at ceiling, baseline 3/3:
+  with only `executing` injected, every writer brief carried the three
+  criteria word for word with the spec's path, so #184 closes as a finding,
+  no A/B ran, and the handoff sentence ships unmeasured on its text (B-9).
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
 

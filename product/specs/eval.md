@@ -639,3 +639,10 @@ its rationale is inline at B-10.
   `--also-stage` gives the treatment, both items run under an 1800 s
   ceiling with their staged digests recomputed before the first preflight,
   and the cap is about 45 sessions (B-3, B-10, B-15, B-20, B-22).
+- **D-069** — 6.6.0's round: both preflights BLOCKed at ceiling, two
+  findings and no measured result, in 7 sessions of the cap. No A/B ran,
+  so B-20's A/B half and B-22's `--also-stage` were never exercised live
+  and still rest on contract tests. Both infrastructure reruns were spent:
+  one on a fixture Setup that failed to sign a commit in the contained
+  environment (B-18), one on a trial the write guard stopped for an
+  operator's write (B-3, B-16, B-18, B-20, B-22).
