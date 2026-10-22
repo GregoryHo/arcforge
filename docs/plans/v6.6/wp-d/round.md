@@ -53,5 +53,4 @@ infra reruns ≤6 (≤2 in the round). Spent in the round: 7 sessions (run 1 spe
 run 2 spent 3; run 3 spent 1, a 65 s trial the guard stopped; run 4 spent 3).
 No A/B ran, so the nominal 26 became 6 preflight sessions plus 1 lost to the
 guard stop; both infrastructure reruns were used (one for the fixture's
-signing config, one for the operator's write during a trial). D1's A/B (10) is not run, so the round's nominal total falls
-to 16.
+signing config, one for the operator's write during a trial).
