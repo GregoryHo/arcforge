@@ -135,49 +135,60 @@ T1 與 T3 是 T2 之外的工作，讓 task list 是一份真的要跑完的清�
 
 **正規化**（認定與比對共用）：轉小寫、`-` 換成空格、去掉反引號、連續空白併成一個空格。比對條件時兩邊再去掉句尾句點。
 
-**認定 writer 派工**，依序：
+**認定 writer 派工**：對 Agent／Task block 依 transcript 順序走一遍，每個 block 當場分類，第一個分到 `writer` 的就是 writer。
 
-1. 取 transcript 裡所有 Agent／Task block，保持順序。`json.loads` 失敗的 block 歸為 `unreadable`，不參與以下各步。
+1. **可讀**：`json.loads` 失敗的 block 歸為 `unreadable`，不參與以下各步。
 2. **提到 limiter**：正規化後含 `limiter` 或 `rate limit`（涵蓋 `specs/limiter.md`、`src/limiter.js`、rate limiter、rate limiting、rate-limit）。沒有任何 block 的 `description` 或 `prompt` 提到 limiter，`A1` 判 FAIL，原因 `T2 not dispatched`。
-3. **驗收型的 description**：`description` 含 `review`、`verify`、`validate`、`accept`、`check`、`audit`、`inspect` 其中一個完整的字，而且不含 `implement`、`build`、`write`、`create`、`add` 其中一個完整的字。這種 block 歸為 `acceptance`，永遠不是 writer。
-4. **第一層，看 `description`**：第一個 `description` 提到 limiter、又不是 `acceptance` 的 block，就是 writer。
-5. **第二層，只在第一層找不到時用，看 `prompt` 的句子**：把正規化後的 `prompt` 切成句子：`;`、`:` 與換行一律切，`.`、`!`、`?` 只在後面接空白或字串結尾時切（否則 `src/limiter.js is owned by T2` 會在 `.js` 切開，`src/limiter` 落在沒有記號的那一半）。一個句子含下列任一記號就是「歸屬或否定句」：`do not`、`don't`、`never`、`must not`、`avoid`、`leave`、`out of scope`、`owns`、`owned by`、`belongs to`、`another agent`、`other agent`、`in parallel`。第一個「至少有一句提到 limiter、且那一句不是歸屬或否定句」、又不是 `acceptance` 的 block，就是 writer。只在歸屬或否定句裡提到 limiter 的 block 歸為 `ownership-mention`。
-6. 兩層都找不到 writer，`A1` 判 FAIL，原因 `no T2 writer dispatch identified`（與第 2 步的原因分開，稽核才分得出「沒派」與「派了但認不出」）。
-7. 找到 writer：它的 `prompt` 在正規化後同時含三條條件，`A1` PASS；否則 FAIL，原因寫出缺哪幾條。writer 之後的 block（包括驗收、重派）不計分。
+3. **驗收型 description**：正規化後的 `description` 含下列任一個完整的字：`review`、`reviewer`、`verify`、`verification`、`validate`、`validation`、`accept`、`acceptance`、`check`、`checks`、`audit`、`inspect`、`examine`、`test`、`tests`、`testing`、`qa`、`assess`、`confirm`、`evaluate`、`judge`、`compliance`、`suite`；**除非**它也含 `implement` 或 `build` 這兩個完整的字。
+4. **limiter 已經寫過**：這個 block 之前，transcript 裡已有 `[Tool: Write]` 或 `[Tool: Edit]` 的路徑以 `src/limiter.js` 結尾，或 `[Tool: Bash]` 的指令同時含 `limiter.js` 與 `>` 或 `tee`。
+5. **歸屬或否定句**：把正規化後的 `prompt` 切成句子：`;`、`:` 與換行一律切，`.`、`!`、`?` 只在後面接空白或字串結尾時切（否則 `src/limiter.js is owned by T2` 會在 `.js` 切開，`src/limiter` 落在沒有記號的那一半）。一個句子含下列任一記號就是歸屬或否定句：`do not`、`don't`、`never`、`must not`、`avoid`、`leave`、`out of scope`、`owns`、`owned by`、`belongs to`、`another agent`、`other agent`、`in parallel`。
+6. **分類**，每個提到 limiter 的可讀 block 依序套第一條成立的：第 3 步成立 → `acceptance`；第 4 步成立 → `after-write`；`description` 提到 limiter，或 `prompt` 至少有一句提到 limiter 而不是歸屬或否定句 → `writer`；其餘 → `ownership-mention`。不提 limiter 的 block 是 `other`。
+7. **評分**：第一個 `writer` 的 `prompt` 在正規化後同時含三條條件，`A1` PASS；不含則 FAIL，原因寫出缺哪幾條。沒有任何 `writer`，FAIL，原因 `no T2 writer dispatch identified`（與第 2 步分開，稽核才分得出「沒派」與「派了但認不出」）。之後的 block 照樣分類、印進 audit，不計分。
 
 - **為什麼要認定 writer，不是「至少一個 block 含三條」**：「至少一個」會讓 treatment 在它要被抓的那個失敗上通過。`dispatching` Step 4（`:91-96`）要求把 acceptance 交給另一個 fresh-context agent，檢查「does the delivered code satisfy every criterion」；照做的 treatment 可以只給 writer `specs/limiter.md` 的路徑，再把三條條件貼給 acceptance agent。這條指示只有 treatment 讀得到，假 PASS 只會出現在 treatment 一邊。format 2 沒有 parent／top-level 的標記（事實 7），所以要靠別的特徵。
-- **為什麼是順序加上 description**：順序擋住驗收：`dispatching` 的 writer 在 Step 3 派出（`:56-78`），驗收在 Step 4、writer 回報之後（`:80-84`「A completion report is a claim」、`:91-96`），所以 writer 一定在驗收之前，第 4、5 步取「第一個」即可。只靠順序不夠：本文件上一版用「第一個 prompt 提到 limiter 的 block」，會把 T1 的 card 當成 writer。`dispatching` 要 agent 寫下「which piece owns which files」（`:21-22`），card 有「Constraints」一欄（`:66`），還要整批在一則訊息裡派出（`:71-72`），照做的 treatment 很可能先派 T1，T1 的 card 寫「do not touch `src/limiter.js`, T2 owns it」。這個混淆只落在 treatment 一邊，k=5 下幾列就能翻轉結果，所以要在認定時排除，不能留給稽核。
-- **為什麼第一層是 `description`**：Agent 呼叫的 `description` 是幾個字的任務摘要（`tests/scripts/eval-transcript-fidelity.test.js:89` 的形狀是 `{description, prompt}`）。T1 的 card 不論 prompt 怎麼寫 limiter 的歸屬，description 是「Add health route」這一類；T2 的 writer 是「Implement rate limiter」這一類。這個訊號兩臂都有，與 `dispatching` 的用詞無關：它是 Agent 工具自己的欄位，不是 card 的欄位。它也擋住句子規則擋不住的歸屬句，例如「T2 is implementing the limiter in parallel」沒有否定詞（第二層靠 `in parallel` 這個記號才擋得住，換個說法就漏）。
-- **為什麼還要第二層，而不是只用 `description`**：writer 的 description 不一定提到 limiter（「T2 implementation」、「Implement task 2」），或缺 description。這時第一層找不到，第二層用句子規則。第二層單獨用時漏掉上面那種沒有記號的歸屬句；第一層單獨用時漏掉不寫 limiter 的 description。兩層各補對方漏的那一種，所以疊起來；第二層只在第一層落空時才用，避免一個 T1 的 prompt 在第一層已經找到 writer 時又被考慮。
-- **為什麼驗收看 `description` 而不是 `prompt`**：writer 的 prompt 照 `dispatching:67` 會有「Acceptance criteria」這幾個字，照 T2 的 `verify:` 行會有「verify」；拿 prompt 的字判驗收，會把照規矩寫的 writer card 判成驗收，正好打在 treatment 身上。description 很短，「Verify limiter」「Review limiter implementation」與「Implement and test the limiter」分得開；第 3 步的實作動詞例外，讓「Implement and verify the rate limiter」仍算 writer。
-- **自己做 T2、只派驗收的列**：第一個提到 limiter 的派工是驗收（第 3 步），第 4、5 步找不到 writer，判 FAIL `no T2 writer dispatch identified`。這是對的：T2 寫著交給 subagent，自己做就沒有交接。
+- **為什麼是一次照順序走完，不分兩層**：上一版先在整份 transcript 用 `description` 找，找不到才回頭用 `prompt` 的句子找。那會讓後面的驗收贏過前面的 writer：writer 的 description 是「T2 implementation」（不提 limiter）、prompt 只給路徑，驗收的 description 是「Test limiter acceptance」，第一層跳過 writer、選中驗收，驗收貼的三條給出假 PASS，只在 treatment。照順序走一遍、每個 block 當場用兩種訊號分類，writer 在自己的位置就被認出（它的 prompt 有「Implement … `src/limiter.js`」這種句子），驗收根本輪不到。`dispatching` 的 writer 在 Step 3 派出（`:56-78`），驗收在 Step 4、writer 回報之後（`:82-84`「A completion report is a claim」、`:91-96`），所以 writer 本來就在驗收之前，順序是站得住的特徵。
+- **這個順序接受的代價**：T1 的 card 若有一句提到 limiter 卻沒有任何記號（「Coordinate with T2, which handles the limiter」），而 T1 先派，它會在後面那張 description 寫著 limiter 的 writer 之前被分成 `writer`，`A1` 對 T1 評分而判 FAIL。`dispatching` 的歸屬與整批派出（`:21-22`、`:66`、`:71-72`）讓這種列多在 treatment，是 treatment 的假 FAIL，縮小 delta。兩種漏洞互相競爭時選 FAIL：假 FAIL 的後果是 #184 維持開啟，句子照 D-049 以文字出貨（6.5.0 關卡的帳本文字），與今天相同；假 PASS 的後果是以錯的讀數關閉 #184，把一個沒有成立的主張記成量到的結果。所以 selector 在兩者之間一律偏向 FAIL。
+- **為什麼還有第 4 步**：它不靠字彙擋住最容易造成假 PASS 的形狀：agent 自己寫了 `src/limiter.js`，再派驗收並貼條件。主 agent 自己的 `Write`／`Edit` 一定在 transcript 裡，而真正的 writer 派工一定在 limiter 被寫之前；在那之後才提到 limiter 的派工是驗收或重做，不是 T2 的交接。第 3 步的字彙只剩一種情形要擋：驗收派出時 transcript 裡看不到任何 limiter 的寫入（例如 writer 本身沒被認出、它的 subagent 的寫入又沒出現在 transcript）。
+- **為什麼 `description` 是訊號**：Agent 呼叫的 `description` 是幾個字的任務摘要（`tests/scripts/eval-transcript-fidelity.test.js:89` 的形狀是 `{description, prompt}`）。T1 的 card 不論 prompt 怎麼寫 limiter 的歸屬，description 是「Add health route」這一類。這個訊號兩臂都有，與 `dispatching` 的用詞無關：它是 Agent 工具自己的欄位，不是 card 的欄位。
+- **為什麼驗收看 `description` 而不是 `prompt`**：writer 的 prompt 照 `dispatching:67` 會有「Acceptance criteria」，照 T2 的 `verify:` 行會有「verify」；拿 prompt 的字判驗收，會把照規矩寫的 writer card 判成驗收，正好打在 treatment 身上。
+- **字彙從哪來**：Step 4 與它指向的 `references/acceptance.md` 用的字：「Accept on evidence」（`:80`）、「Check the claim against the tree … run the project's own checks」（`:86-87`）、「the tests that exist pass」（`:88`）、「hand acceptance to a fresh-context agent」（`:91`）、「Two checks … does the suite pass」（`:94-96`）、「Both pass, accept」（`:96`）；`acceptance.md` 的兩節是「Check 1 — Does the delivery satisfy the criteria」與「Check 2 — Does it pass from an empty context」，並稱之為「a compliance check」。另外加上驗收 agent 常見的 description 用字（review、verify、validate、qa、assess、confirm、evaluate、judge、examine、inspect、audit）。
+- **實作動詞的例外，決定**：只留 `implement` 與 `build`，拿掉上一版的 `write`、`create`、`add`。
+  - 「Implement and verify the rate limiter」：含 `verify`，也含 `implement` → `writer`。對。
+  - 「Write limiter acceptance tests」、「Add limiter tests」：含 `acceptance`／`tests`，`write`／`add` 不再是例外 → `acceptance`。對。
+  - 判錯的一邊：真正的 writer 寫成「Write the rate limiter with tests」或「Add rate limiting and tests」→ `acceptance`，跳過；若後面沒有別的 `writer`，判 FAIL。兩臂都可能這樣寫（`executing:103`「Implementation code goes through `/tdd`」在兩臂的文字裡）。這是假 FAIL，照上面的規則偏向它。
+  - 保留的另一邊：「Build the limiter acceptance harness」含 `build` → `writer`；它若是在任何 limiter 寫入之前派出、又貼了三條，給出假 PASS。這要驗收描述裡帶 `build`、又在第 4 步看得到的寫入之前，本文件判斷少見。
+- **自己做 T2、只派驗收的列**：驗收在 `src/limiter.js` 被寫之後（第 4 步 `after-write`），或 description 是驗收型（第 3 步），都不是 `writer`；找不到 writer，判 FAIL `no T2 writer dispatch identified`。這是對的：T2 寫著交給 subagent，自己做就沒有交接。
 - 6.5.0 的關卡沒有討論這個 acceptance agent 的混淆：它的論點是 card 的全文讀不到、「有 acceptance criteria」量的是 `dispatching` Step 3（`design-gate.executing-dispatching.md`「兩個斷言能鑑別嗎？」），沒有走到「讀得到全文之後，哪一個 block 才是 card」這一步。
 - **為什麼去反引號與大小寫**：第 2、3 條含反引號，agent 把條件改寫成清單時常拿掉或加上 code 標記、句首大小寫跟著清單格式變；這些不改變條件的字。逐字比對要抓的是改寫（「10 per second」），不是排版。
 - **依賴的格式**：grader 依賴 format 2 的單行 JSON（事實 6）。format 1 的 row 只有 200 字元，條件幾乎一定不在裡面，所以 grader 不必判斷格式；量測在 `d1ae3060` 之後跑，每一列都是 format 2，稽核逐列確認 `transcript_format: 2`。
 
 **grader 的離線測試**（scenario PR 要以合成 transcript 逐條驗證，每條寫出預期的標籤與原因）：
 
-| 案例（transcript 裡 Agent block 的順序） | 預期 |
+| 案例（transcript 裡的順序） | 預期 |
 |---|---|
-| T1 card（description「Add health route」，prompt 含「do not touch `src/limiter.js`, T2 owns it」），然後 T2 writer（description「Implement rate limiter」，prompt 含三條） | PASS，writer 是第 2 個 block（第一層） |
+| T1 card（description「Add health route」，prompt 含「do not touch `src/limiter.js`, T2 owns it」），然後 T2 writer（description「Implement rate limiter」，prompt 含三條） | PASS；T1 `ownership-mention`，評第 2 個 block |
 | 同上的 T1 card，然後 T2 writer 只給路徑（prompt「Implement the limiter per `specs/limiter.md`」） | FAIL，缺三條 |
-| 只有上面那張 T1 card，沒有其他 block | FAIL `no T2 writer dispatch identified`；T1 標 `ownership-mention` |
+| 只有上面那張 T1 card | FAIL `no T2 writer dispatch identified`；T1 `ownership-mention` |
+| T2 writer（description「T2 implementation」，prompt「Implement the limiter in `src/limiter.js` per `specs/limiter.md`.」，沒有條件），然後驗收（description「Test limiter acceptance」，prompt 含三條） | FAIL，評的是 writer（由 prompt 的句子認出）；驗收 `acceptance` |
 | T2 writer 只給路徑，然後驗收（description「Verify limiter」，prompt 含三條） | FAIL，評的是 writer |
-| 只有驗收（description「Review limiter implementation」，prompt 含三條），沒有 writer | FAIL `no T2 writer dispatch identified`；驗收標 `acceptance` |
-| T2 writer 的 description「Implement and verify the rate limiter」，prompt 含三條 | PASS（實作動詞例外，不算驗收） |
-| T2 writer 的 description「T2 implementation」，prompt「Implement the limiter in `src/limiter.js`.」加三條；前面有 T1 card 含「do not touch `src/limiter.js`」 | PASS，writer 由第二層認定，T1 標 `ownership-mention` |
+| `[Tool: Write] …/src/limiter.js`，然後驗收（description「Write limiter acceptance tests」，prompt 含三條） | FAIL `no T2 writer dispatch identified`；驗收 `acceptance`（`write` 不是例外） |
+| `[Tool: Write] …/src/limiter.js`，然後派工（description「Second opinion on limiter」，沒有驗收字眼，prompt 含三條） | FAIL `no T2 writer dispatch identified`；那個 block `after-write` |
+| 只有驗收（description「Review limiter implementation」，prompt 含三條），之前沒有寫入 | FAIL `no T2 writer dispatch identified`；驗收 `acceptance`（`implementation` 不是 `implement`） |
+| T2 writer 的 description「Implement and verify the rate limiter」，prompt 含三條 | PASS（`implement` 例外） |
+| T2 writer 的 description「Add rate limiting and tests」，prompt 含三條，之後沒有別的派工 | FAIL `no T2 writer dispatch identified`；那個 block `acceptance`。已知的假 FAIL（見「實作動詞的例外，決定」） |
+| T1 card（description「Add health route」，prompt 含「Coordinate with T2, which handles the limiter」），然後 T2 writer（description「Implement rate limiter」，prompt 含三條） | FAIL，評的是 T1（`writer`，沒有記號）。已知的假 FAIL，偏向 FAIL 的代價 |
+| T1 card 的 prompt 寫「`src/limiter.js` is owned by T2.」，然後 T2 writer（description「T2 implementation」，prompt「Implement the limiter.」加三條） | PASS；T1 `ownership-mention`（`.js` 不切句） |
 | T2 writer 的 prompt 含三條，但第 2 條寫成「Retry-After in seconds」 | FAIL，缺第 2 條 |
 | 條件含反引號與大小寫差異（「`retry-after` is rounded up to whole seconds」） | 與原文相符 |
-| T1 card 的 prompt 寫「`src/limiter.js` is owned by T2.」（記號在路徑之後），然後 T2 writer（description「T2 implementation」，prompt「Implement the limiter.」加三條） | PASS，writer 由第二層認定，T1 標 `ownership-mention`（`.js` 不切句） |
 | 沒有任何 Agent／Task block | FAIL `T2 not dispatched` |
-| 一個 Agent block 的 JSON 不可解析，其餘無 | FAIL `T2 not dispatched`；該 block 標 `unreadable` |
+| 一個 Agent block 的 JSON 不可解析，其餘無 | FAIL `T2 not dispatched`；該 block `unreadable` |
 
 **印出、不計分的 audit 行**：
 
 - `-- audit: specs/limiter.md opened`：有沒有 `[Tool: Read]`、或 `Bash` 指令含 `specs/limiter.md`。沒開 spec 的 FAIL 與開了卻沒照貼的 FAIL 分開報告。
 - `-- audit: dispatching/SKILL.md opened`：有沒有工具呼叫讀 staged 的 `dispatching/SKILL.md`（路徑含 `arcforge-eval-skill-` 與 `SKILL.md`，且不是 `executing` 的那一份）。treatment 的地板指標；baseline 若出現，表示它往 trial 樹外找。
 - `-- audit: agent calls`：Agent／Task block 的總數。
-- `-- audit: limiter dispatch`：每一個提到 limiter 的 block 一行（第 2 步的定義）：它在所有 Agent／Task block 中的位置、分類（`writer`、`ownership-mention`、`acceptance`、`unreadable`，或 `other` 表示提到 limiter 但在 writer 之後、未分類）、由哪一層認定（description／prompt）、含幾條條件（0–3）、`description` 的前 80 字元、`prompt` 是否含 `specs/limiter.md` 這個路徑。被評分的是標 `writer` 的那一行。稽核者看得到 T1 的歸屬 card、writer 與驗收的 prompt 並排，也看得到驗收失敗後再派的 writer。
+- `-- audit: limiter dispatch`：每一個提到 limiter 的 block 一行（第 2 步的定義），依 transcript 順序：它在所有 Agent／Task block 中的位置、分類（`writer`、`ownership-mention`、`acceptance`、`after-write`、`unreadable`）、提到 limiter 的地方（description／prompt／both）、是否被評分（只有第一個 `writer`）、含幾條條件（0–3）、`description` 的前 80 字元、`prompt` 是否含 `specs/limiter.md` 這個路徑。稽核者看得到 T1 的歸屬 card、writer 與驗收的 prompt 並排，也看得到驗收失敗後再派的 writer。
 - `-- audit: not top-level`：無法判斷。format 2 不標記 subagent 的呼叫（事實 7），這一行固定印出這句，提醒稽核者一個含條件的 block 理論上可能出自 subagent。
 - `-- audit: model tier`：prompt 裡有沒有 `model:`、`haiku`、`sonnet`、`opus` 這類欄位。不計分：6.5.0 關卡與 D-066 都判它在兩臂都是天花板，不斷言。
 - `-- audit: arcforge errors`：每個指令含 `arcforge` 的 `[Tool: Bash]` block，若緊接著的是 `[Result: Bash] error (exit N)`，印出指令的第一行與 exit code。format 2 只記失敗的結果、不記內容（`eval-transcript.js:20-22`、`:103-110`），所以這一行只能說「失敗了、exit 多少」，不能說為什麼。
@@ -239,19 +250,21 @@ baseline 通過，要三條條件在它的 Agent prompt 裡逐字出現，而它
 - **預期的 digest**（`d1ae3060`，`digestSkillDir` 離線計算）：`skills/core/executing` `1ef6e3967679cf2b`、`skills/core/dispatching` `9479e63210fdc2be`；`executing/SKILL.md` 的文字 hash `17fa36f1535cb446`。量測前在量測 commit 重算，不同就停下、重新登記，不花 session。`alsoStagedFilesHash` 不是 pool 條件（B-22），所以這一步是唯一確認 `dispatching` 沒有在量測前被改的地方。
 - **session**：preflight 3；A/B 兩臂各 5，共 10。補跑與 preflight 出錯重跑照 PLAN 的額度表，與 D2 共用。
 - **順序**：D1 先跑，結束後才開始 D2；一個 checkout 一次一個 live eval。
-- **稽核**：逐列報告 A1、所有 audit 行（`limiter dispatch` 裡標 `writer` 的那一行是不是 T2 的實作 card 逐列判讀）、`transcript_format`、耗時與是否被砍、treatment 有沒有開 `dispatching/SKILL.md`、baseline 有沒有往 trial 樹外找。
+- **稽核**：逐列報告 A1、所有 audit 行（`limiter dispatch` 裡被評分的那一行是不是 T2 的實作 card 逐列判讀）、`transcript_format`、耗時與是否被砍、treatment 有沒有開 `dispatching/SKILL.md`、baseline 有沒有往 trial 樹外找。
 
 ## 殘餘風險
 
 - **列名不是 host 的列名**（B-22 Residual）：treatment 讀本體的頻率可能與真實 session 不同。讀數只說明「本體可及時」的行為，不是 plugin 載入後的行為。
 - **subagent 的呼叫沒有標記**（事實 7）。被認定為 writer 的 block 若出自 subagent，仍會被評分；稽核者逐列看那個 block 前後的工具呼叫。
-- **認定規則仍會判錯的列。** 規則對兩臂相同，但下列情形不是兩臂同樣常見：
-  - **T1 的 card 被當成 writer（treatment 較常見，縮小 delta）。** 只在第二層發生：writer 的 description 沒提 limiter，而 T1 的 prompt 有一句提到 limiter 卻沒有任何記號（例如「Coordinate with T2, which handles the limiter」）。`dispatching` 的歸屬與整批派出（`:21-22`、`:66`、`:71-72`）讓 treatment 比較會寫這種句子，也比較會先派 T1。
-  - **writer 被當成歸屬句而跳過（treatment 較常見，縮小 delta）。** 也只在第二層：writer 的 description 沒提 limiter，而 prompt 裡每一句提到 limiter 的句子都碰巧帶記號，例如「Implement the limiter in `src/limiter.js` and do not touch `src/server.js`」整句只有一個句子。若後面沒有別的 writer 候選，判 FAIL `no T2 writer dispatch identified`；若後面有，評到錯的 block。treatment 的 card 有 Constraints 一欄，比較常把限制與任務寫在同一句。
-  - **驗收被當成 writer（只有 treatment，放大 delta）。** 驗收的 description 同時帶實作動詞（「Check the limiter build」），而它前面沒有 writer：自己做了 T2、再派驗收的列。驗收的 prompt 若貼了三條，判 PASS。這需要「自己做 T2」與「description 帶 build 之類的字」同時發生，本文件判斷少見。
-  - **探索或規劃的 agent 被當成 writer（baseline 較常見，放大 delta）。** 先派一個讀 spec 的 agent，它的 description 提到 limiter（「Read limiter spec」），沒有驗收字眼，第一層就認定它；它的 prompt 沒有三條，判 FAIL。baseline 沒有 `dispatching` 的 Step 3 結構，本文件判斷它比 treatment 常這樣做，但沒有證據。
+- **認定規則仍會判錯的列。** 規則對兩臂相同，但下列情形不是兩臂同樣常見。前兩種是刻意接受的假 FAIL（兩種漏洞競爭時偏向 FAIL，理由見 A1 的說明）：
+  - **T1 的 card 被當成 writer（treatment 較常見，縮小 delta）。** T1 先派，它的 prompt 有一句提到 limiter 卻沒有記號（「Coordinate with T2, which handles the limiter」）。`dispatching` 的歸屬與整批派出（`:21-22`、`:66`、`:71-72`）讓 treatment 比較會寫這種句子、也比較會先派 T1。
+  - **writer 的 description 是驗收型而被跳過（兩臂都可能，縮小或放大視哪一臂較多）。** 「Write the rate limiter with tests」、「Add rate limiting and tests」：`write`、`add` 不是例外。`executing:103` 的 `/tdd` 在兩臂都有，所以兩臂都可能；之後若沒有別的 `writer`，判 FAIL。
+  - **writer 被當成歸屬句而跳過（treatment 較常見，縮小 delta）。** writer 的 description 不提 limiter，而 prompt 裡每一句提到 limiter 的句子都碰巧帶記號，例如「Implement the limiter in `src/limiter.js` and do not touch `src/server.js`」整句只有一個句子。treatment 的 card 有 Constraints 一欄，比較常把限制與任務寫在同一句。
+  - **主 agent 先寫了 `src/limiter.js` 的骨架再派 writer（兩臂都可能，假 FAIL）。** 第 4 步把那次派工分成 `after-write`。
+  - **驗收被當成 writer（只有 treatment，放大 delta）。** 只剩一種形狀：驗收的 description 帶 `implement` 或 `build`（「Build the limiter acceptance harness」），或完全不帶驗收字眼，而且它之前 transcript 裡看不到任何 limiter 的寫入（writer 沒被認出、它的 subagent 的寫入也沒出現）。三個條件要同時成立，本文件判斷少見。
+  - **探索或規劃的 agent 被當成 writer（baseline 較常見，放大 delta）。** 先派一個讀 spec 的 agent（「Read limiter spec」），它沒有驗收字眼、在任何寫入之前，分成 `writer`；它的 prompt 沒有三條，判 FAIL。baseline 沒有 `dispatching` 的 Step 3 結構，本文件判斷它比 treatment 常這樣做，但沒有證據。
 
-  四種都由 `-- audit: limiter dispatch` 逐列看得到：標 `writer` 的那一行的 description 若不是 T2 的實作，就是這種列。稽核逐列標出，兩臂各有幾列寫進結果的 decision；不改標籤、不重新計分（D-063 第 4 點的規則）。若 A/B 的判定靠這幾列翻轉，結果的 decision 要照實寫出。
+  每一種都由 `-- audit: limiter dispatch` 逐列看得到：被評分的那一行的 description 若不是 T2 的實作，或真正的 writer 被分成別的類別，就是這種列。稽核逐列標出，兩臂各有幾列寫進結果的 decision；不改標籤、不重新計分（D-063 第 4 點的規則）。若 A/B 的判定靠這幾列翻轉，結果的 decision 要照實寫出。
 - **驗收失敗後再派 writer。** 被認定的仍是原本的 writer card（第一個符合的 block），`A1` 評的是它；重派的 card 只出現在 audit 行。這是想要的行為：量的是第一次交接帶不帶條件。
 - **`aliases.json` 的誤報**：brief 把它歸到本關卡，與檔案不符。D-065、D-066 的 Residual 記的是 6.5.0 resume scenario（`eval-sessions-handover-and-resume`）的「archive file read directly」旗標在 `aliases.json` 上誤報；本 scenario 是新的，不讀 archive，不受影響。那個誤報照 D-066 維持原狀。
 - **`arcforge worktree add` 在 trial 裡因別的原因失敗。** `PATH` 已宣告，離線也跑通；仍可能失敗的原因有 `ARCFORGE_HOME` 在 trial 下的路徑、git 身分、或 agent 在 worktree 裡再建 worktree（`dispatching:48`「Never nest a worktree inside a worktree」）。失敗會留在 transcript：`-- audit: arcforge errors` 逐列印出。treatment 的 row 若在這裡失敗、之後沒有派 writer，`A1` 判 FAIL；稽核逐列標出這是「CLI 失敗」而不是「沒照貼」，寫進結果的 decision，不改標籤。
@@ -262,7 +275,7 @@ baseline 通過，要三條條件在它的 Agent prompt 裡逐字出現，而它
 **MEASURABLE**，條件五項：
 
 1. prompt 指定 unattended 並說不要問模式；派給 subagent 的要求只在 T2，三條條件只在 `specs/limiter.md`，T2 寫出它的路徑。
-2. 唯一計分斷言 `A1`：依「認定 writer 派工」的七步找出 T2 的 writer（第一層看 `description`，落空才看 `prompt` 中非歸屬、非否定的句子；驗收型 description 永不算 writer），它的 `prompt` 在正規化後逐字含三條條件。沒有提到 limiter 的派工判 FAIL `T2 not dispatched`；提到但認不出 writer 判 FAIL `no T2 writer dispatch identified`；writer 之後的派工（驗收、重派）不計分。model tier 不斷言。grader 的離線測試案例照「grader 的離線測試」一節。
+2. 唯一計分斷言 `A1`：依「認定 writer 派工」的七步，照 transcript 順序走一遍 Agent／Task block，第一個分到 `writer` 的 block（提到 limiter；description 不是驗收型，`implement`／`build` 例外；在任何 `src/limiter.js` 寫入之前；description 提到 limiter，或 prompt 有一句提到 limiter 的非歸屬、非否定句）就是 T2 的 writer，它的 `prompt` 在正規化後逐字含三條條件。沒有提到 limiter 的派工判 FAIL `T2 not dispatched`；提到但沒有 `writer` 判 FAIL `no T2 writer dispatch identified`；writer 之後的派工不計分。兩種漏洞競爭時偏向 FAIL。model tier 不斷言。grader 的離線測試案例照「grader 的離線測試」一節。
 3. grader 讀存檔 transcript 的 format 2 單行 JSON，不讀 `raw/`；稽核確認每列 `transcript_format: 2`。
 4. 兩臂旗標如上；兩個 digest 與文字 hash 在量測 commit 重算相符。
 5. `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000`，preflight 與 A/B 同值；Setup 建 git repo 並設定身分；`## Environment` 宣告 `PATH+=${PROJECT_ROOT}/bin`，讓 `dispatching` Step 2 的 `arcforge worktree add` 在 trial 裡解析得到。
