@@ -24,6 +24,7 @@ const SCENARIO_FILE = path.join(
 
 const C1 = 'A burst of exactly 10 requests within 1000 ms is allowed; the 11th gets 429.';
 const C2 = '`Retry-After` is rounded up to whole seconds.';
+// biome-ignore lint/suspicious/noTemplateCurlyInString: literal fixture text
 const C3 = 'The counter key is `${ip}:${route}`, never `ip` alone.';
 const CRITERIA = `Acceptance criteria:\n1. ${C1}\n2. ${C2}\n3. ${C3}`;
 const T1_OWNERSHIP = 'Add GET /health to src/server.js. Do not touch `src/limiter.js`, T2 owns it.';
@@ -37,7 +38,8 @@ describe('eval-executing-dispatch-acceptance scenario', () => {
     expect(scenario.trials).toBe(5);
     expect(scenario.scope).toBe('skill');
     expect(scenario.target).toBe('skills/core/executing/SKILL.md');
-    expect(scenario.environment).toEqual(['PATH+=${PROJECT_ROOT}/bin']);
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: literal fixture text
+    expect(scenario.environment).toEqual(['PATH^=${PROJECT_ROOT}/bin']);
     expect(scenario.grader).toBe('code');
     expect(scenario.assertions).toHaveLength(1);
     expect(scenario.maxTurns).toBeUndefined();
@@ -212,7 +214,59 @@ describe('eval-executing-dispatch-acceptance grader (offline)', () => {
     expect(g.dispatch[0]).toMatch(/#1 unreadable/);
   });
 
+  it('`ls src/limiter.js 2>/dev/null` is not a write: a correct writer after it PASSes', () => {
+    const g = grade([
+      '[Tool: Bash] $ ls src/limiter.js 2>/dev/null',
+      agent('Implement rate limiter', CRITERIA),
+    ]);
+    expect(g.passed).toBe(true);
+    expect(g.dispatch[0]).toMatch(/#1 writer \[scored\]/);
+  });
+
+  it('`cat > src/limiter.js <<EOF` is a write: the later limiter dispatch is after-write', () => {
+    const g = grade([
+      '[Tool: Bash] $ cat > src/limiter.js <<EOF\nmodule.exports = {};\nEOF',
+      agent('Rate limiter follow-up', CRITERIA),
+    ]);
+    expect(g.evidence).toBe('FAIL: no T2 writer dispatch identified');
+    expect(g.dispatch[0]).toMatch(/#1 after-write/);
+  });
+
+  it('"Whenever" is not the marker "never": the sentence still names the writer, PASS', () => {
+    const g = grade([
+      agent(
+        'T2 implementation',
+        `Whenever a client exceeds the rate limit, respond 429.\n${CRITERIA}`,
+      ),
+    ]);
+    expect(g.passed).toBe(true);
+    expect(g.dispatch[0]).toMatch(/#1 writer \[scored\]/);
+  });
+
   // ---- shapes the gate's rules name that the table does not ----
+
+  it.each([
+    ['unset', undefined],
+    ['missing', 'missing.txt'],
+    ['empty', 'empty.txt'],
+  ])('a transcript that is %s gives no verdict: a grade error, not a FAIL', (_, name) => {
+    let transcript;
+    if (name) {
+      transcript = path.join(workDir, name);
+      if (name === 'empty.txt') fs.writeFileSync(transcript, '');
+    }
+    const graded = gradeTrialResult({ trialDir, transcript }, scenario, PROJECT_ROOT);
+    expect(graded.gradeError).toBe(true);
+    expect(graded.errorType).toBe('code_grader_assertion_labels_invalid');
+    expect(graded.assertionScores).toBeUndefined();
+    expect(graded.graderOutput).toMatch(/A0:FAIL:no transcript to read; this trial has no verdict/);
+  });
+
+  it('a subagent card that only passes a staged SKILL.md path does not count as opened', () => {
+    const d = '/var/folders/x/T/arcforge-eval-skill-41-aB3';
+    const g = grade([agent('Implement rate limiter', `Read ${d}/SKILL.md first.\n${CRITERIA}`)]);
+    expect(g.output).toMatch(/dispatching\/SKILL\.md opened: no Read or Bash call/);
+  });
 
   it('a single T2 writer with the three criteria, through the Task tool name: PASS', () => {
     const g = grade([
@@ -277,7 +331,7 @@ describe('eval-executing-dispatch-acceptance grader (offline)', () => {
     );
     expect(g.output).toMatch(/-- audit: model tier: #1/);
     expect(g.output).toMatch(/-- audit: not top-level: cannot be determined/);
-    expect(g.output).toMatch(/-- audit: dispatching\/SKILL\.md opened: no tool call/);
+    expect(g.output).toMatch(/-- audit: dispatching\/SKILL\.md opened: no Read or Bash call/);
     expect(g.output).toMatch(/-- audit: outside the trial tree: none/);
   });
 });

@@ -67,9 +67,11 @@ for the mode first — and says nothing about subagents, criteria, pasting, path
 or `dispatching`. Each criterion has one detail a common paraphrase drops:
 "exactly 10 … the 11th", "rounded up", "never `ip` alone".
 
-`## Environment` puts the repository's `bin/` on the trial's `PATH`: `dispatching`
-Step 2 runs `arcforge worktree add`, and a trial's `PATH` has no `arcforge`
-unless the scenario declares it (B-18). Without it the treatment would meet
+`## Environment` puts the repository's `bin/` first on the trial's `PATH`:
+`dispatching` Step 2 runs `arcforge worktree add`, and a trial's `PATH` has no
+`arcforge` unless the scenario declares it (B-18). It is prepended (`^=`), not
+appended, so an `arcforge` in a system directory cannot shadow this checkout's;
+`bin/` holds only `arcforge`, so prepending shadows none of the trial's shims. Without it the treatment would meet
 `command not found` before the writer dispatch and the baseline would not,
 and the run would measure whether the CLI exists. `ARCFORGE_HOME` is under the
 trial, so the worktree lands in the trial tree. Failed calls are already in the
@@ -89,9 +91,10 @@ JSON does not parse); no mention of `limiter` or `rate limit` → `other`; an
 acceptance-type `description` (the gate's whole-word list, excepted only by the
 whole words `implement` or `build`) → `acceptance`; a block after a write of
 `src/limiter.js` (`Write`/`Edit` of a path ending in it, or a `Bash` command
-with `limiter.js` and `>` or `tee`) → `after-write`; a `description` that
+whose `>`/`>>` redirect or `tee` target is a path ending in `limiter.js`) →
+`after-write`; a `description` that
 mentions the limiter, or a `prompt` sentence that mentions it and carries no
-ownership or negation marker → `writer`; otherwise `ownership-mention`.
+ownership or negation marker (matched as whole words or phrases) → `writer`; otherwise `ownership-mention`.
 Nothing mentions the limiter → FAIL `T2 not dispatched`; mentions but no
 `writer` → FAIL `no T2 writer dispatch identified`. Blocks after the writer are
 classed and printed, never scored.
@@ -111,16 +114,23 @@ first 80 characters of the `description`, whether the `prompt` names
 model-tier fields; failed `arcforge` calls with their exit code; and tool calls
 outside the trial tree.
 
-The staged-`SKILL.md` line cannot name which copy it read: both staged copies
-are `<tmp>/arcforge-eval-skill-<pid>-<random>/`, and the transcript does not
-carry the injection that says which is which. A copy is marked as
-`dispatching`'s only when a `references/` path under it was named, since
-`executing`'s copy holds `SKILL.md` alone. Otherwise read the row's raw stream
-for the base-directory lines.
+The staged-`SKILL.md` line counts only `Read` and `Bash` calls — a card that
+passes `<copy>/SKILL.md` to a subagent did not open it — and cannot name which
+copy it read: both staged copies are `<tmp>/arcforge-eval-skill-<pid>-<random>/`,
+and the transcript does not carry the injection that says which is which. A
+copy is marked as `dispatching`'s only when a `references/` path under the same
+copy was also read, since `executing`'s copy holds `SKILL.md` alone. Otherwise
+the line says "copy not identified"; read the row's raw stream for the
+base-directory lines.
 
 The grader reads the saved format-2 transcript, never `raw/`, as data; it runs
 nothing. It runs as `python3 -I` from a fresh empty directory (B-14), and the
 transcript is read only when it is a regular file under 32 MiB.
+
+**When the grader gives no verdict.** The grader prints an out-of-range `A0`
+label, which the engine records as a grade error, when `TRANSCRIPT_PATH` is
+unset, missing, empty or not a regular file under 32 MiB. A grade error is not
+a FAIL: the row has no verdict.
 
 ### Running it
 
@@ -162,7 +172,12 @@ handling of #184: the gate's 「執行計畫」 and 「判定」.
 The gate's 「殘餘風險」 is the list: the listing line is not the host's, a
 subagent's calls are not marked, the rows the writer rule still misclasses
 (each visible in `-- audit: limiter dispatch`), a re-dispatched writer after a
-failed acceptance, and `arcforge worktree add` failing in the trial. Report
+failed acceptance, and `arcforge worktree add` failing in the trial. One more
+belongs to the grader's write rule: it sees `Write`, `Edit` and Bash `>`/`>>`/`tee`
+targets, not writes by other means (`sed -i`, `node -e` with `writeFileSync`,
+`cp`/`mv`), so a row that implemented T2 itself that way and then dispatched an
+acceptance agent with the criteria can be scored on that dispatch. The main
+agent normally writes with `Write`/`Edit`, which are caught. Report
 those rows per arm as the gate says; do not relabel or re-score.
 
 ## Setup
@@ -244,11 +259,11 @@ EOF
 git add -A && git commit -qm "fixture"
 
 ## Environment
-# arcforge is what dispatching's Step 2 runs to make a worktree; the trial PATH has no arcforge otherwise (eval B-18)
-PATH+=${PROJECT_ROOT}/bin
+# arcforge is what dispatching's Step 2 runs to make a worktree; the trial PATH has no arcforge otherwise (eval B-18), and it is prepended so a host arcforge cannot shadow this checkout's
+PATH^=${PROJECT_ROOT}/bin
 
 ## Assertions
-- [ ] A1: The first Agent/Task call identified as T2's writer — in one pass over the Agent/Task blocks in transcript order, the first block that mentions the limiter (`limiter` or `rate limit`), whose `description` is not acceptance-type (the whole words `implement` and `build` excepted), that comes before any write of `src/limiter.js`, and whose `description` mentions the limiter or whose `prompt` has a sentence mentioning it with no ownership or negation marker — carries all three acceptance criteria of `specs/limiter.md` in its `prompt`, word for word after normalisation (lowercase, `-` as a space, no backticks, whitespace collapsed, no trailing period). No limiter mention in any block fails as `T2 not dispatched`; mentions with no writer fail as `no T2 writer dispatch identified`.
+- [ ] A1: The first Agent/Task call identified as T2's writer — in one pass over the Agent/Task blocks in transcript order, the first block that mentions the limiter (`limiter` or `rate limit`), whose `description` is not acceptance-type (the whole words `implement` and `build` excepted), that comes before any write of `src/limiter.js` (a `Write`/`Edit` of a path ending in it, or a Bash `>`/`>>`/`tee` target ending in `limiter.js`), and whose `description` mentions the limiter or whose `prompt` has a sentence mentioning it with no ownership or negation marker (whole words or phrases) — carries all three acceptance criteria of `specs/limiter.md` in its `prompt`, word for word after normalisation (lowercase, `-` as a space, no backticks, whitespace collapsed, no trailing period). No limiter mention in any block fails as `T2 not dispatched`; mentions with no writer fail as `no T2 writer dispatch identified`.
 
 ## Grader
 code
@@ -346,7 +361,14 @@ def sentences(prompt):
 
 
 def ownership(sentence):
-    return any(m in sentence for m in MARKERS)
+    # Whole words or phrases: `whenever` is not `never`, `downstream` is not `owns`.
+    return has_word(sentence, MARKERS)
+
+
+# A redirect (`>`, `>>`) or `tee` (`-a` allowed) whose target is a path ending in limiter.js.
+BASH_WRITE_RE = re.compile(
+    r"(?:>>?|\btee(?:\s+-a)?)\s*[\"']?[^\s\"';|&<>]*limiter\.js(?![\w.])"
+)
 
 
 def writes_limiter(block):
@@ -358,7 +380,7 @@ def writes_limiter(block):
         target = head[len("[Tool: Edit] "):].split(' (replace "', 1)[0]
         return target.strip().endswith("src/limiter.js")
     if block.startswith("[Tool: Bash]"):
-        return "limiter.js" in block and (">" in block or "tee" in block)
+        return BASH_WRITE_RE.search(block) is not None
     return False
 
 
@@ -398,9 +420,11 @@ def criteria_present(prompt):
 
 # ---- read the transcript ----
 raw = regular_bytes(tp) if tp else None
-if raw is None:
-    emit("A1", False, f"transcript missing, or not a regular file under {MAX_BYTES >> 20} MiB: {tp}")
-    sys.exit(1)
+if not raw:
+    # Not a FAIL: an out-of-range label is a grade error (eval-grader-code.js), so the row
+    # has no verdict.
+    print("A0:FAIL:no transcript to read; this trial has no verdict")
+    sys.exit(3)
 blocks = [b for b in raw.decode("utf-8", errors="replace").split("\n\n") if b.strip()]
 
 records, written = [], False
@@ -450,12 +474,13 @@ for s in spec[:3]:
     print(f"-- audit: specs/limiter.md opened: <- {s}")
 
 staged_re = re.compile(r"[^\s\"'`]*arcforge-eval-skill-[^/\s\"'`]+(?:/[^\s\"'`]*)?")
-named = [(m.group(0), b) for b in tools for m in staged_re.finditer(scanned(b))]
+opened = [b for b in tools if b.startswith("[Tool: Read]") or b.startswith("[Tool: Bash]")]
+named = [(m.group(0), b) for b in opened for m in staged_re.finditer(b)]
 copy_of = lambda p: re.match(r"(.*arcforge-eval-skill-[^/]+)", p).group(1)  # noqa: E731
 with_refs = {copy_of(p) for p, _ in named if "/references/" in p}
 skill_reads = [(p, b) for p, b in named if p == copy_of(p) + "/SKILL.md"]
 if not skill_reads:
-    print("-- audit: dispatching/SKILL.md opened: no tool call names a staged SKILL.md")
+    print("-- audit: dispatching/SKILL.md opened: no Read or Bash call names a staged SKILL.md")
 for p, b in skill_reads[:5]:
     which = "dispatching's (references/ named under it)" if copy_of(p) in with_refs else "copy not identified"
     print(f"-- audit: dispatching/SKILL.md opened: staged SKILL.md, {which}: {p} <- {b.splitlines()[0][:100]}")

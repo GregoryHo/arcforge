@@ -50,7 +50,7 @@ D-066 把主張改寫成兩支 skill 合起來的行為：兩臂都注入同一�
 6. **transcript format 2 的 Agent block。** `summarizeToolInput` 對 `Agent` 與 `Task` 回傳 `JSON.stringify(input)`（`eval-transcript.js:183-185`），整行寫成 `[Tool: Agent] <json>`（`:61-62`），block 之間以空行分隔（`:79`）。JSON 把 prompt 裡的換行轉成 `\n`，所以 block 是單行。測試 `tests/scripts/eval-transcript-fidelity.test.js:83-94` 以一份超過 2000 字元、含空行的 prompt 驗證：`parseActionsFromTranscript` 得到一個 action，`JSON.parse(actions[0].args)` 等於原輸入 `{description, prompt}`。grader 讀的就是存檔 transcript 裡這一行，不是 `raw/`。row 記 `transcript_format`（`eval-trial.js:331`）。
 7. **subagent 的呼叫沒有標記。** 解析器只看 `event.type` 與 `content`，不讀 `parent_tool_use_id`（`eval-transcript.js:54-63`），subagent 的工具呼叫與主 agent 的混在一起。grader 無法分辨一個 `[Tool: Agent]` 出自主 agent 還是 subagent。
 8. **ceiling 預設 900 s，被砍的 trial 不計分。** `DEFAULT_TRIAL_TIMEOUT_MS = 900000`（`eval-trial.js:53`），「A killed trial never scores」（`:52`，`trial_killed_incomplete`，`:387-399`）。
-9. **trial 的 `PATH` 沒有 `arcforge`，除非 scenario 宣告。** eval B-18（`product/specs/eval.md:267` 起，`PATH` 的部分在 `:286-297`）：trial 的 `PATH` 是建出來的，只有 `.eval-trials/.bin` 的 shim（`claude`、`node`、`npm`、`npx`、`python3`）加上 `/usr/bin`、`/bin`、`/usr/sbin`、`/sbin`，operator 自己的 `PATH` 不帶過去，「`arcforge` included — is not something a trial can run unless the scenario says so」。本文件第一版引用 D-064 (1) 說 `arcforge` 在真 trial 解析得到，那是錯的引用：D-064 (1) 是 resume scenario，它自己在 `## Environment` 宣告了 `PATH+=${PROJECT_ROOT}/bin`（`evals/scenarios/eval-sessions-handover-and-resume.md` 的 `## Environment`；依據是 `docs/plans/v6.5/wp-d/design-gate.sessions-resume.md` 的「離線驗證」表）。不宣告，treatment 照 `dispatching` Step 2（`dispatching/SKILL.md:30-44`）執行 `arcforge worktree add … --json` 會得到 `command not found`，可能在 `A1` 評分的那個 Agent block 之前就停下或改道，而 baseline 直接派工，實驗量到的就成了 CLI 在不在。所以本 scenario 宣告同一條（見「`## Environment`」）。`ARCFORGE_HOME` 設在 trial 目錄下的 `.arcforge`（`scripts/lib/eval-trial-environment.js:404`），`getWorktreeRoot` 經 `getArcforgeHome()` 跟著它走（`scripts/lib/worktree-paths.js:36-42`），所以 worktree 落在 trial 樹裡。worktree 需要 git repo，fixture 的 Setup 要 `git init` 並設定身分，前例是 `evals/scenarios/eval-code-review-range-fidelity.md:59-61`。
+9. **trial 的 `PATH` 沒有 `arcforge`，除非 scenario 宣告。** eval B-18（`product/specs/eval.md:267` 起，`PATH` 的部分在 `:286-297`）：trial 的 `PATH` 是建出來的，只有 `.eval-trials/.bin` 的 shim（`claude`、`node`、`npm`、`npx`、`python3`）加上 `/usr/bin`、`/bin`、`/usr/sbin`、`/sbin`，operator 自己的 `PATH` 不帶過去，「`arcforge` included — is not something a trial can run unless the scenario says so」。本文件第一版引用 D-064 (1) 說 `arcforge` 在真 trial 解析得到，那是錯的引用：D-064 (1) 是 resume scenario，它自己在 `## Environment` 宣告了 `PATH+=${PROJECT_ROOT}/bin`（`evals/scenarios/eval-sessions-handover-and-resume.md` 的 `## Environment`；依據是 `docs/plans/v6.5/wp-d/design-gate.sessions-resume.md` 的「離線驗證」表）。不宣告，treatment 照 `dispatching` Step 2（`dispatching/SKILL.md:30-44`）執行 `arcforge worktree add … --json` 會得到 `command not found`，可能在 `A1` 評分的那個 Agent block 之前就停下或改道，而 baseline 直接派工，實驗量到的就成了 CLI 在不在。所以本 scenario 宣告 `${PROJECT_ROOT}/bin`，但以 `PATH^=` 放在最前面，不是 resume scenario 的 `PATH+=`：附加在系統目錄之後，主機上的 `arcforge`（例如 `/usr/bin/arcforge`）會蓋過這個 checkout 的 CLI（見「`## Environment`」）。`ARCFORGE_HOME` 設在 trial 目錄下的 `.arcforge`（`scripts/lib/eval-trial-environment.js:404`），`getWorktreeRoot` 經 `getArcforgeHome()` 跟著它走（`scripts/lib/worktree-paths.js:36-42`），所以 worktree 落在 trial 樹裡。worktree 需要 git repo，fixture 的 Setup 要 `git init` 並設定身分，前例是 `evals/scenarios/eval-code-review-range-fidelity.md:59-61`。
 
 ## scenario 設計
 
@@ -85,11 +85,11 @@ git add -A && git commit -qm "fixture"
 
 ```
 ## Environment
-# arcforge is what dispatching's Step 2 runs to make a worktree; the trial PATH has no arcforge otherwise (eval B-18)
-PATH+=${PROJECT_ROOT}/bin
+# arcforge is what dispatching's Step 2 runs to make a worktree; the trial PATH has no arcforge otherwise (eval B-18), and it is prepended so a host arcforge cannot shadow this checkout's
+PATH^=${PROJECT_ROOT}/bin
 ```
 
-只有這一行。resume scenario 另有一行 `PATH^=${TRIAL_DIR}/.arcforge/bin` 與 Setup 寫的包裝 script，用途是把每次 `arcforge` 呼叫的 exit code 記進 log，因為當時 transcript 不記 exit code（`design-gate.sessions-resume.md`「離線驗證」表最後兩列；D-063 第 5 點的 per-row 規則）。format 2 已經把失敗的 Bash 呼叫記成 `[Result: Bash] error (exit N)`（`scripts/lib/eval-transcript.js:103-110`），本 scenario 不需要那支包裝，也就不宣告第二行。
+只有這一行。`^=` 把 `bin/` 放在 `PATH` 最前面（`scripts/lib/eval-trial-environment.js:102`、`:255`）；`bin/` 只有 `arcforge`，不會蓋過 trial 的任何 shim。resume scenario 另有一行 `PATH^=${TRIAL_DIR}/.arcforge/bin` 與 Setup 寫的包裝 script，用途是把每次 `arcforge` 呼叫的 exit code 記進 log，因為當時 transcript 不記 exit code（`design-gate.sessions-resume.md`「離線驗證」表最後兩列；D-063 第 5 點的 per-row 規則）。format 2 已經把失敗的 Bash 呼叫記成 `[Result: Bash] error (exit N)`（`scripts/lib/eval-transcript.js:103-110`），本 scenario 不需要那支包裝，也就不宣告第二行。
 
 **離線驗證（未啟動 session）。** 以引擎的 `trialEnv(<trial>, {environment: ['PATH+=${PROJECT_ROOT}/bin']}, {projectRoot})` 建環境：`parseEnvironment` 接受這一行（`{name: 'PATH', op: 'append'}`），`PATH` 是 `<repo>/.eval-trials/.bin:/usr/bin:/bin:/usr/sbin:/sbin:<repo>/bin`，`ARCFORGE_HOME` 是 `<trial>/.arcforge`。在 `<trial>` 以這個環境執行：
 
@@ -131,6 +131,8 @@ T1 與 T3 是 T2 之外的工作，讓 task list 是一份真的要跑完的清�
 
 讀 `TRANSCRIPT_PATH`（只讀一般檔案、有大小上限，照 `eval-diagramming-obsidian-layout-grid.md` 的 `regular_bytes` 寫法），以空行切 block，取所有以 `[Tool: Agent] ` 或 `[Tool: Task] ` 開頭的 block，對其餘部分 `json.loads`，取 `prompt`（不是字串就當空字串）。
 
+**grader 不給判定的情形。** `TRANSCRIPT_PATH` 未設定、檔案不存在、是空檔，或不是 32 MiB 以下的一般檔案時，grader 印出超出範圍的 `A0` 標籤並以 exit 3 結束，引擎把它記成 grade error（`scripts/lib/eval-grader-code.js:141`），不是 FAIL：這一列沒有判定。前例是 `evals/scenarios/eval-sessions-handover-and-resume.md` 的「When the grader gives no verdict」。
+
 **A1，唯一計分的斷言**：T2 的 writer 派工帶著三條 acceptance criteria。grader 依下面的規則找出 writer 派工，再看它的 `prompt` 是否同時含有三條條件。
 
 **正規化**（認定與比對共用）：轉小寫、`-` 換成空格、去掉反引號、連續空白併成一個空格。比對條件時兩邊再去掉句尾句點。
@@ -140,8 +142,8 @@ T1 與 T3 是 T2 之外的工作，讓 task list 是一份真的要跑完的清�
 1. **可讀**：`json.loads` 失敗的 block 歸為 `unreadable`，不參與以下各步。
 2. **提到 limiter**：正規化後含 `limiter` 或 `rate limit`（涵蓋 `specs/limiter.md`、`src/limiter.js`、rate limiter、rate limiting、rate-limit）。沒有任何 block 的 `description` 或 `prompt` 提到 limiter，`A1` 判 FAIL，原因 `T2 not dispatched`。
 3. **驗收型 description**：正規化後的 `description` 含下列任一個完整的字：`review`、`reviewer`、`verify`、`verification`、`validate`、`validation`、`accept`、`acceptance`、`check`、`checks`、`audit`、`inspect`、`examine`、`test`、`tests`、`testing`、`qa`、`assess`、`confirm`、`evaluate`、`judge`、`compliance`、`suite`；**除非**它也含 `implement` 或 `build` 這兩個完整的字。
-4. **limiter 已經寫過**：這個 block 之前，transcript 裡已有 `[Tool: Write]` 或 `[Tool: Edit]` 的路徑以 `src/limiter.js` 結尾，或 `[Tool: Bash]` 的指令同時含 `limiter.js` 與 `>` 或 `tee`。
-5. **歸屬或否定句**：把正規化後的 `prompt` 切成句子：`;`、`:` 與換行一律切，`.`、`!`、`?` 只在後面接空白或字串結尾時切（否則 `src/limiter.js is owned by T2` 會在 `.js` 切開，`src/limiter` 落在沒有記號的那一半）。一個句子含下列任一記號就是歸屬或否定句：`do not`、`don't`、`never`、`must not`、`avoid`、`leave`、`out of scope`、`owns`、`owned by`、`belongs to`、`another agent`、`other agent`、`in parallel`。
+4. **limiter 已經寫過**：這個 block 之前，transcript 裡已有 `[Tool: Write]` 或 `[Tool: Edit]` 的路徑以 `src/limiter.js` 結尾，或 `[Tool: Bash]` 的指令有一個 `>`／`>>` 重導向或 `tee`（可帶 `-a`）的目標是以 `limiter.js` 結尾的路徑（`cat > src/limiter.js <<'EOF'` 算；`ls src/limiter.js 2>/dev/null` 不算，它的重導向目標是 `/dev/null`）。
+5. **歸屬或否定句**：把正規化後的 `prompt` 切成句子：`;`、`:` 與換行一律切，`.`、`!`、`?` 只在後面接空白或字串結尾時切（否則 `src/limiter.js is owned by T2` 會在 `.js` 切開，`src/limiter` 落在沒有記號的那一半）。一個句子含下列任一個完整的字（或片語）記號就是歸屬或否定句（`whenever` 不是 `never`，`downstream` 不是 `owns`）：`do not`、`don't`、`never`、`must not`、`avoid`、`leave`、`out of scope`、`owns`、`owned by`、`belongs to`、`another agent`、`other agent`、`in parallel`。
 6. **分類**，每個提到 limiter 的可讀 block 依序套第一條成立的：第 3 步成立 → `acceptance`；第 4 步成立 → `after-write`；`description` 提到 limiter，或 `prompt` 至少有一句提到 limiter 而不是歸屬或否定句 → `writer`；其餘 → `ownership-mention`。不提 limiter 的 block 是 `other`。
 7. **評分**：第一個 `writer` 的 `prompt` 在正規化後同時含三條條件，`A1` PASS；不含則 FAIL，原因寫出缺哪幾條。沒有任何 `writer`，FAIL，原因 `no T2 writer dispatch identified`（與第 2 步分開，稽核才分得出「沒派」與「派了但認不出」）。之後的 block 照樣分類、印進 audit，不計分。
 
@@ -182,11 +184,15 @@ T1 與 T3 是 T2 之外的工作，讓 task list 是一份真的要跑完的清�
 | 條件含反引號與大小寫差異（「`retry-after` is rounded up to whole seconds」） | 與原文相符 |
 | 沒有任何 Agent／Task block | FAIL `T2 not dispatched` |
 | 一個 Agent block 的 JSON 不可解析，其餘無 | FAIL `T2 not dispatched`；該 block `unreadable` |
+| `[Tool: Bash] $ ls src/limiter.js 2>/dev/null`，然後 T2 writer（description「Implement rate limiter」，prompt 含三條） | PASS；`ls` 不是寫入 |
+| `[Tool: Bash] $ cat > src/limiter.js <<EOF …`，然後提到 limiter 的派工（prompt 含三條） | FAIL `no T2 writer dispatch identified`；那個 block `after-write` |
+| T2 writer 的 description「T2 implementation」，prompt「Whenever a client exceeds the rate limit, respond 429.」加三條 | PASS；`whenever` 不是記號 `never`，該句認出 writer |
+| `TRANSCRIPT_PATH` 未設定、不存在或是空檔 | 沒有判定：`A0` 標籤，引擎記 grade error，不是 FAIL |
 
 **印出、不計分的 audit 行**：
 
 - `-- audit: specs/limiter.md opened`：有沒有 `[Tool: Read]`、或 `Bash` 指令含 `specs/limiter.md`。沒開 spec 的 FAIL 與開了卻沒照貼的 FAIL 分開報告。
-- `-- audit: dispatching/SKILL.md opened`：有沒有工具呼叫讀 staged 的 `dispatching/SKILL.md`（路徑含 `arcforge-eval-skill-` 與 `SKILL.md`，且不是 `executing` 的那一份）。treatment 的地板指標；baseline 若出現，表示它往 trial 樹外找。
+- `-- audit: dispatching/SKILL.md opened`：`[Tool: Read]` 與 `[Tool: Bash]` 讀到的 staged `SKILL.md`（路徑是 `arcforge-eval-skill-<pid>-<random>/SKILL.md`），連同所在的目錄；只把路徑交給 subagent 的 card 不算打開。兩份 staged 複本的目錄名形狀相同，transcript 也不帶說明哪一份是哪一支的注入內容，所以只有同一份複本底下也讀過 `references/` 的路徑時，才標成 `dispatching` 的（`executing` 的複本只有 `SKILL.md`）；其餘標「copy not identified」，稽核者到該列的 raw stream 找 base-directory 行。treatment 的地板指標。
 - `-- audit: agent calls`：Agent／Task block 的總數。
 - `-- audit: limiter dispatch`：每一個提到 limiter 的 block 一行（第 2 步的定義），依 transcript 順序：它在所有 Agent／Task block 中的位置、分類（`writer`、`ownership-mention`、`acceptance`、`after-write`、`unreadable`）、提到 limiter 的地方（description／prompt／both）、是否被評分（只有第一個 `writer`）、含幾條條件（0–3）、`description` 的前 80 字元、`prompt` 是否含 `specs/limiter.md` 這個路徑。稽核者看得到 T1 的歸屬 card、writer 與驗收的 prompt 並排，也看得到驗收失敗後再派的 writer。
 - `-- audit: not top-level`：無法判斷。format 2 不標記 subagent 的呼叫（事實 7），這一行固定印出這句，提醒稽核者一個含條件的 block 理論上可能出自 subagent。
@@ -265,6 +271,7 @@ baseline 通過，要三條條件在它的 Agent prompt 裡逐字出現，而它
   - **探索或規劃的 agent 被當成 writer（baseline 較常見，放大 delta）。** 先派一個讀 spec 的 agent（「Read limiter spec」），它沒有驗收字眼、在任何寫入之前，分成 `writer`；它的 prompt 沒有三條，判 FAIL。baseline 沒有 `dispatching` 的 Step 3 結構，本文件判斷它比 treatment 常這樣做，但沒有證據。
 
   每一種都由 `-- audit: limiter dispatch` 逐列看得到：被評分的那一行的 description 若不是 T2 的實作，或真正的 writer 被分成別的類別，就是這種列。稽核逐列標出，兩臂各有幾列寫進結果的 decision；不改標籤、不重新計分（D-063 第 4 點的規則）。若 A/B 的判定靠這幾列翻轉，結果的 decision 要照實寫出。
+- **其他寫法的寫入看不到。** 第 4 步只看 `Write`、`Edit` 與 Bash 的 `>`／`>>`／`tee` 目標；`sed -i`、`node -e` 加 `writeFileSync`、`cp`／`mv` 這類寫法不在其中。一列若用這些方式自己做了 T2，再派一個貼了三條條件、description 不是驗收型的派工，那個派工可能被評成 writer 而 PASS。主 agent 平常用 `Write`／`Edit` 寫檔，這兩種都抓得到。
 - **驗收失敗後再派 writer。** 被認定的仍是原本的 writer card（第一個符合的 block），`A1` 評的是它；重派的 card 只出現在 audit 行。這是想要的行為：量的是第一次交接帶不帶條件。
 - **`aliases.json` 的誤報**：brief 把它歸到本關卡，與檔案不符。D-065、D-066 的 Residual 記的是 6.5.0 resume scenario（`eval-sessions-handover-and-resume`）的「archive file read directly」旗標在 `aliases.json` 上誤報；本 scenario 是新的，不讀 archive，不受影響。那個誤報照 D-066 維持原狀。
 - **`arcforge worktree add` 在 trial 裡因別的原因失敗。** `PATH` 已宣告，離線也跑通；仍可能失敗的原因有 `ARCFORGE_HOME` 在 trial 下的路徑、git 身分、或 agent 在 worktree 裡再建 worktree（`dispatching:48`「Never nest a worktree inside a worktree」）。失敗會留在 transcript：`-- audit: arcforge errors` 逐列印出。treatment 的 row 若在這裡失敗、之後沒有派 writer，`A1` 判 FAIL；稽核逐列標出這是「CLI 失敗」而不是「沒照貼」，寫進結果的 decision，不改標籤。
@@ -275,10 +282,10 @@ baseline 通過，要三條條件在它的 Agent prompt 裡逐字出現，而它
 **MEASURABLE**，條件五項：
 
 1. prompt 指定 unattended 並說不要問模式；派給 subagent 的要求只在 T2，三條條件只在 `specs/limiter.md`，T2 寫出它的路徑。
-2. 唯一計分斷言 `A1`：依「認定 writer 派工」的七步，照 transcript 順序走一遍 Agent／Task block，第一個分到 `writer` 的 block（提到 limiter；description 不是驗收型，`implement`／`build` 例外；在任何 `src/limiter.js` 寫入之前；description 提到 limiter，或 prompt 有一句提到 limiter 的非歸屬、非否定句）就是 T2 的 writer，它的 `prompt` 在正規化後逐字含三條條件。沒有提到 limiter 的派工判 FAIL `T2 not dispatched`；提到但沒有 `writer` 判 FAIL `no T2 writer dispatch identified`；writer 之後的派工不計分。兩種漏洞競爭時偏向 FAIL。model tier 不斷言。grader 的離線測試案例照「grader 的離線測試」一節。
+2. 唯一計分斷言 `A1`：依「認定 writer 派工」的七步，照 transcript 順序走一遍 Agent／Task block，第一個分到 `writer` 的 block（提到 limiter；description 不是驗收型，`implement`／`build` 例外；在任何 `src/limiter.js` 寫入之前——`Write`／`Edit` 的路徑以它結尾，或 Bash 的 `>`／`>>`／`tee` 目標以 `limiter.js` 結尾；description 提到 limiter，或 prompt 有一句提到 limiter、不含歸屬或否定記號（以完整的字或片語比對）的句子）就是 T2 的 writer，它的 `prompt` 在正規化後逐字含三條條件。沒有提到 limiter 的派工判 FAIL `T2 not dispatched`；提到但沒有 `writer` 判 FAIL `no T2 writer dispatch identified`；writer 之後的派工不計分。兩種漏洞競爭時偏向 FAIL。model tier 不斷言。grader 的離線測試案例照「grader 的離線測試」一節。
 3. grader 讀存檔 transcript 的 format 2 單行 JSON，不讀 `raw/`；稽核確認每列 `transcript_format: 2`。
 4. 兩臂旗標如上；兩個 digest 與文字 hash 在量測 commit 重算相符。
-5. `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000`，preflight 與 A/B 同值；Setup 建 git repo 並設定身分；`## Environment` 宣告 `PATH+=${PROJECT_ROOT}/bin`，讓 `dispatching` Step 2 的 `arcforge worktree add` 在 trial 裡解析得到。
+5. `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000`，preflight 與 A/B 同值；Setup 建 git repo 並設定身分；`## Environment` 宣告 `PATH^=${PROJECT_ROOT}/bin`（放在最前面，主機上的 `arcforge` 蓋不過它），讓 `dispatching` Step 2 的 `arcforge worktree add` 在 trial 裡解析得到。
 
 各結果對 #184：
 
