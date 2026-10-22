@@ -184,6 +184,7 @@ those rows per arm as the gate says; do not relabel or re-score.
 git init -q -b main
 git config user.email eval@example.com
 git config user.name "Eval Fixture"
+git config commit.gpgsign false
 mkdir -p src specs test
 cat > package.json <<'EOF'
 {
