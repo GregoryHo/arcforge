@@ -119,7 +119,7 @@ A scenario Setup that runs `git commit` in its fixture must run
 only a whitelist of variables, and `SSH_AUTH_SOCK` is not on it (#286).
 So if your `~/.gitconfig` turns signing on for `~/GitHub/` through an
 `includeIf`, the fixture under `.eval-trials/` inherits it, the Setup
-hangs on a signing passphrase, and every trial comes back `setup_failed`
+fails asking for a signing passphrase, and every trial comes back `setup_failed`
 before a session starts. That was 3/3 rows in 6.6.0's run 1, fixed in
 #317 (`evals/scenarios/eval-executing-dispatch-acceptance.md`) with the
 line `evals/scenarios/eval-sessions-handover-and-resume.md` already had.
