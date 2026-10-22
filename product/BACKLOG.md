@@ -106,6 +106,18 @@ playbook in [`product/AGENTS.md`](AGENTS.md).
 - ~~**eval-layout-grid-v2**~~ — graduated into 6.6.0 (D-066).
 - ~~**eval-transcript-full-tool-input**~~ — graduated into 6.5.1 (D-065).
 - ~~**eval-provider-limit-mid-trial**~~ — graduated into 6.5.1 (D-065).
+- **eval-trial-no-commit-signing** — a trial's built environment forwards no
+  `SSH_AUTH_SOCK` (#286, [eval](specs/eval.md) B-18). So on a host whose
+  `~/.gitconfig` signs commits, any scenario Setup that runs `git commit`
+  fails before a session starts. Either the trial environment neutralises the
+  operator's commit-signing config for every trial, or the eval guide requires
+  every Setup that commits to disable signing. Evidence: 6.6.0's run 1, 3/3
+  `setup_failed` at 0 sessions (`docs/plans/v6.6/wp-d/round.md`, D-069),
+  fixed for one scenario only by #317's one line. Of the 16 scenario files
+  that contain `git commit`, only 2 set `commit.gpgsign false`.
+  `eval-finishing-verify-before-options`'s Setup commits twice without it;
+  the other 13 are not yet checked for whether their `git commit` sits in
+  Setup.
 
 ## CLI
 

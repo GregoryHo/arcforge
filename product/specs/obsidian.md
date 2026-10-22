@@ -206,3 +206,8 @@ live behind the CLI per [cli](cli.md) B-8.
   three-line text in one row, scored on a 40 px gap, the baseline directory
   pinned at `0f3c574c1e448946`; a ceiling BLOCK closes #185 as a finding
   (B-10).
+- **D-069** — Version 2 BLOCKed at ceiling, baseline 3/3: given the old
+  reference, every baseline drew 180 px Primary boxes and widened the
+  200 px grid itself to gaps of 60 or 80 px, so #185 closes as a finding
+  after its second and last design, the current layout reference never
+  measured against the old; B-10 is unchanged (B-10).
