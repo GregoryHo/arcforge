@@ -99,3 +99,40 @@ repo because the plugin is disabled here" is a contributor fact. It
 belongs in this file, not in the `looping` skill, not in
 `scripts/lib/loop-session.js`, not in `docs/guide/`. The user-facing
 audience never encounters that situation.
+
+## Running a live eval from this checkout
+
+Write nothing inside the repository checkout while a live eval
+(`arcforge eval preflight`, `eval ab`, `eval run`) is running. The trial
+write guard (`scripts/lib/eval-trial-guard.js`) snapshots the project
+around every trial and attributes any change to that trial: the row comes
+back `trial_wrote_repo` with `infraError`, and the run stops. In the 6.6.0
+round this cost a rerun when the operator saved ledger notes into
+`docs/plans/` mid-trial (`docs/plans/v6.6/wp-d/round.md` run 3, D-069
+clause (4) in `product/ROADMAP.md`). Keep notes in a scratch directory
+outside the repo, or write them after the run ends. The guard skips only
+`.git`, `node_modules`, `.eval-trials/` and `evals/results/`; the engine
+writes `evals/preflight/` itself, between trials.
+
+A scenario Setup that runs `git commit` in its fixture must run
+`git config commit.gpgsign false` first. The trial environment forwards
+only a whitelist of variables, and `SSH_AUTH_SOCK` is not on it (#286).
+So if your `~/.gitconfig` turns signing on for `~/GitHub/` through an
+`includeIf`, the fixture under `.eval-trials/` inherits it, the Setup
+hangs on a signing passphrase, and every trial comes back `setup_failed`
+before a session starts. That was 3/3 rows in 6.6.0's run 1, fixed in
+#317 (`evals/scenarios/eval-executing-dispatch-acceptance.md`) with the
+line `evals/scenarios/eval-sessions-handover-and-resume.md` already had.
+As measured on 2026-10-22, 16 scenario files contain `git commit` and 2
+set `commit.gpgsign false`; not every one of the 16 commits in its
+Setup. The engine-side idea is the `eval-trial-no-commit-signing` wish in
+`product/BACKLOG.md`.
+
+An observation, not a problem to fix: Claude Code 2.1.296, installing
+the plugin from the GitHub-sourced marketplace, puts a `node_modules`
+directory (208 entries, per `docs/plans/v6.6/PLAN.md`) in the cache
+payload under `plugins/cache/arcforge-dev/arcforge/<version>/`. Neither
+the repo nor the marketplace clone has one, and arcforge needs no runtime
+dependency (*Zero External Dependencies* in
+`.claude/rules/architecture.md`). If you find it while inspecting a
+cached install, it is the host's doing, not ours.
