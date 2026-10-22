@@ -18,7 +18,7 @@ decision *and* every reversal. How to maintain this file: [`product/AGENTS.md`](
 | 6.4.0 | `v6.4.0` | session archive returns · daemon, write and counter races · grader isolation | **shipped** | v5's session archive, dropped at 6.0.0 without a record, returns as a sixth CLI group, `arcforge session` (`save`, `resume`, `list`, `alias`), over the engine modules that survived unexposed: an engine-written metrics header plus the handover file's five sections, written by the agent in-session, and the `sessions` skill learns to drive it (D-056). The engine fixes planned as 6.3.1 ride along — observer daemon starts and stops that can leave two daemons (#247, #252), the shared atomic-write helper's temporary-file race (#253), the diary tool counter that loses increments (#260), and code graders that can import from the trial directory (#250) — with the README naming `speccing` as the v5 pipeline's file-based replacement and two corrections to past CHANGELOG entries. A minor because it adds a CLI group; the round, capped at about 40 trial sessions, spent 29 and read the `sessions` skill's present-then-stop behaviour (B-11) at baseline 0/5 against treatment 5/5 and the router at 0/5 against 5/5 again, reproducing 6.3.0 — direction only, at k=5 on one fixture and one model each, for injected skill text — while the `diagramming-obsidian` verify-exit sentence already on `main` (#267) was found not measurable on the current engine and is recorded as a finding (D-055, D-057, D-058). | [cli](specs/cli.md) · [skill-system](specs/skill-system.md) · [learning](specs/learning.md) · [hooks](specs/hooks.md) · [eval](specs/eval.md) · [obsidian](specs/obsidian.md) |
 | 6.5.0 | `v6.5.0` | eval instrument debts · session continuity · four gated measurements | **shipped** | The debts two measurement rounds left on the eval instrument are paid first: one live eval per checkout becomes a lock the engine holds instead of a rule the operator keeps, preflight writes result rows under a label of its own, every row records the Node version and the scenario hash, the operator's `PATH` stops reaching trials and a scenario can declare its trial environment, and `eval compare` can skip the analyzer session. Two additions then open what 6.4.0's design gate found not measurable: a skill's files staged outside the trial tree, and an A/B between two skill texts (D-062). SessionStart names the project's newest session archive and the command that reads it — the promise D-031 withdrew, which 6.4.0's archive makes keepable — in one line, never the archive's contents (D-061), and the `sessions` body moves its reference material into its own `references/`. A minor because it adds hook behaviour and eval flags; the round, capped at about 80 trial sessions and run one scenario at a time, spent 32 and put each measurement behind an offline design gate: the `sessions` skill's present-then-stop behaviour (B-11), on an archive read through `arcforge session resume`, read baseline 0/5 against treatment 5/5 — direction only, at k=5 on one fixture and one model, for injected skill text — the `diagramming-obsidian` `references/` layout change (#185) was at ceiling in preflight and is recorded as a finding with no A/B, the trimmed `sessions` handover path did not regress with the skill's files staged, and the `executing` to `dispatching` handoff (#184) and the `diagramming-obsidian` verify-exit sentence were found not measurable before any session (D-059, D-063, D-064). | [eval](specs/eval.md) · [hooks](specs/hooks.md) · [skill-system](specs/skill-system.md) · [obsidian](specs/obsidian.md) · [cli](specs/cli.md) |
 | 6.5.1 | `v6.5.1` | instrument repairs · flaky tests · bounded transcript parse, no measurement | **shipped** | Repairs to the instrument 6.5.0's round left in debt: a transcript keeps an Agent call's whole input and marks a tool result the host flagged as an error, with the `Bash` exit code when the result text carries one, and each row records the transcript format it was written under; a provider limit that lands after the agent's tool calls is recognised by the shape of the session's last message and leaves every scored pool; each trial's raw stream-json is kept beside its run; a preflight rerun keeps the record it replaces; and an A/B's grading files are named per arm, so the two arms no longer overwrite each other. Four flaky tests are fixed at their causes and a fifth, a jest worker crash, gets a reproduction attempt; the diary transcript parse reads at most its last 8 MiB (#172); and the CLI guide names the commands that have no human format and print the same JSON with or without `--json`. No new flag or command, and nothing under `skills/`, `evals/scenarios/` or `evals/fixtures/`, so it ships as a patch without a live eval session (D-065). | [eval](specs/eval.md) · [hooks](specs/hooks.md) · [cli](specs/cli.md) |
-| 6.6.0 | — | second staged skill directory · #184 handoff scenario · #185 layout V2 · #256 block model · one measurement round | **next ← we are here** | An A/B's treatment can be given a second skill's directory beside the one it is injected with — staged the way the first is, and named in one line the way the host lists a skill that is available, its body never injected (D-067) — so the `executing` to `dispatching` handoff (#184), found not measurable for want of it, gets a scenario whose two arms are injected with the same `executing` text and differ only in whether `dispatching` is within reach. The `diagramming-obsidian` layout reference (#185) gets its second and last scenario design, a task in which the baseline reaches Primary-sized elements without the prompt naming a width; another ceiling BLOCK closes #185 as a finding. The `maintaining-obsidian` lint helpers' block model (#256) rides along on contract tests: it sits under `skills/`, so only a version with a measurement round can carry it. A minor because it adds an `arcforge eval` flag; the round is capped at about 45 trial sessions, 40 at worst, each measurement behind an offline design gate that comes before any session, and the `diagramming-obsidian` verify-exit sentence stays out of it — found not measurable twice, a third attempt deferred (D-066). | [eval](specs/eval.md) · [obsidian](specs/obsidian.md) · [skill-system](specs/skill-system.md) |
+| 6.6.0 | — | second staged skill directory · #184 handoff scenario · #185 layout V2 · #256 block model · one measurement round | **next ← we are here** | An A/B's treatment can be given a second skill's directory beside the one it is injected with — staged the way the first is, and named in one line the way the host lists a skill that is available, its body never injected (D-067) — so the `executing` to `dispatching` handoff (#184), found not measurable for want of it, gets a scenario whose two arms are injected with the same `executing` text and differ only in whether `dispatching` is within reach. The `diagramming-obsidian` layout reference (#185) gets its second and last scenario design, a task in which the baseline reaches Primary-sized elements without the prompt naming a width; another ceiling BLOCK closes #185 as a finding. The `maintaining-obsidian` lint helpers' block model (#256) rides along on contract tests: it sits under `skills/`, so only a version with a measurement round can carry it. A minor because it adds an `arcforge eval` flag; the round is capped at about 45 trial sessions, 40 at worst, each measurement behind an offline design gate that comes before any session, and the `diagramming-obsidian` verify-exit sentence stays out of it — found not measurable twice, a third attempt deferred (D-066, D-068). | [eval](specs/eval.md) · [obsidian](specs/obsidian.md) · [skill-system](specs/skill-system.md) |
 
 > Un-scheduled ideas live in the [Backlog](BACKLOG.md); a wish graduates into a
 > version (row + spec + Decision Log entry) when picked.
@@ -2835,3 +2835,120 @@ reverse one, append a superseding entry (see AGENTS.md).
   golden string; `eval preflight` with the flag, the flag without
   `--stage-skill-files`, and a directory with no `SKILL.md` are each
   refused. `npm run check:docs` holds the flag to the CLI manifest.
+
+### D-068 — 6.6.0's round: pre-registration, both gates MEASURABLE
+- Date: 2026-10-22
+- Version: 6.6.0
+- Refines: D-066
+- Status: Accepted
+- Decision: D-066's round is fixed as seven clauses, after its two design
+  gates and before any session of it. (1) Both gates end MEASURABLE, and
+  each gate's verdict section is the authority for its conditions. D1, the
+  `executing` to `dispatching` handoff (#184), is
+  `docs/plans/v6.6/wp-d/design-gate.executing-dispatching-v2.md` as on
+  `main` at `f6ddacb1` (amended in #315), section 「判定」, five
+  conditions: the prompt runs the list unattended and says not to ask for a
+  mode, T2 alone is handed to a subagent, and the three acceptance criteria
+  sit only in `specs/limiter.md`, whose path T2 names; the one scored
+  assertion scores the first block the gate's seven steps identify as T2's
+  writer, leaning to FAIL wherever two misreadings compete; the grader reads
+  the saved transcript's format 2 one-line JSON, not `raw/`, and the audit
+  confirms `transcript_format: 2` on every row; the arms' flags and the
+  digests in (4) hold at the measurement commit; and both commands run under
+  the 1800 s ceiling, the fixture builds a git repository with an identity,
+  and `## Environment` prepends `PATH^=${PROJECT_ROOT}/bin`, so
+  `dispatching`'s `arcforge worktree add` resolves inside the trial. D2,
+  `eval-diagramming-obsidian-layout-grid` Version 2 (#185), is
+  `docs/plans/v6.6/wp-d/design-gate.diagramming-layout-v2.md`, section
+  「判定與 #185」, four conditions: the gate's prompt, naming no width, with
+  description lines of at most 12 characters; one scored assertion, the six
+  worker boxes in one row with adjacent gaps of at least 40 px and each box's
+  `text` three lines whose first is the service's name; a two-text A/B on the
+  digests in (4); and Version 1's gate conditions (1), (3) and (4) as they
+  were. (2) D1 is `evals/scenarios/eval-executing-dispatch-acceptance.md`
+  Version 1, `## Trials` 5, scored by A1 alone: T2's writer dispatch carries
+  the three criteria word for word after normalisation. D2 is
+  `evals/scenarios/eval-diagramming-obsidian-layout-grid.md` Version 2,
+  `## Trials` 5, scored by A1 alone. Each preflight is k=3 (`PREFLIGHT_K`)
+  against `CEILING_THRESHOLD = 0.8` in `scripts/lib/eval-preflight.js`, so a
+  BLOCK needs 3/3 baseline passes; each A/B is 5 per arm. (3) Both items run
+  on `--model 'opus[1m]' --effort xhigh`, isolated, with no `--plugin-dir`,
+  and with `ARCFORGE_EVAL_TRIAL_TIMEOUT_MS=1800000` for preflight and A/B
+  alike, since the ceiling is in the preflight key. D1: both arms
+  `--stage-skill-files --baseline-skill-file skills/core/executing/SKILL.md`,
+  the treatment `--skill-file skills/core/executing/SKILL.md --also-stage
+  skills/core/dispatching`; the two texts are one (text hash
+  `17fa36f1535cb446`), so the arms differ only by the staged `dispatching`
+  copy and its listing line; every A/B row of both arms records
+  `alsoStaged: true` and the same `alsoStagedFilesHash`
+  ([eval](specs/eval.md) B-22); the preflight runs the baseline arm without
+  `--also-stage`. As D-066 says, this is the first A/B between two skill
+  texts the engine runs. D2: `--stage-skill-files --baseline-skill-file
+  <materialised>/SKILL.md`, the A/B adding `--skill-file
+  skills/core/diagramming-obsidian/SKILL.md`, the baseline directory being
+  the current skill directory with `references/layout-heuristics.md`
+  replaced by its `1fed56d0~1` text, assembled outside the repository as the
+  gate's execution plan describes; no `--also-stage`, and no D2 row records
+  `alsoStaged: true`. (4) The registered digests: D1, `executing`
+  `1ef6e3967679cf2b` and `dispatching` `9479e63210fdc2be`; D2, baseline
+  `0f3c574c1e448946` and current `42ec93e5d9d42cec`. Each, and D1's text
+  hash, is recomputed at the measurement commit before the first preflight;
+  any difference stops the round with no session spent and is registered
+  again in an entry that refines this one. (5) D1 runs first and D2 only
+  after D1 has ended, one live eval at a time under the run lock
+  ([eval](specs/eval.md) B-15). The cap is about 45 trial sessions: 26
+  nominal (6 preflight, 20 A/B); up to 8 for `INSUFFICIENT_DATA` top-ups,
+  `eval ab --k 1`, at most two per arm per item; up to 6 for preflight
+  infrastructure-error reruns, at most two in the round, shared; 40 at
+  worst. A preflight BLOCK at ceiling is a finding: no rerun, no A/B. An A/B
+  that would pass the cap is not started, and its k is not lowered. A
+  topped-up verdict is read with `eval compare` on the merged pool of the
+  scenario's Version. Each run's summary, a copy of its preflight record and
+  its per-row audit land in `docs/plans/v6.6/wp-d/`; after the round comes
+  `arcforge eval report`, and `git diff --stat <measurement commit>..HEAD --
+  skills evals/scenarios evals/fixtures` must be empty. The result is one
+  later decision in D-064's shape. (6) Dispositions. #184: a verdict the
+  engine reads, in either direction, closes it with the ledger link and what
+  the delta means for the handoff sentence; a D1 preflight BLOCK at ceiling
+  closes it as a finding. #185: a verdict closes it with the ledger link; a
+  D2 preflight BLOCK at ceiling closes it as a finding, Version 2 being its
+  second and last design (D-066). For either issue, an item not measured —
+  `INSUFFICIENT_DATA` that the top-ups do not recover, or a preflight still
+  without a usable record when the reruns are spent — leaves the issue open,
+  annotated "not measured in 6.6.0". "No model-tier field" is at ceiling in
+  both arms of D1 and is not asserted. (7) The result decision reports per
+  arm, from the audit lines and without changing a label or re-scoring a
+  row: in D1, rows whose scored block is not T2's writer; rows whose
+  staged-copy audit line cannot name which copy was read; writes of
+  `src/limiter.js` by means the grader cannot see (`sed -i`, `node -e`, `cp`
+  or `mv`); and `arcforge worktree add` failures inside the trial; in D2, how
+  many FAILs are the `text` format and how many the spacing.
+- Why: the gates left these choices to this entry. D1's gate assigns no
+  disposition for a D1 BLOCK or an unrecovered run, and D2's none for an
+  unrecovered run; D-066 named only a D2 BLOCK. A D1 BLOCK closes #184
+  because a baseline that pastes the criteria with no `dispatching` body in
+  reach leaves the sentence no delta to show. An unmeasured item stays open because an issue closes
+  only on a reading (D-059). D1's 1800 s ceiling is a condition its gate
+  adds and D-066 did not state: the treatment's `dispatching` path makes a
+  worktree and may dispatch an acceptance agent, so it runs longer, and a
+  killed trial never scores, which would lose rows in one arm more than the
+  other. The digests are recomputed because `alsoStagedFilesHash` does not
+  pool (B-22), so the recomputation is the only check that `dispatching` was
+  not edited before the round. The budget is D-066's arithmetic unchanged.
+  The residuals in (7) are the D1 gate's 「殘餘風險」 and D2's format-FAIL
+  count; each is visible only in an audit line, so it is counted, not
+  scored. This refines D-066 and reverses nothing.
+- Residual: every reading is direction only, at k=5 on one fixture and one
+  model, for injected skill text (D-059). D1's listing line imitates a host
+  listing and is not one (B-22), and a subagent's tool calls carry no marker
+  in the transcript, so a scored block may come from a subagent. D2 reads
+  the spacing of a plan, not a build, render or save.
+- Cost accepted: up to about 45 trial sessions, 40 in the worst case these
+  rules allow, every trial under an 1800 s ceiling, reported as
+  [eval](specs/eval.md) B-10 requires.
+- Verification: the two gates and two scenario files named above; the
+  digests and D1's text hash recomputed at the measurement commit; the
+  round's summaries, preflight records and per-row audits under
+  `docs/plans/v6.6/wp-d/`; and, before the tag, `node
+  scripts/check-benchmark-freshness.js` reporting OK after `eval report`,
+  with the `git diff --stat` in (5) empty.

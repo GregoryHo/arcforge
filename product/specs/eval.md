@@ -457,7 +457,13 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   it, since the preflight runs the baseline; the directory must contain a
   `SKILL.md` with a frontmatter `description`, which the listing line below
   carries in its parenthesis, and `eval ab` refuses a directory whose
-  `SKILL.md` has none. The listing line's `<name>` is the staged
+  `SKILL.md` has none. It also refuses a bare `--also-stage` or an empty
+  value, rather than running the A/B without the second directory, and a
+  run whose treatment skill text is empty, which would be injected as none
+  and stage nothing. The `description` must be a one-line plain or quoted
+  scalar with no inline comment; any other shape — a block scalar, a value
+  continued on the next line, an unclosed quote, an inline comment — is
+  refused, naming the shape, before any trial runs. The listing line's `<name>` is the staged
   directory's basename as given (resolved against the project root, not
   through symlinks), and the frontmatter `name` is not read: the skill schema makes the two equal
   ([skill-system](skill-system.md) B-1), and on a directory where they
@@ -620,3 +626,8 @@ its rationale is inline at B-10.
   treatment only, its line a stand-in for a host skill listing, with
   `alsoStaged` a pool condition and the preflight key unchanged (B-8,
   B-19, B-20, B-22).
+- **D-068** — 6.6.0's round, fixed after both gates ended MEASURABLE: D1's
+  two arms share one `executing` text and differ by the `dispatching` copy
+  `--also-stage` gives the treatment, both items run under an 1800 s
+  ceiling with their staged digests recomputed before the first preflight,
+  and the cap is about 45 sessions (B-3, B-10, B-15, B-20, B-22).
