@@ -101,7 +101,7 @@ PATH^=${PROJECT_ROOT}/bin
 | `arcforge worktree list --json` | 兩筆：`<trial>`（`kind: base`）與上面那個 worktree |
 | `git status --short` | `?? .arcforge/` |
 
-這次檢查的 `command -v git` 印出 `/opt/homebrew/bin/git`，與 B-18 說的「`git` 只在系統目錄」不符；`/usr/bin/git` 存在，原因可能是執行檢查的 shell，不是 trial 的環境，本文件沒有追。worktree 的結果不受影響。
+第一次檢查（2026-10-21，`PATH+=`）的 `command -v git` 印出 `/opt/homebrew/bin/git`，與 B-18 說的「`git` 只在系統目錄」不符。2026-10-22 的重跑印出 `/usr/bin/git`，所以第一次的讀數來自執行檢查的 shell，不是 trial 的環境。兩次的 worktree 結果相同。
 
 **worktree 在 trial 樹裡。** 路徑在 `<trial>/.arcforge/worktrees/` 下，`-- audit: outside the trial tree` 不會因它出現（它比對的是 trial 目錄以外的路徑），隔離不受影響，也不寫到專案根目錄（不觸發 `trial_wrote_repo`）。一個副作用：`.arcforge/` 在 trial repo 裡是未追蹤的目錄，agent 之後若在 trial 根目錄 `git add -A`，會碰到裡面的 worktree（git 把它當成嵌入的 repo 並警告）。這只會在 treatment 建了 worktree 之後發生，在 T2 的 writer 派工之後，不影響 `A1`。
 
