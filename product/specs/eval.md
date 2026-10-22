@@ -461,9 +461,17 @@ a behavioral claim about a skill ships with a measured delta, not a self-report.
   value, rather than running the A/B without the second directory, and a
   run whose treatment skill text is empty, which would be injected as none
   and stage nothing. The `description` must be a one-line plain or quoted
-  scalar with no inline comment; any other shape — a block scalar, a value
-  continued on the next line, an unclosed quote, an inline comment — is
-  refused, naming the shape, before any trial runs. The listing line's `<name>` is the staged
+  scalar with no inline comment, and the reader reads a subset of YAML's: a
+  plain value may not open with a YAML indicator (`-`, `?` and `:` run
+  straight into the text excepted) and may not hold `: `; a quoted value
+  must close on its line and may not hold its own quote character, doubled
+  or not, so `'it''s here'` is refused; a double-quoted value may carry only
+  the escapes `\\`, `\"` and `\t`, so `"caf\u00e9"` is refused as an escape
+  the reader does not read and `\n` as a second line; a `#` inside the
+  quotes is text. Any other shape — a block scalar, a value continued on
+  the next line, an unclosed quote, an inline comment, a quote or escape
+  the reader does not read — is refused, naming the shape, before any trial
+  runs. The listing line's `<name>` is the staged
   directory's basename as given (resolved against the project root, not
   through symlinks), and the frontmatter `name` is not read: the skill schema makes the two equal
   ([skill-system](skill-system.md) B-1), and on a directory where they
