@@ -199,6 +199,10 @@ asserted by test (B-3).
   one `executing` text in both arms, `dispatching` staged for the treatment
   alone, an offline design gate before any session; the outcome is a later
   entry (B-9).
+- **D-068** — the handoff's gate ended MEASURABLE: T2's writer dispatch is
+  scored on carrying the three acceptance criteria word for word, a ceiling
+  BLOCK closes #184 as a finding, and a run not measured leaves it open
+  (B-9).
 
 See the [ROADMAP Decision Log](../ROADMAP.md#decision-log).
 

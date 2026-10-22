@@ -202,3 +202,7 @@ live behind the CLI per [cli](cli.md) B-8.
   contract tests, gives the layout change (#185) its second and last
   scenario design, and leaves the verify-exit sentence out of the round
   (B-5, B-10).
+- **D-068** — Version 2's gate ended MEASURABLE: six peer services with
+  three-line text in one row, scored on a 40 px gap, the baseline directory
+  pinned at `0f3c574c1e448946`; a ceiling BLOCK closes #185 as a finding
+  (B-10).

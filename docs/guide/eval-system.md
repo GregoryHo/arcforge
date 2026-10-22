@@ -426,9 +426,11 @@ arcforge eval ab <name> --skill-file path/to/SKILL.md --stage-skill-files --also
 ```
 
 The directory must hold a `SKILL.md` whose frontmatter `description` is a
-one-line plain or quoted scalar with no inline comment. Any other shape, such as
-a block scalar (`description: >-`) or a value continued on the next line, is
-refused, naming the shape.
+one-line plain or quoted scalar with no inline comment, read as a subset of
+YAML: a quoted value may not hold its own quote character, doubled or not, and
+a double-quoted one carries only the escapes `\\`, `\"` and `\t`. Any other
+shape, such as a block scalar (`description: >-`), a value continued on the
+next line or `'it''s here'`, is refused, naming the shape.
 `--also-stage` is refused without `--stage-skill-files`, on a workflow-scope
 scenario, and on `eval preflight`, which runs the baseline. It is refused, too,
 with no directory after it or an empty one, and when the `--skill-file` text is
