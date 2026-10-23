@@ -1,6 +1,6 @@
 # skill-system — spec
 
-> Status: shipped v6.5.0 · extended by 6.6.0 (next) · [ROADMAP](../ROADMAP.md)
+> Status: shipped v6.6.0 · [ROADMAP](../ROADMAP.md)
 > Living document — keep in sync with the shipped behavior; record the *why* of any
 > change in the ROADMAP Decision Log.
 
