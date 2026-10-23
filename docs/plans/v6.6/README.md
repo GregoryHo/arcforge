@@ -12,5 +12,6 @@
 | [`wp-d/audit.d2.md`](wp-d/audit.d2.md) | D2 preflight 的逐列稽核：3/3 PASS、天花板 BLOCK，baseline 看出舊格線與 40 px 最小值的矛盾、自己放大欄距；格式與間距 FAIL 各 0 |
 | `wp-d/preflight.*.json` | preflight 紀錄複本：D1 run 1（`setup_failed`）、D1 run 2（BLOCK）、D2 run 4（BLOCK）；`-1`、`-2` 的 D2 紀錄是 Version 1 的，在 `../v6.5/wp-d/` |
 | [`post-release-6.5.1.md`](post-release-6.5.1.md) | 6.5.1 發版後查核（2026-10-22）：release、網站、GitHub 來源安裝、hook 從快取執行，以及每個出貨改動各一個探測 |
+| [`post-release-6.6.0.md`](post-release-6.6.0.md) | 6.6.0 發版後查核（2026-10-23）：release、網站、GitHub 來源安裝、hook 從快取執行，以及每個出貨改動各一個探測 |
 
 上一輪的規劃在 [`../v6.5/`](../v6.5/)。
