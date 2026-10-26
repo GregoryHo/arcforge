@@ -360,7 +360,8 @@ function spawnDiaryEnricher(draftPath, transcriptData, project) {
       '',
       'Write the enriched diary back to the same path.',
       'Keep auto-generated metrics sections unchanged.',
-      'Fill Completed, In Progress, Decisions, Challenges from the session context.',
+      'Fill Decisions Made, User Preferences Observed, What Worked Well, Challenges & Solutions,',
+      'Completed, In Progress and Context for Next Session from the session context.',
     ].join('\n');
 
     const systemPrompt =

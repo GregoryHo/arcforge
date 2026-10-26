@@ -537,4 +537,70 @@ process.stdout.write(String(min));`;
       expect(childCwd).toBe(fs.realpathSync(path.dirname(draftPath)));
     });
   });
+  // The prompt used to name four sections while the draft carries seven stubs,
+  // and Haiku 5.5 took the shorter list at its word: 7 of 17 enricher runs on
+  // 2026-10-12 wrote the draft back with User Preferences Observed, What Worked
+  // Well and Context for Next Session still TO BE ENRICHED. The stub sections
+  // are read from a real draft so the two lists cannot drift apart again.
+  describe('enricher prompt', () => {
+    let binDir;
+    let savedPath;
+
+    beforeEach(() => {
+      binDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diary-capture-prompt-'));
+      savedPath = process.env.PATH;
+      process.env.PATH = `${binDir}${path.delimiter}${savedPath}`;
+      // Stub `claude` that keeps the prompt it was piped. stdin is drained in
+      // full before the file is renamed into place, so the poller never reads
+      // a prompt that is still being written.
+      const promptFile = path.join(binDir, 'prompt.txt');
+      fs.writeFileSync(
+        path.join(binDir, 'claude'),
+        `#!/bin/sh\ncat > "${promptFile}.tmp"\nmv "${promptFile}.tmp" "${promptFile}"\n`,
+        { mode: 0o755 },
+      );
+    });
+
+    afterEach(() => {
+      process.env.PATH = savedPath;
+      fs.rmSync(binDir, { recursive: true, force: true });
+    });
+
+    async function recordedPrompt(timeoutMs) {
+      const file = path.join(binDir, 'prompt.txt');
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        if (fs.existsSync(file)) return fs.readFileSync(file, 'utf-8');
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      return null;
+    }
+
+    it('names every section the generated draft leaves TO BE ENRICHED', async () => {
+      const { generateDraft } = require('../../scripts/lib/auto-diary');
+      const { spawnDiaryEnricher } = require('../../scripts/lib/diary-capture');
+      const draft = generateDraft('demo', '2026-06-14', 'diary-capture-session');
+
+      // Every `## Heading` whose body carries a TO BE ENRICHED stub.
+      const lines = draft.split('\n');
+      const stubbed = [];
+      let heading = null;
+      for (const line of lines) {
+        if (line.startsWith('## ')) heading = line.slice(3);
+        else if (line.includes('TO BE ENRICHED') && heading) stubbed.push(heading);
+      }
+      expect(stubbed.length).toBeGreaterThan(0);
+
+      const draftPath = path.join(homeDir, '.arcforge', 'diaries', 'demo', '2026-06-14', 'd.md');
+      fs.mkdirSync(path.dirname(draftPath), { recursive: true });
+      fs.writeFileSync(draftPath, draft);
+
+      spawnDiaryEnricher(draftPath, { userMessages: [] }, 'demo');
+      const prompt = await recordedPrompt(5000);
+      expect(prompt).not.toBeNull();
+
+      const missing = stubbed.filter((section) => !prompt.includes(section));
+      expect(missing).toEqual([]);
+    });
+  });
 });
